@@ -110,6 +110,23 @@ function note(message, kind) {
   return `<p class="note ${kind === "ok" ? "note-ok" : "note-bad"}" role="status">${esc(message)}</p>`;
 }
 
+function flashOf(message) {
+  if (message && typeof message === "object") {
+    return { text: String(message.text ?? ""), kind: message.kind === "bad" ? "bad" : "ok" };
+  }
+  return { text: String(message ?? ""), kind: "ok" };
+}
+
+function signedWhen(article, when) {
+  return article.authorName ? `${when} · ${article.authorName}` : when;
+}
+
+function articleMeta(article) {
+  const base = signedWhen(article, formatLong(article.createdOn));
+  const mark = article.redacted ? ` · <span class="redigovano">Redigováno</span>` : "";
+  return `<p class="meta">${esc(base)}${mark}</p>`;
+}
+
 export function homePage(data, ctx) {
   const lead = data.articles[0];
   const rest = data.articles.slice(1, 4);
@@ -120,7 +137,7 @@ export function homePage(data, ctx) {
         <p class="kicker">${esc(catLabel(ctx.copy, lead.category))}</p>
         <h3>${esc(lead.title)}</h3>
         <p class="muted">${esc(lead.excerpt)}</p>
-        <p class="meta">${esc(formatDayMonth(lead.createdOn))}</p>
+        <p class="meta">${esc(signedWhen(lead, formatDayMonth(lead.createdOn)))}</p>
       </a>`
     : `<p class="card muted">${esc(tx(ctx.copy, "empty_articles"))}</p>`;
   const restHtml = rest
@@ -198,7 +215,7 @@ export function newsPage(data, ctx, rubrika) {
             <p class="kicker">${esc(catLabel(ctx.copy, article.category))}</p>
             <h2>${esc(article.title)}</h2>
             <p class="muted">${esc(article.excerpt)}</p>
-            <p class="meta">${esc(formatDayMonth(article.createdOn))}</p>
+            <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
           </a>`,
         )
         .join("")
@@ -220,7 +237,7 @@ export function articlePage(article, ctx) {
       <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
       <p class="eyebrow">${esc(catLabel(ctx.copy, article.category))}</p>
       <h1 class="article-title">${esc(article.title)}</h1>
-      <p class="meta">${esc(formatLong(article.createdOn))}</p>
+      ${articleMeta(article)}
       ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
       <div class="prose">${paragraphs(article.body)}</div>`,
   });
@@ -342,6 +359,7 @@ function field(label, control) {
 const input = "control";
 
 function adminShell(ctx, data, tab, message, inner) {
+  const flash = flashOf(message);
   if (!data.signedIn) {
     return layout({
       ...ctx,
@@ -352,33 +370,45 @@ function adminShell(ctx, data, tab, message, inner) {
         <section class="card login">
           <p class="eyebrow">Administrace</p>
           <h1>Redakce</h1>
-          <p class="muted">Sem se dostane jen ten, kdo stránku vede. Návštěvníci obsah jen čtou.</p>
+          <p class="muted">Hlavní redaktor a přispěvatelé. Návštěvníci obsah jen čtou.</p>
           ${
             data.showDefaultPassword
-              ? `<p class="banner">Výchozí heslo je Drbna2026. Po přihlášení si ho změňte.</p>`
+              ? `<p class="banner">Výchozí přihlášení je jméno redakce a heslo Drbna2026. Po vstupu si ho změňte.</p>`
               : ""
           }
           <form method="post" action="/redakce/prihlasit">
+            ${field("Přihlašovací jméno", `<input class="${input}" name="login" autocomplete="username" autocapitalize="none" required>`)}
             ${field("Heslo", `<input class="${input}" type="password" name="password" autocomplete="current-password" required>`)}
             <button class="btn btn-primary" type="submit">Vstoupit</button>
-            ${note(message, "bad")}
+            ${note(flash.text, "bad")}
           </form>
         </section>`,
     });
   }
 
-  const tabs = [
-    ["/redakce/zpravy", "zpravy", "Zprávy"],
-    ["/redakce/akce", "akce", "Akce"],
-    ["/redakce/texty", "texty", "Texty"],
-    ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
-    ["/redakce/heslo", "heslo", "Heslo"],
-  ]
+  const chief = data.user?.role === "hlavni";
+  const waiting = (data.proposals ?? []).filter((item) => item.status === "pending").length;
+  const newsLabel = chief && waiting ? `Zprávy (${waiting})` : "Zprávy";
+  const tabs = chief
+    ? [
+        ["/redakce/zpravy", "zpravy", newsLabel],
+        ["/redakce/akce", "akce", "Akce"],
+        ["/redakce/texty", "texty", "Texty"],
+        ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
+        ["/redakce/lide", "lide", "Lidé"],
+        ["/redakce/heslo", "heslo", "Heslo"],
+      ]
+    : [
+        ["/redakce/zpravy", "zpravy", "Zprávy"],
+        ["/redakce/heslo", "heslo", "Heslo"],
+      ];
+  const tabHtml = tabs
     .map(
       ([href, id, label]) =>
         `<a class="btn ${tab === id ? "btn-ink" : "btn-line"}" href="${href}">${label}</a>`,
     )
     .join("");
+  const who = chief ? "hlavní redaktor" : "přispěvatel";
   return layout({
     ...ctx,
     path: "/redakce",
@@ -387,26 +417,63 @@ function adminShell(ctx, data, tab, message, inner) {
     script: `<script src="/editor.js" defer></script>`,
     body: `
       <div class="admin-head">
-        <div><p class="eyebrow">Administrace</p><h1>Redakce</h1></div>
+        <div>
+          <p class="eyebrow">Administrace</p>
+          <h1>Redakce</h1>
+          <p class="muted">${esc(data.user?.name ?? "")} · ${who}</p>
+        </div>
         <form method="post" action="/redakce/odhlasit"><button class="btn btn-line" type="submit">Odhlásit</button></form>
       </div>
-      ${data.showDefaultPassword ? `<p class="banner">Pořád platí výchozí heslo. V záložce Heslo si nastavte vlastní.</p>` : ""}
-      <div class="row">${tabs}</div>
-      ${note(message, message?.startsWith("Heslo nesedí") || message?.startsWith("Doplňte") || message?.startsWith("Nové") || message?.startsWith("Současné") || message?.startsWith("Fotka") || message?.startsWith("Interval") || message?.startsWith("Vyberte") || message?.startsWith("Přihlaste") || message?.startsWith("Texty se") || message?.startsWith("Adresa") ? "bad" : "ok")}
+      ${
+        chief && data.showDefaultPassword
+          ? `<p class="banner">Pořád platí výchozí heslo. V záložce Heslo si nastavte vlastní.</p>`
+          : ""
+      }
+      <div class="row">${tabHtml}</div>
+      ${note(flash.text, flash.kind)}
       ${inner}`,
   });
 }
 
-export function adminArticles(ctx, data, message, editingId, confirmId) {
-  const editing = data.articles.find((item) => item.id === editingId) ?? null;
-  const options = CATEGORIES.map(
+function categoryOptions(ctx, selected) {
+  return CATEGORIES.map(
     (category) =>
-      `<option value="${esc(category)}"${editing?.category === category || (!editing && category === "Zprávy") ? " selected" : ""}>${esc(catLabel(ctx.copy, category))}</option>`,
+      `<option value="${esc(category)}"${selected === category ? " selected" : ""}>${esc(catLabel(ctx.copy, category))}</option>`,
   ).join("");
+}
+
+function articleFields(ctx, source) {
+  const selected = source?.category ?? "Zprávy";
+  return `
+    ${field("Nadpis", `<input class="${input}" name="title" required maxlength="160" value="${esc(source?.title ?? "")}">`)}
+    ${field("Perex", `<textarea class="${input}" name="excerpt" required maxlength="320" rows="3">${esc(source?.excerpt ?? "")}</textarea>`)}
+    ${field("Text", `<textarea class="${input}" name="body" required maxlength="12000" rows="8">${esc(source?.body ?? "")}</textarea>`)}
+    ${field("Rubrika", `<select class="${input}" name="category">${categoryOptions(ctx, selected)}</select>`)}
+    ${field("Fotka", photoControl(source))}`;
+}
+
+function proposalKind(item) {
+  return item.articleId ? "Návrh úpravy" : "Nový příspěvek";
+}
+
+function chiefArticles(ctx, data, message, query) {
+  const proposal = data.proposals.find((item) => item.id === query.proposalId) ?? null;
+  const editing = proposal ? null : (data.articles.find((item) => item.id === query.editingId) ?? null);
+  const queue = data.proposals
+    .map(
+      (item) => `<li class="card">
+        <p class="kicker">${proposalKind(item)} · ${esc(item.authorName)}</p>
+        <h3>${esc(item.title)}</h3>
+        <p class="muted">${esc(item.excerpt)}</p>
+        ${item.articleTitle ? `<p class="meta">Ke zprávě: ${esc(item.articleTitle)}</p>` : ""}
+        <div class="row"><a class="btn btn-line" href="/redakce/zpravy?navrh=${item.id}">Otevřít</a></div>
+      </li>`,
+    )
+    .join("");
   const list = data.articles
     .map((item) => {
       const confirm =
-        confirmId === item.id
+        query.confirmId === item.id
           ? `<form method="post" action="/redakce/zpravy/smazat">
               <input type="hidden" name="id" value="${item.id}">
               <input type="hidden" name="confirm" value="1">
@@ -415,7 +482,7 @@ export function adminArticles(ctx, data, message, editingId, confirmId) {
             <a class="btn btn-ghost" href="/redakce/zpravy">Nechat</a>`
           : `<a class="btn btn-ghost" href="/redakce/zpravy?smazat=${item.id}">Smazat</a>`;
       return `<li class="card">
-        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${item.published ? "" : " · skrytá"}</p>
+        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${item.authorName ? ` · ${esc(item.authorName)}` : ""}${item.published ? "" : " · skrytá"}${item.redacted ? " · redigováno" : ""}</p>
         <h3>${esc(item.title)}</h3>
         <div class="row">
           <a class="btn btn-line" href="/redakce/zpravy?id=${item.id}">Upravit</a>
@@ -424,27 +491,189 @@ export function adminArticles(ctx, data, message, editingId, confirmId) {
       </li>`;
     })
     .join("");
-  const form = `<form class="card form" method="post" action="/redakce/zpravy/ulozit" enctype="multipart/form-data">
-    <h2>${editing ? "Upravit zprávu" : "Nová zpráva"}</h2>
-    ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
-    ${field("Nadpis", `<input class="${input}" name="title" required maxlength="160" value="${esc(editing?.title ?? "")}">`)}
-    ${field("Perex", `<textarea class="${input}" name="excerpt" required maxlength="320" rows="3">${esc(editing?.excerpt ?? "")}</textarea>`)}
-    ${field("Text", `<textarea class="${input}" name="body" required maxlength="12000" rows="8">${esc(editing?.body ?? "")}</textarea>`)}
-    ${field("Rubrika", `<select class="${input}" name="category">${options}</select>`)}
-    ${field("Fotka", photoControl(editing))}
-    <label class="check"><input type="checkbox" name="published" value="1"${editing ? (editing.published ? " checked" : "") : " checked"}> Zveřejnit</label>
-    <div class="row">
-      <button class="btn btn-primary" type="submit">Uložit</button>
-      ${editing ? `<a class="btn btn-ghost" href="/redakce/zpravy">Nová</a>` : ""}
-    </div>
-  </form>`;
+  const form = proposal
+    ? `<div class="stack"><form class="card form" method="post" action="/redakce/zpravy/schvalit" enctype="multipart/form-data">
+        <h2>${proposal.articleId ? "Schválit úpravu" : "Schválit příspěvek"}</h2>
+        <p class="muted">Autor na webu: ${esc(proposal.authorName)}. Text můžete před schválením upravit, typicky češtinu. Ven se neukáže, co se měnilo. Když se znění liší od návrhu, u autora bude nanejvýš slovo Redigováno.</p>
+        ${proposal.articleTitle ? `<p class="meta">Ke zprávě: ${esc(proposal.articleTitle)}</p>` : ""}
+        <input type="hidden" name="id" value="${proposal.id}">
+        ${articleFields(ctx, proposal)}
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Schválit a zveřejnit</button>
+          <a class="btn btn-ghost" href="/redakce/zpravy">Zpět</a>
+        </div>
+      </form>
+      <form class="card form" method="post" action="/redakce/zpravy/vratit">
+        <input type="hidden" name="id" value="${proposal.id}">
+        ${field("Poznámka pro autora", `<textarea class="${input}" name="note" maxlength="400" rows="3" placeholder="Co má dopracovat. Může zůstat prázdné."></textarea>`)}
+        <button class="btn btn-line" type="submit">Vrátit</button>
+      </form></div>`
+    : `<form class="card form" method="post" action="/redakce/zpravy/ulozit" enctype="multipart/form-data">
+        <h2>${editing ? "Upravit zprávu" : "Nová zpráva"}</h2>
+        <p class="muted">${
+          !editing
+            ? `Jde na web hned a podepíše se jménem ${esc(data.user?.name ?? "Redakce")}.`
+            : editing.authorName && editing.authorId !== data.user?.id
+              ? `Autor zůstává ${esc(editing.authorName)}. Když změníte text, na webu se objeví nanejvýš slovo Redigováno.`
+              : "Úprava jde na web hned."
+        }</p>
+        ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
+        ${articleFields(ctx, editing)}
+        <label class="check"><input type="checkbox" name="published" value="1"${editing ? (editing.published ? " checked" : "") : " checked"}> Zveřejnit</label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Uložit</button>
+          ${editing ? `<a class="btn btn-ghost" href="/redakce/zpravy">Nová</a>` : ""}
+        </div>
+      </form>`;
+  const queueHtml = queue
+    ? `<section class="block"><h2>Ke schválení</h2><ul class="stack plain">${queue}</ul></section>`
+    : "";
   return adminShell(
     ctx,
     data,
     "zpravy",
     message,
-    `<div class="split">${form}<ul class="stack plain">${list}</ul></div>`,
+    `${queueHtml}<div class="split">${form}<ul class="stack plain">${list}</ul></div>`,
   );
+}
+
+function contributorArticles(ctx, data, message, query) {
+  const opened = data.proposals.find((item) => item.id === query.proposalId) ?? null;
+  const target = data.articles.find((item) => item.id === query.targetId) ?? null;
+  const existingForTarget = target
+    ? (data.proposals.find((item) => item.articleId === target.id) ?? null)
+    : null;
+  const proposal = opened ?? existingForTarget;
+  const source = proposal ?? target;
+  const linked = data.articles.find((item) => item.id === (proposal?.articleId ?? target?.id)) ?? null;
+  const editingArticle = Boolean(proposal?.articleId || target);
+  const mine = Boolean(linked && linked.authorId === data.user?.id);
+  const heading = !editingArticle
+    ? proposal
+      ? "Váš příspěvek"
+      : "Nový příspěvek"
+    : mine
+      ? "Úprava vaší zprávy"
+      : "Návrh úpravy";
+  const help = !editingArticle
+    ? `Na web to přijde, až to schválí hlavní redaktor. Do té doby to tu můžete měnit. Podepíše se jménem ${esc(data.user?.name ?? "")}.`
+    : mine
+      ? "Veřejné znění se nezmění, dokud úpravu neschválí hlavní redaktor."
+      : "Cizí zprávu nejde přepsat přímo. Tohle je návrh a rozhodne o něm hlavní redaktor. Autor zůstane ten původní.";
+  const formSource = source ? { ...source, imageKey: source.imageKey || linked?.imageKey || null } : null;
+  const returned = proposal?.status === "rejected" && proposal.note
+    ? `<p class="banner">${esc(proposal.note)}</p>`
+    : proposal?.status === "rejected"
+      ? `<p class="banner">Hlavní redaktor návrh vrátil. Upravte ho a pošlete znovu.</p>`
+      : "";
+  const form = `<form class="card form" method="post" action="/redakce/zpravy/navrh" enctype="multipart/form-data">
+    <h2>${heading}</h2>
+    <p class="muted">${help}</p>
+    ${returned}
+    ${proposal ? `<input type="hidden" name="id" value="${proposal.id}">` : ""}
+    ${target && !proposal ? `<input type="hidden" name="clanek" value="${target.id}">` : ""}
+    ${proposal?.articleId ? `<input type="hidden" name="clanek" value="${proposal.articleId}">` : ""}
+    ${articleFields(ctx, formSource)}
+    <div class="row">
+      <button class="btn btn-primary" type="submit">${proposal ? "Uložit návrh" : target ? "Poslat návrh" : "Poslat ke schválení"}</button>
+      ${proposal || target ? `<a class="btn btn-ghost" href="/redakce/zpravy">Nový</a>` : ""}
+    </div>
+  </form>`;
+  const own = data.proposals
+    .map((item) => {
+      const confirm =
+        query.withdrawId === item.id
+          ? `<form method="post" action="/redakce/zpravy/stahnout">
+              <input type="hidden" name="id" value="${item.id}">
+              <input type="hidden" name="confirm" value="1">
+              <button class="btn btn-primary" type="submit">Opravdu stáhnout</button>
+            </form>
+            <a class="btn btn-ghost" href="/redakce/zpravy">Nechat</a>`
+          : `<a class="btn btn-ghost" href="/redakce/zpravy?stahnout=${item.id}">Stáhnout</a>`;
+      const state = item.status === "rejected" ? "Vráceno" : "Čeká na schválení";
+      return `<li class="card">
+        <p class="kicker">${proposalKind(item)} · ${state}</p>
+        <h3>${esc(item.title)}</h3>
+        ${item.note ? `<p class="muted">${esc(item.note)}</p>` : ""}
+        <div class="row">
+          <a class="btn btn-line" href="/redakce/zpravy?navrh=${item.id}">Upravit</a>
+          ${confirm}
+        </div>
+      </li>`;
+    })
+    .join("");
+  const published = data.articles
+    .map((item) => {
+      const mine = item.authorId === data.user?.id;
+      const open = data.proposals.find((proposal) => proposal.articleId === item.id);
+      const href = open ? `/redakce/zpravy?navrh=${open.id}` : `/redakce/zpravy?clanek=${item.id}`;
+      return `<li class="card">
+        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${item.authorName ? ` · ${esc(item.authorName)}` : ""}${mine ? " · vaše" : ""}</p>
+        <h3>${esc(item.title)}</h3>
+        <div class="row"><a class="btn btn-line" href="${href}">${mine ? "Upravit" : "Navrhnout úpravu"}</a></div>
+      </li>`;
+    })
+    .join("");
+  const side = `
+    <section class="block"><h2>Vaše návrhy</h2>${own ? `<ul class="stack plain">${own}</ul>` : `<p class="card dashed muted">Zatím tu nic nečeká.</p>`}</section>
+    <section class="block"><h2>Zprávy na webu</h2><ul class="stack plain">${published}</ul></section>`;
+  return adminShell(ctx, data, "zpravy", message, `<div class="split">${form}<div class="stack">${side}</div></div>`);
+}
+
+export function adminArticles(ctx, data, message, query = {}) {
+  if (data.user?.role === "hlavni") return chiefArticles(ctx, data, message, query);
+  return contributorArticles(ctx, data, message, query);
+}
+
+export function adminPeople(ctx, data, message, disableId) {
+  const list = data.users
+    .map((person) => {
+      const role = person.role === "hlavni" ? "hlavní redaktor" : "přispěvatel";
+      const state = person.active ? "" : " · vypnutý";
+      let controls = "";
+      if (person.role !== "hlavni") {
+        controls = person.active
+          ? disableId === person.id
+            ? `<form method="post" action="/redakce/lide/stav">
+                <input type="hidden" name="id" value="${person.id}">
+                <input type="hidden" name="active" value="0">
+                <button class="btn btn-primary" type="submit">Opravdu vypnout</button>
+              </form>
+              <a class="btn btn-ghost" href="/redakce/lide">Nechat</a>`
+            : `<a class="btn btn-ghost" href="/redakce/lide?vypnout=${person.id}">Vypnout</a>`
+          : `<form method="post" action="/redakce/lide/stav">
+              <input type="hidden" name="id" value="${person.id}">
+              <input type="hidden" name="active" value="1">
+              <button class="btn btn-line" type="submit">Zapnout</button>
+            </form>`;
+      }
+      const password =
+        person.role === "hlavni"
+          ? ""
+          : `<form class="form" method="post" action="/redakce/lide/heslo">
+              <input type="hidden" name="id" value="${person.id}">
+              ${field("Nové heslo", `<input class="${input}" type="password" name="next" minlength="8" required autocomplete="new-password">`)}
+              <button class="btn btn-line" type="submit">Nastavit heslo</button>
+            </form>`;
+      return `<li class="card">
+        <p class="kicker">${role}${state}</p>
+        <h3>${esc(person.name)}</h3>
+        <p class="muted">${esc(person.login)}</p>
+        <div class="row">${controls}</div>
+        ${password}
+      </li>`;
+    })
+    .join("");
+  const form = `<form class="card form" method="post" action="/redakce/lide/ulozit">
+    <h2>Nový přispěvatel</h2>
+    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění.</p>
+    ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" autocomplete="off">`)}
+    ${field("Přihlašovací jméno", `<input class="${input}" name="login" required minlength="3" maxlength="32" autocapitalize="none" autocomplete="off">`)}
+    <span class="hint">Malá písmena a číslice, bez mezer. Třeba jana.</span>
+    ${field("Heslo", `<input class="${input}" type="password" name="password" required minlength="8" autocomplete="new-password">`)}
+    <button class="btn btn-primary" type="submit">Přidat</button>
+  </form>`;
+  return adminShell(ctx, data, "lide", message, `<div class="split">${form}<ul class="stack plain">${list}</ul></div>`);
 }
 
 export function adminTexts(ctx, data, message) {
@@ -551,8 +780,14 @@ export function adminSite(ctx, data, message) {
 }
 
 export function adminPassword(ctx, data, message) {
-  const form = `<form class="card form narrow" method="post" action="/redakce/heslo/ulozit">
-    <h2>Heslo redakce</h2>
+  const form = `<form class="card form narrow" method="post" action="/redakce/jmeno/ulozit">
+    <h2>Jméno pod článkem</h2>
+    <p class="muted">Tak se podepíšou nové příspěvky. Už zveřejněné zprávy si nechají jméno, se kterým šly ven.</p>
+    ${field("Jméno", `<input class="${input}" name="name" required maxlength="60" value="${esc(data.user?.name ?? "")}">`)}
+    <button class="btn btn-primary" type="submit">Uložit jméno</button>
+  </form>
+  <form class="card form narrow" method="post" action="/redakce/heslo/ulozit">
+    <h2>Heslo</h2>
     ${field("Současné heslo", `<input class="${input}" type="password" name="current" autocomplete="current-password" required>`)}
     ${field("Nové heslo", `<input class="${input}" type="password" name="next" autocomplete="new-password" minlength="8" required>`)}
     <button class="btn btn-primary" type="submit">Změnit heslo</button>

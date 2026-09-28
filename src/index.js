@@ -1,6 +1,9 @@
 import {
+  approveProposal,
   changePassword,
   clearCookie,
+  createContributor,
+  ensureSchema,
   loadAdmin,
   loadArticle,
   loadCopy,
@@ -8,19 +11,26 @@ import {
   login,
   logout,
   media,
+  rejectProposal,
   removeArticle,
   removeEvent,
   saveArticle,
   saveCopy,
+  saveDisplayName,
   saveEvent,
+  saveProposal,
   saveSite,
   sessionCookie,
+  setContributorActive,
+  setContributorPassword,
+  withdrawProposal,
 } from "./db.js";
 import {
   aboutPage,
   adminArticles,
   adminEvents,
   adminPassword,
+  adminPeople,
   adminSite,
   adminTexts,
   articlePage,
@@ -44,6 +54,16 @@ const OK = {
   web: "Svoz a kontakt jsou uložené.",
   texty: "Texty jsou uložené.",
   heslo: "Heslo je změněné.",
+  jmeno: "Jméno na webu je uložené.",
+  navrh: "Návrh čeká na schválení.",
+  "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
+  "navrh-stazen": "Návrh je stažený.",
+  schvaleno: "Příspěvek je schválený a na webu.",
+  vraceno: "Návrh je vrácený autorovi.",
+  clovek: "Přispěvatel má účet.",
+  "clovek-vypnut": "Účet je vypnutý.",
+  "clovek-zapnut": "Účet je zase aktivní.",
+  "clovek-heslo": "Heslo přispěvatele je nastavené.",
 };
 
 function secure(request) {
@@ -83,21 +103,15 @@ function ctxFor(request, path) {
 }
 
 function messageFrom(url) {
-  const ok = url.searchParams.get("ok");
   const chyba = url.searchParams.get("chyba");
-  if (chyba) return chyba;
-  if (ok && OK[ok]) return OK[ok];
-  return "";
+  if (chyba) return { text: chyba, kind: "bad" };
+  const ok = url.searchParams.get("ok");
+  if (ok && OK[ok]) return { text: OK[ok], kind: "ok" };
+  return { text: "", kind: "ok" };
 }
 
-function idParam(url) {
-  const raw = url.searchParams.get("id");
-  const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : undefined;
-}
-
-function confirmParam(url) {
-  const id = Number(url.searchParams.get("smazat"));
+function positiveParam(url, name) {
+  const id = Number(url.searchParams.get(name));
   return Number.isInteger(id) && id > 0 ? id : undefined;
 }
 
@@ -118,6 +132,11 @@ async function formFields(request) {
     startsTime: text("startsTime"),
     description: text("description"),
     password: text("password"),
+    login: text("login"),
+    name: text("name"),
+    note: text("note"),
+    active: text("active"),
+    articleId: Number.isInteger(Number(text("clanek"))) && Number(text("clanek")) > 0 ? Number(text("clanek")) : undefined,
     current: text("current"),
     next: text("next"),
     contactNote: text("contactNote"),
@@ -186,10 +205,25 @@ async function renderGet(request, env, url) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    if (tab === "zpravy") return html(adminArticles(ctx, data, message, idParam(url), confirmParam(url)));
-    if (tab === "akce") return html(adminEvents(ctx, data, message, idParam(url), confirmParam(url)));
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide"]);
+    if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
+      return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
+    }
+    if (tab === "zpravy") {
+      return html(
+        adminArticles(ctx, data, message, {
+          editingId: positiveParam(url, "id"),
+          confirmId: positiveParam(url, "smazat"),
+          proposalId: positiveParam(url, "navrh"),
+          targetId: positiveParam(url, "clanek"),
+          withdrawId: positiveParam(url, "stahnout"),
+        }),
+      );
+    }
+    if (tab === "akce") return html(adminEvents(ctx, data, message, positiveParam(url, "id"), positiveParam(url, "smazat")));
     if (tab === "texty") return html(adminTexts(ctx, data, message));
     if (tab === "svoz") return html(adminSite(ctx, data, message));
+    if (tab === "lide") return html(adminPeople(ctx, data, message, positiveParam(url, "vypnout")));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
   return html(missingPage({ ...ctx, path: "/" }), 404);
@@ -209,13 +243,54 @@ async function renderPost(request, env, url) {
   const fields = await formFields(request);
 
   if (path === "/redakce/prihlasit") {
-    const result = await login(env, fields.password);
+    const result = await login(env, fields.login, fields.password);
     if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/zpravy", sessionCookie(result.token, https));
   }
   if (path === "/redakce/odhlasit") {
-    await logout(env);
+    await logout(env, request);
     return redirect("/redakce/zpravy", clearCookie(https));
+  }
+  if (path === "/redakce/zpravy/navrh") {
+    const result = await saveProposal(env, request, fields);
+    if (!result.ok) return redirect(withError(deskQuery(fields), result.error));
+    return redirect(`/redakce/zpravy?ok=${result.updated ? "navrh-upraven" : "navrh"}`);
+  }
+  if (path === "/redakce/zpravy/stahnout") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/zpravy");
+    const result = await withdrawProposal(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/zpravy?ok=navrh-stazen");
+  }
+  if (path === "/redakce/zpravy/schvalit") {
+    const result = await approveProposal(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/zpravy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/zpravy?ok=schvaleno");
+  }
+  if (path === "/redakce/zpravy/vratit") {
+    const result = await rejectProposal(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/zpravy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/zpravy?ok=vraceno");
+  }
+  if (path === "/redakce/lide/ulozit") {
+    const result = await createContributor(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lide?ok=clovek");
+  }
+  if (path === "/redakce/lide/stav") {
+    const result = await setContributorActive(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
+    return redirect(`/redakce/lide?ok=${result.active ? "clovek-zapnut" : "clovek-vypnut"}`);
+  }
+  if (path === "/redakce/lide/heslo") {
+    const result = await setContributorPassword(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lide?ok=clovek-heslo");
+  }
+  if (path === "/redakce/jmeno/ulozit") {
+    const result = await saveDisplayName(env, request, fields.name);
+    if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/heslo?ok=jmeno");
   }
   if (path === "/redakce/zpravy/ulozit") {
     const result = await saveArticle(env, request, fields);
@@ -252,10 +327,22 @@ async function renderPost(request, env, url) {
   return new Response("Tahle akce tu není.", { status: 404 });
 }
 
+function deskQuery(fields) {
+  if (fields.id) return `/redakce/zpravy?navrh=${fields.id}`;
+  if (fields.articleId) return `/redakce/zpravy?clanek=${fields.articleId}`;
+  return "/redakce/zpravy";
+}
+
+function withError(path, error) {
+  const join = path.includes("?") ? "&" : "?";
+  return `${path}${join}chyba=${encodeURIComponent(error)}`;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      await ensureSchema(env);
       if (request.method === "GET" && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
         return env.ASSETS.fetch(request);
       }

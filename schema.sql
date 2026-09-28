@@ -20,7 +20,10 @@ create table if not exists articles (
   category text not null,
   image_key text,
   published integer not null default 1,
-  created_at text not null default (date('now'))
+  created_at text not null default (date('now')),
+  author_id integer,
+  author_name text not null default '',
+  redacted integer not null default 0
 );
 
 create table if not exists events (
@@ -183,3 +186,38 @@ Napište to věcně: co, kde, kdy a koho se to týká. Čím kratší, tím spí
 Texty vkládá redakce. Veřejný formulář tu schválně není, ať se tu nehromadí cizí jména a telefony. Kontakt na redakci je na stránce O nás, až si ho doplníte.',
   'Komunita'
 where not exists (select 1 from articles where slug = 'jak-poslat-tip');
+
+create table if not exists users (
+  id integer primary key autoincrement,
+  login text not null unique,
+  name text not null,
+  password_hash text not null,
+  role text not null,
+  session_token text,
+  active integer not null default 1,
+  created_at text not null default (date('now'))
+);
+
+insert into users (login, name, password_hash, role)
+select 'redakce', 'Redakce', password_hash, 'hlavni'
+from settings
+where id = 1 and not exists (select 1 from users);
+
+create table if not exists proposals (
+  id integer primary key autoincrement,
+  article_id integer,
+  author_id integer not null,
+  author_name text not null,
+  title text not null,
+  excerpt text not null,
+  body text not null,
+  category text not null,
+  image_key text,
+  submitted_title text not null,
+  submitted_excerpt text not null,
+  submitted_body text not null,
+  submitted_category text not null,
+  status text not null default 'pending',
+  note text not null default '',
+  created_at text not null default (date('now'))
+);

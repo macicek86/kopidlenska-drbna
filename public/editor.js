@@ -1,13 +1,14 @@
-const form = document.querySelector('form[action="/redakce/zpravy/ulozit"]');
 const MAX_EDGE = 1600;
 const START_QUALITY = 0.82;
 
-if (form) {
+for (const form of document.querySelectorAll("form")) {
+  const fileInput = form.querySelector('input[type="file"][name="image"]');
+  if (!fileInput) continue;
   let ready = false;
   form.addEventListener("submit", async (event) => {
     if (ready) return;
-    const input = form.querySelector('input[type="file"][name="image"]');
-    const file = input?.files?.[0];
+    const input = fileInput;
+    const file = input.files?.[0];
     if (!file || file.size === 0) return;
     if (file.type === "image/webp" && file.size <= 500_000) {
       const small = await edgeOf(file);

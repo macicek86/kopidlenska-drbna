@@ -297,6 +297,8 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .meta { font-weight: 700; font-size: 0.92rem; }
 
+.redigovano { color: var(--muted); font-weight: 600; }
+
 .chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 1rem 0; }
 
 .article-title { max-width: 18ch; }

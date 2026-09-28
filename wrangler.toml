@@ -10,7 +10,7 @@ run_worker_first = true
 [[d1_databases]]
 binding = "DB"
 database_name = "kopidlenska-drbna"
-database_id = "00000000-0000-4000-8000-000000000001"
+database_id = "6b49d75b-58bf-433d-91be-1869f543a388"
 
 [[r2_buckets]]
 binding = "BUCKET"

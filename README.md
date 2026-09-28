@@ -32,7 +32,13 @@ Domény musí být na stejném účtu. Stejné řádky jsou připravené zakomen
 
 ## Redakce
 
-Adresa `/redakce`. Výchozí heslo je `Drbna2026`. Po prvním přihlášení ho v záložce Heslo změň.
+Adresa `/redakce`. Účty jsou dvou druhů.
+
+Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v záložce Heslo. Může zprávy, akce, texty, svoz i účty. Jeho vlastní zpráva jde na web hned a podepíše se jeho jménem. Výchozí jméno je Redakce, v záložce Heslo se dá přepsat.
+
+Přispěvatele přidá hlavní redaktor v záložce Lidé: jméno pod článkem, přihlašovací jméno a heslo. Přispěvatel píše nové zprávy a u zveřejněné zprávy, i cizí, může jen navrhnout úpravu. Na web se dostane až to, co hlavní redaktor schválí. Cizí text přímo nezmění a návrh úpravy jeho vlastní zprávy taky čeká na schválení.
+
+Hlavní redaktor může text před schválením upravit, nejčastěji češtinu. Veřejně se neukáže, co se měnilo. Když se zveřejněné znění liší od návrhu, u autora je nanejvýš slovo Redigováno. Autor příspěvku zůstává přispěvatel. U návrhu úpravy cizí zprávy zůstává původní autor.
 
 V záložce Zprávy jde přiložit fotka. Prohlížeč ji před odesláním zmenší a uloží jako WebP. Na webu je potom v bucketu `kopidlenska-drbna` pod `/media/...`.
 

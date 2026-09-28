@@ -60,4 +60,4 @@ run(["d1", "execute", dbName, "--remote", "--file=./schema.sql"]);
 
 console.log("Nasazuji Worker…");
 run(["deploy"]);
-console.log("Hotovo. Redakce je na /redakce, výchozí heslo je Drbna2026. Hned si ho změň.");
+console.log("Hotovo. Redakce je na /redakce, výchozí přihlášení je redakce / Drbna2026. Hned si ho změň.");
