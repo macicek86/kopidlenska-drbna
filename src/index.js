@@ -3,6 +3,7 @@ import {
   clearCookie,
   loadAdmin,
   loadArticle,
+  loadCopy,
   loadPublic,
   login,
   logout,
@@ -10,6 +11,7 @@ import {
   removeArticle,
   removeEvent,
   saveArticle,
+  saveCopy,
   saveEvent,
   saveSite,
   sessionCookie,
@@ -20,6 +22,7 @@ import {
   adminEvents,
   adminPassword,
   adminSite,
+  adminTexts,
   articlePage,
   binsPage,
   brokenPage,
@@ -39,6 +42,7 @@ const OK = {
   "akce-upravena": "Akce je upravená.",
   "akce-smazana": "Akce je smazaná.",
   web: "Svoz a kontakt jsou uložené.",
+  texty: "Texty jsou uložené.",
   heslo: "Heslo je změněné.",
 };
 
@@ -128,8 +132,8 @@ async function formFields(request) {
 
 async function renderGet(request, env, url) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
-  const ctx = ctxFor(request, path);
-  const minimalHome = ctx.minimal && path === "/";
+  const base = ctxFor(request, path);
+  const minimalHome = base.minimal && path === "/";
 
   if (path === "/media" || path.startsWith("/media/")) {
     const key = decodeURIComponent(path.slice("/media/".length));
@@ -143,6 +147,8 @@ async function renderGet(request, env, url) {
       },
     });
   }
+
+  const ctx = { ...base, copy: await loadCopy(env) };
 
   if (minimalHome || path === "/popelnice") {
     const data = await loadPublic(env);
@@ -182,6 +188,7 @@ async function renderGet(request, env, url) {
     const message = messageFrom(url);
     if (tab === "zpravy") return html(adminArticles(ctx, data, message, idParam(url), confirmParam(url)));
     if (tab === "akce") return html(adminEvents(ctx, data, message, idParam(url), confirmParam(url)));
+    if (tab === "texty") return html(adminTexts(ctx, data, message));
     if (tab === "svoz") return html(adminSite(ctx, data, message));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
@@ -192,6 +199,13 @@ async function renderPost(request, env, url) {
   if (!sameOrigin(request)) return new Response("Cizí původ.", { status: 403 });
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const https = secure(request);
+
+  if (path === "/redakce/texty/ulozit") {
+    const result = await saveCopy(env, request);
+    if (!result.ok) return redirect(`/redakce/texty?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/texty?ok=texty");
+  }
+
   const fields = await formFields(request);
 
   if (path === "/redakce/prihlasit") {
