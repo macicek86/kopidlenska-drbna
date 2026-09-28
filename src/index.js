@@ -13,16 +13,22 @@ import {
   media,
   rejectProposal,
   removeArticle,
+  removeClosure,
   removeEvent,
+  removeYard,
   saveArticle,
+  saveClosure,
   saveCopy,
-  saveDisplayName,
   saveEvent,
+  saveProfile,
   saveProposal,
   saveSite,
+  saveYard,
   sessionCookie,
+  saveContributorAccess,
   setContributorActive,
   setContributorPassword,
+  userCan,
   withdrawProposal,
 } from "./db.js";
 import {
@@ -33,6 +39,7 @@ import {
   adminPeople,
   adminSite,
   adminTexts,
+  adminYards,
   articlePage,
   binsPage,
   brokenPage,
@@ -40,7 +47,9 @@ import {
   homePage,
   missingPage,
   newsPage,
+  yardsPage,
 } from "./view.js";
+import { WEEK_DAYS } from "./yards.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
@@ -54,7 +63,12 @@ const OK = {
   web: "Svoz a kontakt jsou uložené.",
   texty: "Texty jsou uložené.",
   heslo: "Heslo je změněné.",
-  jmeno: "Jméno na webu je uložené.",
+  jmeno: "Jméno a alias jsou uložené.",
+  dvur: "Sběrný dvůr je uložený.",
+  "dvur-upraven": "Sběrný dvůr je upravený.",
+  "dvur-smazan": "Sběrný dvůr je smazaný.",
+  uzavreni: "Mimořádné uzavření je zapsané.",
+  "uzavreni-smazane": "Mimořádné uzavření je zrušené.",
   navrh: "Návrh čeká na schválení.",
   "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
   "navrh-stazen": "Návrh je stažený.",
@@ -64,6 +78,7 @@ const OK = {
   "clovek-vypnut": "Účet je vypnutý.",
   "clovek-zapnut": "Účet je zase aktivní.",
   "clovek-heslo": "Heslo přispěvatele je nastavené.",
+  "clovek-udaje": "Alias a oprávnění jsou uložené.",
 };
 
 function secure(request) {
@@ -145,6 +160,19 @@ async function formFields(request) {
     weekday: text("weekday"),
     weekParity: text("weekParity"),
     stepDays: text("stepDays"),
+    accepts: text("accepts"),
+    week: WEEK_DAYS.map(({ day }) => ({
+      day,
+      open: form.get(`open-${day}`) === "1",
+      from: text(`from-${day}`),
+      to: text(`to-${day}`),
+    })),
+    endsOn: text("endsOn"),
+    reason: text("reason"),
+    alias: text("alias"),
+    sortOrder: text("sortOrder"),
+    yardId: Number.isInteger(Number(text("yardId"))) && Number(text("yardId")) > 0 ? Number(text("yardId")) : undefined,
+    permissions: form.getAll("permission").map((item) => String(item)),
     confirm: text("confirm") === "1",
   };
 }
@@ -200,6 +228,10 @@ async function renderGet(request, env, url) {
     const data = await loadPublic(env);
     return html(aboutPage(data, ctx));
   }
+  if (path === "/sberne-dvory") {
+    const data = await loadPublic(env);
+    return html(yardsPage(data, ctx));
+  }
   if (path === "/redakce") return redirect("/redakce/zpravy");
   if (path.startsWith("/redakce/")) {
     const data = await loadAdmin(env, request);
@@ -223,6 +255,21 @@ async function renderGet(request, env, url) {
     if (tab === "akce") return html(adminEvents(ctx, data, message, positiveParam(url, "id"), positiveParam(url, "smazat")));
     if (tab === "texty") return html(adminTexts(ctx, data, message));
     if (tab === "svoz") return html(adminSite(ctx, data, message));
+    if (tab === "dvory") {
+      if (data.signedIn && !userCan(data.user, "sberny_dvur")) {
+        return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Na sběrné dvory potřebuješ oprávnění.")}`);
+      }
+      return html(
+        adminYards(
+          ctx,
+          data,
+          message,
+          positiveParam(url, "id"),
+          positiveParam(url, "smazat"),
+          positiveParam(url, "zrusit"),
+        ),
+      );
+    }
     if (tab === "lide") return html(adminPeople(ctx, data, message, positiveParam(url, "vypnout")));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
@@ -287,8 +334,13 @@ async function renderPost(request, env, url) {
     if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/lide?ok=clovek-heslo");
   }
+  if (path === "/redakce/lide/udaje") {
+    const result = await saveContributorAccess(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lide?ok=clovek-udaje");
+  }
   if (path === "/redakce/jmeno/ulozit") {
-    const result = await saveDisplayName(env, request, fields.name);
+    const result = await saveProfile(env, request, fields);
     if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/heslo?ok=jmeno");
   }
@@ -318,6 +370,31 @@ async function renderPost(request, env, url) {
     const result = await saveSite(env, request, fields);
     if (!result.ok) return redirect(`/redakce/svoz?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/svoz?ok=web");
+  }
+  if (path === "/redakce/dvory/ulozit") {
+    const result = await saveYard(env, request, fields);
+    if (!result.ok) {
+      const back = fields.id ? `/redakce/dvory?id=${fields.id}` : "/redakce/dvory";
+      return redirect(withError(back, result.error));
+    }
+    return redirect(`/redakce/dvory?ok=${result.updated ? "dvur-upraven" : "dvur"}`);
+  }
+  if (path === "/redakce/dvory/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/dvory");
+    const result = await removeYard(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/dvory?ok=dvur-smazan");
+  }
+  if (path === "/redakce/dvory/uzavreni") {
+    const result = await saveClosure(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/dvory?ok=uzavreni");
+  }
+  if (path === "/redakce/dvory/uzavreni/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/dvory");
+    const result = await removeClosure(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/dvory?ok=uzavreni-smazane");
   }
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);

@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { verifyPassword } from "../src/password.js";
 import { countdownLabel } from "../src/format.js";
-import { buildWasteView, isoWeek } from "../src/waste.js";
-import { redactedFlag, textWasEdited } from "../src/db.js";
+import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
+import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
+import { closureSpan, coversDay, homeStatus, hoursSummary, normalizeWeek, statusLine } from "../src/yards.js";
 
 const SEED =
   "pbkdf2:6b6f7069646c656e736b612d6472626e612d7631:71910d0f1a33b6ce8f9647f30734fbf39e392f5194eaa5fcfc68df6730249132";
@@ -80,6 +81,126 @@ test("formátování nechá nadpisy a odrážky a skript zahodí", () => {
     ),
     false,
   );
+});
+
+test("alias má přednost před jménem pod článkem", () => {
+  assert.equal(byline({ name: "Jana Nováková", alias: "Jana z návsi" }), "Jana z návsi");
+  assert.equal(byline({ authorName: "Jana Nováková", authorAlias: "Jana z návsi" }), "Jana z návsi");
+  assert.equal(byline({ name: "Jana Nováková", alias: "  " }), "Jana Nováková");
+  assert.equal(byline({ authorName: "Redakce" }), "Redakce");
+  assert.equal(byline(null), "");
+});
+
+test("oprávnění na sběrný dvůr má hlavní redaktor vždy a přispěvatel jen když ho dostane", () => {
+  assert.equal(userCan({ role: "hlavni", permissions: [] }, "sberny_dvur"), true);
+  assert.equal(userCan({ role: "prispevovatel", permissions: ["sberny_dvur"] }, "sberny_dvur"), true);
+  assert.equal(userCan({ role: "prispevovatel", permissions: [] }, "sberny_dvur"), false);
+  assert.equal(userCan(null, "sberny_dvur"), false);
+  assert.deepEqual(knownPermissions(["sberny_dvur", "sberny_dvur", "cizi"]), ["sberny_dvur"]);
+});
+
+test("mimořádné uzavření drží rozmezí a pozná dnešek", () => {
+  assert.equal(closureSpan("", "").error, "Doplňte den, od kdy je zavřeno.");
+  assert.equal(closureSpan("2026-02-31", "").error, "Doplňte den, od kdy je zavřeno.");
+  assert.deepEqual(closureSpan("2026-10-05", ""), { startsOn: "2026-10-05", endsOn: "2026-10-05" });
+  assert.deepEqual(closureSpan("2026-10-05", "2026-10-07"), { startsOn: "2026-10-05", endsOn: "2026-10-07" });
+  assert.equal(closureSpan("2026-10-07", "2026-10-05").error, "Konec uzavření musí být stejný den, nebo později.");
+  const span = closureSpan("2026-10-05", "2026-10-07");
+  assert.equal(coversDay(span, "2026-10-06"), true);
+  assert.equal(coversDay(span, "2026-10-04"), false);
+  assert.equal(coversDay(span, "2026-10-07"), true);
+});
+
+function yard(week, closures = []) {
+  return { name: "Sběrný dvůr Kopidlno", week, legacy: "", closures };
+}
+
+function day(day, from, to) {
+  return { day, open: true, from, to };
+}
+
+test("otevírací doba se počítá po dnech a mimořádné zavření má přednost", () => {
+  const monday = [day(1, "08:00", "16:00")];
+  assert.equal(normalizeWeek([]).error, "Zaškrtněte aspoň jeden den, kdy má otevřeno.");
+  assert.equal(normalizeWeek([{ day: 1, open: true, from: "16:00", to: "08:00" }]).error.includes("později"), true);
+  const saved = normalizeWeek([{ day: 1, open: true, from: "8:00", to: "16:00" }, { day: 4, open: true, from: "13:00", to: "17:00" }]);
+  assert.equal(saved.week.find((slot) => slot.day === 1).from, "08:00");
+  assert.equal(saved.week.find((slot) => slot.day === 2).open, false);
+  assert.equal(
+    statusLine(yard(saved.week), "2026-09-28", "10:00"),
+    "Sběrný dvůr Kopidlno je dnes otevřený 08:00–16:00.",
+  );
+  assert.equal(
+    statusLine(yard(saved.week), "2026-09-28", "15:59"),
+    "Sběrný dvůr Kopidlno je dnes otevřený 08:00–16:00.",
+  );
+  assert.equal(
+    statusLine(yard(saved.week), "2026-09-28", "07:30"),
+    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený dnes od 08:00 do 16:00.",
+  );
+  assert.equal(
+    statusLine(yard(saved.week), "2026-09-28", "16:00"),
+    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený ve čtvrtek 1. 10. od 13:00 do 17:00.",
+  );
+  assert.equal(
+    statusLine(yard(saved.week.filter((slot) => slot.day === 4)), "2026-09-28", "10:00"),
+    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený ve čtvrtek 1. 10. od 13:00 do 17:00.",
+  );
+  assert.equal(
+    statusLine(yard([day(1, "08:00", "16:00")]), "2026-10-04", "18:00"),
+    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený zítra od 08:00 do 16:00.",
+  );
+  assert.equal(
+    statusLine(
+      yard([day(1, "08:00", "16:00")], [{ startsOn: "2026-09-28", endsOn: "2027-04-01", reason: "Rekonstrukce" }]),
+      "2026-09-28",
+      "18:00",
+    ),
+    "Sběrný dvůr Kopidlno je uzavřený do 1. 4. 2027. Rekonstrukce.",
+  );
+  assert.equal(
+    statusLine(
+      yard([day(1, "08:00", "16:00")], [{ startsOn: "2026-10-05", endsOn: "2026-10-05", reason: "Svátek" }]),
+      "2026-10-04",
+      "12:00",
+    ),
+    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený v pondělí 12. 10. od 08:00 do 16:00.",
+  );
+  assert.equal(hoursSummary(yard(saved.week)), "Po 08:00–16:00, Čt 13:00–17:00");
+  assert.deepEqual(homeStatus(yard([day(1, "08:00", "16:00"), day(2, "09:00", "15:00")]), "2026-09-28", "10:00"), {
+    kind: "open",
+    name: "Sběrný dvůr Kopidlno",
+    state: "Dnes otevřený",
+    detail: "08:00–16:00",
+    tomorrow: "Zítra od 09:00 do 15:00.",
+  });
+  assert.deepEqual(homeStatus(yard([day(1, "08:00", "16:00"), day(2, "09:00", "15:00")]), "2026-09-28", "18:00"), {
+    kind: "closed",
+    name: "Sběrný dvůr Kopidlno",
+    state: "Dnes zavřený",
+    detail: "Zítra od 09:00 do 15:00.",
+    tomorrow: "",
+  });
+  assert.deepEqual(
+    homeStatus(
+      yard([day(1, "08:00", "16:00")], [{ startsOn: "2026-09-28", endsOn: "2026-10-31", reason: "Nikomu se nechce dělat." }]),
+      "2026-09-28",
+      "10:00",
+    ),
+    {
+      kind: "closure",
+      name: "Sběrný dvůr Kopidlno",
+      state: "Uzavřený do 31. 10. 2026",
+      detail: "Nikomu se nechce dělat.",
+      tomorrow: "",
+    },
+  );
+});
+
+test("hodiny se berou z Prahy, ne z času workeru", () => {
+  assert.deepEqual(pragueNow(new Date("2026-09-28T14:05:00Z")), { date: "2026-09-28", time: "16:05" });
+  assert.deepEqual(pragueNow(new Date("2026-09-28T22:30:00Z")), { date: "2026-09-29", time: "00:30" });
+  assert.deepEqual(pragueNow(new Date("2026-12-01T15:30:00Z")), { date: "2026-12-01", time: "16:30" });
 });
 
 test("28. 9. 2026 je sudý týden, další svoz je 5. 10.", () => {

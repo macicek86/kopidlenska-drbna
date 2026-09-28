@@ -5,6 +5,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "nav_news", label: "Menu: zprávy", value: "Zprávy", max: 40 },
   { group: "Hlavička a patička", key: "nav_events", label: "Menu: akce", value: "Akce", max: 40 },
   { group: "Hlavička a patička", key: "nav_bins", label: "Menu: popelnice", value: "Popelnice", max: 40 },
+  { group: "Hlavička a patička", key: "nav_yards", label: "Menu: sběrné dvory", value: "Sběrné dvory", max: 40 },
   { group: "Hlavička a patička", key: "nav_about", label: "Menu: o nás", value: "O nás", max: 40 },
   { group: "Hlavička a patička", key: "menu_label", label: "Tlačítko menu na mobilu", value: "Menu", max: 40 },
   { group: "Hlavička a patička", key: "skip", label: "Odkaz přeskočit na obsah", value: "Přeskočit na obsah", max: 80 },
@@ -21,6 +22,7 @@ export const COPY = [
   { group: "Titulka", key: "hero_alt", label: "Popis maskota", value: "Maskot Kopidlenské drbny, černobílý kozel", max: 160 },
   { group: "Titulka", key: "home_waste_eyebrow", label: "Nadpis u svozu na titulce", value: "Popelnice", max: 40 },
   { group: "Titulka", key: "home_waste_button", label: "Tlačítko na svoz", value: "Kdy se sváží", max: 40 },
+  { group: "Titulka", key: "home_yards_button", label: "Tlačítko na sběrné dvory", value: "Sběrné dvory", max: 40 },
   { group: "Titulka", key: "home_news_heading", label: "Nadpis sekce zpráv", value: "Zprávy", max: 40 },
   { group: "Titulka", key: "home_news_all", label: "Odkaz na všechny zprávy", value: "Všechny", max: 40 },
   { group: "Titulka", key: "home_events_heading", label: "Nadpis sekce akcí", value: "Akce", max: 40 },
@@ -63,6 +65,17 @@ export const COPY = [
   { group: "Popelnice", key: "countdown_many", label: "Odpočet od 5 dnů, {n} je počet", value: "Za {n} dní.", max: 80 },
   { group: "Popelnice", key: "popelnice_label", label: "Text odkazu na původní svoz", value: "popelnice.kopidlenskadrbna.org", max: 120 },
   { group: "Popelnice", key: "popelnice_url", label: "Adresa původního svozu", value: "https://popelnice.kopidlenskadrbna.org/", max: 200 },
+  { group: "Popelnice", key: "bins_yards_link", label: "Odkaz ze svozu na sběrné dvory", value: "Sběrné dvory", max: 80 },
+
+  { group: "Sběrné dvory", key: "yards_description", label: "Popis stránky sběrných dvorů", value: "Sběrné dvory v Kopidlně: co se tam vozí, kdy mají otevřeno a kdy je mimořádně zavřeno.", max: 240, long: true },
+  { group: "Sběrné dvory", key: "yards_eyebrow", label: "Malý nadpis stránky dvorů", value: "Odpad", max: 40 },
+  { group: "Sběrné dvory", key: "yards_heading", label: "Nadpis stránky dvorů", value: "Sběrné dvory", max: 80 },
+  { group: "Sběrné dvory", key: "yards_lede", label: "Úvod stránky dvorů", value: "Co se kam vozí a kdy mají otevřeno. Když je dvůr mimořádně zavřený, je tu i důvod. Není to úřední deska města.", max: 500, long: true },
+  { group: "Sběrné dvory", key: "yards_empty", label: "Když není žádný dvůr", value: "Zatím tu není zveřejněný sběrný dvůr. Až ho redakce doplní, objeví se tady.", max: 240, long: true },
+  { group: "Sběrné dvory", key: "yards_accepts", label: "Nadpis, co dvůr bere", value: "Co se sem vozí", max: 80 },
+  { group: "Sběrné dvory", key: "yards_hours", label: "Nadpis otevírací doby", value: "Otevřeno", max: 40 },
+  { group: "Sběrné dvory", key: "yards_closed", label: "Štítek mimořádného uzavření", value: "Mimořádně zavřeno", max: 80 },
+  { group: "Sběrné dvory", key: "yards_upcoming", label: "Nadpis plánovaných uzavření", value: "Plánovaná uzavření", max: 80 },
 
   { group: "O nás", key: "about_description", label: "Popis stránky O nás", value: "Sousedská, ne úřední stránka pro Kopidlno a jeho části.", max: 240, long: true },
   { group: "O nás", key: "about_eyebrow", label: "Malý nadpis stránky O nás", value: "O stránce", max: 40 },
@@ -70,6 +83,7 @@ export const COPY = [
   { group: "O nás", key: "about_lede", label: "Úvod stránky O nás", value: "Kopidlenská drbna je místní noviny pro Kopidlno, Drahoraz, Mlýnec, Pševes a Ledkov. Píšeme zprávy, pozvánky a praktické věci, hlavně kdy vyvézt popelnici.", max: 500, long: true },
   { group: "O nás", key: "about_disclaimer", label: "Upozornění, že nejde o úřad", value: "Stránku neprovozuje Město Kopidlno. Vyhlášky, poplatky a úřední oznámení berte vždy z webu města.", max: 500, long: true },
   { group: "O nás", key: "about_bins_link", label: "Odkaz na svoz", value: "Svoz popelnic", max: 80 },
+  { group: "O nás", key: "about_yards_link", label: "Odkaz na sběrné dvory", value: "Sběrné dvory", max: 80 },
   { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Maskot Kopidlenské drbny", max: 160 },
 ];
 

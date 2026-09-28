@@ -191,6 +191,7 @@ create table if not exists users (
   id integer primary key autoincrement,
   login text not null unique,
   name text not null,
+  alias text not null default '',
   password_hash text not null,
   role text not null,
   session_token text,
@@ -219,5 +220,31 @@ create table if not exists proposals (
   submitted_category text not null,
   status text not null default 'pending',
   note text not null default '',
+  created_at text not null default (date('now'))
+);
+
+create table if not exists user_permissions (
+  user_id integer not null,
+  code text not null,
+  primary key (user_id, code)
+);
+
+create table if not exists yards (
+  id integer primary key autoincrement,
+  name text not null,
+  place text not null,
+  accepts text not null,
+  hours text not null,
+  sort_order integer not null default 0,
+  published integer not null default 1
+);
+
+create table if not exists yard_closures (
+  id integer primary key autoincrement,
+  yard_id integer not null,
+  starts_on text not null,
+  ends_on text not null,
+  reason text not null,
+  created_by integer,
   created_at text not null default (date('now'))
 );

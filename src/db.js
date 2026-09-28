@@ -1,13 +1,22 @@
 import { COPY } from "./copy.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { prepareArticleBody } from "./rich.js";
-import { buildWasteView } from "./waste.js";
+import { buildWasteView, pragueNow } from "./waste.js";
+import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
 
 export const CATEGORIES = ["Zprávy", "Komunita", "Kultura", "Praktické", "Sport"];
+export const PERMISSIONS = [
+  {
+    code: "sberny_dvur",
+    label: "Sběrný dvůr",
+    detail: "Může zapsat mimořádné uzavření a důvod. Dvůr samotný pořád mění hlavní redaktor.",
+  },
+];
 export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
 const COOKIE = "drbna_editor";
-const ARTICLE_COLUMNS =
-  "id, slug, title, excerpt, body, category, image_key, published, created_at, author_id, author_name, redacted";
+const ARTICLE_FIELDS =
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.image_key, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias";
+const ARTICLE_FROM = "articles a left join users u on u.id = a.author_id";
 
 let schemaPromise = null;
 
@@ -68,6 +77,25 @@ export function redactedFlag(already, submitted, finalText) {
   return Boolean(already) || textWasEdited(submitted, finalText);
 }
 
+export function byline(person) {
+  if (!person) return "";
+  const alias = String(person.alias ?? person.authorAlias ?? "").trim();
+  if (alias) return alias;
+  return String(person.name ?? person.authorName ?? "").trim();
+}
+
+export function userCan(user, code) {
+  if (!user) return false;
+  if (user.role === "hlavni") return true;
+  return Array.isArray(user.permissions) && user.permissions.includes(code);
+}
+
+export function knownPermissions(values) {
+  const allowed = new Set(PERMISSIONS.map((item) => item.code));
+  const list = Array.isArray(values) ? values : [];
+  return [...new Set(list.map((item) => String(item)))].filter((code) => allowed.has(code));
+}
+
 function mapArticle(row) {
   return {
     id: Number(row.id),
@@ -81,6 +109,7 @@ function mapArticle(row) {
     createdOn: String(row.created_at ?? "").slice(0, 10),
     authorId: row.author_id == null || row.author_id === "" ? null : Number(row.author_id),
     authorName: String(row.author_name ?? ""),
+    authorAlias: String(row.author_alias ?? "").trim(),
     redacted: asBool(row.redacted),
   };
 }
@@ -97,13 +126,41 @@ function mapEvent(row) {
   };
 }
 
-function mapAccount(row) {
+function mapAccount(row, permissions = []) {
   return {
     id: Number(row.id),
     login: String(row.login),
     name: String(row.name),
+    alias: String(row.alias ?? "").trim(),
     role: String(row.role),
     active: asBool(row.active),
+    permissions,
+  };
+}
+
+function mapYard(row) {
+  const hours = parseHours(row.hours);
+  return {
+    id: Number(row.id),
+    name: String(row.name),
+    place: String(row.place ?? ""),
+    accepts: String(row.accepts ?? ""),
+    week: hours.week,
+    legacy: hours.legacy,
+    sortOrder: Number(row.sort_order ?? 0),
+    published: asBool(row.published),
+    closures: [],
+  };
+}
+
+function mapClosure(row) {
+  return {
+    id: Number(row.id),
+    yardId: Number(row.yard_id),
+    startsOn: String(row.starts_on ?? "").slice(0, 10),
+    endsOn: String(row.ends_on ?? "").slice(0, 10),
+    reason: String(row.reason ?? ""),
+    createdBy: row.created_by == null || row.created_by === "" ? null : Number(row.created_by),
   };
 }
 
@@ -115,6 +172,7 @@ function mapProposal(row) {
     articleTitle: row.article_title ? String(row.article_title) : "",
     authorId: Number(row.author_id),
     authorName: String(row.author_name),
+    authorAlias: String(row.author_alias ?? "").trim(),
     title: String(row.title),
     excerpt: String(row.excerpt),
     body: String(row.body),
@@ -176,6 +234,7 @@ async function createDeskTables(env) {
       id integer primary key autoincrement,
       login text not null unique,
       name text not null,
+      alias text not null default '',
       password_hash text not null,
       role text not null,
       session_token text,
@@ -203,6 +262,41 @@ async function createDeskTables(env) {
       created_at text not null default (date('now'))
     )`,
   ).run();
+  await env.DB.prepare(
+    `create table if not exists user_permissions (
+      user_id integer not null,
+      code text not null,
+      primary key (user_id, code)
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `create table if not exists yards (
+      id integer primary key autoincrement,
+      name text not null,
+      place text not null,
+      accepts text not null,
+      hours text not null,
+      sort_order integer not null default 0,
+      published integer not null default 1
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `create table if not exists yard_closures (
+      id integer primary key autoincrement,
+      yard_id integer not null,
+      starts_on text not null,
+      ends_on text not null,
+      reason text not null,
+      created_by integer,
+      created_at text not null default (date('now'))
+    )`,
+  ).run();
+}
+
+async function ensureUserColumns(env) {
+  const info = await env.DB.prepare("pragma table_info(users)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "alias", "alter table users add column alias text not null default ''");
 }
 
 async function addColumn(env, present, name, sql) {
@@ -237,6 +331,10 @@ async function migrateSession(env) {
 
 async function migrateSchema(env) {
   await createDeskTables(env);
+  const usersTable = await env.DB.prepare(
+    "select 1 as ok from sqlite_master where type = 'table' and name = 'users'",
+  ).first();
+  if (usersTable) await ensureUserColumns(env);
   const settingsTable = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
@@ -269,15 +367,34 @@ export function ensureSchema(env) {
   return schemaPromise;
 }
 
+async function permissionCodes(env, userId) {
+  const rows = await env.DB.prepare("select code from user_permissions where user_id = ?").bind(userId).all();
+  return (rows.results ?? []).map((row) => String(row.code));
+}
+
+async function attachPermissions(env, accounts) {
+  if (!accounts.length) return accounts;
+  const rows = (await env.DB.prepare("select user_id, code from user_permissions").all()).results ?? [];
+  const byUser = new Map();
+  for (const row of rows) {
+    const id = Number(row.user_id);
+    const list = byUser.get(id) ?? [];
+    list.push(String(row.code));
+    byUser.set(id, list);
+  }
+  return accounts.map((account) => ({ ...account, permissions: byUser.get(account.id) ?? [] }));
+}
+
 async function currentUser(env, request) {
   const token = readCookie(request);
   if (!token || token.length < 20) return null;
   const row = await env.DB.prepare(
-    "select id, login, name, role, active from users where session_token = ? and active = 1",
+    "select id, login, name, alias, role, active from users where session_token = ? and active = 1",
   )
     .bind(token)
     .first();
-  return row ? mapAccount(row) : null;
+  if (!row) return null;
+  return mapAccount(row, await permissionCodes(env, row.id));
 }
 
 async function requireUser(env, request) {
@@ -308,21 +425,50 @@ async function loadProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
     `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.image_key,
             p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at,
-            a.slug as article_slug, a.title as article_title
+            a.slug as article_slug, a.title as article_title, u.alias as author_alias
      from proposals p
      left join articles a on a.id = p.article_id
+     left join users u on u.id = p.author_id
      ${whereSql}`,
   );
   const rows = binds.length ? await query.bind(...binds).all() : await query.all();
   return (rows.results ?? []).map(mapProposal);
 }
 
+export async function loadYards(env, { publicOnly = false, today = null } = {}) {
+  const yardSql = publicOnly
+    ? `select id, name, place, accepts, hours, sort_order, published
+       from yards where published = 1 order by sort_order asc, id asc`
+    : `select id, name, place, accepts, hours, sort_order, published
+       from yards order by sort_order asc, id asc`;
+  const yards = ((await env.DB.prepare(yardSql).all()).results ?? []).map(mapYard);
+  if (!yards.length) return [];
+  let closureSql = "select id, yard_id, starts_on, ends_on, reason, created_by from yard_closures";
+  const binds = [];
+  if (today) {
+    closureSql += " where ends_on >= ?";
+    binds.push(today);
+  }
+  closureSql += " order by starts_on asc, id asc";
+  const query = env.DB.prepare(closureSql);
+  const rows = binds.length ? await query.bind(...binds).all() : await query.all();
+  const byYard = new Map(yards.map((yard) => [yard.id, yard]));
+  for (const row of rows.results ?? []) {
+    const closure = mapClosure(row);
+    const yard = byYard.get(closure.yardId);
+    if (yard) yard.closures.push(closure);
+  }
+  return yards;
+}
+
 export async function loadPublic(env) {
   const row = await settings(env);
+  const now = pragueNow();
+  const today = now.date;
   const articles = (
     await env.DB.prepare(
-      `select ${ARTICLE_COLUMNS}
-       from articles where published = 1 order by created_at desc, id desc`,
+      `select ${ARTICLE_FIELDS}
+       from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`,
     ).all()
   ).results.map(mapArticle);
   const events = (
@@ -334,7 +480,9 @@ export async function loadPublic(env) {
   return {
     articles,
     events,
-    waste: buildWasteView(wasteFrom(row)),
+    yards: await loadYards(env, { publicOnly: true, today }),
+    waste: buildWasteView(wasteFrom(row), today),
+    now,
     contactNote: String(row.contact_note),
     showDefaultPassword: asBool(row.password_is_default),
   };
@@ -342,8 +490,8 @@ export async function loadPublic(env) {
 
 export async function loadArticle(env, slug) {
   const row = await env.DB.prepare(
-    `select ${ARTICLE_COLUMNS}
-     from articles where slug = ? and published = 1`,
+    `select ${ARTICLE_FIELDS}
+     from ${ARTICLE_FROM} where a.slug = ? and a.published = 1`,
   )
     .bind(slug)
     .first();
@@ -363,13 +511,17 @@ export async function loadAdmin(env, request) {
     events: [],
     proposals: [],
     users: [],
+    yards: [],
   };
   if (!user) return base;
   const articleSql =
     user.role === "hlavni"
-      ? `select ${ARTICLE_COLUMNS} from articles order by created_at desc, id desc`
-      : `select ${ARTICLE_COLUMNS} from articles where published = 1 order by created_at desc, id desc`;
+      ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
+      : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
   base.articles = (await env.DB.prepare(articleSql).all()).results.map(mapArticle);
+  if (user.role === "hlavni" || userCan(user, "sberny_dvur")) {
+    base.yards = await loadYards(env, { publicOnly: user.role !== "hlavni" });
+  }
   if (user.role === "hlavni") {
     base.events = (
       await env.DB.prepare(
@@ -377,11 +529,14 @@ export async function loadAdmin(env, request) {
          from events order by starts_on asc, starts_time asc, id asc`,
       ).all()
     ).results.map(mapEvent);
-    base.users = (
-      await env.DB.prepare(
-        "select id, login, name, role, active from users order by case role when 'hlavni' then 0 else 1 end, name",
-      ).all()
-    ).results.map(mapAccount);
+    base.users = await attachPermissions(
+      env,
+      (
+        await env.DB.prepare(
+          "select id, login, name, alias, role, active from users order by case role when 'hlavni' then 0 else 1 end, name",
+        ).all()
+      ).results.map((row) => mapAccount(row)),
+    );
     base.proposals = await loadProposals(env, "where p.status = 'pending' order by p.id asc");
   } else {
     base.proposals = await loadProposals(
@@ -439,13 +594,32 @@ export async function changePassword(env, request, current, next) {
   return { ok: true, token: session };
 }
 
-export async function saveDisplayName(env, request, name) {
+function readAlias(value) {
+  const alias = clip(value, 60);
+  if (alias && alias.length < 2) {
+    return { error: "Alias musí mít aspoň 2 znaky. Když ho nechcete, nechte pole prázdné." };
+  }
+  return { alias };
+}
+
+export async function saveProfile(env, request, input) {
   const gate = await requireUser(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const next = clip(name, 60);
+  const next = clip(input.name, 60);
   if (next.length < 2) return { ok: false, error: "Doplňte jméno, jak má být pod článkem." };
-  await env.DB.prepare("update users set name = ? where id = ?").bind(next, gate.user.id).run();
+  const alias = readAlias(input.alias);
+  if (alias.error) return { ok: false, error: alias.error };
+  await env.DB.prepare("update users set name = ?, alias = ? where id = ?")
+    .bind(next, alias.alias, gate.user.id)
+    .run();
   return { ok: true };
+}
+
+async function writePermissions(env, userId, codes) {
+  await env.DB.prepare("delete from user_permissions where user_id = ?").bind(userId).run();
+  for (const code of codes) {
+    await env.DB.prepare("insert into user_permissions (user_id, code) values (?, ?)").bind(userId, code).run();
+  }
 }
 
 async function uniqueSlug(env, base) {
@@ -759,16 +933,35 @@ export async function createContributor(env, request, input) {
   const name = clip(input.name, 60);
   const loginName = normalizeLogin(input.login);
   const password = String(input.password ?? "").trim();
+  const alias = readAlias(input.alias);
   if (name.length < 2) return { ok: false, error: "Doplňte jméno, jak má být pod článkem." };
+  if (alias.error) return { ok: false, error: alias.error };
   if (!/^[a-z0-9]{3,32}$/.test(loginName)) {
     return { ok: false, error: "Přihlašovací jméno může mít 3 až 32 znaků: malá písmena a číslice." };
   }
   if (password.length < 8) return { ok: false, error: "Heslo musí mít aspoň 8 znaků." };
   const existing = await env.DB.prepare("select id from users where login = ?").bind(loginName).first();
   if (existing) return { ok: false, error: "Tohle přihlašovací jméno už někdo má." };
-  await env.DB.prepare("insert into users (login, name, password_hash, role) values (?, ?, ?, 'prispevovatel')")
-    .bind(loginName, name, await hashPassword(password))
+  await env.DB.prepare(
+    "insert into users (login, name, alias, password_hash, role) values (?, ?, ?, ?, 'prispevovatel')",
+  )
+    .bind(loginName, name, alias.alias, await hashPassword(password))
     .run();
+  const created = await env.DB.prepare("select id from users where login = ?").bind(loginName).first();
+  if (created) await writePermissions(env, created.id, knownPermissions(input.permissions));
+  return { ok: true };
+}
+
+export async function saveContributorAccess(env, request, input) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const row = await env.DB.prepare("select id, role from users where id = ?").bind(input.id).first();
+  if (!row) return { ok: false, error: "Ten účet už tu není." };
+  if (row.role === "hlavni") return { ok: false, error: "Hlavní redaktor má všechna oprávnění." };
+  const alias = readAlias(input.alias);
+  if (alias.error) return { ok: false, error: alias.error };
+  await env.DB.prepare("update users set alias = ? where id = ?").bind(alias.alias, row.id).run();
+  await writePermissions(env, row.id, knownPermissions(input.permissions));
   return { ok: true };
 }
 
@@ -832,6 +1025,87 @@ export async function removeEvent(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from events where id = ?").bind(id).run();
+  return { ok: true };
+}
+
+function readYard(input) {
+  const name = clip(input.name, 120);
+  const place = clip(input.place, 160);
+  const accepts = clip(input.accepts, 1200);
+  const normalized = normalizeWeek(input.week);
+  if (normalized.error) return normalized;
+  const hours = JSON.stringify(normalized.week);
+  const sortOrder = Number(input.sortOrder);
+  if (name.length < 2) return { error: "Doplňte název sběrného dvora." };
+  if (place.length < 2) return { error: "Doplňte místo." };
+  if (accepts.length < 3) return { error: "Napište, co se tam vozí." };
+  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 999) {
+    return { error: "Pořadí musí být číslo od 0 do 999." };
+  }
+  return { name, place, accepts, hours, sortOrder, published: input.published ? 1 : 0 };
+}
+
+export async function saveYard(env, request, input) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const parsed = readYard(input);
+  if (parsed.error) return { ok: false, error: parsed.error };
+  if (input.id) {
+    const current = await env.DB.prepare("select id from yards where id = ?").bind(input.id).first();
+    if (!current) return { ok: false, error: "Tenhle sběrný dvůr už tu není." };
+    await env.DB.prepare(
+      "update yards set name = ?, place = ?, accepts = ?, hours = ?, sort_order = ?, published = ? where id = ?",
+    )
+      .bind(parsed.name, parsed.place, parsed.accepts, parsed.hours, parsed.sortOrder, parsed.published, input.id)
+      .run();
+    return { ok: true, updated: true };
+  }
+  await env.DB.prepare(
+    "insert into yards (name, place, accepts, hours, sort_order, published) values (?, ?, ?, ?, ?, ?)",
+  )
+    .bind(parsed.name, parsed.place, parsed.accepts, parsed.hours, parsed.sortOrder, parsed.published)
+    .run();
+  return { ok: true, updated: false };
+}
+
+export async function removeYard(env, request, id) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  await env.DB.prepare("delete from yard_closures where yard_id = ?").bind(id).run();
+  await env.DB.prepare("delete from yards where id = ?").bind(id).run();
+  return { ok: true };
+}
+
+async function requireClosure(env, request) {
+  const gate = await requireUser(env, request);
+  if (!gate.ok) return gate;
+  if (!userCan(gate.user, "sberny_dvur")) {
+    return { ok: false, error: "Mimořádné uzavření zapíše hlavní redaktor, nebo člověk s oprávněním na sběrný dvůr." };
+  }
+  return gate;
+}
+
+export async function saveClosure(env, request, input) {
+  const gate = await requireClosure(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const yard = await env.DB.prepare("select id from yards where id = ?").bind(input.yardId).first();
+  if (!yard) return { ok: false, error: "Tenhle sběrný dvůr už tu není." };
+  const span = closureSpan(input.startsOn, input.endsOn);
+  if (span.error) return { ok: false, error: span.error };
+  const reason = clip(input.reason, 400);
+  if (reason.length < 3) return { ok: false, error: "Napište důvod uzavření." };
+  await env.DB.prepare(
+    "insert into yard_closures (yard_id, starts_on, ends_on, reason, created_by) values (?, ?, ?, ?, ?)",
+  )
+    .bind(yard.id, span.startsOn, span.endsOn, reason, gate.user.id)
+    .run();
+  return { ok: true };
+}
+
+export async function removeClosure(env, request, id) {
+  const gate = await requireClosure(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  await env.DB.prepare("delete from yard_closures where id = ?").bind(id).run();
   return { ok: true };
 }
 

@@ -72,6 +72,7 @@ a { color: inherit; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 1.25rem 0;
 }
@@ -106,7 +107,7 @@ a { color: inherit; }
   font-size: 1.25rem;
 }
 
-.nav { display: none; gap: 0.25rem; }
+.nav { display: none; gap: 0.25rem; flex-wrap: wrap; justify-content: flex-end; }
 
 .nav-link, .chip {
   display: inline-flex;
@@ -530,6 +531,8 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .dates { display: grid; gap: 0.7rem; }
 
+.dates.compact { grid-template-columns: 1fr; }
+
 .date-tile {
   border: 1px solid var(--line);
   background: var(--paper);
@@ -568,6 +571,62 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .hint { font-weight: 400; color: var(--muted); }
 
+.keep-lines { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.yard h2 { margin: 0.15rem 0 0.6rem; font-size: clamp(1.6rem, 4vw, 2.1rem); }
+
+.yard-home { list-style: none; margin: 0.85rem 0 0; padding: 0; }
+
+.yard-home li {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.yard-home li:first-child { border-top: 0; padding-top: 0.15rem; }
+
+.yard-home-name {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 1.28rem;
+  font-weight: 560;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.yard-home-state { margin: 0.2rem 0 0; font-weight: 700; }
+
+.yard-home-detail { margin: 0.12rem 0 0; color: var(--muted); line-height: 1.4; }
+
+.yard-home .is-open .yard-home-state { color: var(--pine); }
+
+.yard-home .is-closure .yard-home-state { color: var(--brand); }
+
+.week-list { list-style: none; margin: 0.2rem 0 0.4rem; padding: 0; }
+
+.week-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.week-list .is-today span { font-weight: 700; }
+
+.week-list .is-off { color: var(--muted); }
+
+.hours-grid { display: grid; gap: 0.45rem; }
+
+.hours-grid > span:first-child { font-weight: 700; font-size: 0.92rem; }
+
+.hours-row {
+  display: grid;
+  grid-template-columns: minmax(8.2rem, 10rem) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4rem;
+  align-items: center;
+}
+
 .thumb { width: 8rem; height: 5rem; object-fit: cover; border-radius: 0.7rem; }
 
 .banner {
@@ -591,10 +650,13 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 @media (max-width: 420px) {
   .rich trix-toolbar .trix-dialog__link-fields { grid-template-columns: 1fr 1fr; }
   .rich trix-toolbar .trix-dialog__link-fields .trix-input { grid-column: 1 / -1; }
+  .hours-row { grid-template-columns: 1fr 1fr; }
+  .hours-row .check { grid-column: 1 / -1; }
 }
 
 @media (min-width: 720px) {
   .cards-3, .dates { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dates.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pair { grid-template-columns: 1fr 1fr; }
   .about { grid-template-columns: 16rem 1fr; align-items: center; }
 }

@@ -34,9 +34,9 @@ Domény musí být na stejném účtu. Stejné řádky jsou připravené zakomen
 
 Adresa `/redakce`. Účty jsou dvou druhů.
 
-Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v záložce Heslo. Může zprávy, akce, texty, svoz i účty. Jeho vlastní zpráva jde na web hned a podepíše se jeho jménem. Výchozí jméno je Redakce, v záložce Heslo se dá přepsat.
+Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v záložce Heslo. Může zprávy, akce, texty, svoz, sběrné dvory i účty. Jeho vlastní zpráva jde na web hned. Výchozí jméno pod článkem je Redakce. V záložce Heslo si každý nastaví jméno a volitelný alias. Když alias používá, na webu se u jeho zpráv ukáže alias.
 
-Přispěvatele přidá hlavní redaktor v záložce Lidé: jméno pod článkem, přihlašovací jméno a heslo. Přispěvatel píše nové zprávy a u zveřejněné zprávy, i cizí, může jen navrhnout úpravu. Na web se dostane až to, co hlavní redaktor schválí. Cizí text přímo nezmění a návrh úpravy jeho vlastní zprávy taky čeká na schválení.
+Přispěvatele přidá hlavní redaktor v záložce Lidé: jméno pod článkem, volitelný alias, přihlašovací jméno, heslo a oprávnění. Teď je tu oprávnění Sběrný dvůr. Přispěvatel píše nové zprávy a u zveřejněné zprávy, i cizí, může jen navrhnout úpravu. Na web se dostane až to, co hlavní redaktor schválí. Cizí text přímo nezmění a návrh úpravy jeho vlastní zprávy taky čeká na schválení. Člověk s oprávněním na sběrný dvůr navíc zapíše mimořádné uzavření a důvod. Dvůr, popis a otevírací dobu mění jen hlavní redaktor.
 
 Hlavní redaktor může text před schválením upravit, nejčastěji češtinu. Veřejně se neukáže, co se měnilo. Když se zveřejněné znění liší od návrhu, u autora je nanejvýš slovo Redigováno. Autor příspěvku zůstává přispěvatel. U návrhu úpravy cizí zprávy zůstává původní autor.
 
@@ -57,3 +57,7 @@ Otevři `http://127.0.0.1:8787`. Místní D1 i R2 jsou jen na tom počítači, n
 ## Svoz
 
 Pravidlo je stejné jako na popelnice.kopidlenskadrbna.org: pondělí lichého kalendářního týdne, jednou za 14 dní. V redakci se dá den, sudý/lichý týden i interval přepnout. Není to úřední harmonogram města.
+
+## Sběrné dvory
+
+Veřejná stránka je `/sberne-dvory`. Hlavní redaktor v záložce Sběrné dvory přidá i víc dvorů: místo, co se tam vozí a u každého dne v týdnu od–do. Na titulce je u každého dvora podle pražského času, jestli je právě otevřený, kdy zas otevře, nebo že je mimořádně zavřený do data. Mimořádné uzavření a důvod k němu zapíše hlavní redaktor, nebo přispěvatel s oprávněním Sběrný dvůr. Není to úřední deska města.

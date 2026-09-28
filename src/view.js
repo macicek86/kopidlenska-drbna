@@ -1,7 +1,9 @@
-import { CATEGORIES } from "./db.js";
+import { byline, CATEGORIES, PERMISSIONS, userCan } from "./db.js";
 import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
 import { prepareArticleBody, renderArticleHtml } from "./rich.js";
+import { civilWeekday } from "./waste.js";
+import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 
 const CATEGORY_KEY = {
   Zprávy: "cat_zpravy",
@@ -25,6 +27,7 @@ const NAV = [
   ["/zpravy", "nav_news"],
   ["/akce", "nav_events"],
   ["/popelnice", "nav_bins"],
+  ["/sberne-dvory", "nav_yards"],
   ["/o-nas", "nav_about"],
 ];
 
@@ -112,7 +115,21 @@ function flashOf(message) {
 }
 
 function signedWhen(article, when) {
-  return article.authorName ? `${when} · ${article.authorName}` : when;
+  const name = byline(article);
+  return name ? `${when} · ${name}` : when;
+}
+
+function credit(person) {
+  const shown = byline(person);
+  const name = String(person?.authorName ?? person?.name ?? "").trim();
+  if (!shown) return "";
+  if (name && shown !== name) return `${shown} (${name})`;
+  return shown;
+}
+
+function closureLabel(closure) {
+  if (closure.startsOn === closure.endsOn) return formatLong(closure.startsOn);
+  return `${formatLong(closure.startsOn)} – ${formatLong(closure.endsOn)}`;
 }
 
 function articleMeta(article) {
@@ -178,6 +195,7 @@ export function homePage(data, ctx) {
               <a class="btn btn-line" href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
             </div>
           </div>
+          ${yardsTeaser(data, ctx)}
         </div>
       </section>
       <section class="block">
@@ -306,6 +324,7 @@ export function binsPage(waste, ctx, { showExternal, standaloneTitle }) {
               ? `<a class="back" href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>`
               : ""
           }
+          ${ctx.minimal ? "" : `<a class="back" href="/sberne-dvory">${esc(tx(ctx.copy, "bins_yards_link"))}</a>`}
         </div>
         <div class="bin-photo"><img src="/kozel-popelar.webp" alt="${esc(tx(ctx.copy, "bins_alt"))}"></div>
       </section>
@@ -332,6 +351,7 @@ export function aboutPage(data, ctx) {
           <p>${esc(data.contactNote)}</p>
           <div class="row links">
             <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
+            <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
             <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
           </div>
         </div>
@@ -383,17 +403,20 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
   const chief = data.user?.role === "hlavni";
   const waiting = (data.proposals ?? []).filter((item) => item.status === "pending").length;
   const newsLabel = chief && waiting ? `Zprávy (${waiting})` : "Zprávy";
+  const yardTab = ["/redakce/dvory", "dvory", "Sběrné dvory"];
   const tabs = chief
     ? [
         ["/redakce/zpravy", "zpravy", newsLabel],
         ["/redakce/akce", "akce", "Akce"],
         ["/redakce/texty", "texty", "Texty"],
         ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
+        yardTab,
         ["/redakce/lide", "lide", "Lidé"],
         ["/redakce/heslo", "heslo", "Heslo"],
       ]
     : [
         ["/redakce/zpravy", "zpravy", "Zprávy"],
+        ...(userCan(data.user, "sberny_dvur") ? [yardTab] : []),
         ["/redakce/heslo", "heslo", "Heslo"],
       ];
   const tabHtml = tabs
@@ -467,7 +490,7 @@ function chiefArticles(ctx, data, message, query) {
   const queue = data.proposals
     .map(
       (item) => `<li class="card">
-        <p class="kicker">${proposalKind(item)} · ${esc(item.authorName)}</p>
+        <p class="kicker">${proposalKind(item)} · ${esc(credit(item))}</p>
         <h3>${esc(item.title)}</h3>
         <p class="muted">${esc(item.excerpt)}</p>
         ${item.articleTitle ? `<p class="meta">Ke zprávě: ${esc(item.articleTitle)}</p>` : ""}
@@ -487,7 +510,7 @@ function chiefArticles(ctx, data, message, query) {
             <a class="btn btn-ghost" href="/redakce/zpravy">Nechat</a>`
           : `<a class="btn btn-ghost" href="/redakce/zpravy?smazat=${item.id}">Smazat</a>`;
       return `<li class="card">
-        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${item.authorName ? ` · ${esc(item.authorName)}` : ""}${item.published ? "" : " · skrytá"}${item.redacted ? " · redigováno" : ""}</p>
+        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${credit(item) ? ` · ${esc(credit(item))}` : ""}${item.published ? "" : " · skrytá"}${item.redacted ? " · redigováno" : ""}</p>
         <h3>${esc(item.title)}</h3>
         <div class="row">
           <a class="btn btn-line" href="/redakce/zpravy?id=${item.id}">Upravit</a>
@@ -499,7 +522,7 @@ function chiefArticles(ctx, data, message, query) {
   const form = proposal
     ? `<div class="stack"><form class="card form" method="post" action="/redakce/zpravy/schvalit" enctype="multipart/form-data">
         <h2>${proposal.articleId ? "Schválit úpravu" : "Schválit příspěvek"}</h2>
-        <p class="muted">Autor na webu: ${esc(proposal.authorName)}. Text můžete před schválením upravit, typicky češtinu. Ven se neukáže, co se měnilo. Když se znění liší od návrhu, u autora bude nanejvýš slovo Redigováno.</p>
+        <p class="muted">Autor na webu: ${esc(credit(proposal))}. Text můžete před schválením upravit, typicky češtinu. Ven se neukáže, co se měnilo. Když se znění liší od návrhu, u autora bude nanejvýš slovo Redigováno.</p>
         ${proposal.articleTitle ? `<p class="meta">Ke zprávě: ${esc(proposal.articleTitle)}</p>` : ""}
         <input type="hidden" name="id" value="${proposal.id}">
         ${articleFields(ctx, proposal)}
@@ -517,9 +540,9 @@ function chiefArticles(ctx, data, message, query) {
         <h2>${editing ? "Upravit zprávu" : "Nová zpráva"}</h2>
         <p class="muted">${
           !editing
-            ? `Jde na web hned a podepíše se jménem ${esc(data.user?.name ?? "Redakce")}.`
-            : editing.authorName && editing.authorId !== data.user?.id
-              ? `Autor zůstává ${esc(editing.authorName)}. Když změníte text, na webu se objeví nanejvýš slovo Redigováno.`
+            ? `Jde na web hned a podepíše se jako ${esc(byline(data.user) || "Redakce")}.`
+            : credit(editing) && editing.authorId !== data.user?.id
+              ? `Autor zůstává ${esc(credit(editing))}. Když změníte text, na webu se objeví nanejvýš slovo Redigováno.`
               : "Úprava jde na web hned."
         }</p>
         ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
@@ -562,7 +585,7 @@ function contributorArticles(ctx, data, message, query) {
       ? "Úprava vaší zprávy"
       : "Návrh úpravy";
   const help = !editingArticle
-    ? `Na web to přijde, až to schválí hlavní redaktor. Do té doby to tu můžete měnit. Podepíše se jménem ${esc(data.user?.name ?? "")}.`
+    ? `Na web to přijde, až to schválí hlavní redaktor. Do té doby to tu můžete měnit. Podepíše se jako ${esc(byline(data.user))}.`
     : mine
       ? "Veřejné znění se nezmění, dokud úpravu neschválí hlavní redaktor."
       : "Cizí zprávu nejde přepsat přímo. Tohle je návrh a rozhodne o něm hlavní redaktor. Autor zůstane ten původní.";
@@ -614,7 +637,7 @@ function contributorArticles(ctx, data, message, query) {
       const open = data.proposals.find((proposal) => proposal.articleId === item.id);
       const href = open ? `/redakce/zpravy?navrh=${open.id}` : `/redakce/zpravy?clanek=${item.id}`;
       return `<li class="card">
-        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${item.authorName ? ` · ${esc(item.authorName)}` : ""}${mine ? " · vaše" : ""}</p>
+        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${credit(item) ? ` · ${esc(credit(item))}` : ""}${mine ? " · vaše" : ""}</p>
         <h3>${esc(item.title)}</h3>
         <div class="row"><a class="btn btn-line" href="${href}">${mine ? "Upravit" : "Navrhnout úpravu"}</a></div>
       </li>`;
@@ -633,10 +656,19 @@ export function adminArticles(ctx, data, message, query = {}) {
   return contributorArticles(ctx, data, message, query);
 }
 
+function permissionBoxes(selected) {
+  const have = new Set(selected ?? []);
+  return PERMISSIONS.map(
+    (item) =>
+      `<label class="check"><input type="checkbox" name="permission" value="${esc(item.code)}"${have.has(item.code) ? " checked" : ""}> ${esc(item.label)}</label><span class="hint">${esc(item.detail)}</span>`,
+  ).join("");
+}
+
 export function adminPeople(ctx, data, message, disableId) {
   const list = data.users
     .map((person) => {
-      const role = person.role === "hlavni" ? "hlavní redaktor" : "přispěvatel";
+      const extras = PERMISSIONS.filter((item) => person.permissions?.includes(item.code)).map((item) => item.label);
+      const role = person.role === "hlavni" ? "hlavní redaktor" : ["přispěvatel", ...extras].join(" · ");
       const state = person.active ? "" : " · vypnutý";
       let controls = "";
       if (person.role !== "hlavni") {
@@ -655,6 +687,16 @@ export function adminPeople(ctx, data, message, disableId) {
               <button class="btn btn-line" type="submit">Zapnout</button>
             </form>`;
       }
+      const access =
+        person.role === "hlavni"
+          ? ""
+          : `<form class="form" method="post" action="/redakce/lide/udaje">
+              <input type="hidden" name="id" value="${person.id}">
+              ${field("Alias", `<input class="${input}" name="alias" maxlength="60" value="${esc(person.alias)}" autocomplete="off">`)}
+              <span class="hint">Když je alias vyplněný, na webu se ukáže místo jména pod článkem. Prázdné pole znamená, že zůstane jméno.</span>
+              ${permissionBoxes(person.permissions)}
+              <button class="btn btn-line" type="submit">Uložit alias a oprávnění</button>
+            </form>`;
       const password =
         person.role === "hlavni"
           ? ""
@@ -664,21 +706,26 @@ export function adminPeople(ctx, data, message, disableId) {
               <button class="btn btn-line" type="submit">Nastavit heslo</button>
             </form>`;
       return `<li class="card">
-        <p class="kicker">${role}${state}</p>
+        <p class="kicker">${esc(role)}${state}</p>
         <h3>${esc(person.name)}</h3>
+        <p class="meta">Na webu: ${esc(byline(person))}</p>
         <p class="muted">${esc(person.login)}</p>
         <div class="row">${controls}</div>
+        ${access}
         ${password}
       </li>`;
     })
     .join("");
   const form = `<form class="card form" method="post" action="/redakce/lide/ulozit">
     <h2>Nový přispěvatel</h2>
-    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění.</p>
+    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Oprávnění jdou přidávat: teď je tu sběrný dvůr.</p>
     ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" autocomplete="off">`)}
+    ${field("Alias", `<input class="${input}" name="alias" maxlength="60" autocomplete="off">`)}
+    <span class="hint">Nepovinné. Když ho vyplní, na webu se ukáže místo jména. Sám si ho pak může změnit v záložce Heslo.</span>
     ${field("Přihlašovací jméno", `<input class="${input}" name="login" required minlength="3" maxlength="32" autocapitalize="none" autocomplete="off">`)}
     <span class="hint">Malá písmena a číslice, bez mezer. Třeba jana.</span>
     ${field("Heslo", `<input class="${input}" type="password" name="password" required minlength="8" autocomplete="new-password">`)}
+    ${permissionBoxes([])}
     <button class="btn btn-primary" type="submit">Přidat</button>
   </form>`;
   return adminShell(ctx, data, "lide", message, `<div class="split">${form}<ul class="stack plain">${list}</ul></div>`);
@@ -788,11 +835,13 @@ export function adminSite(ctx, data, message) {
 }
 
 export function adminPassword(ctx, data, message) {
+  const shown = byline(data.user);
   const form = `<form class="card form narrow" method="post" action="/redakce/jmeno/ulozit">
-    <h2>Jméno pod článkem</h2>
-    <p class="muted">Tak se podepíšou nové příspěvky. Už zveřejněné zprávy si nechají jméno, se kterým šly ven.</p>
-    ${field("Jméno", `<input class="${input}" name="name" required maxlength="60" value="${esc(data.user?.name ?? "")}">`)}
-    <button class="btn btn-primary" type="submit">Uložit jméno</button>
+    <h2>Jméno a alias</h2>
+    <p class="muted">Jméno je základ pod článkem. Alias je dobrovolný. Když ho používáte, na webu se u vašich zpráv ukáže on, ne jméno. Když alias smažete, znovu se ukáže jméno, se kterým zpráva vyšla. Teď se na webu ukáže: ${esc(shown)}.</p>
+    ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" value="${esc(data.user?.name ?? "")}">`)}
+    ${field("Alias", `<input class="${input}" name="alias" maxlength="60" value="${esc(data.user?.alias ?? "")}" autocomplete="nickname">`)}
+    <button class="btn btn-primary" type="submit">Uložit jméno a alias</button>
   </form>
   <form class="card form narrow" method="post" action="/redakce/heslo/ulozit">
     <h2>Heslo</h2>
@@ -801,6 +850,207 @@ export function adminPassword(ctx, data, message) {
     <button class="btn btn-primary" type="submit">Změnit heslo</button>
   </form>`;
   return adminShell(ctx, data, "heslo", message, form);
+}
+
+function clockOf(data) {
+  return data.now ?? { date: data.waste.today, time: "12:00" };
+}
+
+function yardsTeaser(data, ctx) {
+  const yards = data.yards ?? [];
+  if (!yards.length) return "";
+  const now = clockOf(data);
+  const lines = yards
+    .map((yard) => {
+      const item = homeStatus(yard, now.date, now.time);
+      const kind = item.kind === "open" ? "is-open" : item.kind === "closure" ? "is-closure" : "is-shut";
+      return `<li class="${kind}">
+        <p class="yard-home-name">${esc(item.name)}</p>
+        <p class="yard-home-state">${esc(item.state)}</p>
+        ${item.detail ? `<p class="yard-home-detail">${esc(item.detail)}</p>` : ""}
+        ${item.tomorrow ? `<p class="yard-home-detail">${esc(item.tomorrow)}</p>` : ""}
+      </li>`;
+    })
+    .join("");
+  return `<div class="card waste-teaser">
+    <p class="eyebrow">${esc(tx(ctx.copy, "home_yards_button"))}</p>
+    <ul class="yard-home">${lines}</ul>
+    <div class="row"><a class="btn btn-primary" href="/sberne-dvory">${esc(tx(ctx.copy, "home_yards_button"))}</a></div>
+  </div>`;
+}
+
+function dayLabel(day) {
+  return WEEK_DAYS.find((item) => item.day === day)?.label ?? "";
+}
+
+function weekList(week, today) {
+  const todayDay = civilWeekday(today);
+  return `<ul class="week-list">${week
+    .map((slot) => {
+      const mark = slot.day === todayDay ? " is-today" : "";
+      const off = slot.open ? "" : " is-off";
+      const when = slot.open ? `${slot.from}–${slot.to}` : "zavřeno";
+      return `<li class="${mark}${off}"><span>${esc(dayLabel(slot.day))}</span><strong>${esc(when)}</strong></li>`;
+    })
+    .join("")}</ul>`;
+}
+
+function hoursFields(week) {
+  return `<div class="hours-grid"><span>Otevřeno ve dnech</span>${week
+    .map(
+      (slot) => `<div class="hours-row">
+        <label class="check"><input type="checkbox" name="open-${slot.day}" value="1"${slot.open ? " checked" : ""}> ${esc(dayLabel(slot.day))}</label>
+        <input class="control" type="time" name="from-${slot.day}" value="${esc(slot.from)}" aria-label="${esc(dayLabel(slot.day))} od">
+        <input class="control" type="time" name="to-${slot.day}" value="${esc(slot.to)}" aria-label="${esc(dayLabel(slot.day))} do">
+      </div>`,
+    )
+    .join("")}<span class="hint">Zaškrtněte den a doplňte od a do. Den bez fajfky je zavřený.</span></div>`;
+}
+
+function yardStatusHtml(yard, now) {
+  const item = homeStatus(yard, now.date, now.time);
+  const line = esc(statusLine(yard, now.date, now.time));
+  const extra = item.tomorrow ? `<p class="muted">${esc(item.tomorrow)}</p>` : "";
+  if (item.kind === "closure") return `<p class="banner">${line}</p>${extra}`;
+  if (item.kind === "open") return `<p class="count">${line}</p>${extra}`;
+  return `<p class="meta">${line}</p>${extra}`;
+}
+
+export function yardsPage(data, ctx) {
+  const today = data.waste.today;
+  const now = clockOf(data);
+  const cards = (data.yards ?? []).length
+    ? (data.yards ?? [])
+        .map((yard) => {
+          const later = yard.closures.filter((closure) => closure.startsOn > today);
+          const planned = later.length
+            ? `<p class="kicker">${esc(tx(ctx.copy, "yards_upcoming"))}</p><div class="dates compact">${later
+                .map(
+                  (closure) =>
+                    `<article class="date-tile"><strong>${esc(closureLabel(closure))}</strong><span>${esc(closure.reason)}</span></article>`,
+                )
+                .join("")}</div>`
+            : "";
+          const hours = yard.legacy
+            ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
+            : weekList(yard.week, today);
+          return `<article class="card yard">
+            <p class="kicker">${esc(yard.place)}</p>
+            <h2>${esc(yard.name)}</h2>
+            ${yardStatusHtml(yard, now)}
+            <p class="kicker">${esc(tx(ctx.copy, "yards_accepts"))}</p>
+            <p class="keep-lines">${esc(yard.accepts)}</p>
+            <p class="kicker">${esc(tx(ctx.copy, "yards_hours"))}</p>
+            ${hours}
+            ${planned}
+          </article>`;
+        })
+        .join("")
+    : `<p class="card dashed muted">${esc(tx(ctx.copy, "yards_empty"))}</p>`;
+  return layout({
+    ...ctx,
+    title: `${tx(ctx.copy, "yards_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "yards_description"),
+    body: `
+      <p class="eyebrow">${esc(tx(ctx.copy, "yards_eyebrow"))}</p>
+      <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>
+      <p class="lede">${esc(tx(ctx.copy, "yards_lede"))}</p>
+      <div class="stack">${cards}</div>`,
+  });
+}
+
+function closureAdmin(yard, cancelId) {
+  const items = yard.closures.length
+    ? yard.closures
+        .map((closure) => {
+          const confirm =
+            cancelId === closure.id
+              ? `<form method="post" action="/redakce/dvory/uzavreni/smazat">
+                  <input type="hidden" name="id" value="${closure.id}">
+                  <input type="hidden" name="confirm" value="1">
+                  <button class="btn btn-primary" type="submit">Opravdu zrušit</button>
+                </form>
+                <a class="btn btn-ghost" href="/redakce/dvory">Nechat</a>`
+              : `<a class="btn btn-ghost" href="/redakce/dvory?zrusit=${closure.id}">Zrušit uzavření</a>`;
+          return `<div class="date-tile">
+            <strong>${esc(closureLabel(closure))}</strong>
+            <span>${esc(closure.reason)}</span>
+            <div class="row">${confirm}</div>
+          </div>`;
+        })
+        .join("")
+    : `<p class="muted">Žádné zapsané uzavření.</p>`;
+  return `<p class="meta">Mimořádné uzavření</p>
+    <div class="dates compact">${items}</div>
+    <form class="form" method="post" action="/redakce/dvory/uzavreni">
+      <input type="hidden" name="yardId" value="${yard.id}">
+      <div class="pair">
+        ${field("Od", `<input class="${input}" type="date" name="startsOn" required>`)}
+        ${field("Do", `<input class="${input}" type="date" name="endsOn">`)}
+      </div>
+      <span class="hint">Když jde o jeden den, pole Do nechte prázdné.</span>
+      ${field("Důvod", `<textarea class="${input}" name="reason" required maxlength="400" rows="2" placeholder="Třeba inventura nebo porucha vrat."></textarea>`)}
+      <button class="btn btn-line" type="submit">Zapsat uzavření</button>
+    </form>`;
+}
+
+export function adminYards(ctx, data, message, editingId, confirmId, cancelId) {
+  const chief = data.user?.role === "hlavni";
+  const editing = chief ? (data.yards.find((item) => item.id === editingId) ?? null) : null;
+  const list = data.yards.length
+    ? data.yards
+        .map((item) => {
+          const confirm =
+            chief && confirmId === item.id
+              ? `<form method="post" action="/redakce/dvory/smazat">
+                  <input type="hidden" name="id" value="${item.id}">
+                  <input type="hidden" name="confirm" value="1">
+                  <button class="btn btn-primary" type="submit">Opravdu smazat</button>
+                </form>
+                <a class="btn btn-ghost" href="/redakce/dvory">Nechat</a>`
+              : chief
+                ? `<a class="btn btn-line" href="/redakce/dvory?id=${item.id}">Upravit</a>
+                   <a class="btn btn-ghost" href="/redakce/dvory?smazat=${item.id}">Smazat</a>`
+                : "";
+          return `<li class="card">
+            <p class="kicker">${esc(item.place)}${item.published ? "" : " · skrytý"}</p>
+            <h3>${esc(item.name)}</h3>
+            <p class="keep-lines">${esc(item.accepts)}</p>
+            <p class="muted">${esc(hoursSummary(item))}</p>
+            ${confirm ? `<div class="row">${confirm}</div>` : ""}
+            ${closureAdmin(item, cancelId)}
+          </li>`;
+        })
+        .join("")
+    : `<li class="card dashed muted">Zatím žádný sběrný dvůr.</li>`;
+  const form = chief
+    ? `<form class="card form" method="post" action="/redakce/dvory/ulozit">
+        <h2>${editing ? "Upravit sběrný dvůr" : "Nový sběrný dvůr"}</h2>
+        <p class="muted">Název, co se tam vozí a kdy má otevřeno. Mimořádné uzavření může zapsat i člověk s oprávněním Sběrný dvůr.</p>
+        ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
+        ${field("Název", `<input class="${input}" name="name" required maxlength="120" value="${esc(editing?.name ?? "")}">`)}
+        ${field("Místo", `<input class="${input}" name="place" required maxlength="160" value="${esc(editing?.place ?? "")}">`)}
+        ${field("Co se tam vozí", `<textarea class="${input}" name="accepts" required maxlength="1200" rows="4">${esc(editing?.accepts ?? "")}</textarea>`)}
+        ${hoursFields(editing?.week ?? WEEK_DAYS.map(({ day }) => ({ day, open: false, from: "08:00", to: "16:00" })))}
+        ${field("Pořadí", `<input class="${input}" type="number" name="sortOrder" min="0" max="999" required value="${editing?.sortOrder ?? 0}">`)}
+        <span class="hint">Menší číslo je na stránce výš.</span>
+        <label class="check"><input type="checkbox" name="published" value="1"${editing ? (editing.published ? " checked" : "") : " checked"}> Zveřejnit</label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Uložit</button>
+          ${editing ? `<a class="btn btn-ghost" href="/redakce/dvory">Nový</a>` : ""}
+        </div>
+      </form>`
+    : `<section class="card">
+        <h2>Mimořádné uzavření</h2>
+        <p class="muted">Dvory a otevírací dobu nastavuje hlavní redaktor. Sem se píše den, nebo rozmezí, a důvod, proč je zavřeno.</p>
+      </section>`;
+  return adminShell(
+    ctx,
+    data,
+    "dvory",
+    message,
+    `<div class="${chief ? "split" : "stack"}">${form}<ul class="stack plain">${list}</ul></div>`,
+  );
 }
 
 export function brokenPage(message) {

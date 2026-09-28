@@ -1,10 +1,23 @@
 export function pragueToday(now = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
+  return pragueNow(now).date;
+}
+
+/** Den a hodina v Evropě/Praha. Hodiny procesu se nepoužijí, worker je v UTC. */
+export function pragueNow(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Prague",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const pick = (type) => parts.find((part) => part.type === type)?.value ?? "";
+  return {
+    date: `${pick("year")}-${pick("month")}-${pick("day")}`,
+    time: `${pick("hour").padStart(2, "0")}:${pick("minute").padStart(2, "0")}`,
+  };
 }
 
 export function addDays(iso, days) {
