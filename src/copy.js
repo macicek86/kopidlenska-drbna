@@ -6,6 +6,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "nav_events", label: "Menu: akce", value: "Akce", max: 40 },
   { group: "Hlavička a patička", key: "nav_bins", label: "Menu: popelnice", value: "Popelnice", max: 40 },
   { group: "Hlavička a patička", key: "nav_yards", label: "Menu: sběrné dvory", value: "Sběrné dvory", max: 40 },
+  { group: "Hlavička a patička", key: "nav_doctors", label: "Menu: lékaři", value: "Lékaři", max: 40 },
   { group: "Hlavička a patička", key: "nav_about", label: "Menu: o nás", value: "O nás", max: 40 },
   { group: "Hlavička a patička", key: "menu_label", label: "Tlačítko menu na mobilu", value: "Menu", max: 40 },
   { group: "Hlavička a patička", key: "skip", label: "Odkaz přeskočit na obsah", value: "Přeskočit na obsah", max: 80 },
@@ -23,6 +24,7 @@ export const COPY = [
   { group: "Titulka", key: "home_waste_eyebrow", label: "Nadpis u svozu na titulce", value: "Popelnice", max: 40 },
   { group: "Titulka", key: "home_waste_button", label: "Tlačítko na svoz", value: "Kdy se sváží", max: 40 },
   { group: "Titulka", key: "home_yards_button", label: "Tlačítko na sběrné dvory", value: "Sběrné dvory", max: 40 },
+  { group: "Titulka", key: "home_doctors_button", label: "Tlačítko na lékaře", value: "Lékaři", max: 40 },
   { group: "Titulka", key: "home_news_heading", label: "Nadpis sekce zpráv", value: "Zprávy", max: 40 },
   { group: "Titulka", key: "home_news_all", label: "Odkaz na všechny zprávy", value: "Všechny", max: 40 },
   { group: "Titulka", key: "home_events_heading", label: "Nadpis sekce akcí", value: "Akce", max: 40 },
@@ -77,6 +79,16 @@ export const COPY = [
   { group: "Sběrné dvory", key: "yards_closed", label: "Štítek mimořádného uzavření", value: "Mimořádně zavřeno", max: 80 },
   { group: "Sběrné dvory", key: "yards_upcoming", label: "Nadpis plánovaných uzavření", value: "Plánovaná uzavření", max: 80 },
 
+  { group: "Lékaři", key: "doctors_description", label: "Popis stránky lékařů", value: "Ordinační hodiny lékařů v Kopidlně a dočasné změny, třeba zástup nebo jiná doba.", max: 240, long: true },
+  { group: "Lékaři", key: "doctors_eyebrow", label: "Malý nadpis stránky lékařů", value: "Ordinace", max: 40 },
+  { group: "Lékaři", key: "doctors_heading", label: "Nadpis stránky lékařů", value: "Lékaři", max: 80 },
+  { group: "Lékaři", key: "doctors_lede", label: "Úvod stránky lékařů", value: "Ordinační hodiny v Kopidlně. Dopoledne a odpoledne mají vlastní čas a poznámku, třeba že jde jen o akutní případy. Dočasná změna je tu i s důvodem. Není to úřední deska města ani objednávkový systém.", max: 500, long: true },
+  { group: "Lékaři", key: "doctors_empty", label: "Když není žádný lékař", value: "Zatím tu není zveřejněná ordinace. Až ji redakce doplní, objeví se tady.", max: 240, long: true },
+  { group: "Lékaři", key: "doctors_hours", label: "Nadpis ordinačních hodin", value: "Ordinační hodiny", max: 40 },
+  { group: "Lékaři", key: "doctors_regular", label: "Nadpis běžných hodin, když platí změna", value: "Běžné hodiny", max: 40 },
+  { group: "Lékaři", key: "doctors_changes", label: "Nadpis dočasných změn", value: "Dočasné změny", max: 80 },
+  { group: "Lékaři", key: "doctors_missing_hours", label: "Když hodiny ještě nejsou", value: "Ordinační hodiny zatím nejsou doplněné.", max: 160 },
+
   { group: "O nás", key: "about_description", label: "Popis stránky O nás", value: "Sousedská, ne úřední stránka pro Kopidlno a jeho části.", max: 240, long: true },
   { group: "O nás", key: "about_eyebrow", label: "Malý nadpis stránky O nás", value: "O stránce", max: 40 },
   { group: "O nás", key: "about_heading", label: "Nadpis stránky O nás", value: "Sousedská, ne úřední", max: 80 },
@@ -84,6 +96,7 @@ export const COPY = [
   { group: "O nás", key: "about_disclaimer", label: "Upozornění, že nejde o úřad", value: "Stránku neprovozuje Město Kopidlno. Vyhlášky, poplatky a úřední oznámení berte vždy z webu města.", max: 500, long: true },
   { group: "O nás", key: "about_bins_link", label: "Odkaz na svoz", value: "Svoz popelnic", max: 80 },
   { group: "O nás", key: "about_yards_link", label: "Odkaz na sběrné dvory", value: "Sběrné dvory", max: 80 },
+  { group: "O nás", key: "about_doctors_link", label: "Odkaz na lékaře", value: "Lékaři", max: 80 },
   { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Maskot Kopidlenské drbny", max: 160 },
 ];
 

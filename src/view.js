@@ -3,6 +3,16 @@ import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
 import { prepareArticleBody, renderArticleHtml } from "./rich.js";
 import { civilWeekday } from "./waste.js";
+import {
+  HOME_LEAD_DAYS,
+  activeChange,
+  blankWeek,
+  hasOpenSlot,
+  homeNotice,
+  hoursSummary as doctorHoursSummary,
+  periodClosed,
+  spanSummary,
+} from "./doctors.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 
 const CATEGORY_KEY = {
@@ -28,6 +38,7 @@ const NAV = [
   ["/akce", "nav_events"],
   ["/popelnice", "nav_bins"],
   ["/sberne-dvory", "nav_yards"],
+  ["/lekari", "nav_doctors"],
   ["/o-nas", "nav_about"],
 ];
 
@@ -196,6 +207,7 @@ export function homePage(data, ctx) {
             </div>
           </div>
           ${yardsTeaser(data, ctx)}
+          ${doctorsTeaser(data, ctx)}
         </div>
       </section>
       <section class="block">
@@ -352,6 +364,7 @@ export function aboutPage(data, ctx) {
           <div class="row links">
             <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
             <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
+            <a href="/lekari">${esc(tx(ctx.copy, "about_doctors_link"))}</a>
             <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
           </div>
         </div>
@@ -404,6 +417,7 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
   const waiting = (data.proposals ?? []).filter((item) => item.status === "pending").length;
   const newsLabel = chief && waiting ? `Zprávy (${waiting})` : "Zprávy";
   const yardTab = ["/redakce/dvory", "dvory", "Sběrné dvory"];
+  const doctorTab = ["/redakce/lekari", "lekari", "Lékaři"];
   const tabs = chief
     ? [
         ["/redakce/zpravy", "zpravy", newsLabel],
@@ -411,12 +425,14 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
         ["/redakce/texty", "texty", "Texty"],
         ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
         yardTab,
+        doctorTab,
         ["/redakce/lide", "lide", "Lidé"],
         ["/redakce/heslo", "heslo", "Heslo"],
       ]
     : [
         ["/redakce/zpravy", "zpravy", "Zprávy"],
         ...(userCan(data.user, "sberny_dvur") ? [yardTab] : []),
+        ...(userCan(data.user, "doktori") ? [doctorTab] : []),
         ["/redakce/heslo", "heslo", "Heslo"],
       ];
   const tabHtml = tabs
@@ -718,7 +734,7 @@ export function adminPeople(ctx, data, message, disableId) {
     .join("");
   const form = `<form class="card form" method="post" action="/redakce/lide/ulozit">
     <h2>Nový přispěvatel</h2>
-    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Oprávnění jdou přidávat: teď je tu sběrný dvůr.</p>
+    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Oprávnění jdou přidávat: teď je tu sběrný dvůr a lékaři.</p>
     ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" autocomplete="off">`)}
     ${field("Alias", `<input class="${input}" name="alias" maxlength="60" autocomplete="off">`)}
     <span class="hint">Nepovinné. Když ho vyplní, na webu se ukáže místo jména. Sám si ho pak může změnit v záložce Heslo.</span>
@@ -876,6 +892,30 @@ function yardsTeaser(data, ctx) {
     <p class="eyebrow">${esc(tx(ctx.copy, "home_yards_button"))}</p>
     <ul class="yard-home">${lines}</ul>
     <div class="row"><a class="btn btn-primary" href="/sberne-dvory">${esc(tx(ctx.copy, "home_yards_button"))}</a></div>
+  </div>`;
+}
+
+function doctorsTeaser(data, ctx) {
+  const today = clockOf(data).date;
+  const lines = (data.doctors ?? [])
+    .map((doctor) => {
+      const item = homeNotice(doctor, today);
+      if (!item) return "";
+      return `<li class="is-change">
+        <p class="yard-home-name">${esc(item.name)}</p>
+        <p class="yard-home-detail">${esc(item.specialty)}</p>
+        <p class="yard-home-state">${esc(item.state)}</p>
+        ${item.note ? `<p class="yard-home-detail">${esc(item.note)}</p>` : ""}
+        ${item.detail ? `<p class="yard-home-detail">${esc(item.detail)}</p>` : ""}
+      </li>`;
+    })
+    .filter(Boolean)
+    .join("");
+  if (!lines) return "";
+  return `<div class="card waste-teaser">
+    <p class="eyebrow">${esc(tx(ctx.copy, "home_doctors_button"))}</p>
+    <ul class="yard-home">${lines}</ul>
+    <div class="row"><a class="btn btn-primary" href="/lekari">${esc(tx(ctx.copy, "home_doctors_button"))}</a></div>
   </div>`;
 }
 
@@ -1048,6 +1088,216 @@ export function adminYards(ctx, data, message, editingId, confirmId, cancelId) {
     ctx,
     data,
     "dvory",
+    message,
+    `<div class="${chief ? "split" : "stack"}">${form}<ul class="stack plain">${list}</ul></div>`,
+  );
+}
+
+function phoneLink(phone) {
+  const text = String(phone ?? "").trim();
+  if (!text) return "";
+  const digits = text.replace(/[^\d+]/g, "");
+  if (digits.length < 9) return esc(text);
+  const href = digits.startsWith("+") ? digits : digits.startsWith("420") ? `+${digits}` : `+420${digits}`;
+  return `<a href="tel:${esc(href)}">${esc(text)}</a>`;
+}
+
+function partLine(label, part) {
+  if (!part?.open) return "";
+  const note = part.note ? `<span class="hint">${esc(part.note)}</span>` : "";
+  return `<strong>${esc(`${label} ${part.from}–${part.to}`)}</strong>${note}`;
+}
+
+function doctorWeekList(week, today) {
+  const todayDay = civilWeekday(today);
+  return `<ul class="week-list doctor-week">${week
+    .map((slot) => {
+      const morning = partLine("dopoledne", slot.morning);
+      const afternoon = partLine("odpoledne", slot.afternoon);
+      const open = Boolean(morning || afternoon);
+      const body = open ? `<div class="parts">${morning}${afternoon}</div>` : `<strong>zavřeno</strong>`;
+      return `<li class="${slot.day === todayDay ? " is-today" : ""}${open ? "" : " is-off"}"><span>${esc(dayLabel(slot.day))}</span>${body}</li>`;
+    })
+    .join("")}</ul>`;
+}
+
+function slotRow(label, prefix, day, part, placeholder) {
+  const name = dayLabel(day);
+  return `<div class="slot-row">
+    <label class="check"><input type="checkbox" name="${prefix}-open-${day}" value="1"${part.open ? " checked" : ""}> ${label}</label>
+    <input class="control" type="time" name="${prefix}-from-${day}" value="${esc(part.from)}" aria-label="${esc(name)} ${label} od">
+    <input class="control" type="time" name="${prefix}-to-${day}" value="${esc(part.to)}" aria-label="${esc(name)} ${label} do">
+    <input class="control slot-note" type="text" name="${prefix}-note-${day}" maxlength="160" value="${esc(part.note)}" placeholder="${esc(placeholder)}" aria-label="${esc(name)} ${label}, poznámka">
+  </div>`;
+}
+
+function doctorHoursFields(week) {
+  const days = week?.length ? week : blankWeek();
+  return `<div class="hours-grid"><span>Ordinační hodiny</span>${days
+    .map(
+      (slot) => `<div class="hours-day">
+        <p class="meta">${esc(dayLabel(slot.day))}</p>
+        ${slotRow("Dopoledne", "am", slot.day, slot.morning, "Třeba jen pro objednané")}
+        ${slotRow("Odpoledne", "pm", slot.day, slot.afternoon, "Třeba jen akutní případy")}
+      </div>`,
+    )
+    .join("")}<span class="hint">Dopoledne a odpoledne se zaškrtávají zvlášť, ať mezi nimi může být polední pauza. Ke každé půlce jde poznámka. Půlka bez fajfky v ten den není.</span></div>`;
+}
+
+function doctorChangeTiles(changes) {
+  return changes
+    .map((change) => {
+      const hours = periodClosed(change) ? "Zavřeno" : spanSummary(change);
+      return `<article class="date-tile"><strong>${esc(closureLabel(change))}</strong><span>${esc(change.note)}</span><span>${esc(hours)}</span></article>`;
+    })
+    .join("");
+}
+
+export function doctorsPage(data, ctx) {
+  const today = data.waste.today;
+  const cards = (data.doctors ?? []).length
+    ? (data.doctors ?? [])
+        .map((doctor) => {
+          const current = activeChange(doctor, today);
+          const notice = current ? homeNotice(doctor, today) : null;
+          const banner = notice
+            ? `<div class="banner"><p>${esc(`${notice.name} ${notice.state.charAt(0).toLowerCase()}${notice.state.slice(1)}`)}</p><p>${esc(notice.note)}</p>${notice.detail ? `<p>${esc(notice.detail)}</p>` : ""}</div>`
+            : "";
+          const rest = doctor.changes.filter((change) => change.id !== current?.id);
+          const planned = rest.length
+            ? `<p class="kicker">${esc(tx(ctx.copy, "doctors_changes"))}</p><div class="dates compact">${doctorChangeTiles(rest)}</div>`
+            : "";
+          const phone = phoneLink(doctor.phone);
+          const hours = hasOpenSlot(doctor.week)
+            ? doctorWeekList(doctor.week, today)
+            : `<p class="muted">${esc(tx(ctx.copy, "doctors_missing_hours"))}</p>`;
+          return `<article class="card yard">
+            <p class="kicker">${esc(doctor.specialty)}</p>
+            <h2>${esc(doctor.name)}</h2>
+            <p class="meta">${esc(doctor.place)}${phone ? ` · ${phone}` : ""}</p>
+            ${banner}
+            <p class="kicker">${esc(tx(ctx.copy, banner ? "doctors_regular" : "doctors_hours"))}</p>
+            ${hours}
+            ${planned}
+          </article>`;
+        })
+        .join("")
+    : `<p class="card dashed muted">${esc(tx(ctx.copy, "doctors_empty"))}</p>`;
+  return layout({
+    ...ctx,
+    title: `${tx(ctx.copy, "doctors_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "doctors_description"),
+    body: `
+      <p class="eyebrow">${esc(tx(ctx.copy, "doctors_eyebrow"))}</p>
+      <h1>${esc(tx(ctx.copy, "doctors_heading"))}</h1>
+      <p class="lede">${esc(tx(ctx.copy, "doctors_lede"))}</p>
+      <div class="stack">${cards}</div>`,
+  });
+}
+
+function doctorChangeAdmin(doctor, cancelId) {
+  const items = doctor.changes.length
+    ? doctor.changes
+        .map((change) => {
+          const hours = periodClosed(change) ? "Zavřeno" : spanSummary(change);
+          const confirm =
+            cancelId === change.id
+              ? `<form method="post" action="/redakce/lekari/zmena/smazat">
+                  <input type="hidden" name="id" value="${change.id}">
+                  <input type="hidden" name="confirm" value="1">
+                  <button class="btn btn-primary" type="submit">Opravdu zrušit</button>
+                </form>
+                <a class="btn btn-ghost" href="/redakce/lekari">Nechat</a>`
+              : `<a class="btn btn-ghost" href="/redakce/lekari?zrusit=${change.id}">Zrušit změnu</a>`;
+          return `<div class="date-tile">
+            <strong>${esc(closureLabel(change))}</strong>
+            <span>${esc(change.note)}</span>
+            <span>${esc(hours)}</span>
+            <div class="row">${confirm}</div>
+          </div>`;
+        })
+        .join("")
+    : `<p class="muted">Žádná zapsaná dočasná změna.</p>`;
+  return `<p class="meta">Dočasná změna</p>
+    <div class="dates compact">${items}</div>
+    <form class="form" method="post" action="/redakce/lekari/zmena">
+      <input type="hidden" name="doctorId" value="${doctor.id}">
+      <div class="pair">
+        ${field("Od", `<input class="${input}" type="date" name="startsOn" required>`)}
+        ${field("Do", `<input class="${input}" type="date" name="endsOn">`)}
+      </div>
+      <span class="hint">Když jde o jeden den, pole Do nechte prázdné. Na titulce se změna ukáže ${HOME_LEAD_DAYS} dní předem a po dobu, kdy platí. Na stránce Lékaři je vidět hned.</span>
+      ${field("Poznámka", `<textarea class="${input}" name="changeNote" required maxlength="400" rows="2" placeholder="Třeba: sestra přítomna, zastupuje MUDr. Novák. Nebo: akutní případy ošetří ordinace v Jičíně."></textarea>`)}
+      ${doctorHoursFields(blankWeek())}
+      <span class="hint">Bez zaškrtnutého času je ordinace v tom období zavřená a na webu zůstane poznámka.</span>
+      <button class="btn btn-line" type="submit">Zapsat změnu</button>
+    </form>`;
+}
+
+function doctorHoursAdmin(doctor) {
+  return `<form class="form" method="post" action="/redakce/lekari/hodiny">
+    <input type="hidden" name="doctorId" value="${doctor.id}">
+    ${doctorHoursFields(doctor.week)}
+    <button class="btn btn-line" type="submit">Uložit hodiny</button>
+  </form>`;
+}
+
+export function adminDoctors(ctx, data, message, editingId, confirmId, cancelId) {
+  const chief = data.user?.role === "hlavni";
+  const editing = chief ? (data.doctors.find((item) => item.id === editingId) ?? null) : null;
+  const list = data.doctors.length
+    ? data.doctors
+        .map((item) => {
+          const confirm =
+            chief && confirmId === item.id
+              ? `<form method="post" action="/redakce/lekari/smazat">
+                  <input type="hidden" name="id" value="${item.id}">
+                  <input type="hidden" name="confirm" value="1">
+                  <button class="btn btn-primary" type="submit">Opravdu smazat</button>
+                </form>
+                <a class="btn btn-ghost" href="/redakce/lekari">Nechat</a>`
+              : chief
+                ? `<a class="btn btn-line" href="/redakce/lekari?id=${item.id}">Upravit</a>
+                   <a class="btn btn-ghost" href="/redakce/lekari?smazat=${item.id}">Smazat</a>`
+                : "";
+          return `<li class="card">
+            <p class="kicker">${esc(item.specialty)}${item.published ? "" : " · skrytá"}</p>
+            <h3>${esc(item.name)}</h3>
+            <p class="meta">${esc(item.place)}${item.phone ? ` · ${esc(item.phone)}` : ""}</p>
+            <p class="muted">${esc(doctorHoursSummary(item))}</p>
+            ${confirm ? `<div class="row">${confirm}</div>` : ""}
+            ${chief ? "" : doctorHoursAdmin(item)}
+            ${doctorChangeAdmin(item, cancelId)}
+          </li>`;
+        })
+        .join("")
+    : `<li class="card dashed muted">Zatím žádná ordinace.</li>`;
+  const form = chief
+    ? `<form class="card form" method="post" action="/redakce/lekari/ulozit">
+        <h2>${editing ? "Upravit ordinaci" : "Nová ordinace"}</h2>
+        <p class="muted">Jméno se na webu vypisuje přesně tak, jak ho zadáte. Věty jsou postavené tak, aby se jméno neskloňovalo. Hodiny a dočasnou změnu může měnit i člověk s oprávněním Lékaři.</p>
+        ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
+        ${field("Jméno", `<input class="${input}" name="name" required maxlength="120" value="${esc(editing?.name ?? "")}" placeholder="MUDr. Jana Nováková">`)}
+        ${field("Obor", `<input class="${input}" name="specialty" required maxlength="120" value="${esc(editing?.specialty ?? "")}" placeholder="Praktický lékař">`)}
+        ${field("Místo", `<input class="${input}" name="place" required maxlength="160" value="${esc(editing?.place ?? "")}">`)}
+        ${field("Telefon", `<input class="${input}" name="phone" maxlength="40" value="${esc(editing?.phone ?? "")}" inputmode="tel">`)}
+        ${doctorHoursFields(editing?.week ?? blankWeek())}
+        ${field("Pořadí", `<input class="${input}" type="number" name="sortOrder" min="0" max="999" required value="${editing?.sortOrder ?? 0}">`)}
+        <span class="hint">Menší číslo je na stránce výš. Na titulce se ordinace ukáže jen při dočasné změně, ${HOME_LEAD_DAYS} dní předem.</span>
+        <label class="check"><input type="checkbox" name="published" value="1"${editing ? (editing.published ? " checked" : "") : " checked"}> Zveřejnit</label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Uložit</button>
+          ${editing ? `<a class="btn btn-ghost" href="/redakce/lekari">Nová</a>` : ""}
+        </div>
+      </form>`
+    : `<section class="card">
+        <h2>Ordinační hodiny</h2>
+        <p class="muted">Jméno, obor a místo nastavuje hlavní redaktor. Tady se mění běžné hodiny i dočasná změna, obojí jedním oprávněním.</p>
+      </section>`;
+  return adminShell(
+    ctx,
+    data,
+    "lekari",
     message,
     `<div class="${chief ? "split" : "stack"}">${form}<ul class="stack plain">${list}</ul></div>`,
   );

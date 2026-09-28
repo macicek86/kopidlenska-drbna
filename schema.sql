@@ -248,3 +248,25 @@ create table if not exists yard_closures (
   created_by integer,
   created_at text not null default (date('now'))
 );
+
+create table if not exists doctors (
+  id integer primary key autoincrement,
+  name text not null,
+  specialty text not null,
+  place text not null,
+  phone text not null default '',
+  hours text not null,
+  sort_order integer not null default 0,
+  published integer not null default 1
+);
+
+create table if not exists doctor_changes (
+  id integer primary key autoincrement,
+  doctor_id integer not null,
+  starts_on text not null,
+  ends_on text not null,
+  note text not null,
+  hours text not null,
+  created_by integer,
+  created_at text not null default (date('now'))
+);

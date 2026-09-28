@@ -5,6 +5,15 @@ import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
+import {
+  DOCTOR_SEEDS,
+  HOME_LEAD_DAYS,
+  changeSpan,
+  homeNotice,
+  hoursSummary as doctorHoursSummary,
+  normalizeWeek as normalizeDoctorWeek,
+  visibleHomeChange,
+} from "../src/doctors.js";
 import { closureSpan, coversDay, homeStatus, hoursSummary, normalizeWeek, statusLine } from "../src/yards.js";
 
 const SEED =
@@ -212,4 +221,74 @@ test("28. 9. 2026 je sudý týden, další svoz je 5. 10.", () => {
   assert.equal(waste.nextDate, "2026-10-05");
   assert.equal(waste.daysUntil, 7);
   assert.equal(waste.upcoming[1], "2026-10-19");
+});
+
+function half(from, to, note = "") {
+  return { open: true, from, to, note };
+}
+
+function doctor(name, changes = [], week = []) {
+  return { name, specialty: "Praktický lékař", week, changes };
+}
+
+test("ordinační hodiny mají dopoledne a odpoledne a nesmí se překrývat", () => {
+  const saved = normalizeDoctorWeek([
+    { day: 1, morning: half("7:00", "12:00", " jen pro objednané "), afternoon: half("13:00", "17:00", "jen akutní případy") },
+    { day: 4, morning: half("8:00", "11:00"), afternoon: { open: false, from: "", to: "", note: "" } },
+  ]);
+  assert.equal(saved.error, undefined);
+  assert.equal(saved.week.find((slot) => slot.day === 1).morning.note, "jen pro objednané");
+  assert.equal(saved.week.find((slot) => slot.day === 1).afternoon.from, "13:00");
+  assert.equal(saved.week.find((slot) => slot.day === 2).morning.open, false);
+  assert.equal(
+    normalizeDoctorWeek([{ day: 1, morning: half("08:00", "13:00"), afternoon: half("12:00", "16:00") }]).error,
+    "Pondělí: odpoledne musí začít až po dopoledni, ať se časy nepřekrývají.",
+  );
+  assert.equal(normalizeDoctorWeek([{ day: 3, morning: half("10:00", "09:00") }]).error.includes("později"), true);
+  assert.equal(doctorHoursSummary(doctor("MUDr. Eva Nová", [], saved.week)).includes("Po dopoledne 07:00–12:00, jen pro objednané"), true);
+  assert.equal(doctorHoursSummary(doctor("MUDr. Eva Nová")), "Ordinační hodiny zatím nejsou doplněné");
+  const office = DOCTOR_SEEDS[0];
+  assert.equal(normalizeDoctorWeek(office.week).error, undefined);
+  assert.equal(office.week.find((slot) => slot.day === 1).afternoon.to, "18:00");
+  assert.equal(DOCTOR_SEEDS.map((item) => item.name).join(", "), "Ordinace Kopidlno, MUDr. Lubomír Klíma, MUDr. Jaroslava Lelková");
+});
+
+test("dočasná změna se na titulce ukáže 14 dní předem a jméno se neskloňuje", () => {
+  assert.equal(HOME_LEAD_DAYS, 14);
+  assert.equal(changeSpan("2026-10-06", "").endsOn, "2026-10-06");
+  assert.equal(changeSpan("2026-10-08", "2026-10-06").error.includes("později"), true);
+  const closed = {
+    id: 1,
+    startsOn: "2026-10-12",
+    endsOn: "2026-10-16",
+    note: "Akutní případy ošetří ordinace v Jičíně.",
+    week: [],
+  };
+  const tooFar = { ...closed, id: 2, startsOn: "2026-10-13", endsOn: "2026-10-13" };
+  const practice = doctor("Ordinace Kopidlno", [tooFar]);
+  assert.equal(homeNotice(practice, "2026-09-28"), null);
+  const onTime = doctor("MUDr. Jaroslava Lelková", [closed]);
+  assert.equal(homeNotice(onTime, "2026-09-28").state, "Má od 12. 10. do 16. 10. zavřeno.");
+  assert.equal(homeNotice(onTime, "2026-09-28").name, "MUDr. Jaroslava Lelková");
+  const klima = doctor("MUDr. Lubomír Klíma", [{ ...closed, id: 3, startsOn: "2026-10-06", endsOn: "2026-10-06" }]);
+  assert.equal(homeNotice(klima, "2026-09-28").state, "Má 6. 10. zavřeno.");
+  const changed = doctor("MUDr. Lubomír Klíma", [
+    {
+      id: 4,
+      startsOn: "2026-10-05",
+      endsOn: "2026-10-09",
+      note: "Sestra přítomna, zastupuje MUDr. Novák.",
+      week: [{ day: 1, morning: half("08:00", "11:00", "jen akutní případy"), afternoon: { open: false } }],
+    },
+  ]);
+  const notice = homeNotice(changed, "2026-09-28");
+  assert.equal(notice.state, "Má od 5. 10. do 9. 10. jiné ordinační hodiny.");
+  assert.equal(notice.detail, "Po dopoledne 08:00–11:00, jen akutní případy");
+  assert.equal(notice.note, "Sestra přítomna, zastupuje MUDr. Novák.");
+  const overlapping = doctor("Ordinace Kopidlno", [
+    { id: 1, startsOn: "2026-09-20", endsOn: "2026-10-20", note: "starší", week: [] },
+    { id: 2, startsOn: "2026-09-28", endsOn: "2026-09-30", note: "novější", week: [] },
+  ]);
+  assert.equal(visibleHomeChange(overlapping, "2026-09-28").id, 2);
+  assert.equal(homeNotice(overlapping, "2026-09-28").note, "novější");
 });

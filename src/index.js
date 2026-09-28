@@ -14,11 +14,16 @@ import {
   rejectProposal,
   removeArticle,
   removeClosure,
+  removeDoctor,
+  removeDoctorChange,
   removeEvent,
   removeYard,
   saveArticle,
   saveClosure,
   saveCopy,
+  saveDoctor,
+  saveDoctorChange,
+  saveDoctorHours,
   saveEvent,
   saveProfile,
   saveProposal,
@@ -39,10 +44,12 @@ import {
   adminPeople,
   adminSite,
   adminTexts,
+  adminDoctors,
   adminYards,
   articlePage,
   binsPage,
   brokenPage,
+  doctorsPage,
   eventsPage,
   homePage,
   missingPage,
@@ -69,6 +76,12 @@ const OK = {
   "dvur-smazan": "Sběrný dvůr je smazaný.",
   uzavreni: "Mimořádné uzavření je zapsané.",
   "uzavreni-smazane": "Mimořádné uzavření je zrušené.",
+  lekar: "Ordinace je uložená.",
+  "lekar-upraven": "Ordinace je upravená.",
+  "lekar-smazan": "Ordinace je smazaná.",
+  "lekar-hodiny": "Ordinační hodiny jsou uložené.",
+  "lekar-zmena": "Dočasná změna je zapsaná.",
+  "lekar-zmena-smazana": "Dočasná změna je zrušená.",
   navrh: "Návrh čeká na schválení.",
   "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
   "navrh-stazen": "Návrh je stažený.",
@@ -172,6 +185,25 @@ async function formFields(request) {
     alias: text("alias"),
     sortOrder: text("sortOrder"),
     yardId: Number.isInteger(Number(text("yardId"))) && Number(text("yardId")) > 0 ? Number(text("yardId")) : undefined,
+    specialty: text("specialty"),
+    phone: text("phone"),
+    changeNote: text("changeNote"),
+    doctorId: Number.isInteger(Number(text("doctorId"))) && Number(text("doctorId")) > 0 ? Number(text("doctorId")) : undefined,
+    doctorWeek: WEEK_DAYS.map(({ day }) => ({
+      day,
+      morning: {
+        open: form.get(`am-open-${day}`) === "1",
+        from: text(`am-from-${day}`),
+        to: text(`am-to-${day}`),
+        note: text(`am-note-${day}`),
+      },
+      afternoon: {
+        open: form.get(`pm-open-${day}`) === "1",
+        from: text(`pm-from-${day}`),
+        to: text(`pm-to-${day}`),
+        note: text(`pm-note-${day}`),
+      },
+    })),
     permissions: form.getAll("permission").map((item) => String(item)),
     confirm: text("confirm") === "1",
   };
@@ -232,6 +264,10 @@ async function renderGet(request, env, url) {
     const data = await loadPublic(env);
     return html(yardsPage(data, ctx));
   }
+  if (path === "/lekari") {
+    const data = await loadPublic(env);
+    return html(doctorsPage(data, ctx));
+  }
   if (path === "/redakce") return redirect("/redakce/zpravy");
   if (path.startsWith("/redakce/")) {
     const data = await loadAdmin(env, request);
@@ -261,6 +297,21 @@ async function renderGet(request, env, url) {
       }
       return html(
         adminYards(
+          ctx,
+          data,
+          message,
+          positiveParam(url, "id"),
+          positiveParam(url, "smazat"),
+          positiveParam(url, "zrusit"),
+        ),
+      );
+    }
+    if (tab === "lekari") {
+      if (data.signedIn && !userCan(data.user, "doktori")) {
+        return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
+      }
+      return html(
+        adminDoctors(
           ctx,
           data,
           message,
@@ -395,6 +446,36 @@ async function renderPost(request, env, url) {
     const result = await removeClosure(env, request, fields.id);
     if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/dvory?ok=uzavreni-smazane");
+  }
+  if (path === "/redakce/lekari/ulozit") {
+    const result = await saveDoctor(env, request, fields);
+    if (!result.ok) {
+      const back = fields.id ? `/redakce/lekari?id=${fields.id}` : "/redakce/lekari";
+      return redirect(withError(back, result.error));
+    }
+    return redirect(`/redakce/lekari?ok=${result.updated ? "lekar-upraven" : "lekar"}`);
+  }
+  if (path === "/redakce/lekari/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/lekari");
+    const result = await removeDoctor(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lekari?ok=lekar-smazan");
+  }
+  if (path === "/redakce/lekari/hodiny") {
+    const result = await saveDoctorHours(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lekari?ok=lekar-hodiny");
+  }
+  if (path === "/redakce/lekari/zmena") {
+    const result = await saveDoctorChange(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lekari?ok=lekar-zmena");
+  }
+  if (path === "/redakce/lekari/zmena/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/lekari");
+    const result = await removeDoctorChange(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
   }
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);
