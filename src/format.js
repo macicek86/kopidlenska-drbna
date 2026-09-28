@@ -34,11 +34,15 @@ export function formatDayMonth(iso) {
   return `${d}. ${months[m - 1]}`;
 }
 
-export function countdownLabel(days) {
-  if (days <= 0) return "Svoz je dnes.";
-  if (days === 1) return "Svoz je zítra.";
-  if (days < 5) return `Za ${days} dny.`;
-  return `Za ${days} dní.`;
+export function countdownLabel(days, copy = {}) {
+  const pick = (key, fallback) => {
+    const value = copy?.[key];
+    return typeof value === "string" && value.trim() ? value : fallback;
+  };
+  if (days <= 0) return pick("countdown_today", "Svoz je dnes.");
+  if (days === 1) return pick("countdown_tomorrow", "Svoz je zítra.");
+  const template = days < 5 ? pick("countdown_few", "Za {n} dny.") : pick("countdown_many", "Za {n} dní.");
+  return template.replaceAll("{n}", String(days));
 }
 
 const DAY_IN = ["neděli", "pondělí", "úterý", "středu", "čtvrtek", "pátek", "sobotu"];
