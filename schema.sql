@@ -73,7 +73,7 @@ insert into articles (slug, title, excerpt, body, category)
 select
   'svoz-jednou-za-ctrnact-dni',
   'Směsný odpad se sváží jednou za čtrnáct dní',
-  'Od roku 2024 jezdí v Kopidlně popelnice na směsný odpad v pondělí lichých týdnů. Nejbližší termín hlídáme spolu s popelnicemi.',
+  'Od roku 2024 jezdí v Kopidlně popelnice na směsný odpad v pondělí lichých týdnů. Nejblížší termín hlídáme spolu s popelnicemi.',
   'Od roku 2024 město přešlo na čtrnáctidenní svoz směsného komunálního odpadu z popelnic a kontejnerů. Týdenní interval skončil.
 
 Drbna drží stejné pravidlo jako stránka popelnice.kopidlenskadrbna.org: svoz vychází na pondělí lichého kalendářního týdne. Svoz zpravidla probíhá i o svátcích.
