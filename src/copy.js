@@ -1,0 +1,82 @@
+export const COPY = [
+  { group: "Hlavička a patička", key: "site_name", label: "Název webu", value: "Kopidlenská drbna", max: 80 },
+  { group: "Hlavička a patička", key: "brand_line", label: "Název, první řádek", value: "Kopidlenská", max: 40 },
+  { group: "Hlavička a patička", key: "brand_accent", label: "Název, druhý řádek", value: "drbna", max: 40 },
+  { group: "Hlavička a patička", key: "nav_news", label: "Menu: zprávy", value: "Zprávy", max: 40 },
+  { group: "Hlavička a patička", key: "nav_events", label: "Menu: akce", value: "Akce", max: 40 },
+  { group: "Hlavička a patička", key: "nav_bins", label: "Menu: popelnice", value: "Popelnice", max: 40 },
+  { group: "Hlavička a patička", key: "nav_about", label: "Menu: o nás", value: "O nás", max: 40 },
+  { group: "Hlavička a patička", key: "menu_label", label: "Tlačítko menu na mobilu", value: "Menu", max: 40 },
+  { group: "Hlavička a patička", key: "skip", label: "Odkaz přeskočit na obsah", value: "Přeskočit na obsah", max: 80 },
+  { group: "Hlavička a patička", key: "link_whole", label: "Odkaz na celé noviny ze stránky svozu", value: "Celé noviny", max: 40 },
+  { group: "Hlavička a patička", key: "footer_copy", label: "Patička, první řádek", value: "© 2026 Kopidlenská drbna", max: 120 },
+  { group: "Hlavička a patička", key: "footer_fine", label: "Patička, upřesnění", value: "Neoficiální informační stránka — není provozována Městem Kopidlno.", max: 240, long: true },
+  { group: "Hlavička a patička", key: "footer_admin", label: "Odkaz do redakce", value: "Redakce", max: 40 },
+
+  { group: "Titulka", key: "home_description", label: "Popis titulky pro vyhledávače", value: "Místní zprávy, pozvánky a svoz popelnic pro Kopidlno a jeho části.", max: 240, long: true },
+  { group: "Titulka", key: "hero_pill", label: "Štítek nad nadpisem", value: "Kopidlno a jeho části", max: 80 },
+  { group: "Titulka", key: "hero_title", label: "Velký nadpis, první řádek", value: "Kopidlenská", max: 80 },
+  { group: "Titulka", key: "hero_accent", label: "Velký nadpis, druhý řádek", value: "drbna", max: 40 },
+  { group: "Titulka", key: "hero_lede", label: "Úvodní odstavec", value: "Místní zprávy, pozvánky a sousedské novinky z Kopidlna, Drahorazi, Mlýnce, Pševesi a Ledkova. Neúřední, přehledné a odsud.", max: 500, long: true },
+  { group: "Titulka", key: "hero_alt", label: "Popis maskota", value: "Maskot Kopidlenské drbny, černobílý kozel", max: 160 },
+  { group: "Titulka", key: "home_waste_eyebrow", label: "Nadpis u svozu na titulce", value: "Popelnice", max: 40 },
+  { group: "Titulka", key: "home_waste_button", label: "Tlačítko na svoz", value: "Kdy se sváží", max: 40 },
+  { group: "Titulka", key: "home_news_heading", label: "Nadpis sekce zpráv", value: "Zprávy", max: 40 },
+  { group: "Titulka", key: "home_news_all", label: "Odkaz na všechny zprávy", value: "Všechny", max: 40 },
+  { group: "Titulka", key: "home_events_heading", label: "Nadpis sekce akcí", value: "Akce", max: 40 },
+  { group: "Titulka", key: "home_events_all", label: "Odkaz na kalendář", value: "Kalendář", max: 40 },
+  { group: "Titulka", key: "empty_articles", label: "Když není žádná zpráva", value: "Zatím tu není žádná zpráva.", max: 200 },
+  { group: "Titulka", key: "empty_events", label: "Když není žádná akce", value: "Zatím tu není zveřejněná pozvánka. Až ji redakce přidá, objeví se tady.", max: 240, long: true },
+
+  { group: "Zprávy", key: "news_description", label: "Popis stránky zpráv", value: "Místní zprávy z Kopidlna a jeho částí.", max: 240, long: true },
+  { group: "Zprávy", key: "news_eyebrow", label: "Malý nadpis stránky zpráv", value: "Rubrika", max: 40 },
+  { group: "Zprávy", key: "news_heading", label: "Nadpis stránky zpráv", value: "Zprávy", max: 40 },
+  { group: "Zprávy", key: "chip_all", label: "Filtr všech rubrik", value: "Vše", max: 40 },
+  { group: "Zprávy", key: "cat_zpravy", label: "Název rubriky Zprávy", value: "Zprávy", max: 40 },
+  { group: "Zprávy", key: "cat_komunita", label: "Název rubriky Komunita", value: "Komunita", max: 40 },
+  { group: "Zprávy", key: "cat_kultura", label: "Název rubriky Kultura", value: "Kultura", max: 40 },
+  { group: "Zprávy", key: "cat_prakticke", label: "Název rubriky Praktické", value: "Praktické", max: 40 },
+  { group: "Zprávy", key: "cat_sport", label: "Název rubriky Sport", value: "Sport", max: 40 },
+  { group: "Zprávy", key: "news_empty", label: "Prázdná rubrika", value: "V téhle rubrice zatím nic není.", max: 200 },
+  { group: "Zprávy", key: "article_back", label: "Návrat na zprávy", value: "Zpět na zprávy", max: 80 },
+  { group: "Zprávy", key: "missing_heading", label: "Chybějící zpráva", value: "Tahle zpráva tu není", max: 80 },
+  { group: "Zprávy", key: "missing_description", label: "Popis chybějící zprávy", value: "Tahle zpráva tu není.", max: 160 },
+
+  { group: "Akce", key: "events_description", label: "Popis stránky akcí", value: "Pozvánky z Kopidlna a okolních částí.", max: 240, long: true },
+  { group: "Akce", key: "events_eyebrow", label: "Malý nadpis stránky akcí", value: "Kalendář", max: 40 },
+  { group: "Akce", key: "events_heading", label: "Nadpis stránky akcí", value: "Akce", max: 40 },
+  { group: "Akce", key: "events_lede", label: "Úvod stránky akcí", value: "Pozvánky z Kopidlna a okolních částí. Co tu není, redakce ještě nepřidala.", max: 400, long: true },
+  { group: "Akce", key: "events_upcoming", label: "Nadpis nadcházejících akcí", value: "Chystá se", max: 40 },
+  { group: "Akce", key: "events_upcoming_empty", label: "Když se nic nechystá", value: "Žádná zveřejněná pozvánka. Až bude, objeví se tady.", max: 240, long: true },
+  { group: "Akce", key: "events_past", label: "Nadpis proběhlých akcí", value: "Už proběhlo", max: 40 },
+
+  { group: "Popelnice", key: "bins_description", label: "Popis stránky svozu", value: "Nejbližší svoz směsného odpadu v Kopidlně.", max: 240, long: true },
+  { group: "Popelnice", key: "bins_title", label: "Název stránky svozu", value: "Kdy se sváží", max: 40 },
+  { group: "Popelnice", key: "bins_standalone", label: "Název samostatné stránky svozu", value: "Popelnice", max: 40 },
+  { group: "Popelnice", key: "bins_pill", label: "Štítek nejbližšího svozu", value: "Nejbližší svoz", max: 40 },
+  { group: "Popelnice", key: "bins_more", label: "Nadpis dalších termínů", value: "Další termíny", max: 40 },
+  { group: "Popelnice", key: "bins_kind", label: "Druh odpadu", value: "Směsný komunální odpad", max: 80 },
+  { group: "Popelnice", key: "bins_alt", label: "Popis fotky popeláře", value: "Kozel v montérkách s popelnicí na kopidlenském náměstí", max: 160 },
+  { group: "Popelnice", key: "countdown_today", label: "Odpočet, svoz dnes", value: "Svoz je dnes.", max: 80 },
+  { group: "Popelnice", key: "countdown_tomorrow", label: "Odpočet, svoz zítra", value: "Svoz je zítra.", max: 80 },
+  { group: "Popelnice", key: "countdown_few", label: "Odpočet do 4 dnů, {n} je počet", value: "Za {n} dny.", max: 80 },
+  { group: "Popelnice", key: "countdown_many", label: "Odpočet od 5 dnů, {n} je počet", value: "Za {n} dní.", max: 80 },
+  { group: "Popelnice", key: "popelnice_label", label: "Text odkazu na původní svoz", value: "popelnice.kopidlenskadrbna.org", max: 120 },
+  { group: "Popelnice", key: "popelnice_url", label: "Adresa původního svozu", value: "https://popelnice.kopidlenskadrbna.org/", max: 200 },
+
+  { group: "O nás", key: "about_description", label: "Popis stránky O nás", value: "Sousedská, ne úřední stránka pro Kopidlno a jeho části.", max: 240, long: true },
+  { group: "O nás", key: "about_eyebrow", label: "Malý nadpis stránky O nás", value: "O stránce", max: 40 },
+  { group: "O nás", key: "about_heading", label: "Nadpis stránky O nás", value: "Sousedská, ne úřední", max: 80 },
+  { group: "O nás", key: "about_lede", label: "Úvod stránky O nás", value: "Kopidlenská drbna je místní noviny pro Kopidlno, Drahoraz, Mlýnec, Pševes a Ledkov. Píšeme zprávy, pozvánky a praktické věci, hlavně kdy vyvézt popelnici.", max: 500, long: true },
+  { group: "O nás", key: "about_disclaimer", label: "Upozornění, že nejde o úřad", value: "Stránku neprovozuje Město Kopidlno. Vyhlášky, poplatky a úřední oznámení berte vždy z webu města.", max: 500, long: true },
+  { group: "O nás", key: "about_bins_link", label: "Odkaz na svoz", value: "Svoz popelnic", max: 80 },
+  { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Maskot Kopidlenské drbny", max: 160 },
+];
+
+const BY_KEY = new Map(COPY.map((item) => [item.key, item]));
+
+export function text(copy, key) {
+  const value = copy?.[key];
+  if (typeof value === "string" && value.trim()) return value;
+  return BY_KEY.get(key)?.value ?? "";
+}
