@@ -65,6 +65,14 @@ test("formátování nechá nadpisy a odrážky a skript zahodí", () => {
   assert.match(clean.html, /neklikejte/);
   assert.equal(renderArticleHtml(dirty), clean.html);
   assert.equal(prepareArticleBody("Ahoj\n\nsousedé").html, "<p>Ahoj</p><p>sousedé</p>");
+  assert.equal(prepareArticleBody("<div>Ahoj</div><div>sousedé</div>").html, "<p>Ahoj</p><p>sousedé</p>");
+  assert.equal(prepareArticleBody("<p>V <u>sobotu</u>.<br></p>").html, "<p>V <u>sobotu</u>.</p>");
+  assert.equal(prepareArticleBody("<h3>Podnadpis</h3>").html, "<h3>Podnadpis</h3>");
+  assert.equal(
+    prepareArticleBody("<ul><li>a<ul><li>b</li></ul></li></ul>").html,
+    "<ul><li>a<ul><li>b</li></ul></li></ul>",
+  );
+  assert.equal(prepareArticleBody('<div><script>alert(1)</script><p onclick="x">Ahoj</p></div>').html.includes("script"), false);
   assert.equal(
     textWasEdited(
       { title: "A", excerpt: "B", body: "Ahoj\n\nsousedé", category: "Zprávy" },

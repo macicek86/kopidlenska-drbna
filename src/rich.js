@@ -1,4 +1,4 @@
-const ALIAS = { b: "strong", i: "em", h1: "h2", h4: "h3", h5: "h3", h6: "h3" };
+const ALIAS = { b: "strong", i: "em", h1: "h2", h4: "h3", h5: "h3", h6: "h3", div: "p" };
 const DROP = new Set([
   "script",
   "style",
@@ -226,10 +226,13 @@ function parseRich(input) {
 
 function serialize(node) {
   if (node.text != null) return escapeText(node.text);
-  const inner = node.children.map(serialize).join("");
+  let inner = node.children.map(serialize).join("");
   if (node.name === "#root") return inner;
-  if (node.name !== "br" && !inner.replace(/<br>/g, "").trim()) return "";
   if (node.name === "br") return "<br>";
+  if (node.name === "p" || node.name === "h2" || node.name === "h3" || node.name === "li") {
+    inner = inner.replace(/(?:<br>)+$/, "");
+  }
+  if (!inner.replace(/<br>/g, "").trim()) return "";
   if (node.name === "a") {
     const href = escapeAttr(node.href);
     if (/^mailto:/i.test(node.href) || node.href.startsWith("/")) return `<a href="${href}">${inner}</a>`;

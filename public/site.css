@@ -331,12 +331,42 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .prose a { color: var(--brand); font-weight: 700; }
 
-.rich { display: grid; gap: 0.45rem; }
+.rich { display: grid; gap: 0.45rem; font-weight: 400; }
 
-.rich-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.rich trix-toolbar {
+  position: sticky;
+  top: 0.35rem;
+  z-index: 3;
+  white-space: normal;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  padding: 0.15rem 0 0.35rem;
+}
 
-.rich-bar button {
+.rich trix-toolbar .trix-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  overflow: visible;
+}
+
+.rich trix-toolbar .trix-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.rich trix-toolbar .trix-button {
+  float: none;
+  width: auto;
+  height: auto;
   min-height: 2.2rem;
+  max-width: none;
+  margin: 0;
   padding: 0.2rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -345,18 +375,93 @@ a.card { display: block; text-decoration: none; color: inherit; }
   font: inherit;
   font-size: 0.86rem;
   font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-indent: 0;
 }
 
-.rich-bar button:hover, .rich-bar button.is-on { background: var(--paper-deep); }
+.rich trix-toolbar .trix-button:not(:first-child) { border-left: 1px solid var(--line); }
+
+.rich trix-toolbar .trix-button:hover,
+.rich trix-toolbar .trix-button.trix-active {
+  background: var(--paper-deep);
+  color: var(--ink);
+}
+
+.rich trix-toolbar .trix-button:disabled {
+  opacity: 0.45;
+  color: var(--ink);
+}
+
+.rich trix-toolbar .trix-button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.rich trix-toolbar .trix-dialogs { position: static; }
+
+.rich trix-toolbar .trix-dialog {
+  position: static;
+  max-width: none;
+  margin: 0.15rem 0 0.35rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--card);
+  box-shadow: none;
+  font-size: 1rem;
+}
+
+.rich trix-toolbar .trix-dialog__link-fields {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.rich trix-toolbar .trix-dialog__link-fields .trix-input,
+.rich trix-toolbar .trix-input--dialog {
+  width: auto;
+  min-width: min(100%, 16rem);
+  flex: 1 1 12rem;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.55rem 0.7rem;
+}
+
+.rich trix-toolbar .trix-dialog__link-fields .trix-button-group { flex: 0 0 auto; }
 
 .rich-area {
+  display: block;
   min-height: 12rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--card);
+  padding: 0.7rem 0.8rem;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.6;
+  outline: none;
 }
 
-.rich-area:empty::before {
+.rich-area:focus { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+.rich-area.is-empty::before {
   content: "Text zprávy";
   color: var(--muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
+
+.rich-area a { color: var(--brand); text-decoration: underline; }
+
+.rich-area > div { margin: 0 0 1rem; }
 
 .bin-copy h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); }
 

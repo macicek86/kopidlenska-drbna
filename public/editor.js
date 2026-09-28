@@ -88,164 +88,242 @@ function blobOf(canvas, type, quality) {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
-const RICH_DROP = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "NOSCRIPT", "TEMPLATE", "SVG", "MATH", "TEXTAREA", "FORM", "LINK", "META"]);
-const RICH_ALIAS = { B: "STRONG", I: "EM", H1: "H2", H4: "H3", H5: "H3", H6: "H3", DIV: "P" };
-const RICH_ALLOWED = new Set(["P", "BR", "STRONG", "EM", "U", "H2", "H3", "UL", "OL", "LI", "BLOCKQUOTE", "A"]);
+const RICH_INLINE = ["bold", "italic", "underline", "href", "strike"];
+const RICH_CLEAR = [
+  "heading1",
+  "heading2",
+  "quote",
+  "bullet",
+  "bulletList",
+  "number",
+  "numberList",
+  "code",
+  ...RICH_INLINE,
+];
+const RICH_SWAP = {
+  heading1: ["heading2", "quote", "bullet", "bulletList", "number", "numberList", "code"],
+  heading2: ["heading1", "quote", "bullet", "bulletList", "number", "numberList", "code"],
+  quote: ["heading1", "heading2", "bullet", "bulletList", "number", "numberList", "code"],
+  bullet: ["heading1", "heading2", "quote", "number", "numberList", "code"],
+  number: ["heading1", "heading2", "quote", "bullet", "bulletList", "code"],
+};
+const RICH_LIMIT = 20000;
+let richSeq = 0;
 
 function safeRichHref(raw) {
-  let value = String(raw ?? "").trim().replace(/[\u0000-\u001F\u007F\s]/g, "");
-  if (!value) return "";
-  if (/^https:\/\//i.test(value) || /^http:\/\//i.test(value) || /^mailto:/i.test(value)) return value;
+  let value = String(raw ?? "").trim().replace(/[\u0000-\u001F\u007F]/g, "");
+  if (!value || /\s/.test(value)) return "";
+  if (/^www\./i.test(value)) value = `https://${value}`;
+  else if (/^[a-z0-9.-]+\.[a-z]{2,}(?:[/?#]|$)/i.test(value)) value = `https://${value}`;
+  if (/^https:\/\//i.test(value) || /^http:\/\//i.test(value)) return value;
+  if (/^mailto:/i.test(value) && !/[<>"]/.test(value)) return value;
   if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !value.includes(":")) return value;
   return "";
 }
 
-function cleanRich(node) {
-  const fragment = document.createDocumentFragment();
-  for (const child of [...node.childNodes]) {
-    if (child.nodeType === Node.TEXT_NODE) {
-      fragment.append(document.createTextNode(child.textContent ?? ""));
-      continue;
-    }
-    if (child.nodeType !== Node.ELEMENT_NODE) continue;
-    if (RICH_DROP.has(child.tagName)) continue;
-    const name = RICH_ALIAS[child.tagName] || child.tagName;
-    if (!RICH_ALLOWED.has(name)) {
-      fragment.append(cleanRich(child));
-      continue;
-    }
-    if (name === "A") {
-      const href = safeRichHref(child.getAttribute("href"));
-      if (!href) {
-        fragment.append(cleanRich(child));
-        continue;
-      }
-      const link = document.createElement("a");
-      link.setAttribute("href", href);
-      link.append(cleanRich(child));
-      fragment.append(link);
-      continue;
-    }
-    const element = document.createElement(name.toLowerCase());
-    if (name !== "BR") element.append(cleanRich(child));
-    fragment.append(element);
-  }
-  return fragment;
+function richButton(label, title, extra) {
+  return `<button type="button" class="trix-button" tabindex="-1" title="${title}" ${extra}>${label}</button>`;
 }
 
-function plainRichFragment(value) {
-  const fragment = document.createDocumentFragment();
-  const blocks = String(value ?? "").replace(/\r\n/g, "\n").split(/\n{2,}/);
-  for (const block of blocks) {
-    if (!block.trim()) continue;
-    const paragraph = document.createElement("p");
-    const lines = block.split("\n");
-    lines.forEach((line, index) => {
-      if (index > 0) paragraph.append(document.createElement("br"));
-      paragraph.append(document.createTextNode(line));
-    });
-    fragment.append(paragraph);
-  }
-  return fragment;
+function richToolbarHtml() {
+  return `<div class="trix-button-row">
+    <span class="trix-button-group" data-trix-button-group="text">
+      ${richButton("Tučně", "Tučně (Ctrl+B)", 'data-trix-attribute="bold" data-trix-key="b"')}
+      ${richButton("Kurzíva", "Kurzíva (Ctrl+I)", 'data-trix-attribute="italic" data-trix-key="i"')}
+      ${richButton("Podtržení", "Podtržení (Ctrl+U)", 'data-trix-attribute="underline" data-trix-key="u"')}
+      ${richButton("Odkaz", "Odkaz (Ctrl+K)", 'data-trix-attribute="href" data-trix-action="link" data-trix-key="k"')}
+      ${richButton("Bez formátu", "Zrušit formátování", 'data-drbna="clear"')}
+    </span>
+    <span class="trix-button-group" data-trix-button-group="block">
+      ${richButton("Nadpis", "Nadpis", 'data-trix-attribute="heading1"')}
+      ${richButton("Podnadpis", "Podnadpis", 'data-trix-attribute="heading2"')}
+      ${richButton("Citace", "Citace", 'data-trix-attribute="quote"')}
+      ${richButton("Odrážky", "Odrážky", 'data-trix-attribute="bullet"')}
+      ${richButton("Čísla", "Číslovaný seznam", 'data-trix-attribute="number"')}
+      ${richButton("Míň odsazení", "Menší odsazení seznamu", 'data-trix-action="decreaseNestingLevel"')}
+      ${richButton("Víc odsazení", "Větší odsazení seznamu", 'data-trix-action="increaseNestingLevel"')}
+    </span>
+    <span class="trix-button-group" data-trix-button-group="history">
+      ${richButton("Zpět", "Vrátit úpravu (Ctrl+Z)", 'data-trix-action="undo" data-trix-key="z"')}
+      ${richButton("Znovu", "Znovu (Ctrl+Shift+Z)", 'data-trix-action="redo" data-trix-key="shift+z"')}
+    </span>
+  </div>
+  <div class="trix-dialogs" data-trix-dialogs>
+    <div class="trix-dialog trix-dialog--link" data-trix-dialog="href" data-trix-dialog-attribute="href">
+      <div class="trix-dialog__link-fields">
+        <input type="text" name="href" class="trix-input trix-input--dialog" placeholder="https://… nebo mailto:…" aria-label="Adresa odkazu" required data-trix-input>
+        <div class="trix-button-group">
+          <input type="button" class="trix-button trix-button--dialog" value="Vložit" data-trix-method="setAttribute">
+          <input type="button" class="trix-button trix-button--dialog" value="Zrušit odkaz" data-trix-method="removeAttribute">
+        </div>
+      </div>
+    </div>
+  </div>`;
 }
 
-function looksRich(value) {
-  return /<\/?[a-z][\s\S]*?>/i.test(value);
+function preparePastedHtml(html) {
+  return html
+    .replace(/<(\/?)h1\b/gi, "<$1h2")
+    .replace(/<(\/?)h[4-6]\b/gi, "<$1h3")
+    .replace(/<img\b[^>]*>/gi, "")
+    .replace(/<\/?figure\b[^>]*>/gi, "");
 }
 
-function htmlFromRich(area) {
-  const holder = document.createElement("div");
-  holder.append(cleanRich(area));
-  return holder.innerHTML;
+function richHasText(html) {
+  const plain = String(html ?? "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&");
+  return plain.trim().length > 0;
 }
 
-function fillRich(area, value) {
-  area.replaceChildren();
-  if (!value.trim()) return;
-  if (looksRich(value)) {
-    const parsed = new DOMParser().parseFromString(value, "text/html");
-    area.append(cleanRich(parsed.body));
+function configureTrix() {
+  const { blockAttributes, textAttributes, toolbar } = window.Trix.config;
+  blockAttributes.default.tagName = "p";
+  blockAttributes.heading1.tagName = "h2";
+  blockAttributes.heading1.terminal = false;
+  blockAttributes.heading2 = {
+    tagName: "h3",
+    terminal: false,
+    breakOnReturn: true,
+    group: false,
+  };
+  textAttributes.underline = { tagName: "u", inheritable: true };
+  toolbar.getDefaultHTML = richToolbarHtml;
+  document.addEventListener("trix-file-accept", (event) => event.preventDefault());
+  document.addEventListener("trix-attachment-add", (event) => {
+    event.target?.editor?.composition?.removeAttachment(event.attachment);
+  });
+  document.addEventListener("mousedown", onRichMouseDown, true);
+  document.addEventListener("click", onRichClick, true);
+  document.addEventListener("keydown", onRichKey, true);
+}
+
+function editorOf(node) {
+  return node.closest(".rich")?.querySelector("trix-editor")?.editor ?? null;
+}
+
+function onRichMouseDown(event) {
+  const clear = event.target.closest?.("[data-drbna='clear']");
+  if (clear) {
+    event.preventDefault();
+    event.stopPropagation();
+    const editor = editorOf(clear);
+    if (!editor) return;
+    editor.recordUndoEntry("Formát");
+    for (const name of RICH_CLEAR) editor.deactivateAttribute(name);
     return;
   }
-  area.append(plainRichFragment(value));
+
+  const format = event.target.closest?.("trix-toolbar button[data-trix-attribute]");
+  if (!format) return;
+  const name = format.getAttribute("data-trix-attribute");
+  const others = RICH_SWAP[name];
+  if (!others) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const editor = editorOf(format);
+  if (!editor) return;
+  const turningOff = format.classList.contains("trix-active");
+  editor.recordUndoEntry("Formát");
+  if (turningOff) {
+    editor.deactivateAttribute(name);
+    return;
+  }
+  for (const other of others) editor.deactivateAttribute(other);
+  editor.activateAttribute(name);
 }
 
-function insertRich(fragment) {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const range = selection.getRangeAt(0);
-  range.deleteContents();
-  range.insertNode(fragment);
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
+function closeLinkDialog(input) {
+  const dialog = input.closest("[data-trix-dialog]");
+  dialog?.removeAttribute("data-trix-active");
+  dialog?.classList.remove("trix-active");
+  input.setAttribute("disabled", "disabled");
+  editorOf(input)?.deactivateAttribute("frozen");
 }
 
-for (const rich of document.querySelectorAll(".rich")) {
-  const source = rich.querySelector("textarea");
-  const area = rich.querySelector(".rich-area");
-  const bar = rich.querySelector(".rich-bar");
-  if (!source || !area || !bar) continue;
-  fillRich(area, source.value);
-  source.hidden = true;
-  source.required = false;
-  area.hidden = false;
-  bar.hidden = false;
-  document.execCommand("defaultParagraphSeparator", false, "p");
-
-  bar.addEventListener("mousedown", (event) => {
-    if (event.target.closest("button")) event.preventDefault();
-  });
-  bar.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-rich]");
-    if (!button) return;
-    area.focus();
-    const command = button.dataset.rich;
-    if (command === "bold") document.execCommand("bold");
-    else if (command === "italic") document.execCommand("italic");
-    else if (command === "underline") document.execCommand("underline");
-    else if (command === "ul") document.execCommand("insertUnorderedList");
-    else if (command === "ol") document.execCommand("insertOrderedList");
-    else if (command === "h2" || command === "h3") document.execCommand("formatBlock", false, command);
-    else if (command === "quote") document.execCommand("formatBlock", false, "blockquote");
-    else if (command === "link") {
-      const selection = window.getSelection();
-      const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
-      if (!range || range.collapsed) {
-        window.alert("Nejdřív v textu označte slova, která mají být odkaz.");
-        return;
-      }
-      const typed = window.prompt("Adresa odkazu. Začíná na https://, http:// nebo mailto:");
-      if (!typed) return;
-      const href = safeRichHref(typed);
-      if (!href) {
-        window.alert("Tahle adresa nejde vložit. Použijte https://, http:// nebo mailto:.");
-        return;
-      }
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand("createLink", false, href);
-    }
-  });
-
-  area.addEventListener("paste", (event) => {
+function onRichClick(event) {
+  const apply = event.target.closest?.("[data-trix-method='setAttribute']");
+  if (!apply) return;
+  const input = apply.closest("[data-trix-dialog]")?.querySelector("input[name='href']");
+  if (!input) return;
+  const href = safeRichHref(input.value);
+  if (!href) {
     event.preventDefault();
-    const html = event.clipboardData?.getData("text/html") ?? "";
-    const text = event.clipboardData?.getData("text/plain") ?? "";
-    if (html) {
-      const parsed = new DOMParser().parseFromString(html, "text/html");
-      insertRich(cleanRich(parsed.body));
+    event.stopPropagation();
+    closeLinkDialog(input);
+    window.alert("Tahle adresa nejde vložit. Použijte https://, http://, mailto: nebo odkaz začínající na /.");
+    return;
+  }
+  input.value = href;
+}
+
+function onRichKey(event) {
+  if (event.key !== "Enter") return;
+  const input = event.target.closest?.(".trix-input--dialog");
+  if (!input) return;
+  event.preventDefault();
+  input.closest(".trix-dialog")?.querySelector("[data-trix-method='setAttribute']")?.click();
+}
+
+function mountRich(rich) {
+  const source = rich.querySelector("textarea[name='body']");
+  if (!source || rich.querySelector("trix-editor")) return;
+  richSeq += 1;
+  if (!source.id) source.id = `clanek-text-${richSeq}`;
+  const editor = document.createElement("trix-editor");
+  editor.setAttribute("input", source.id);
+  editor.setAttribute("aria-label", "Text zprávy");
+  editor.setAttribute("placeholder", "Text zprávy");
+  editor.className = "rich-area";
+  source.after(editor);
+
+  let lastGood = source.value;
+  let reverting = false;
+  const markEmpty = () => editor.classList.toggle("is-empty", !richHasText(source.value));
+  const keepLimit = () => {
+    if (reverting) return;
+    markEmpty();
+    if (source.value.length <= RICH_LIMIT) {
+      lastGood = source.value;
       return;
     }
-    document.execCommand("insertText", false, text);
-  });
-  area.addEventListener("drop", (event) => event.preventDefault());
-
-  source.form?.addEventListener(
-    "submit",
-    () => {
-      source.value = htmlFromRich(area);
+    reverting = true;
+    editor.editor.loadHTML(lastGood);
+    reverting = false;
+    markEmpty();
+    window.alert("Text je moc dlouhý. Nevejde se víc než 20 000 znaků.");
+  };
+  editor.addEventListener("trix-change", keepLimit);
+  editor.addEventListener("trix-initialize", markEmpty);
+  editor.addEventListener(
+    "paste",
+    (event) => {
+      const html = event.clipboardData?.getData("text/html") ?? "";
+      if (!html) return;
+      event.preventDefault();
+      editor.editor.insertHTML(preparePastedHtml(html));
     },
     true,
   );
+  editor.addEventListener("drop", (event) => {
+    if ([...event.dataTransfer?.types ?? []].includes("Files")) event.preventDefault();
+  });
+  markEmpty();
 }
+
+function bootRich() {
+  const fields = document.querySelectorAll(".rich");
+  if (!fields.length) return;
+  if (!window.Trix) {
+    for (const rich of fields) {
+      const source = rich.querySelector("textarea");
+      if (source) source.hidden = false;
+    }
+    return;
+  }
+  configureTrix();
+  for (const rich of fields) mountRich(rich);
+}
+
+bootRich();

@@ -1,7 +1,7 @@
 import { CATEGORIES } from "./db.js";
 import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
-import { renderArticleHtml } from "./rich.js";
+import { prepareArticleBody, renderArticleHtml } from "./rich.js";
 
 const CATEGORY_KEY = {
   Zprávy: "cat_zpravy",
@@ -49,7 +49,7 @@ function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
 
-export function layout({ title, description, path, minimal, mainOrigin, body, script = "", copy = {} }) {
+export function layout({ title, description, path, minimal, mainOrigin, body, script = "", head = "", copy = {} }) {
   const brandHref = minimal ? "/popelnice" : "/";
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const links = NAV.map(
@@ -75,6 +75,7 @@ export function layout({ title, description, path, minimal, mainOrigin, body, sc
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site.css">
+  ${head}
 </head>
 <body>
   <div class="wrap">
@@ -351,7 +352,7 @@ function field(label, control) {
 
 const input = "control";
 
-function adminShell(ctx, data, tab, message, inner) {
+function adminShell(ctx, data, tab, message, inner, options = {}) {
   const flash = flashOf(message);
   if (!data.signedIn) {
     return layout({
@@ -407,7 +408,8 @@ function adminShell(ctx, data, tab, message, inner) {
     path: "/redakce",
     title: "Redakce | Kopidlenská drbna",
     description: "Redakce Kopidlenské drbny.",
-    script: `<script src="/editor.js" defer></script>`,
+    head: options.rich ? `<link rel="stylesheet" href="/vendor/trix/trix.css">` : "",
+    script: `${options.rich ? `<script src="/vendor/trix/trix.umd.min.js" defer></script>` : ""}<script src="/editor.js" defer></script>`,
     body: `
       <div class="admin-head">
         <div>
@@ -436,26 +438,12 @@ function categoryOptions(ctx, selected) {
 }
 
 function richTextField(body) {
-  const tools = [
-    ["bold", "Tučně"],
-    ["italic", "Kurzíva"],
-    ["underline", "Podtržení"],
-    ["h2", "Nadpis"],
-    ["h3", "Podnadpis"],
-    ["ul", "Odrážky"],
-    ["ol", "Čísla"],
-    ["quote", "Citace"],
-    ["link", "Odkaz"],
-  ]
-    .map(([command, label]) => `<button type="button" data-rich="${command}">${label}</button>`)
-    .join("");
+  const html = prepareArticleBody(body).html;
   return `<div class="field"><span>Text</span>
     <div class="rich">
-      <div class="rich-bar" hidden>${tools}</div>
-      <div class="rich-area" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Text" hidden></div>
-      <textarea class="control" name="body" maxlength="20000" rows="8">${esc(body)}</textarea>
+      <textarea class="control" name="body" maxlength="20000" rows="12" hidden>${esc(html)}</textarea>
     </div>
-    <span class="hint">Nadpisy, odrážky, tučné a kurzíva, citace a odkazy.</span>
+    <span class="hint">Nadpisy, seznamy, tučné, kurzíva, podtržení, citace a odkazy. Adresa začíná na https://, http://, mailto: nebo /.</span>
   </div>`;
 }
 
@@ -551,6 +539,7 @@ function chiefArticles(ctx, data, message, query) {
     "zpravy",
     message,
     `${queueHtml}<div class="split">${form}<ul class="stack plain">${list}</ul></div>`,
+    { rich: true },
   );
 }
 
@@ -634,7 +623,9 @@ function contributorArticles(ctx, data, message, query) {
   const side = `
     <section class="block"><h2>Vaše návrhy</h2>${own ? `<ul class="stack plain">${own}</ul>` : `<p class="card dashed muted">Zatím tu nic nečeká.</p>`}</section>
     <section class="block"><h2>Zprávy na webu</h2><ul class="stack plain">${published}</ul></section>`;
-  return adminShell(ctx, data, "zpravy", message, `<div class="split">${form}<div class="stack">${side}</div></div>`);
+  return adminShell(ctx, data, "zpravy", message, `<div class="split">${form}<div class="stack">${side}</div></div>`, {
+    rich: true,
+  });
 }
 
 export function adminArticles(ctx, data, message, query = {}) {
