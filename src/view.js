@@ -1,11 +1,30 @@
-import { CATEGORIES, POPELNICE_URL } from "./db.js";
+import { CATEGORIES } from "./db.js";
+import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
 
+const CATEGORY_KEY = {
+  Zprávy: "cat_zpravy",
+  Komunita: "cat_komunita",
+  Kultura: "cat_kultura",
+  Praktické: "cat_prakticke",
+  Sport: "cat_sport",
+};
+
+function externalHref(copy) {
+  const value = tx(copy, "popelnice_url").trim();
+  return /^https?:\/\//i.test(value) ? value : "https://popelnice.kopidlenskadrbna.org/";
+}
+
+function catLabel(copy, category) {
+  const key = CATEGORY_KEY[category];
+  return key ? tx(copy, key) : category;
+}
+
 const NAV = [
-  ["/zpravy", "Zprávy"],
-  ["/akce", "Akce"],
-  ["/popelnice", "Popelnice"],
-  ["/o-nas", "O nás"],
+  ["/zpravy", "nav_news"],
+  ["/akce", "nav_events"],
+  ["/popelnice", "nav_bins"],
+  ["/o-nas", "nav_about"],
 ];
 
 const AMP = "\u0026amp;";
@@ -37,18 +56,18 @@ function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
 
-export function layout({ title, description, path, minimal, mainOrigin, body, script = "" }) {
+export function layout({ title, description, path, minimal, mainOrigin, body, script = "", copy = {} }) {
   const brandHref = minimal ? "/popelnice" : "/";
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const links = NAV.map(
-    ([href, label]) =>
-      `<a class="nav-link${active(path, href)}" href="${href}">${label}</a>`,
+    ([href, key]) =>
+      `<a class="nav-link${active(path, href)}" href="${href}">${esc(tx(copy, key))}</a>`,
   ).join("");
   const headerNav = minimal
-    ? `<a class="btn btn-line" href="${esc(mainOrigin)}">Celé noviny</a>`
+    ? `<a class="btn btn-line" href="${esc(mainOrigin)}">${esc(tx(copy, "link_whole"))}</a>`
     : `<nav class="nav" aria-label="Hlavní">${links}</nav>
        <details class="mobile-nav">
-         <summary>Menu</summary>
+         <summary>${esc(tx(copy, "menu_label"))}</summary>
          <nav aria-label="Mobilní">${links}</nav>
        </details>`;
   return `<!doctype html>
@@ -66,19 +85,19 @@ export function layout({ title, description, path, minimal, mainOrigin, body, sc
 </head>
 <body>
   <div class="wrap">
-    <a class="skip" href="#obsah">Přeskočit na obsah</a>
+    <a class="skip" href="#obsah">${esc(tx(copy, "skip"))}</a>
     <header class="top">
       <a class="brand" href="${brandHref}">
         <img src="${brandImg}" alt="">
-        <span>Kopidlenská<span>drbna</span></span>
+        <span>${esc(tx(copy, "brand_line"))}<span>${esc(tx(copy, "brand_accent"))}</span></span>
       </a>
       ${headerNav}
     </header>
     <main id="obsah">${body}</main>
     <footer>
-      <p>© 2026 Kopidlenská drbna</p>
-      <p class="fine">Neoficiální informační stránka — není provozována Městem Kopidlno.</p>
-      ${minimal ? "" : `<a href="/redakce">Redakce</a>`}
+      <p>${esc(tx(copy, "footer_copy"))}</p>
+      <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
+      ${minimal ? "" : `<a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>`}
     </footer>
   </div>
   ${script}
@@ -98,16 +117,16 @@ export function homePage(data, ctx) {
   const leadHtml = lead
     ? `<a class="card card-lead" href="/zpravy/${esc(lead.slug)}">
         ${lead.imageKey ? `<img class="cover" src="${mediaUrl(lead.imageKey)}" alt="">` : ""}
-        <p class="kicker">${esc(lead.category)}</p>
+        <p class="kicker">${esc(catLabel(ctx.copy, lead.category))}</p>
         <h3>${esc(lead.title)}</h3>
         <p class="muted">${esc(lead.excerpt)}</p>
         <p class="meta">${esc(formatDayMonth(lead.createdOn))}</p>
       </a>`
-    : `<p class="card muted">Zatím tu není žádná zpráva.</p>`;
+    : `<p class="card muted">${esc(tx(ctx.copy, "empty_articles"))}</p>`;
   const restHtml = rest
     .map(
       (article) => `<a class="card card-side" href="/zpravy/${esc(article.slug)}">
-        <p class="kicker">${esc(article.category)}</p>
+        <p class="kicker">${esc(catLabel(ctx.copy, article.category))}</p>
         <h3>${esc(article.title)}</h3>
       </a>`,
     )
@@ -122,40 +141,40 @@ export function homePage(data, ctx) {
           </article>`,
         )
         .join("")}</div>`
-    : `<p class="card dashed muted">Zatím tu není zveřejněná pozvánka. Až ji redakce přidá, objeví se tady.</p>`;
+    : `<p class="card dashed muted">${esc(tx(ctx.copy, "empty_events"))}</p>`;
 
   return layout({
     ...ctx,
-    title: "Kopidlenská drbna",
-    description: "Místní zprávy, pozvánky a svoz popelnic pro Kopidlno a jeho části.",
+    title: tx(ctx.copy, "site_name"),
+    description: tx(ctx.copy, "home_description"),
     body: `
       <section class="hero">
         <div class="mascot">
           <span class="sun" aria-hidden="true"></span>
           <svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg>
-          <img src="/kozel-maskot.webp" alt="Maskot Kopidlenské drbny, černobílý kozel">
+          <img src="/kozel-maskot.webp" alt="${esc(tx(ctx.copy, "hero_alt"))}">
         </div>
         <div>
-          <p class="pill">Kopidlno a jeho části</p>
-          <h1>Kopidlenská<span>drbna</span></h1>
-          <p class="lede">Místní zprávy, pozvánky a sousedské novinky z Kopidlna, Drahorazi, Mlýnce, Pševesi a Ledkova. Neúřední, přehledné a odsud.</p>
+          <p class="pill">${esc(tx(ctx.copy, "hero_pill"))}</p>
+          <h1>${esc(tx(ctx.copy, "hero_title"))}<span>${esc(tx(ctx.copy, "hero_accent"))}</span></h1>
+          <p class="lede">${esc(tx(ctx.copy, "hero_lede"))}</p>
           <div class="card waste-teaser">
-            <p class="eyebrow">Popelnice</p>
+            <p class="eyebrow">${esc(tx(ctx.copy, "home_waste_eyebrow"))}</p>
             <p class="date">${esc(formatLong(data.waste.nextDate))}</p>
-            <p class="count">${esc(countdownLabel(data.waste.daysUntil))}</p>
+            <p class="count">${esc(countdownLabel(data.waste.daysUntil, ctx.copy))}</p>
             <div class="row">
-              <a class="btn btn-primary" href="/popelnice">Kdy se sváží</a>
-              <a class="btn btn-line" href="${POPELNICE_URL}" target="_blank" rel="noreferrer">popelnice.kopidlenskadrbna.org</a>
+              <a class="btn btn-primary" href="/popelnice">${esc(tx(ctx.copy, "home_waste_button"))}</a>
+              <a class="btn btn-line" href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
             </div>
           </div>
         </div>
       </section>
       <section class="block">
-        <div class="section-head"><h2>Zprávy</h2><a href="/zpravy">Všechny</a></div>
+        <div class="section-head"><h2>${esc(tx(ctx.copy, "home_news_heading"))}</h2><a href="/zpravy">${esc(tx(ctx.copy, "home_news_all"))}</a></div>
         <div class="news-grid">${leadHtml}<div class="stack">${restHtml}</div></div>
       </section>
       <section class="block">
-        <div class="section-head"><h2>Akce</h2><a href="/akce">Kalendář</a></div>
+        <div class="section-head"><h2>${esc(tx(ctx.copy, "home_events_heading"))}</h2><a href="/akce">${esc(tx(ctx.copy, "home_events_all"))}</a></div>
         ${eventsHtml}
       </section>`,
   });
@@ -167,7 +186,8 @@ export function newsPage(data, ctx, rubrika) {
   const chips = ["Vše", ...CATEGORIES]
     .map((category) => {
       const href = category === "Vše" ? "/zpravy" : `/zpravy?rubrika=${encodeURIComponent(category)}`;
-      return `<a class="chip${filter === category ? " is-on" : ""}" href="${href}">${esc(category)}</a>`;
+      const label = category === "Vše" ? tx(ctx.copy, "chip_all") : catLabel(ctx.copy, category);
+      return `<a class="chip${filter === category ? " is-on" : ""}" href="${href}">${esc(label)}</a>`;
     })
     .join("");
   const list = visible.length
@@ -175,30 +195,30 @@ export function newsPage(data, ctx, rubrika) {
         .map(
           (article) => `<a class="card story" href="/zpravy/${esc(article.slug)}">
             ${article.imageKey ? `<img class="cover" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-            <p class="kicker">${esc(article.category)}</p>
+            <p class="kicker">${esc(catLabel(ctx.copy, article.category))}</p>
             <h2>${esc(article.title)}</h2>
             <p class="muted">${esc(article.excerpt)}</p>
             <p class="meta">${esc(formatDayMonth(article.createdOn))}</p>
           </a>`,
         )
         .join("")
-    : `<p class="muted">V téhle rubrice zatím nic není.</p>`;
+    : `<p class="muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
   return layout({
     ...ctx,
-    title: "Zprávy | Kopidlenská drbna",
-    description: "Místní zprávy z Kopidlna a jeho částí.",
-    body: `<p class="eyebrow">Rubrika</p><h1>Zprávy</h1><div class="chips">${chips}</div><div class="stack">${list}</div>`,
+    title: `${tx(ctx.copy, "news_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "news_description"),
+    body: `<p class="eyebrow">${esc(tx(ctx.copy, "news_eyebrow"))}</p><h1>${esc(tx(ctx.copy, "news_heading"))}</h1><div class="chips">${chips}</div><div class="stack">${list}</div>`,
   });
 }
 
 export function articlePage(article, ctx) {
   return layout({
     ...ctx,
-    title: `${article.title} | Kopidlenská drbna`,
+    title: `${article.title} | ${tx(ctx.copy, "site_name")}`,
     description: article.excerpt,
     body: `
-      <a class="back" href="/zpravy">Zpět na zprávy</a>
-      <p class="eyebrow">${esc(article.category)}</p>
+      <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
+      <p class="eyebrow">${esc(catLabel(ctx.copy, article.category))}</p>
       <h1 class="article-title">${esc(article.title)}</h1>
       <p class="meta">${esc(formatLong(article.createdOn))}</p>
       ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
@@ -209,9 +229,9 @@ export function articlePage(article, ctx) {
 export function missingPage(ctx) {
   return layout({
     ...ctx,
-    title: "Zpráva nenalezena | Kopidlenská drbna",
-    description: "Tahle zpráva tu není.",
-    body: `<h1>Tahle zpráva tu není</h1><a class="back" href="/zpravy">Zpět na zprávy</a>`,
+    title: `${tx(ctx.copy, "missing_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "missing_description"),
+    body: `<h1>${esc(tx(ctx.copy, "missing_heading"))}</h1><a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>`,
   });
 }
 
@@ -236,14 +256,14 @@ export function eventsPage(data, ctx) {
   const past = data.events.filter((event) => event.startsOn < data.waste.today).reverse();
   return layout({
     ...ctx,
-    title: "Akce | Kopidlenská drbna",
-    description: "Pozvánky z Kopidlna a okolních částí.",
+    title: `${tx(ctx.copy, "events_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "events_description"),
     body: `
-      <p class="eyebrow">Kalendář</p>
-      <h1>Akce</h1>
-      <p class="lede">Pozvánky z Kopidlna a okolních částí. Co tu není, redakce ještě nepřidala.</p>
-      ${eventList("Chystá se", upcoming, "Žádná zveřejněná pozvánka. Až bude, objeví se tady.")}
-      ${past.length ? eventList("Už proběhlo", past, "") : ""}`,
+      <p class="eyebrow">${esc(tx(ctx.copy, "events_eyebrow"))}</p>
+      <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>
+      <p class="lede">${esc(tx(ctx.copy, "events_lede"))}</p>
+      ${eventList(tx(ctx.copy, "events_upcoming"), upcoming, tx(ctx.copy, "events_upcoming_empty"))}
+      ${past.length ? eventList(tx(ctx.copy, "events_past"), past, "") : ""}`,
   });
 }
 
@@ -255,31 +275,31 @@ export function binsPage(waste, ctx, { showExternal, standaloneTitle }) {
     .join("");
   return layout({
     ...ctx,
-    title: standaloneTitle ? "Popelnice | Kopidlenská drbna" : "Kdy se sváží | Kopidlenská drbna",
-    description: "Nejbližší svoz směsného odpadu v Kopidlně.",
+    title: `${tx(ctx.copy, standaloneTitle ? "bins_standalone" : "bins_title")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "bins_description"),
     minimal: ctx.minimal,
     body: `
       <section class="bins">
         <div class="card bin-copy">
-          <p class="pill">Nejbližší svoz</p>
+          <p class="pill">${esc(tx(ctx.copy, "bins_pill"))}</p>
           <h1>${esc(formatLong(waste.nextDate))}</h1>
-          <p class="count">${esc(countdownLabel(waste.daysUntil))}</p>
+          <p class="count">${esc(countdownLabel(waste.daysUntil, ctx.copy))}</p>
           <p class="muted">${esc(waste.note)}</p>
           <p class="rule">${esc(ruleLabel(waste))}</p>
           <div class="row">
             <span class="chip">${esc(waste.holidayNote)}</span>
-            <span class="chip">Směsný komunální odpad</span>
+            <span class="chip">${esc(tx(ctx.copy, "bins_kind"))}</span>
           </div>
           ${
             showExternal
-              ? `<a class="back" href="${POPELNICE_URL}" target="_blank" rel="noreferrer">popelnice.kopidlenskadrbna.org</a>`
+              ? `<a class="back" href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>`
               : ""
           }
         </div>
-        <div class="bin-photo"><img src="/kozel-popelar.webp" alt="Kozel v montérkách s popelnicí na kopidlenském náměstí"></div>
+        <div class="bin-photo"><img src="/kozel-popelar.webp" alt="${esc(tx(ctx.copy, "bins_alt"))}"></div>
       </section>
       <section class="card block">
-        <h2>Další termíny</h2>
+        <h2>${esc(tx(ctx.copy, "bins_more"))}</h2>
         <div class="dates">${dates}</div>
       </section>`,
   });
@@ -288,20 +308,20 @@ export function binsPage(waste, ctx, { showExternal, standaloneTitle }) {
 export function aboutPage(data, ctx) {
   return layout({
     ...ctx,
-    title: "O nás | Kopidlenská drbna",
-    description: "Sousedská, ne úřední stránka pro Kopidlno a jeho části.",
+    title: `${tx(ctx.copy, "nav_about")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "about_description"),
     body: `
       <section class="about">
-        <img src="/kozel-maskot.webp" alt="Maskot Kopidlenské drbny">
+        <img src="/kozel-maskot.webp" alt="${esc(tx(ctx.copy, "about_alt"))}">
         <div>
-          <p class="eyebrow">O stránce</p>
-          <h1>Sousedská, ne úřední</h1>
-          <p class="lede">Kopidlenská drbna je místní noviny pro Kopidlno, Drahoraz, Mlýnec, Pševes a Ledkov. Píšeme zprávy, pozvánky a praktické věci, hlavně kdy vyvézt popelnici.</p>
-          <p>Stránku neprovozuje Město Kopidlno. Vyhlášky, poplatky a úřední oznámení berte vždy z webu města.</p>
+          <p class="eyebrow">${esc(tx(ctx.copy, "about_eyebrow"))}</p>
+          <h1>${esc(tx(ctx.copy, "about_heading"))}</h1>
+          <p class="lede">${esc(tx(ctx.copy, "about_lede"))}</p>
+          <p>${esc(tx(ctx.copy, "about_disclaimer"))}</p>
           <p>${esc(data.contactNote)}</p>
           <div class="row links">
-            <a href="/popelnice">Svoz popelnic</a>
-            <a href="${POPELNICE_URL}" target="_blank" rel="noreferrer">popelnice.kopidlenskadrbna.org</a>
+            <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
+            <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
           </div>
         </div>
       </section>`,
@@ -350,6 +370,7 @@ function adminShell(ctx, data, tab, message, inner) {
   const tabs = [
     ["/redakce/zpravy", "zpravy", "Zprávy"],
     ["/redakce/akce", "akce", "Akce"],
+    ["/redakce/texty", "texty", "Texty"],
     ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
     ["/redakce/heslo", "heslo", "Heslo"],
   ]
@@ -371,7 +392,7 @@ function adminShell(ctx, data, tab, message, inner) {
       </div>
       ${data.showDefaultPassword ? `<p class="banner">Pořád platí výchozí heslo. V záložce Heslo si nastavte vlastní.</p>` : ""}
       <div class="row">${tabs}</div>
-      ${note(message, message?.startsWith("Heslo nesedí") || message?.startsWith("Doplňte") || message?.startsWith("Nové") || message?.startsWith("Současné") || message?.startsWith("Fotka") || message?.startsWith("Interval") || message?.startsWith("Vyberte") || message?.startsWith("Přihlaste") ? "bad" : "ok")}
+      ${note(message, message?.startsWith("Heslo nesedí") || message?.startsWith("Doplňte") || message?.startsWith("Nové") || message?.startsWith("Současné") || message?.startsWith("Fotka") || message?.startsWith("Interval") || message?.startsWith("Vyberte") || message?.startsWith("Přihlaste") || message?.startsWith("Texty se") || message?.startsWith("Adresa") ? "bad" : "ok")}
       ${inner}`,
   });
 }
@@ -380,7 +401,7 @@ export function adminArticles(ctx, data, message, editingId, confirmId) {
   const editing = data.articles.find((item) => item.id === editingId) ?? null;
   const options = CATEGORIES.map(
     (category) =>
-      `<option${editing?.category === category || (!editing && category === "Zprávy") ? " selected" : ""}>${esc(category)}</option>`,
+      `<option value="${esc(category)}"${editing?.category === category || (!editing && category === "Zprávy") ? " selected" : ""}>${esc(catLabel(ctx.copy, category))}</option>`,
   ).join("");
   const list = data.articles
     .map((item) => {
@@ -394,7 +415,7 @@ export function adminArticles(ctx, data, message, editingId, confirmId) {
             <a class="btn btn-ghost" href="/redakce/zpravy">Nechat</a>`
           : `<a class="btn btn-ghost" href="/redakce/zpravy?smazat=${item.id}">Smazat</a>`;
       return `<li class="card">
-        <p class="kicker">${esc(item.category)}${item.published ? "" : " · skrytá"}</p>
+        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${item.published ? "" : " · skrytá"}</p>
         <h3>${esc(item.title)}</h3>
         <div class="row">
           <a class="btn btn-line" href="/redakce/zpravy?id=${item.id}">Upravit</a>
@@ -424,6 +445,36 @@ export function adminArticles(ctx, data, message, editingId, confirmId) {
     message,
     `<div class="split">${form}<ul class="stack plain">${list}</ul></div>`,
   );
+}
+
+export function adminTexts(ctx, data, message) {
+  const groups = [];
+  for (const item of COPY) {
+    const last = groups.at(-1);
+    if (!last || last.name !== item.group) groups.push({ name: item.group, items: [item] });
+    else last.items.push(item);
+  }
+  const blocks = groups
+    .map((group) => {
+      const fields = group.items
+        .map((item) => {
+          const value = tx(ctx.copy, item.key);
+          const control = item.long
+            ? `<textarea class="${input}" name="${item.key}" rows="3" maxlength="${item.max}" required>${esc(value)}</textarea>`
+            : `<input class="${input}" name="${item.key}" maxlength="${item.max}" required value="${esc(value)}">`;
+          return field(item.label, control);
+        })
+        .join("");
+      return `<h2>${esc(group.name)}</h2>${fields}`;
+    })
+    .join("");
+  const form = `<form class="card form" method="post" action="/redakce/texty/ulozit">
+    <h2>Texty webu</h2>
+    <p class="muted">Tady se mění nápisy, titulky a odstavce na veřejných stránkách. Samotné zprávy jsou v záložce Zprávy, pozvánky v Akcích. Kontakt na redakci, vysvětlení svozu a poznámka ke svátkům zůstávají u Popelnic. Ve větách odpočtu nechte {n} tam, kde má být počet dní.</p>
+    ${blocks}
+    <button class="btn btn-primary" type="submit">Uložit texty</button>
+  </form>`;
+  return adminShell(ctx, data, "texty", message, form);
 }
 
 export function adminEvents(ctx, data, message, editingId, confirmId) {
