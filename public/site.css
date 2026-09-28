@@ -289,6 +289,8 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .news-grid, .bins, .about, .split { display: grid; gap: 0.8rem; }
 
+.split > * { min-width: 0; }
+
 .stack { display: grid; gap: 0.75rem; }
 
 .cards-3 { display: grid; gap: 0.75rem; }
@@ -331,56 +333,92 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .prose a { color: var(--brand); font-weight: 700; }
 
-.rich { display: grid; gap: 0.45rem; font-weight: 400; }
+.rich {
+  display: grid;
+  min-width: 0;
+  font-weight: 400;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--card);
+  overflow: hidden;
+}
 
 .rich trix-toolbar {
   position: sticky;
-  top: 0.35rem;
+  top: 0;
   z-index: 3;
+  display: grid;
+  gap: 0.35rem;
   white-space: normal;
-  background: color-mix(in srgb, var(--paper) 94%, transparent);
-  padding: 0.15rem 0 0.35rem;
+  background: var(--paper-deep);
+  padding: 0.4rem;
+  border-bottom: 1px solid var(--line);
 }
 
 .rich trix-toolbar .trix-button-row {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  gap: 0.4rem;
+  flex-wrap: nowrap;
+  justify-content: stretch;
+  gap: 0.35rem;
   overflow: visible;
+  margin: 0;
 }
 
 .rich trix-toolbar .trix-button-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  min-width: 0;
   margin: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  background: var(--card);
+  overflow: hidden;
 }
 
+.rich trix-toolbar .trix-button-group[data-trix-button-group="history"] { flex: 0 0 auto; }
+
+.rich trix-toolbar .trix-button-group--block { flex: 1 1 auto; }
+
 .rich trix-toolbar .trix-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   float: none;
+  flex: 1 1 0;
   width: auto;
-  height: auto;
-  min-height: 2.2rem;
+  min-width: 0;
+  height: 2.35rem;
   max-width: none;
   margin: 0;
-  padding: 0.2rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--card);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
   color: var(--ink);
   font: inherit;
-  font-size: 0.86rem;
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 1;
   text-indent: 0;
 }
 
-.rich trix-toolbar .trix-button:not(:first-child) { border-left: 1px solid var(--line); }
+.rich trix-toolbar .trix-button-group[data-trix-button-group="history"] .trix-button { width: 2.35rem; flex: 0 0 2.35rem; }
+
+.rich trix-toolbar .trix-button:last-child { border-right: 0; }
+
+.rich trix-toolbar .trix-button:not(:first-child) { border-left: 0; }
+
+.rich trix-toolbar .trix-button svg { width: 1.15rem; height: 1.15rem; display: block; }
+
+.rich-mark { font-size: 0.82rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+
+.rich trix-toolbar .trix-button[data-trix-attribute="quote"] .rich-mark { font-family: var(--display); font-size: 1.25rem; font-weight: 560; }
+
+.rich trix-toolbar .trix-button[data-trix-attribute="italic"] .rich-mark { font-style: italic; font-family: var(--display); }
+
+.rich trix-toolbar .trix-button[data-trix-attribute="underline"] .rich-mark { text-decoration: underline; text-underline-offset: 0.12em; }
 
 .rich trix-toolbar .trix-button:hover,
 .rich trix-toolbar .trix-button.trix-active {
@@ -388,14 +426,17 @@ a.card { display: block; text-decoration: none; color: inherit; }
   color: var(--ink);
 }
 
+.rich trix-toolbar .trix-button.trix-active { background: var(--tape); color: var(--tape-ink); }
+
 .rich trix-toolbar .trix-button:disabled {
-  opacity: 0.45;
+  opacity: 0.38;
   color: var(--ink);
 }
 
 .rich trix-toolbar .trix-button:focus-visible {
   outline: 2px solid var(--brand);
-  outline-offset: 1px;
+  outline-offset: -2px;
+  z-index: 1;
 }
 
 .rich trix-toolbar .trix-dialogs { position: static; }
@@ -413,35 +454,51 @@ a.card { display: block; text-decoration: none; color: inherit; }
 }
 
 .rich trix-toolbar .trix-dialog__link-fields {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 0.4rem;
 }
 
 .rich trix-toolbar .trix-dialog__link-fields .trix-input,
 .rich trix-toolbar .trix-input--dialog {
-  width: auto;
-  min-width: min(100%, 16rem);
-  flex: 1 1 12rem;
+  width: 100%;
+  min-width: 0;
   margin: 0;
   border: 1px solid var(--line);
-  border-radius: 0.8rem;
+  border-radius: 0.7rem;
   background: var(--card);
   color: var(--ink);
   font: inherit;
   font-size: 1rem;
-  padding: 0.55rem 0.7rem;
+  padding: 0.5rem 0.7rem;
 }
 
-.rich trix-toolbar .trix-dialog__link-fields .trix-button-group { flex: 0 0 auto; }
+.rich trix-toolbar .trix-dialog__link-fields .trix-button-group {
+  display: contents;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.rich trix-toolbar .trix-button--dialog {
+  flex: none;
+  width: auto;
+  height: 2.35rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 0.86rem;
+}
 
 .rich-area {
   display: block;
   min-height: 12rem;
-  border: 1px solid var(--line);
-  border-radius: 0.8rem;
+  border: 0;
+  border-radius: 0;
   background: var(--card);
-  padding: 0.7rem 0.8rem;
+  padding: 0.75rem 0.85rem 0.9rem;
   color: var(--ink);
   font: inherit;
   font-weight: 400;
@@ -530,6 +587,11 @@ a.card { display: block; text-decoration: none; color: inherit; }
 ul.plain { list-style: none; margin: 0; padding: 0; }
 
 .block { margin-top: 0.5rem; }
+
+@media (max-width: 420px) {
+  .rich trix-toolbar .trix-dialog__link-fields { grid-template-columns: 1fr 1fr; }
+  .rich trix-toolbar .trix-dialog__link-fields .trix-input { grid-column: 1 / -1; }
+}
 
 @media (min-width: 720px) {
   .cards-3, .dates { grid-template-columns: repeat(3, minmax(0, 1fr)); }

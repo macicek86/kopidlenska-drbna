@@ -121,31 +121,38 @@ function safeRichHref(raw) {
   return "";
 }
 
-function richButton(label, title, extra) {
-  return `<button type="button" class="trix-button" tabindex="-1" title="${title}" ${extra}>${label}</button>`;
+function richSvg(body) {
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+}
+
+function richButton(label, title, extra, graphic) {
+  return `<button type="button" class="trix-button" tabindex="-1" aria-label="${label}" title="${title}" ${extra}>${graphic}</button>`;
 }
 
 function richToolbarHtml() {
+  const mark = (text) => `<span class="rich-mark">${text}</span>`;
   return `<div class="trix-button-row">
     <span class="trix-button-group" data-trix-button-group="text">
-      ${richButton("Tučně", "Tučně (Ctrl+B)", 'data-trix-attribute="bold" data-trix-key="b"')}
-      ${richButton("Kurzíva", "Kurzíva (Ctrl+I)", 'data-trix-attribute="italic" data-trix-key="i"')}
-      ${richButton("Podtržení", "Podtržení (Ctrl+U)", 'data-trix-attribute="underline" data-trix-key="u"')}
-      ${richButton("Odkaz", "Odkaz (Ctrl+K)", 'data-trix-attribute="href" data-trix-action="link" data-trix-key="k"')}
-      ${richButton("Bez formátu", "Zrušit formátování", 'data-drbna="clear"')}
-    </span>
-    <span class="trix-button-group" data-trix-button-group="block">
-      ${richButton("Nadpis", "Nadpis", 'data-trix-attribute="heading1"')}
-      ${richButton("Podnadpis", "Podnadpis", 'data-trix-attribute="heading2"')}
-      ${richButton("Citace", "Citace", 'data-trix-attribute="quote"')}
-      ${richButton("Odrážky", "Odrážky", 'data-trix-attribute="bullet"')}
-      ${richButton("Čísla", "Číslovaný seznam", 'data-trix-attribute="number"')}
-      ${richButton("Míň odsazení", "Menší odsazení seznamu", 'data-trix-action="decreaseNestingLevel"')}
-      ${richButton("Víc odsazení", "Větší odsazení seznamu", 'data-trix-action="increaseNestingLevel"')}
+      ${richButton("Tučně", "Tučně (Ctrl+B)", 'data-trix-attribute="bold" data-trix-key="b"', mark("B"))}
+      ${richButton("Kurzíva", "Kurzíva (Ctrl+I)", 'data-trix-attribute="italic" data-trix-key="i"', mark("I"))}
+      ${richButton("Podtržení", "Podtržení (Ctrl+U)", 'data-trix-attribute="underline" data-trix-key="u"', mark("U"))}
+      ${richButton("Odkaz", "Odkaz (Ctrl+K)", 'data-trix-attribute="href" data-trix-action="link" data-trix-key="k"', richSvg('<path d="M10 13a5 5 0 0 0 7.5.5l1-1a5 5 0 0 0-7-7L10 7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-1 1a5 5 0 0 0 7 7L14 17"/>'))}
+      ${richButton("Bez formátu", "Zrušit formátování", 'data-drbna="clear"', richSvg('<path d="M5 18 12 4l7 14"/><path d="M8.2 13h7.6"/><path d="M16 17l4 4"/>'))}
     </span>
     <span class="trix-button-group" data-trix-button-group="history">
-      ${richButton("Zpět", "Vrátit úpravu (Ctrl+Z)", 'data-trix-action="undo" data-trix-key="z"')}
-      ${richButton("Znovu", "Znovu (Ctrl+Shift+Z)", 'data-trix-action="redo" data-trix-key="shift+z"')}
+      ${richButton("Zpět", "Vrátit úpravu (Ctrl+Z)", 'data-trix-action="undo" data-trix-key="z"', richSvg('<path d="M9 14 5 10l4-4"/><path d="M5 10h8a6 6 0 1 1 0 12h-2"/>'))}
+      ${richButton("Znovu", "Znovu (Ctrl+Shift+Z)", 'data-trix-action="redo" data-trix-key="shift+z"', richSvg('<path d="m15 14 4-4-4-4"/><path d="M19 10h-8a6 6 0 1 0 0 12h2"/>'))}
+    </span>
+  </div>
+  <div class="trix-button-row">
+    <span class="trix-button-group trix-button-group--block" data-trix-button-group="block">
+      ${richButton("Nadpis", "Nadpis", 'data-trix-attribute="heading1"', mark("H2"))}
+      ${richButton("Podnadpis", "Podnadpis", 'data-trix-attribute="heading2"', mark("H3"))}
+      ${richButton("Citace", "Citace", 'data-trix-attribute="quote"', mark("„"))}
+      ${richButton("Odrážky", "Odrážky", 'data-trix-attribute="bullet"', richSvg('<circle cx="5" cy="7" r="1.7" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="5" cy="17" r="1.7" fill="currentColor" stroke="none"/><path d="M10 7h10M10 12h10M10 17h10" stroke-width="2.4"/>'))}
+      ${richButton("Čísla", "Číslovaný seznam", 'data-trix-attribute="number"', mark("1."))}
+      ${richButton("Míň odsazení", "Menší odsazení seznamu", 'data-trix-action="decreaseNestingLevel"', richSvg('<path d="M11 7h9M11 12h9M11 17h9"/><path d="M7 9 3 12l4 3"/>'))}
+      ${richButton("Víc odsazení", "Větší odsazení seznamu", 'data-trix-action="increaseNestingLevel"', richSvg('<path d="M4 7h9M4 12h9M4 17h9"/><path d="m15 9 4 3-4 3"/>'))}
     </span>
   </div>
   <div class="trix-dialogs" data-trix-dialogs>
