@@ -95,7 +95,7 @@ const uploaded = await fetch(base + "/redakce/zpravy/ulozit", {
 });
 assert(uploaded.status === 303, `upload ${uploaded.status} ${uploaded.headers.get("location")}`);
 const withPhoto = await get("/zpravy");
-const match = withPhoto.text.match(/\/media\/clanky\/[^\"]+\.png/);
+const match = withPhoto.text.match(/\/media\/clanky\/[^"]+\.png/);
 assert(match, "uploaded image url missing");
 const photo = await get(match[0]);
 assert(photo.status === 200 && photo.headers.get("content-type")?.includes("image/png"), "r2 image not served");
