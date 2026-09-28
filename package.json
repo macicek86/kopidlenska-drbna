@@ -6,7 +6,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "postinstall": "node decode-images.mjs",
     "dev": "wrangler dev --port 8787",
     "check": "node --test test/*.test.js",
     "db:local": "wrangler d1 execute kopidlenska-drbna --local --file=./schema.sql",
