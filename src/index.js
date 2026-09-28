@@ -29,7 +29,7 @@ import {
   newsPage,
 } from "./view.js";
 
-const ASSET = /\.(?:png|webp|svg|css|ico|jpg|jpeg|gif|woff2)$/i;
+const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
 const OK = {
   zprava: "Zpráva je uložená.",
