@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { verifyPassword } from "../src/password.js";
+import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek } from "../src/waste.js";
 
 const SEED =
@@ -9,6 +10,14 @@ const SEED =
 test("výchozí heslo sedí na hash v D1", async () => {
   assert.equal(await verifyPassword("Drbna2026", SEED), true);
   assert.equal(await verifyPassword("jiné", SEED), false);
+});
+
+test("odpočet bere texty z redakce a nechá {n}", () => {
+  assert.equal(countdownLabel(0), "Svoz je dnes.");
+  assert.equal(countdownLabel(1), "Svoz je zítra.");
+  assert.equal(countdownLabel(3), "Za 3 dny.");
+  assert.equal(countdownLabel(7), "Za 7 dní.");
+  assert.equal(countdownLabel(7, { countdown_many: "Ještě {n} dnů." }), "Ještě 7 dnů.");
 });
 
 test("28. 9. 2026 je sudý týden, další svoz je 5. 10.", () => {
