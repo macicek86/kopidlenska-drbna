@@ -1,3 +1,4 @@
+import { COPY } from "./copy.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { buildWasteView } from "./waste.js";
 
@@ -348,6 +349,44 @@ export async function saveSite(env, request, input) {
   )
     .bind(contactNote, wasteNote, holidayNote, weekday, weekParity, stepDays)
     .run();
+  return { ok: true };
+}
+
+export async function loadCopy(env) {
+  const copy = Object.fromEntries(COPY.map((item) => [item.key, item.value]));
+  try {
+    const rows = (await env.DB.prepare("select key, value from copy").all()).results ?? [];
+    for (const row of rows) {
+      if (row.key in copy && row.value != null && String(row.value).trim()) copy[row.key] = String(row.value);
+    }
+  } catch {
+    // Starší databáze ještě nemá tabulku copy. Stránky pojedou z výchozích textů.
+  }
+  return copy;
+}
+
+export async function saveCopy(env, request) {
+  const denied = await requireEditor(env, request);
+  if (denied) return { ok: false, error: denied };
+  const form = await request.formData();
+  const statements = [];
+  for (const item of COPY) {
+    const value = clip(form.get(item.key), item.max);
+    if (!value) return { ok: false, error: `Doplňte pole: ${item.label}.` };
+    if (item.key === "popelnice_url" && !/^https?:\/\//i.test(value)) {
+      return { ok: false, error: "Adresa původního svozu musí začínat na https://." };
+    }
+    statements.push(
+      env.DB.prepare(
+        "insert into copy (key, value) values (?, ?) on conflict(key) do update set value = excluded.value",
+      ).bind(item.key, value),
+    );
+  }
+  try {
+    await env.DB.batch(statements);
+  } catch {
+    return { ok: false, error: "Texty se neuložily. Spusťte znovu npm run nasadit, ať se v databázi doplní tabulka textů." };
+  }
   return { ok: true };
 }
 
