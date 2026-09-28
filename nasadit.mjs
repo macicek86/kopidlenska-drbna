@@ -1,0 +1,63 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = dirname(fileURLToPath(import.meta.url));
+const wrangler = join(root, "node_modules", "wrangler", "bin", "wrangler.js");
+const placeholder = "00000000-0000-4000-8000-000000000001";
+const dbName = "kopidlenska-drbna";
+const bucket = "kopidlenska-drbna";
+
+function run(args, { allowFail = false } = {}) {
+  const result = spawnSync(process.execPath, [wrangler, ...args], { cwd: root, encoding: "utf8" });
+  const text = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  if (text.trim()) process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
+  if (!allowFail && result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+  return { code: result.status ?? 1, text };
+}
+
+function uuidFrom(text) {
+  return text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? null;
+}
+
+const tomlPath = join(root, "wrangler.toml");
+let toml = readFileSync(tomlPath, "utf8");
+
+if (toml.includes(placeholder)) {
+  console.log("Zakládám databázi D1…");
+  let created = run(["d1", "create", dbName], { allowFail: true });
+  let id = created.code === 0 ? uuidFrom(created.text) : null;
+  if (!id) {
+    console.log("Databáze už asi existuje, beru ji ze seznamu…");
+    const listed = run(["d1", "list", "--json"], { allowFail: true });
+    const start = listed.text.indexOf("[");
+    if (start >= 0) {
+      const rows = JSON.parse(listed.text.slice(start));
+      const row = rows.find((item) => item.name === dbName || item.database_name === dbName);
+      id = row?.uuid || row?.database_id || null;
+    }
+  }
+  if (!id || id === placeholder) {
+    console.error("Nepodařilo se zjistit id databáze. Jsi přihlášený? Spusť nejdřív: npx wrangler login");
+    process.exit(1);
+  }
+  toml = toml.replaceAll(placeholder, id);
+  writeFileSync(tomlPath, toml);
+  console.log(`D1 je ${dbName} (${id}).`);
+}
+
+console.log("Zakládám R2 bucket…");
+const bucketResult = run(["r2", "bucket", "create", bucket], { allowFail: true });
+if (bucketResult.code !== 0 && !/already exists|already owned/i.test(bucketResult.text)) {
+  process.exit(bucketResult.code);
+}
+
+console.log("Nahrávám schéma a výchozí texty…");
+run(["d1", "execute", dbName, "--remote", "--file=./schema.sql"]);
+
+console.log("Nasazuji Worker…");
+run(["deploy"]);
+console.log("Hotovo. Redakce je na /redakce, výchozí heslo je Drbna2026. Hned si ho změň.");

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Kopidlenská drbna">
+  <rect width="32" height="32" rx="8" fill="#C7434D"/>
+  <path d="M10.4 10.2C10 6.6 13 5.2 14 8.4" fill="none" stroke="#4A241B" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M21.6 10.2C22 6.6 19 5.2 18 8.4" fill="none" stroke="#EFC27B" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="16" cy="18" r="9" fill="#FFF8F2"/>
+  <path d="M16 9a9 9 0 0 0 0 18z" fill="#1A1A1A"/>
+  <circle cx="12.6" cy="17.2" r="1.45" fill="#FFF8F2"/>
+  <circle cx="19.4" cy="17.2" r="1.45" fill="#1A1A1A"/>
+  <path d="M13.1 21.2c.9 1.35 1.85 1.9 2.9 1.9s2-.55 2.9-1.9" fill="none" stroke="#C7434D" stroke-width="1.6" stroke-linecap="round"/>
+</svg>
