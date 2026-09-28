@@ -34,7 +34,9 @@ Domény musí být na stejném účtu. Stejné řádky jsou připravené zakomen
 
 Adresa `/redakce`. Výchozí heslo je `Drbna2026`. Po prvním přihlášení ho v záložce Heslo změň.
 
-V záložce Zprávy jde přiložit fotka. Ta se uloží do bucketu `kopidlenska-drbna` a na webu je pod `/media/...`.
+V záložce Zprávy jde přiložit fotka. Prohlížeč ji před odesláním zmenší a uloží jako WebP. Na webu je potom v bucketu `kopidlenska-drbna` pod `/media/...`.
+
+Záložka Texty mění nápisy, titulky a odstavce na veřejných stránkách. Samotné zprávy a pozvánky mají vlastní záložky. Kontakt, vysvětlení svozu a poznámka ke svátkům zůstávají u Popelnic. Po aktualizaci znovu spusť `npm run nasadit`, ať se v databázi doplní tabulka textů.
 
 ## Místní náhled bez účtu
 
