@@ -1,0 +1,23 @@
+name = "kopidlenska-drbna"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kopidlenska-drbna"
+database_id = "00000000-0000-4000-8000-000000000001"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "kopidlenska-drbna"
+
+# routes = [
+#   { pattern = "kopidlenskadrbna.org", custom_domain = true },
+#   { pattern = "www.kopidlenskadrbna.org", custom_domain = true },
+#   { pattern = "popelnice.kopidlenskadrbna.org", custom_domain = true }
+# ]

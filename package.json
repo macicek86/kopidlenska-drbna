@@ -1,0 +1,19 @@
+{
+  "name": "kopidlenska-drbna-worker",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "postinstall": "node decode-images.mjs",
+    "dev": "wrangler dev --port 8787",
+    "check": "node --test test/*.test.js",
+    "db:local": "wrangler d1 execute kopidlenska-drbna --local --file=./schema.sql",
+    "nasadit": "node nasadit.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
+  }
+}
