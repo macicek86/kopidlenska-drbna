@@ -40,7 +40,7 @@ Přispěvatele přidá hlavní redaktor v záložce Lidé: jméno pod článkem,
 
 Hlavní redaktor může text před schválením upravit, nejčastěji češtinu. Veřejně se neukáže, co se měnilo. Když se zveřejněné znění liší od návrhu, u autora je nanejvýš slovo Redigováno. Autor příspěvku zůstává přispěvatel. U návrhu úpravy cizí zprávy zůstává původní autor.
 
-V záložce Zprávy jde přiložit fotka. Prohlížeč ji před odesláním zmenší a uloží jako WebP. Na webu je potom v bucketu `kopidlenska-drbna` pod `/media/...`.
+Text zprávy se píše s nadpisy, odrážkami, tučným písmem, citací a odkazy. Skripty a jiné vložené kódy se neuloží. V záložce Zprávy jde přiložit fotka. Prohlížeč ji před odesláním zmenší a uloží jako WebP. Na webu je potom v bucketu `kopidlenska-drbna` pod `/media/...`.
 
 Záložka Texty mění nápisy, titulky a odstavce na veřejných stránkách. Samotné zprávy a pozvánky mají vlastní záložky. Kontakt, vysvětlení svozu a poznámka ke svátkům zůstávají u Popelnic. Po aktualizaci znovu spusť `npm run nasadit`, ať se v databázi doplní tabulka textů.
 

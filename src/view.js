@@ -1,6 +1,7 @@
 import { CATEGORIES } from "./db.js";
 import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
+import { renderArticleHtml } from "./rich.js";
 
 const CATEGORY_KEY = {
   Zprávy: "cat_zpravy",
@@ -42,14 +43,6 @@ export function esc(value) {
 
 function mediaUrl(key) {
   return `/media/${key.split("/").map(encodeURIComponent).join("/")}`;
-}
-
-function paragraphs(body) {
-  return body
-    .split(/\n\n+/)
-    .filter(Boolean)
-    .map((paragraph) => `<p>${esc(paragraph).replaceAll("\n", "<br>")}</p>`)
-    .join("");
 }
 
 function active(path, href) {
@@ -239,7 +232,7 @@ export function articlePage(article, ctx) {
       <h1 class="article-title">${esc(article.title)}</h1>
       ${articleMeta(article)}
       ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-      <div class="prose">${paragraphs(article.body)}</div>`,
+      <div class="prose">${renderArticleHtml(article.body)}</div>`,
   });
 }
 
@@ -442,12 +435,36 @@ function categoryOptions(ctx, selected) {
   ).join("");
 }
 
+function richTextField(body) {
+  const tools = [
+    ["bold", "Tučně"],
+    ["italic", "Kurzíva"],
+    ["underline", "Podtržení"],
+    ["h2", "Nadpis"],
+    ["h3", "Podnadpis"],
+    ["ul", "Odrážky"],
+    ["ol", "Čísla"],
+    ["quote", "Citace"],
+    ["link", "Odkaz"],
+  ]
+    .map(([command, label]) => `<button type="button" data-rich="${command}">${label}</button>`)
+    .join("");
+  return `<div class="field"><span>Text</span>
+    <div class="rich">
+      <div class="rich-bar" hidden>${tools}</div>
+      <div class="rich-area" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Text" hidden></div>
+      <textarea class="control" name="body" maxlength="20000" rows="8">${esc(body)}</textarea>
+    </div>
+    <span class="hint">Nadpisy, odrážky, tučné a kurzíva, citace a odkazy.</span>
+  </div>`;
+}
+
 function articleFields(ctx, source) {
   const selected = source?.category ?? "Zprávy";
   return `
     ${field("Nadpis", `<input class="${input}" name="title" required maxlength="160" value="${esc(source?.title ?? "")}">`)}
     ${field("Perex", `<textarea class="${input}" name="excerpt" required maxlength="320" rows="3">${esc(source?.excerpt ?? "")}</textarea>`)}
-    ${field("Text", `<textarea class="${input}" name="body" required maxlength="12000" rows="8">${esc(source?.body ?? "")}</textarea>`)}
+    ${richTextField(source?.body ?? "")}
     ${field("Rubrika", `<select class="${input}" name="category">${categoryOptions(ctx, selected)}</select>`)}
     ${field("Fotka", photoControl(source))}`;
 }

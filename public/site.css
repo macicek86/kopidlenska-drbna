@@ -311,6 +311,53 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .prose p { margin: 0 0 1rem; }
 
+.prose h2, .rich-area h2 { font-size: 1.7rem; line-height: 1.15; margin: 1.3rem 0 0.45rem; }
+
+.prose h3, .rich-area h3 { font-size: 1.3rem; line-height: 1.2; margin: 1.1rem 0 0.35rem; }
+
+.prose ul, .prose ol, .rich-area ul, .rich-area ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+
+.prose ul, .rich-area ul { list-style: disc; }
+
+.prose ol, .rich-area ol { list-style: decimal; }
+
+.prose li, .rich-area li { margin: 0.15rem 0; }
+
+.prose blockquote, .rich-area blockquote {
+  margin: 0 0 1rem;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--line);
+}
+
+.prose a { color: var(--brand); font-weight: 700; }
+
+.rich { display: grid; gap: 0.45rem; }
+
+.rich-bar { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+.rich-bar button {
+  min-height: 2.2rem;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.rich-bar button:hover, .rich-bar button.is-on { background: var(--paper-deep); }
+
+.rich-area {
+  min-height: 12rem;
+}
+
+.rich-area:empty::before {
+  content: "Text zprávy";
+  color: var(--muted);
+}
+
 .bin-copy h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); }
 
 .rule { font-weight: 700; }

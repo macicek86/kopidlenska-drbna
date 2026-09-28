@@ -1,5 +1,6 @@
 import { COPY } from "./copy.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import { prepareArticleBody } from "./rich.js";
 import { buildWasteView } from "./waste.js";
 
 export const CATEGORIES = ["Zprávy", "Komunita", "Kultura", "Praktické", "Sport"];
@@ -58,7 +59,7 @@ export function textWasEdited(before, after) {
   return (
     before.title !== after.title ||
     before.excerpt !== after.excerpt ||
-    before.body !== after.body ||
+    prepareArticleBody(before.body).html !== prepareArticleBody(after.body).html ||
     before.category !== after.category
   );
 }
@@ -295,12 +296,12 @@ async function requireChief(env, request) {
 function readArticleFields(input) {
   const title = clip(input.title, 160);
   const excerpt = clip(input.excerpt, 320);
-  const body = clip(input.body, 12000);
+  const prepared = prepareArticleBody(clip(input.body, 20000));
   const category = CATEGORIES.includes(input.category) ? input.category : "Zprávy";
   if (title.length < 3) return { error: "Doplňte nadpis." };
   if (excerpt.length < 3) return { error: "Doplňte krátký perex." };
-  if (body.length < 3) return { error: "Doplňte text." };
-  return { title, excerpt, body, category };
+  if (prepared.text.length < 3) return { error: "Doplňte text." };
+  return { title, excerpt, body: prepared.html, category };
 }
 
 async function loadProposals(env, whereSql, ...binds) {

@@ -4,6 +4,7 @@ import { verifyPassword } from "../src/password.js";
 import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek } from "../src/waste.js";
 import { redactedFlag, textWasEdited } from "../src/db.js";
+import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 
 const SEED =
   "pbkdf2:6b6f7069646c656e736b612d6472626e612d7631:71910d0f1a33b6ce8f9647f30734fbf39e392f5194eaa5fcfc68df6730249132";
@@ -35,6 +36,42 @@ test("redakční zásah se pozná podle textu, ne podle fotky", () => {
   assert.equal(redactedFlag(false, submitted, same), false);
   assert.equal(redactedFlag(false, submitted, fixed), true);
   assert.equal(redactedFlag(true, submitted, same), true);
+});
+
+test("formátování nechá nadpisy a odrážky a skript zahodí", () => {
+  const dirty = [
+    "<h2>Trh</h2>",
+    "<p>V <b>sobotu</b> a <em>neděli</em>.</p>",
+    "<ul><li>housky</li><li>med</li></ul>",
+    "<blockquote>Přijďte včas.</blockquote>",
+    '<script>alert(1)</script>',
+    '<a href="javascript:alert(1)">neklikejte</a>',
+    '<a href="&#106;avascript:alert(1)">ani tady</a>',
+    '<a href="https://kopidlno.cz" onclick="alert(1)">web města</a>',
+    '<img src=x onerror="alert(1)">',
+    '<p onclick="alert(1)">poznámka</p>',
+  ].join("");
+  const clean = prepareArticleBody(dirty);
+  assert.match(clean.html, /<h2>Trh<\/h2>/);
+  assert.match(clean.html, /<strong>sobotu<\/strong>/);
+  assert.match(clean.html, /<ul><li>housky<\/li><li>med<\/li><\/ul>/);
+  assert.match(clean.html, /<blockquote><p>Přijďte včas\.<\/p><\/blockquote>/);
+  assert.match(clean.html, /href="https:\/\/kopidlno\.cz"/);
+  assert.equal(clean.html.includes("<script"), false);
+  assert.equal(clean.html.includes("javascript"), false);
+  assert.equal(clean.html.includes("onerror"), false);
+  assert.equal(clean.html.includes("onclick"), false);
+  assert.equal(clean.html.includes("alert"), false);
+  assert.match(clean.html, /neklikejte/);
+  assert.equal(renderArticleHtml(dirty), clean.html);
+  assert.equal(prepareArticleBody("Ahoj\n\nsousedé").html, "<p>Ahoj</p><p>sousedé</p>");
+  assert.equal(
+    textWasEdited(
+      { title: "A", excerpt: "B", body: "Ahoj\n\nsousedé", category: "Zprávy" },
+      { title: "A", excerpt: "B", body: "<p>Ahoj</p><p onclick=\"x\">sousedé</p>", category: "Zprávy" },
+    ),
+    false,
+  );
 });
 
 test("28. 9. 2026 je sudý týden, další svoz je 5. 10.", () => {
