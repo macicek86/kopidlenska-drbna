@@ -37,7 +37,7 @@ function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
 
-export function layout({ title, description, path, minimal, mainOrigin, body }) {
+export function layout({ title, description, path, minimal, mainOrigin, body, script = "" }) {
   const brandHref = minimal ? "/popelnice" : "/";
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const links = NAV.map(
@@ -81,6 +81,7 @@ export function layout({ title, description, path, minimal, mainOrigin, body }) 
       ${minimal ? "" : `<a href="/redakce">Redakce</a>`}
     </footer>
   </div>
+  ${script}
 </body>
 </html>`;
 }
@@ -310,7 +311,7 @@ export function aboutPage(data, ctx) {
 function photoControl(editing) {
   const preview = editing?.imageKey
     ? `<img class="thumb" src="${mediaUrl(editing.imageKey)}" alt="">`
-    : `<span class="hint">Uloží se do R2 bucketu. JPG, PNG, WEBP nebo GIF, nejvýš 4 MB.</span>`;
+    : `<span class="hint">Před odesláním se v prohlížeči zmenší a uloží jako WEBP. Delší strana nejvýš 1600 px.</span>`;
   return `<input class="control" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">${preview}`;
 }
 
@@ -362,6 +363,7 @@ function adminShell(ctx, data, tab, message, inner) {
     path: "/redakce",
     title: "Redakce | Kopidlenská drbna",
     description: "Redakce Kopidlenské drbny.",
+    script: `<script src="/editor.js" defer></script>`,
     body: `
       <div class="admin-head">
         <div><p class="eyebrow">Administrace</p><h1>Redakce</h1></div>
