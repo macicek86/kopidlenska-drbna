@@ -3,7 +3,7 @@ import test from "node:test";
 import { verifyPassword } from "../src/password.js";
 import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
-import { pickAd, readAdFields, safeAdLink } from "../src/ads.js";
+import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../src/ads.js";
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 import { adPanel, adminAds, articlePage, homePage, newsPage } from "../src/view.js";
@@ -350,22 +350,31 @@ test("odkaz reklamy pustí jen obyčejnou adresu", () => {
   assert.equal(readAdFields({ title: "Chléb", body: "  ", enabled: 0 }).error, "Doplňte text nabídky.");
 });
 
-test("panel reklamy se v den nemění a je označený", () => {
+test("panel reklamy se při načtení střídá a je označený", () => {
   const ads = [
     { id: 3, title: "C" },
     { id: 1, title: "A" },
     { id: 2, title: "B" },
   ];
-  assert.equal(pickAd([], "titulka:2026-09-29"), null);
-  assert.equal(pickAd(ads, "titulka:2026-09-29").id, pickAd(ads, "titulka:2026-09-29").id);
-  const first = pickAd(ads, "a").id;
-  let other = first;
-  for (let i = 0; i < 30; i += 1) {
-    const id = pickAd(ads, `slot-${i}`).id;
+  assert.equal(pickAd([]), null);
+  assert.equal(pickAd(ads, { random: () => 0 }).id, 1);
+  assert.equal(pickAd(ads, { random: () => 0.4 }).id, 2);
+  assert.equal(pickAd(ads, { random: () => 0.9 }).id, 3);
+  assert.equal(pickAd(ads, { avoidId: 1, random: () => 0 }).id, 2);
+  assert.equal(pickAd(ads, { avoidId: 1, random: () => 0.9 }).id, 3);
+  assert.equal(pickAd([{ id: 5, title: "jen" }], { avoidId: 5, random: () => 0 }).id, 5);
+  let previous = null;
+  for (let i = 0; i < 20; i += 1) {
+    const id = pickAd(ads, { avoidId: previous }).id;
     assert.ok([1, 2, 3].includes(id));
-    if (id !== first) other = id;
+    if (previous != null) assert.notEqual(id, previous);
+    previous = id;
   }
-  assert.notEqual(other, first);
+  assert.equal(readSeenAd("drbna_editor=abc; drbna_reklama=12"), 12);
+  assert.equal(readSeenAd("drbna_reklama=nope"), null);
+  assert.match(seenAdCookie(4, true), /drbna_reklama=4/);
+  assert.match(seenAdCookie(4, true), /Secure/);
+  assert.equal(seenAdCookie(4, false).includes("Secure"), false);
 
   const html = adPanel(
     {
@@ -422,6 +431,12 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.match(home, /class="ad-panel has-photo"/);
   assert.match(home, /Reklama/);
   assert.equal(home.includes("<script"), false);
+  const pinned = homePage(
+    { ...bare, ads: [ad, { ...ad, id: 2, slug: "kolo", title: "Seřízení kola" }], ad },
+    ctx,
+  );
+  assert.match(pinned, /Čerstvý chléb/);
+  assert.equal(pinned.includes("Seřízení kola"), false);
 
   const articles = [1, 2, 3].map((id) => ({
     id,

@@ -69,8 +69,7 @@ import {
   newsPage,
   yardsPage,
 } from "./view.js";
-import { pickAd } from "./ads.js";
-import { pragueNow } from "./waste.js";
+import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { WEEK_DAYS } from "./yards.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
@@ -134,6 +133,15 @@ function html(body, status = 200, cookie) {
   });
   if (cookie) headers.set("set-cookie", cookie);
   return new Response(body, { status, headers });
+}
+
+function chooseAd(request, ads) {
+  return pickAd(ads, { avoidId: readSeenAd(request.headers.get("cookie")) });
+}
+
+function htmlAd(request, body, ad) {
+  const cookie = ad?.id != null ? seenAdCookie(ad.id, secure(request)) : undefined;
+  return html(body, 200, cookie);
 }
 
 function redirect(location, cookie) {
@@ -268,19 +276,21 @@ async function renderGet(request, env, url) {
   }
   if (path === "/") {
     const data = await loadPublic(env);
-    return html(homePage(data, ctx));
+    const ad = chooseAd(request, data.ads);
+    return htmlAd(request, homePage({ ...data, ad }, ctx), ad);
   }
   if (path === "/zpravy") {
     const data = await loadPublic(env);
-    return html(newsPage(data, ctx, url.searchParams.get("rubrika") ?? ""));
+    const ad = chooseAd(request, data.ads);
+    return htmlAd(request, newsPage({ ...data, ad }, ctx, url.searchParams.get("rubrika") ?? ""), ad);
   }
   if (path.startsWith("/zpravy/")) {
     const slug = decodeURIComponent(path.slice("/zpravy/".length));
     const article = await loadArticle(env, slug);
     if (!article) return html(missingPage(ctx), 404);
     const ads = await loadAds(env, { enabledOnly: true });
-    const ad = pickAd(ads, `clanek:${article.slug}:${pragueNow().date}`);
-    return html(articlePage(article, ctx, { ad }));
+    const ad = chooseAd(request, ads);
+    return htmlAd(request, articlePage(article, ctx, { ad }), ad);
   }
   if (path === "/reklamy") {
     const data = await loadPublic(env);
@@ -294,7 +304,8 @@ async function renderGet(request, env, url) {
   }
   if (path === "/akce") {
     const data = await loadPublic(env);
-    return html(eventsPage(data, ctx));
+    const ad = chooseAd(request, data.ads);
+    return htmlAd(request, eventsPage({ ...data, ad }, ctx), ad);
   }
   if (path === "/o-nas") {
     const data = await loadPublic(env);

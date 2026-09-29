@@ -66,14 +66,43 @@ export function readAdFields(input) {
   return { title, body, place, link, enabled: Boolean(input?.enabled) };
 }
 
-export function pickAd(ads, seed) {
-  const list = [...(ads ?? [])].filter((item) => item && item.id != null).sort((a, b) => Number(a.id) - Number(b.id));
-  if (!list.length) return null;
-  let hash = 2166136261;
-  const text = String(seed ?? "");
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
+export const AD_SEEN_COOKIE = "drbna_reklama";
+
+function randomUnit() {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] / 4294967296;
+}
+
+export function readSeenAd(cookieHeader) {
+  const raw = String(cookieHeader ?? "");
+  for (const part of raw.split(";")) {
+    const [name, ...rest] = part.trim().split("=");
+    if (name !== AD_SEEN_COOKIE) continue;
+    const id = Number(decodeURIComponent(rest.join("=")));
+    return Number.isInteger(id) && id > 0 ? id : null;
   }
-  return list[(hash >>> 0) % list.length];
+  return null;
+}
+
+export function seenAdCookie(id, secure) {
+  const parts = [`${AD_SEEN_COOKIE}=${encodeURIComponent(String(id))}`, "HttpOnly", "Path=/", "SameSite=Lax", "Max-Age=604800"];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
+}
+
+export function pickAd(ads, options = {}) {
+  const list = [...(ads ?? [])]
+    .filter((item) => item && item.id != null)
+    .sort((a, b) => Number(a.id) - Number(b.id));
+  if (!list.length) return null;
+  let pool = list;
+  const avoidId = Number(options.avoidId);
+  if (list.length > 1 && Number.isInteger(avoidId)) {
+    const rest = list.filter((item) => Number(item.id) !== avoidId);
+    if (rest.length) pool = rest;
+  }
+  const roll = Number(typeof options.random === "function" ? options.random() : randomUnit());
+  const unit = Number.isFinite(roll) ? Math.min(Math.max(roll, 0), 0.999999999999) : randomUnit();
+  return pool[Math.floor(unit * pool.length)];
 }

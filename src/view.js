@@ -215,7 +215,7 @@ export function homePage(data, ctx) {
       <section class="block">
         <div class="section-head"><h2>${esc(tx(ctx.copy, "home_news_heading"))}</h2><a href="/zpravy">${esc(tx(ctx.copy, "home_news_all"))}</a></div>
         <div class="news-grid">${leadHtml}<div class="stack">${restHtml}</div></div>
-        ${adSlot(data, ctx, "titulka")}
+        ${adSlot(data, ctx)}
       </section>
       <section class="block">
         <div class="section-head"><h2>${esc(tx(ctx.copy, "home_events_heading"))}</h2><a href="/akce">${esc(tx(ctx.copy, "home_events_all"))}</a></div>
@@ -243,7 +243,7 @@ export function newsPage(data, ctx, rubrika) {
             <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
           </a>`,
   );
-  const woven = contentAd(data, ctx, "zpravy");
+  const woven = contentAd(data, ctx);
   if (woven && cards.length) cards.splice(Math.min(2, cards.length), 0, woven);
   const list = cards.length ? cards.join("") : `<p class="muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
   return layout({
@@ -255,7 +255,7 @@ export function newsPage(data, ctx, rubrika) {
 }
 
 export function articlePage(article, ctx, extras = {}) {
-  const ad = extras.ad ?? pickAd(extras.ads, `clanek:${article.slug}:${extras.today ?? ""}`);
+  const ad = Object.hasOwn(extras, "ad") ? extras.ad : pickAd(extras.ads);
   return layout({
     ...ctx,
     title: `${article.title} | ${tx(ctx.copy, "site_name")}`,
@@ -271,14 +271,13 @@ export function articlePage(article, ctx, extras = {}) {
   });
 }
 
-function contentAd(data, ctx, slot) {
-  const today = data.waste?.today ?? data.now?.date ?? "";
-  const ad = pickAd(data.ads, `${slot}:${today}`);
+function contentAd(data, ctx) {
+  const ad = Object.hasOwn(data, "ad") ? data.ad : pickAd(data.ads);
   return ad ? adPanel(ad, ctx.copy) : "";
 }
 
-function adSlot(data, ctx, slot) {
-  const html = contentAd(data, ctx, slot);
+function adSlot(data, ctx) {
+  const html = contentAd(data, ctx);
   return html ? `<div class="ad-slot">${html}</div>` : "";
 }
 
@@ -417,7 +416,7 @@ export function eventsPage(data, ctx) {
       <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "events_lede"))}</p>
       ${eventList(tx(ctx.copy, "events_upcoming"), upcoming, tx(ctx.copy, "events_upcoming_empty"))}
-      ${adSlot(data, ctx, "akce")}
+      ${adSlot(data, ctx)}
       ${past.length ? eventList(tx(ctx.copy, "events_past"), past, "") : ""}`,
   });
 }
