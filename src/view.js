@@ -1221,21 +1221,37 @@ function phoneLink(phone) {
   return `<a href="tel:${esc(href)}">${esc(text)}</a>`;
 }
 
+function glueDates(text) {
+  return esc(text)
+    .replace(/(\d+)\. (\d+)\.(?: (\d{4}))?/g, (_, day, month, year) =>
+      year ? `${day}.&nbsp;${month}.&nbsp;${year}` : `${day}.&nbsp;${month}.`,
+    )
+    .replace(/ (od|do) (?=\d)/g, " $1&nbsp;");
+}
+
 function partLine(label, part) {
   if (!part?.open) return "";
   const note = part.note ? `<span class="hint">${esc(part.note)}</span>` : "";
-  return `<strong>${esc(`${label} ${part.from}–${part.to}`)}</strong>${note}`;
+  return `<p class="part"><span class="slot"><strong>${esc(`${part.from}–${part.to}`)}</strong><span class="when">${esc(label)}</span></span>${note}</p>`;
 }
 
-function doctorWeekList(week, today) {
+function doctorWeekList(week, today, { superseded = false } = {}) {
   const todayDay = civilWeekday(today);
   return `<ul class="week-list doctor-week">${week
     .map((slot) => {
       const morning = partLine("dopoledne", slot.morning);
       const afternoon = partLine("odpoledne", slot.afternoon);
       const open = Boolean(morning || afternoon);
+      const todayRow = slot.day === todayDay;
+      const loud = todayRow && !superseded;
+      const classes = [loud ? "is-today" : "", todayRow && superseded ? "is-quiet" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
+      const mark = loud
+        ? `<span class="today-mark">dnes</span>`
+        : todayRow
+          ? `<span class="today-quiet">dnes neplatí</span>`
+          : "";
       const body = open ? `<div class="parts">${morning}${afternoon}</div>` : `<strong>zavřeno</strong>`;
-      return `<li class="${slot.day === todayDay ? " is-today" : ""}${open ? "" : " is-off"}"><span>${esc(dayLabel(slot.day))}</span>${body}</li>`;
+      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${esc(dayLabel(slot.day))}${mark}</span>${body}</li>`;
     })
     .join("")}</ul>`;
 }
@@ -1280,7 +1296,7 @@ export function doctorsPage(data, ctx) {
           const current = activeChange(doctor, today);
           const notice = current ? homeNotice(doctor, today) : null;
           const banner = notice
-            ? `<div class="banner"><p>${esc(`${notice.name} ${notice.state.charAt(0).toLowerCase()}${notice.state.slice(1)}`)}</p><p>${esc(notice.note)}</p>${notice.detail ? `<p>${esc(notice.detail)}</p>` : ""}</div>`
+            ? `<div class="banner doctor-notice"><p>${glueDates(`${notice.name} ${notice.state.charAt(0).toLowerCase()}${notice.state.slice(1)}`)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}${notice.detail ? `<p class="banner-note">${glueDates(notice.detail)}</p>` : ""}</div>`
             : "";
           const rest = doctor.changes.filter((change) => change.id !== current?.id);
           const planned = rest.length
@@ -1288,7 +1304,7 @@ export function doctorsPage(data, ctx) {
             : "";
           const phone = phoneLink(doctor.phone);
           const hours = hasOpenSlot(doctor.week)
-            ? doctorWeekList(doctor.week, today)
+            ? doctorWeekList(doctor.week, today, { superseded: Boolean(notice) })
             : `<p class="muted">${esc(tx(ctx.copy, "doctors_missing_hours"))}</p>`;
           return `<article class="card yard">
             <p class="kicker">${esc(doctor.specialty)}</p>
