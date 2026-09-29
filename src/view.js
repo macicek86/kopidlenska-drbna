@@ -151,6 +151,44 @@ function articleMeta(article) {
   return `<p class="meta">${esc(base)}${mark}</p>`;
 }
 
+function heartSvg(className) {
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg>`;
+}
+
+function flowerSvg(className) {
+  return `<svg class="${className}" viewBox="0 0 36 56" aria-hidden="true"><path d="M18 24c.4 8 .2 18 0 30" fill="none" stroke="#2f7257" stroke-width="1.7" stroke-linecap="round"/><circle cx="18" cy="14" r="3.1" fill="#fffdf9"/><circle cx="18" cy="7.2" r="4.2" fill="#c7434d"/><circle cx="11.2" cy="12.4" r="4.1" fill="#e38990"/><circle cx="24.8" cy="12.4" r="4.1" fill="#f4d7a2"/><circle cx="13.2" cy="19.2" r="4" fill="#f4d7a2"/><circle cx="23.2" cy="19.2" r="4" fill="#d4545d"/></svg>`;
+}
+
+function mascotHtml(alt) {
+  return `<div class="mascot">
+    <div class="mascot-sky" aria-hidden="true">
+      <div class="mascot-fill">
+        <span class="cloud cloud-a"></span>
+        <span class="cloud cloud-b"></span>
+        <span class="cloud cloud-c"></span>
+        ${heartSvg("heart heart-b")}
+      </div>
+    </div>
+    <div class="mascot-figure">
+      <span class="sun" aria-hidden="true"></span>
+      ${heartSvg("heart")}
+      <img src="/kozel-maskot.webp" alt="${alt}">
+    </div>
+    <div class="mascot-ground" aria-hidden="true">
+      <div class="mascot-fill">
+        <span class="hill hill-far"></span>
+        <span class="hill"></span>
+        <span class="tuft tuft-a"></span>
+        <span class="tuft tuft-b"></span>
+        <span class="tuft tuft-c"></span>
+        ${flowerSvg("bloom bloom-a")}
+        ${flowerSvg("bloom bloom-b")}
+        ${flowerSvg("bloom bloom-c")}
+      </div>
+    </div>
+  </div>`;
+}
+
 export function homePage(data, ctx) {
   const lead = data.articles[0];
   const rest = data.articles.slice(1, 4);
@@ -190,11 +228,7 @@ export function homePage(data, ctx) {
     description: tx(ctx.copy, "home_description"),
     body: `
       <section class="hero">
-        <div class="mascot">
-          <span class="sun" aria-hidden="true"></span>
-          <svg class="heart" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 4.6-7 9-7 9z"/></svg>
-          <img src="/kozel-maskot.webp" alt="${esc(tx(ctx.copy, "hero_alt"))}">
-        </div>
+        ${mascotHtml(esc(tx(ctx.copy, "hero_alt")))}
         <div>
           <p class="pill">${esc(tx(ctx.copy, "hero_pill"))}</p>
           <h1>${esc(tx(ctx.copy, "hero_title"))}<span>${esc(tx(ctx.copy, "hero_accent"))}</span></h1>
