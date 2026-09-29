@@ -10,6 +10,7 @@
   --tape: #f4d7a2;
   --tape-ink: #4d2d1b;
   --pine: #2f7257;
+  --soon: #6e4510;
   --shadow: 0 18px 48px rgb(83 49 32 / 0.1);
   --sans: "Source Sans 3", "Segoe UI", sans-serif;
   --display: Fraunces, "Iowan Old Style", Palatino, serif;
@@ -255,6 +256,8 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .date { margin: 0.2rem 0; font-family: var(--display); font-size: 1.7rem; }
 
 .count { margin: 0.2rem 0 0; color: var(--pine); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.soon { margin: 0.2rem 0 0; color: var(--soon); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.8rem; }
 
@@ -599,6 +602,8 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .yard-home-detail { margin: 0.12rem 0 0; color: var(--muted); line-height: 1.4; }
 
 .yard-home .is-open .yard-home-state { color: var(--pine); }
+
+.yard-home .is-later .yard-home-state { color: var(--soon); }
 
 .yard-home .is-closure .yard-home-state,
 .yard-home .is-change .yard-home-state { color: var(--brand); }

@@ -101,24 +101,46 @@ function closureOn(closures, iso) {
   return hits.reduce((latest, closure) => (closure.endsOn > latest.endsOn ? closure : latest));
 }
 
+function nextOpening(yard, startDate) {
+  const week = weekOf(yard);
+  for (let step = 0; step <= 400; step += 1) {
+    const date = step === 0 ? startDate : addDays(startDate, step);
+    if (closureOn(yard.closures, date)) continue;
+    const slot = openSlot(week, date);
+    if (slot) return { date, from: slot.from, to: slot.to };
+  }
+  return null;
+}
+
 export function yardStatus(yard, today, time) {
-  const week = yard.week ?? parseHours(yard.hours).week;
+  const week = weekOf(yard);
   const clock = parseTime(time) || "00:00";
   const closure = closureOn(yard.closures, today);
-  if (closure) return { kind: "closure", until: closure.endsOn, reason: String(closure.reason ?? "").trim() };
+  if (closure) {
+    return {
+      kind: "closure",
+      until: closure.endsOn,
+      reason: String(closure.reason ?? "").trim(),
+      next: nextOpening(yard, addDays(closure.endsOn, 1)),
+    };
+  }
   const todaySlot = openSlot(week, today);
   if (todaySlot && clock >= todaySlot.from && clock < todaySlot.to) {
     return { kind: "open", from: todaySlot.from, to: todaySlot.to };
   }
-  for (let step = 0; step <= 400; step += 1) {
-    const date = step === 0 ? today : addDays(today, step);
-    if (closureOn(yard.closures, date)) continue;
-    const slot = openSlot(week, date);
-    if (!slot) continue;
-    if (step === 0 && clock >= slot.from) continue;
-    return { kind: "closed", nextDate: date, from: slot.from, to: slot.to, sameDay: step === 0 };
+  if (todaySlot && clock < todaySlot.from) {
+    return { kind: "later", from: todaySlot.from, to: todaySlot.to };
   }
-  return { kind: "closed", nextDate: "" };
+  const tomorrow = addDays(today, 1);
+  const ahead = closureOn(yard.closures, tomorrow);
+  return {
+    kind: "closed",
+    finished: Boolean(todaySlot),
+    next: nextOpening(yard, tomorrow),
+    ahead: ahead
+      ? { until: ahead.endsOn, reason: String(ahead.reason ?? "").trim(), onlyTomorrow: ahead.endsOn === tomorrow }
+      : null,
+  };
 }
 
 function numeric(iso, withYear) {
@@ -144,73 +166,143 @@ function weekOf(yard) {
   return yard.week ?? parseHours(yard.hours).week;
 }
 
-function tomorrowSlot(yard, today) {
+function dated(iso, today) {
+  return numeric(iso, iso.slice(0, 4) !== today.slice(0, 4));
+}
+
+function speak(parts) {
+  return parts.filter(Boolean).join(" ");
+}
+
+function opensOn(next, today, again) {
+  if (!next) return { sentence: "", short: "" };
+  if (next.date === addDays(today, 1)) {
+    return {
+      sentence: `Zítra otevře ${range(next.from, next.to)}.`,
+      short: `Zítra ${range(next.from, next.to)}.`,
+    };
+  }
+  const when = nextPhrase(next.date, today);
+  const lead = again ? "Otevře znovu" : "Příště otevře";
+  const shortLead = again ? "Otevře znovu" : "Příště";
+  return {
+    sentence: finish(`${lead} ${when} ${range(next.from, next.to)}`),
+    short: finish(`${shortLead} ${when} ${range(next.from, next.to)}`),
+  };
+}
+
+function dayAside(yard, today) {
   const date = addDays(today, 1);
-  if (closureOn(yard.closures, date)) return null;
-  return openSlot(weekOf(yard), date);
+  const closure = closureOn(yard.closures, date);
+  if (closure) {
+    const reason = String(closure.reason ?? "").trim();
+    const why = reason ? ` ${finish(reason)}` : "";
+    const span = closure.endsOn === date ? "" : ` do ${dated(closure.endsOn, today)}`;
+    const sentence = closure.endsOn === date
+      ? `Zítra je mimořádně zavřený.${why}`
+      : `Od zítřka je mimořádně zavřený${span}.${why}`;
+    const short = closure.endsOn === date
+      ? `Zítra mimořádně zavřeno.${why}`
+      : `Od zítřka mimořádně zavřeno${span}.${why}`;
+    const next = nextOpening(yard, date);
+    const again = opensOn(next, today, true);
+    return {
+      sentence: speak([sentence, again.sentence]),
+      short: speak([short, again.short]),
+    };
+  }
+  const slot = openSlot(weekOf(yard), date);
+  if (slot) {
+    const text = `Zítra ${range(slot.from, slot.to)}.`;
+    return { sentence: text, short: text };
+  }
+  return { sentence: "Zítra má zavřeno.", short: "Zítra zavřeno." };
 }
 
-function tomorrowLine(slot) {
-  return slot ? `Zítra ${range(slot.from, slot.to)}.` : "";
-}
-
-function nextWhen(status, today) {
-  if (status.sameDay) return "dnes";
-  if (status.nextDate === addDays(today, 1)) return "zítra";
-  return nextPhrase(status.nextDate, today);
+function presented(yard, today, time) {
+  const name = yard.name;
+  if (yard.legacy && !(yard.week ?? []).some((slot) => slot.open)) {
+    return { kind: "legacy", name, state: yard.legacy, detail: "", tomorrow: "", line: `${name}. ${yard.legacy}` };
+  }
+  const status = yardStatus(yard, today, time);
+  if (status.kind === "open") {
+    const aside = dayAside(yard, today);
+    return {
+      kind: "open",
+      name,
+      state: "Teď otevřený",
+      detail: `${status.from}–${status.to}`,
+      tomorrow: aside.short,
+      line: speak([`${name} je teď otevřený, dnes ${status.from}–${status.to}.`, aside.sentence]),
+    };
+  }
+  if (status.kind === "later") {
+    const aside = dayAside(yard, today);
+    return {
+      kind: "later",
+      name,
+      state: `Otevře v ${status.from}`,
+      detail: `Dnes do ${status.to}.`,
+      tomorrow: aside.short,
+      line: speak([
+        `${name} dnes otevře v ${status.from} a má otevřeno do ${status.to}.`,
+        aside.sentence,
+      ]),
+    };
+  }
+  if (status.kind === "closure") {
+    const todayOnly = status.until === today;
+    const again = opensOn(status.next, today, true);
+    const head = todayOnly
+      ? `${name} je dnes mimořádně zavřený.`
+      : `${name} je mimořádně zavřený do ${numeric(status.until, true)}.`;
+    return {
+      kind: "closure",
+      name,
+      state: todayOnly ? "Dnes mimořádně zavřený" : `Mimořádně zavřený do ${numeric(status.until, true)}`,
+      detail: status.reason,
+      tomorrow: again.short,
+      line: speak([head, status.reason ? finish(status.reason) : "", again.sentence]),
+    };
+  }
+  const head = status.finished ? `${name} má dnes už zavřeno.` : `${name} má dnes zavřeno.`;
+  if (status.ahead) {
+    const why = status.ahead.reason ? ` ${finish(status.ahead.reason)}` : "";
+    const span = status.ahead.onlyTomorrow ? "" : ` do ${dated(status.ahead.until, today)}`;
+    const sentence = status.ahead.onlyTomorrow
+      ? `Zítra je mimořádně zavřený.${why}`
+      : `Od zítřka je mimořádně zavřený${span}.${why}`;
+    const short = status.ahead.onlyTomorrow
+      ? `Zítra mimořádně zavřeno.${why}`
+      : `Od zítřka mimořádně zavřeno${span}.${why}`;
+    const again = opensOn(status.next, today, false);
+    return {
+      kind: "closed",
+      name,
+      state: status.finished ? "Dnes už zavřený" : "Dnes zavřený",
+      detail: short,
+      tomorrow: again.short,
+      line: speak([head, sentence, again.sentence]),
+    };
+  }
+  const again = opensOn(status.next, today, false);
+  return {
+    kind: "closed",
+    name,
+    state: status.finished ? "Dnes už zavřený" : "Dnes zavřený",
+    detail: again.short,
+    tomorrow: "",
+    line: speak([head, again.sentence]),
+  };
 }
 
 export function statusLine(yard, today, time) {
-  if (yard.legacy && !(yard.week ?? []).some((slot) => slot.open)) return `${yard.name}. ${yard.legacy}`;
-  const status = yardStatus(yard, today, time);
-  if (status.kind === "closure") {
-    const base = finish(`${yard.name} je uzavřený do ${numeric(status.until, true)}`);
-    return status.reason ? `${base} ${finish(status.reason)}` : base;
-  }
-  if (status.kind === "open") return `${yard.name} je dnes otevřený ${status.from}–${status.to}.`;
-  if (status.nextDate) {
-    return finish(
-      `${yard.name} je dnes zavřený. Příště bude otevřený ${nextWhen(status, today)} ${range(status.from, status.to)}`,
-    );
-  }
-  return `${yard.name} je dnes zavřený.`;
+  return presented(yard, today, time).line;
 }
 
 export function homeStatus(yard, today, time) {
-  const name = yard.name;
-  const tomorrow = tomorrowLine(tomorrowSlot(yard, today));
-  if (yard.legacy && !(yard.week ?? []).some((slot) => slot.open)) {
-    return { kind: "legacy", name, state: yard.legacy, detail: "", tomorrow: "" };
-  }
-  const status = yardStatus(yard, today, time);
-  if (status.kind === "closure") {
-    return { kind: "closure", name, state: `Uzavřený do ${numeric(status.until, true)}`, detail: status.reason, tomorrow };
-  }
-  if (status.kind === "open") {
-    return { kind: "open", name, state: "Dnes otevřený", detail: `${status.from}–${status.to}`, tomorrow };
-  }
-  if (status.nextDate && status.sameDay) {
-    return {
-      kind: "closed",
-      name,
-      state: "Dnes zavřený",
-      detail: finish(`Otevře dnes ${range(status.from, status.to)}`),
-      tomorrow,
-    };
-  }
-  if (status.nextDate === addDays(today, 1)) {
-    return { kind: "closed", name, state: "Dnes zavřený", detail: tomorrow, tomorrow: "" };
-  }
-  if (status.nextDate) {
-    return {
-      kind: "closed",
-      name,
-      state: "Dnes zavřený",
-      detail: finish(`Příště ${nextPhrase(status.nextDate, today)} ${range(status.from, status.to)}`),
-      tomorrow: "",
-    };
-  }
-  return { kind: "closed", name, state: "Dnes zavřený", detail: "", tomorrow: "" };
+  const item = presented(yard, today, time);
+  return { kind: item.kind, name: item.name, state: item.state, detail: item.detail, tomorrow: item.tomorrow };
 }
 
 export function hoursSummary(yard) {

@@ -879,7 +879,8 @@ function yardsTeaser(data, ctx) {
   const lines = yards
     .map((yard) => {
       const item = homeStatus(yard, now.date, now.time);
-      const kind = item.kind === "open" ? "is-open" : item.kind === "closure" ? "is-closure" : "is-shut";
+      const kind =
+        item.kind === "open" ? "is-open" : item.kind === "later" ? "is-later" : item.kind === "closure" ? "is-closure" : "is-shut";
       return `<li class="${kind}">
         <p class="yard-home-name">${esc(item.name)}</p>
         <p class="yard-home-state">${esc(item.state)}</p>
@@ -950,10 +951,10 @@ function hoursFields(week) {
 function yardStatusHtml(yard, now) {
   const item = homeStatus(yard, now.date, now.time);
   const line = esc(statusLine(yard, now.date, now.time));
-  const extra = item.tomorrow ? `<p class="muted">${esc(item.tomorrow)}</p>` : "";
-  if (item.kind === "closure") return `<p class="banner">${line}</p>${extra}`;
-  if (item.kind === "open") return `<p class="count">${line}</p>${extra}`;
-  return `<p class="meta">${line}</p>${extra}`;
+  if (item.kind === "closure") return `<p class="banner">${line}</p>`;
+  if (item.kind === "open") return `<p class="count">${line}</p>`;
+  if (item.kind === "later") return `<p class="soon">${line}</p>`;
+  return `<p class="meta">${line}</p>`;
 }
 
 export function yardsPage(data, ctx) {

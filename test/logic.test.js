@@ -137,27 +137,28 @@ test("otevírací doba se počítá po dnech a mimořádné zavření má předn
   assert.equal(saved.week.find((slot) => slot.day === 2).open, false);
   assert.equal(
     statusLine(yard(saved.week), "2026-09-28", "10:00"),
-    "Sběrný dvůr Kopidlno je dnes otevřený 08:00–16:00.",
+    "Sběrný dvůr Kopidlno je teď otevřený, dnes 08:00–16:00. Zítra má zavřeno.",
   );
   assert.equal(
     statusLine(yard(saved.week), "2026-09-28", "15:59"),
-    "Sběrný dvůr Kopidlno je dnes otevřený 08:00–16:00.",
+    "Sběrný dvůr Kopidlno je teď otevřený, dnes 08:00–16:00. Zítra má zavřeno.",
   );
   assert.equal(
     statusLine(yard(saved.week), "2026-09-28", "07:30"),
-    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený dnes od 08:00 do 16:00.",
+    "Sběrný dvůr Kopidlno dnes otevře v 08:00 a má otevřeno do 16:00. Zítra má zavřeno.",
   );
+  assert.equal(statusLine(yard(saved.week), "2026-09-28", "07:30").includes("zavřený"), false);
   assert.equal(
     statusLine(yard(saved.week), "2026-09-28", "16:00"),
-    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený ve čtvrtek 1. 10. od 13:00 do 17:00.",
+    "Sběrný dvůr Kopidlno má dnes už zavřeno. Příště otevře ve čtvrtek 1. 10. od 13:00 do 17:00.",
   );
   assert.equal(
     statusLine(yard(saved.week.filter((slot) => slot.day === 4)), "2026-09-28", "10:00"),
-    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený ve čtvrtek 1. 10. od 13:00 do 17:00.",
+    "Sběrný dvůr Kopidlno má dnes zavřeno. Příště otevře ve čtvrtek 1. 10. od 13:00 do 17:00.",
   );
   assert.equal(
     statusLine(yard([day(1, "08:00", "16:00")]), "2026-10-04", "18:00"),
-    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený zítra od 08:00 do 16:00.",
+    "Sběrný dvůr Kopidlno má dnes zavřeno. Zítra otevře od 08:00 do 16:00.",
   );
   assert.equal(
     statusLine(
@@ -165,7 +166,7 @@ test("otevírací doba se počítá po dnech a mimořádné zavření má předn
       "2026-09-28",
       "18:00",
     ),
-    "Sběrný dvůr Kopidlno je uzavřený do 1. 4. 2027. Rekonstrukce.",
+    "Sběrný dvůr Kopidlno je mimořádně zavřený do 1. 4. 2027. Rekonstrukce. Otevře znovu v pondělí 5. 4. 2027 od 08:00 do 16:00.",
   );
   assert.equal(
     statusLine(
@@ -173,20 +174,39 @@ test("otevírací doba se počítá po dnech a mimořádné zavření má předn
       "2026-10-04",
       "12:00",
     ),
-    "Sběrný dvůr Kopidlno je dnes zavřený. Příště bude otevřený v pondělí 12. 10. od 08:00 do 16:00.",
+    "Sběrný dvůr Kopidlno má dnes zavřeno. Zítra je mimořádně zavřený. Svátek. Příště otevře v pondělí 12. 10. od 08:00 do 16:00.",
+  );
+  assert.equal(
+    statusLine(yard([day(2, "13:00", "17:00")]), "2026-09-29", "09:00"),
+    "Sběrný dvůr Kopidlno dnes otevře v 13:00 a má otevřeno do 17:00. Zítra má zavřeno.",
+  );
+  assert.equal(
+    statusLine(
+      yard([day(1, "08:00", "16:00"), day(3, "09:00", "15:00")], [{ startsOn: "2026-09-29", endsOn: "2026-09-29", reason: "Inventura" }]),
+      "2026-09-28",
+      "10:00",
+    ),
+    "Sběrný dvůr Kopidlno je teď otevřený, dnes 08:00–16:00. Zítra je mimořádně zavřený. Inventura. Otevře znovu ve středu 30. 9. od 09:00 do 15:00.",
   );
   assert.equal(hoursSummary(yard(saved.week)), "Po 08:00–16:00, Čt 13:00–17:00");
   assert.deepEqual(homeStatus(yard([day(1, "08:00", "16:00"), day(2, "09:00", "15:00")]), "2026-09-28", "10:00"), {
     kind: "open",
     name: "Sběrný dvůr Kopidlno",
-    state: "Dnes otevřený",
+    state: "Teď otevřený",
     detail: "08:00–16:00",
+    tomorrow: "Zítra od 09:00 do 15:00.",
+  });
+  assert.deepEqual(homeStatus(yard([day(1, "08:00", "16:00"), day(2, "09:00", "15:00")]), "2026-09-28", "07:30"), {
+    kind: "later",
+    name: "Sběrný dvůr Kopidlno",
+    state: "Otevře v 08:00",
+    detail: "Dnes do 16:00.",
     tomorrow: "Zítra od 09:00 do 15:00.",
   });
   assert.deepEqual(homeStatus(yard([day(1, "08:00", "16:00"), day(2, "09:00", "15:00")]), "2026-09-28", "18:00"), {
     kind: "closed",
     name: "Sběrný dvůr Kopidlno",
-    state: "Dnes zavřený",
+    state: "Dnes už zavřený",
     detail: "Zítra od 09:00 do 15:00.",
     tomorrow: "",
   });
@@ -199,9 +219,23 @@ test("otevírací doba se počítá po dnech a mimořádné zavření má předn
     {
       kind: "closure",
       name: "Sběrný dvůr Kopidlno",
-      state: "Uzavřený do 31. 10. 2026",
+      state: "Mimořádně zavřený do 31. 10. 2026",
       detail: "Nikomu se nechce dělat.",
-      tomorrow: "",
+      tomorrow: "Otevře znovu v pondělí 2. 11. od 08:00 do 16:00.",
+    },
+  );
+  assert.deepEqual(
+    homeStatus(
+      yard([day(1, "08:00", "16:00")], [{ startsOn: "2026-09-28", endsOn: "2026-09-28", reason: "Inventura" }]),
+      "2026-09-28",
+      "10:00",
+    ),
+    {
+      kind: "closure",
+      name: "Sběrný dvůr Kopidlno",
+      state: "Dnes mimořádně zavřený",
+      detail: "Inventura",
+      tomorrow: "Otevře znovu v pondělí 5. 10. od 08:00 do 16:00.",
     },
   );
 });
