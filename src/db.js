@@ -1,3 +1,4 @@
+import { AD_SEEDS, readAdFields } from "./ads.js";
 import { COPY } from "./copy.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { prepareArticleBody } from "./rich.js";
@@ -347,6 +348,22 @@ async function createDeskTables(env) {
       created_at text not null default (date('now'))
     )`,
   ).run();
+  await env.DB.prepare(
+    `create table if not exists ads (
+      id integer primary key autoincrement,
+      slug text not null unique,
+      title text not null,
+      body text not null,
+      place text not null default '',
+      link text not null default '',
+      image_key text,
+      enabled integer not null default 1,
+      sample integer not null default 0,
+      author_id integer,
+      author_name text not null default '',
+      created_at text not null default (date('now'))
+    )`,
+  ).run();
 }
 
 async function ensureUserColumns(env) {
@@ -412,6 +429,50 @@ async function seedDoctors(env) {
   await env.DB.prepare("update settings set doctors_seeded = 1 where id = 1").run();
 }
 
+async function demoImage(env, file) {
+  if (!env.ASSETS?.fetch) return null;
+  try {
+    const response = await env.ASSETS.fetch(new Request(`https://local.invalid/demo-reklamy/${file}`));
+    if (!response.ok) return null;
+    const type = response.headers.get("content-type") ?? "";
+    if (!type.includes("image/")) return null;
+    return await response.arrayBuffer();
+  } catch {
+    return null;
+  }
+}
+
+async function seedAds(env) {
+  const info = await env.DB.prepare("pragma table_info(settings)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "ads_seeded", "alter table settings add column ads_seeded integer not null default 0");
+  const flag = await env.DB.prepare("select ads_seeded as done from settings where id = 1").first();
+  if (Number(flag?.done) === 1) return;
+  const count = await env.DB.prepare("select count(*) as n from ads").first();
+  if (Number(count?.n) === 0) {
+    const chief = await env.DB.prepare(
+      "select id, name from users where role = 'hlavni' order by id asc limit 1",
+    ).first();
+    const authorId = chief?.id ?? null;
+    const authorName = chief?.name ? String(chief.name) : "Redakce";
+    for (const ad of AD_SEEDS) {
+      const bytes = await demoImage(env, ad.image);
+      let imageKey = null;
+      if (bytes) {
+        imageKey = `reklamy/demo-${ad.slug}.webp`;
+        await env.BUCKET.put(imageKey, bytes, { httpMetadata: { contentType: "image/webp" } });
+      }
+      await env.DB.prepare(
+        `insert into ads (slug, title, body, place, link, image_key, enabled, sample, author_id, author_name)
+         values (?, ?, ?, ?, '', ?, 1, 1, ?, ?)`,
+      )
+        .bind(ad.slug, ad.title, ad.body, ad.place, imageKey, authorId, authorName)
+        .run();
+    }
+  }
+  await env.DB.prepare("update settings set ads_seeded = 1 where id = 1").run();
+}
+
 async function migrateSchema(env) {
   await createDeskTables(env);
   const settingsReady = await env.DB.prepare(
@@ -436,6 +497,7 @@ async function migrateSchema(env) {
      where id = 1 and not exists (select 1 from users)`,
   ).run();
   await migrateSession(env);
+  await seedAds(env);
   return true;
 }
 
@@ -595,6 +657,7 @@ export async function loadPublic(env) {
     events,
     yards: await loadYards(env, { publicOnly: true, today }),
     doctors: await loadDoctors(env, { publicOnly: true, today }),
+    ads: await loadAds(env, { enabledOnly: true }),
     waste: buildWasteView(wasteFrom(row), today),
     now,
     contactNote: String(row.contact_note),
@@ -612,6 +675,123 @@ export async function loadArticle(env, slug) {
   return row ? mapArticle(row) : null;
 }
 
+const AD_FIELDS =
+  "a.id, a.slug, a.title, a.body, a.place, a.link, a.image_key, a.enabled, a.sample, a.author_id, a.author_name, a.created_at, u.alias as author_alias";
+const AD_FROM = "ads a left join users u on u.id = a.author_id";
+
+function mapAd(row) {
+  return {
+    id: Number(row.id),
+    slug: String(row.slug),
+    title: String(row.title),
+    body: String(row.body),
+    place: String(row.place ?? ""),
+    link: String(row.link ?? ""),
+    imageKey: row.image_key ? String(row.image_key) : null,
+    enabled: asBool(row.enabled),
+    sample: asBool(row.sample),
+    authorId: row.author_id == null || row.author_id === "" ? null : Number(row.author_id),
+    authorName: String(row.author_name ?? ""),
+    authorAlias: String(row.author_alias ?? "").trim(),
+    createdOn: String(row.created_at ?? "").slice(0, 10),
+  };
+}
+
+export async function loadAds(env, { enabledOnly = false } = {}) {
+  const where = enabledOnly ? "where a.enabled = 1" : "";
+  const rows = await env.DB.prepare(
+    `select ${AD_FIELDS} from ${AD_FROM} ${where} order by a.created_at desc, a.id desc`,
+  ).all();
+  return (rows.results ?? []).map(mapAd);
+}
+
+export async function loadAd(env, slug) {
+  const row = await env.DB.prepare(`select ${AD_FIELDS} from ${AD_FROM} where a.slug = ? and a.enabled = 1`)
+    .bind(slug)
+    .first();
+  return row ? mapAd(row) : null;
+}
+
+function canManageAd(user, row) {
+  return user.role === "hlavni" || Number(row.author_id) === user.id;
+}
+
+async function uniqueAdSlug(env, base) {
+  let slug = base;
+  let n = 2;
+  for (;;) {
+    const row = await env.DB.prepare("select id from ads where slug = ?").bind(slug).first();
+    if (!row) return slug;
+    slug = `${base}-${n}`.slice(0, 80);
+    n += 1;
+  }
+}
+
+export async function saveAd(env, request, input) {
+  const gate = await requireUser(env, request);
+  if (!gate.ok) return gate;
+  const parsed = readAdFields(input);
+  if (parsed.error) return { ok: false, error: parsed.error };
+  const stored = await storeImage(env, input.image, "reklamy");
+  if (stored.error) return { ok: false, error: stored.error };
+  const { title, body, place, link, enabled } = parsed;
+
+  if (input.id) {
+    const current = await env.DB.prepare("select id, author_id, image_key from ads where id = ?").bind(input.id).first();
+    if (!current) return { ok: false, error: "Tahle nabídka už tu není." };
+    if (!canManageAd(gate.user, current)) {
+      return { ok: false, error: "Cizí nabídku mění hlavní redaktor, nebo její autor." };
+    }
+    let imageKey = current.image_key ? String(current.image_key) : null;
+    const previous = imageKey;
+    if (stored.key) imageKey = stored.key;
+    await env.DB.prepare(
+      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, enabled = ?, sample = 0 where id = ?",
+    )
+      .bind(title, body, place, link, imageKey, enabled ? 1 : 0, input.id)
+      .run();
+    if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
+    return { ok: true };
+  }
+
+  const slug = await uniqueAdSlug(env, slugify(title));
+  await env.DB.prepare(
+    `insert into ads (slug, title, body, place, link, image_key, enabled, sample, author_id, author_name, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now'))`,
+  )
+    .bind(slug, title, body, place, link, stored.key, enabled ? 1 : 0, gate.user.id, gate.user.name)
+    .run();
+  return { ok: true };
+}
+
+export async function setAdEnabled(env, request, input) {
+  const gate = await requireUser(env, request);
+  if (!gate.ok) return gate;
+  if (!input.id) return { ok: false, error: "Tahle nabídka už tu není." };
+  const row = await env.DB.prepare("select id, author_id from ads where id = ?").bind(input.id).first();
+  if (!row) return { ok: false, error: "Tahle nabídka už tu není." };
+  if (!canManageAd(gate.user, row)) {
+    return { ok: false, error: "Cizí nabídku vypíná hlavní redaktor, nebo její autor." };
+  }
+  const enabled = input.enabled ? 1 : 0;
+  await env.DB.prepare("update ads set enabled = ? where id = ?").bind(enabled, input.id).run();
+  return { ok: true, enabled: Boolean(enabled) };
+}
+
+export async function removeAd(env, request, id) {
+  const gate = await requireUser(env, request);
+  if (!gate.ok) return gate;
+  const current = await env.DB.prepare("select author_id, image_key from ads where id = ?").bind(id).first();
+  if (!current) return { ok: false, error: "Tahle nabídka už tu není." };
+  if (!canManageAd(gate.user, current)) {
+    return { ok: false, error: "Cizí nabídku maže hlavní redaktor, nebo její autor." };
+  }
+  const key = current.image_key ? String(current.image_key) : null;
+  await env.DB.prepare("delete from ads where id = ?").bind(id).run();
+  await releaseImage(env, key);
+  return { ok: true };
+}
+
 export async function loadAdmin(env, request) {
   const row = await settings(env);
   const user = await currentUser(env, request);
@@ -627,8 +807,10 @@ export async function loadAdmin(env, request) {
     users: [],
     yards: [],
     doctors: [],
+    ads: [],
   };
   if (!user) return base;
+  base.ads = await loadAds(env);
   const articleSql =
     user.role === "hlavni"
       ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
@@ -759,12 +941,13 @@ const IMAGE_TYPES = {
   "image/gif": "gif",
 };
 
-export async function storeImage(env, file) {
+export async function storeImage(env, file, folder = "clanky") {
   if (!(file instanceof File) || file.size === 0) return { key: null };
   if (file.size > 4 * 1024 * 1024) return { error: "Fotka může mít nejvýš 4 MB." };
   const ext = IMAGE_TYPES[file.type];
   if (!ext) return { error: "Fotka musí být JPG, PNG, WEBP nebo GIF." };
-  const key = `clanky/${crypto.randomUUID()}.${ext}`;
+  const prefix = folder === "reklamy" ? "reklamy" : "clanky";
+  const key = `${prefix}/${crypto.randomUUID()}.${ext}`;
   await env.BUCKET.put(key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type },
   });
@@ -777,6 +960,8 @@ async function releaseImage(env, key) {
   if (article) return;
   const proposal = await env.DB.prepare("select 1 as ok from proposals where image_key = ?").bind(key).first();
   if (proposal) return;
+  const ad = await env.DB.prepare("select 1 as ok from ads where image_key = ?").bind(key).first();
+  if (ad) return;
   await env.BUCKET.delete(key);
 }
 

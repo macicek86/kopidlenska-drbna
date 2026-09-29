@@ -4,6 +4,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "brand_accent", label: "Název, druhý řádek", value: "drbna", max: 40 },
   { group: "Hlavička a patička", key: "nav_news", label: "Menu: zprávy", value: "Zprávy", max: 40 },
   { group: "Hlavička a patička", key: "nav_events", label: "Menu: akce", value: "Akce", max: 40 },
+  { group: "Hlavička a patička", key: "nav_ads", label: "Menu: reklamy", value: "Reklamy", max: 40 },
   { group: "Hlavička a patička", key: "nav_bins", label: "Menu: popelnice", value: "Popelnice", max: 40 },
   { group: "Hlavička a patička", key: "nav_yards", label: "Menu: sběrné dvory", value: "Sběrné dvory", max: 40 },
   { group: "Hlavička a patička", key: "nav_doctors", label: "Menu: lékaři", value: "Lékaři", max: 40 },
@@ -97,6 +98,18 @@ export const COPY = [
   { group: "O nás", key: "about_bins_link", label: "Odkaz na svoz", value: "Svoz popelnic", max: 80 },
   { group: "O nás", key: "about_yards_link", label: "Odkaz na sběrné dvory", value: "Sběrné dvory", max: 80 },
   { group: "O nás", key: "about_doctors_link", label: "Odkaz na lékaře", value: "Lékaři", max: 80 },
+  { group: "O nás", key: "about_ads_link", label: "Odkaz na reklamy", value: "Reklamy", max: 80 },
+
+  { group: "Reklamy", key: "ads_description", label: "Popis stránky reklam", value: "Neplacené místní reklamy z Kopidlna a jeho částí.", max: 240, long: true },
+  { group: "Reklamy", key: "ads_eyebrow", label: "Malý nadpis stránky reklam", value: "Rubrika", max: 40 },
+  { group: "Reklamy", key: "ads_heading", label: "Nadpis stránky reklam", value: "Reklamy", max: 80 },
+  { group: "Reklamy", key: "ads_lede", label: "Úvod stránky reklam", value: "Neplacené nabídky od sousedů. Na panelu je napsáno, že jde o reklamu. Občas se stejný panel objeví i mezi zprávami nebo u pozvánky.", max: 500, long: true },
+  { group: "Reklamy", key: "ads_empty", label: "Když není žádná reklama", value: "Zatím tu není žádná nabídka. Přidá ji kdokoli z redakce.", max: 240, long: true },
+  { group: "Reklamy", key: "ads_back", label: "Návrat na reklamy", value: "Všechny reklamy", max: 80 },
+  { group: "Reklamy", key: "ads_flag", label: "Označení panelu", value: "Reklama", max: 40 },
+  { group: "Reklamy", key: "ads_sample", label: "Označení ukázky", value: "ukázka", max: 40 },
+  { group: "Reklamy", key: "ads_more", label: "Text odkazu na panelu", value: "Víc", max: 40 },
+  { group: "Reklamy", key: "ads_missing", label: "Chybějící reklama", value: "Tahle reklama tu není", max: 80 },
   { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Maskot Kopidlenské drbny", max: 160 },
 ];
 

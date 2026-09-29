@@ -3,8 +3,10 @@ import test from "node:test";
 import { verifyPassword } from "../src/password.js";
 import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
+import { pickAd, readAdFields, safeAdLink } from "../src/ads.js";
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
+import { adPanel, adminAds, articlePage, homePage, newsPage } from "../src/view.js";
 import {
   DOCTOR_SEEDS,
   HOME_LEAD_DAYS,
@@ -325,4 +327,153 @@ test("dočasná změna se na titulce ukáže 14 dní předem a jméno se nesklo�
   ]);
   assert.equal(visibleHomeChange(overlapping, "2026-09-28").id, 2);
   assert.equal(homeNotice(overlapping, "2026-09-28").note, "novější");
+});
+
+test("odkaz reklamy pustí jen obyčejnou adresu", () => {
+  assert.equal(safeAdLink(""), "");
+  assert.equal(safeAdLink("  www.pekarna.cz/sobota  "), "https://www.pekarna.cz/sobota");
+  assert.equal(safeAdLink("mailto:soused@example.com"), "mailto:soused@example.com");
+  assert.equal(safeAdLink("/reklamy"), "/reklamy");
+  assert.equal(safeAdLink("javascript:alert(1)").error.length > 0, true);
+  assert.equal(safeAdLink("//zle.example").error.length > 0, true);
+  const fields = readAdFields({
+    title: "  Chléb  ",
+    body: "V sobotu\n od sedmi.",
+    place: "Náměstí",
+    link: "https://example.com",
+    enabled: true,
+  });
+  assert.equal(fields.title, "Chléb");
+  assert.equal(fields.body, "V sobotu od sedmi.");
+  assert.equal(fields.enabled, true);
+  assert.equal(readAdFields({ title: "A", body: "text nabídky", link: "" }).error, "Doplňte název.");
+  assert.equal(readAdFields({ title: "Chléb", body: "  ", enabled: 0 }).error, "Doplňte text nabídky.");
+});
+
+test("panel reklamy se v den nemění a je označený", () => {
+  const ads = [
+    { id: 3, title: "C" },
+    { id: 1, title: "A" },
+    { id: 2, title: "B" },
+  ];
+  assert.equal(pickAd([], "titulka:2026-09-29"), null);
+  assert.equal(pickAd(ads, "titulka:2026-09-29").id, pickAd(ads, "titulka:2026-09-29").id);
+  const first = pickAd(ads, "a").id;
+  let other = first;
+  for (let i = 0; i < 30; i += 1) {
+    const id = pickAd(ads, `slot-${i}`).id;
+    assert.ok([1, 2, 3].includes(id));
+    if (id !== first) other = id;
+  }
+  assert.notEqual(other, first);
+
+  const html = adPanel(
+    {
+      id: 1,
+      slug: "chleb",
+      title: `<script>alert(1)</script>`,
+      body: "a & b",
+      place: "Náměstí",
+      link: "javascript:alert(1)",
+      imageKey: null,
+      sample: true,
+      authorName: "Eva",
+      createdOn: "2026-09-01",
+    },
+    {},
+  );
+  assert.equal(html.includes("<script"), false);
+  assert.match(html, /Reklama/);
+  assert.match(html, /ukázka/);
+  assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /a &amp; b/);
+  assert.equal(html.includes("javascript"), false);
+  assert.match(html, /href="\/reklamy\/chleb"/);
+});
+
+test("reklama se vloží do zpráv a v redakci má náhled", () => {
+  const ctx = { path: "/", copy: {}, minimal: false, mainOrigin: "http://127.0.0.1:8787" };
+  const waste = {
+    today: "2026-09-29",
+    nextDate: "2026-10-05",
+    daysUntil: 6,
+    note: "Poznámka.",
+    holidayNote: "I o svátcích",
+    weekday: 1,
+    weekParity: 1,
+    stepDays: 14,
+  };
+  const ad = {
+    id: 1,
+    slug: "chleb",
+    title: "Čerstvý chléb",
+    body: "V sobotu od sedmi.",
+    place: "Náměstí",
+    link: "https://example.com/chleb",
+    imageKey: "reklamy/demo.webp",
+    sample: true,
+    enabled: true,
+    authorName: "Redakce",
+    createdOn: "2026-09-29",
+  };
+  const bare = { articles: [], events: [], yards: [], doctors: [], waste, ads: [], contactNote: "" };
+  assert.equal(homePage(bare, ctx).includes("ad-panel"), false);
+  const home = homePage({ ...bare, ads: [ad] }, ctx);
+  assert.match(home, /class="ad-panel has-photo"/);
+  assert.match(home, /Reklama/);
+  assert.equal(home.includes("<script"), false);
+
+  const articles = [1, 2, 3].map((id) => ({
+    id,
+    slug: `zprava-${id}`,
+    title: `Zpráva ${id}`,
+    excerpt: "Perex zprávy.",
+    body: "Text.",
+    category: "Zprávy",
+    imageKey: null,
+    createdOn: "2026-09-01",
+    authorName: "",
+  }));
+  const news = newsPage({ ...bare, articles, ads: [ad] }, { ...ctx, path: "/zpravy" }, "");
+  const panelAt = news.indexOf("ad-panel");
+  const thirdAt = news.indexOf("Zpráva 3");
+  assert.ok(panelAt > news.indexOf("Zpráva 1"));
+  assert.ok(panelAt < thirdAt);
+
+  const article = articlePage(articles[0], ctx, { ad });
+  assert.match(article, /ad-slot/);
+  assert.match(article, /href="https:\/\/example.com\/chleb"/);
+  assert.match(article, /rel="noopener noreferrer"/);
+
+  const desk = adminAds(
+    { ...ctx, path: "/redakce" },
+    {
+      signedIn: true,
+      user: { id: 1, role: "hlavni", name: "Redakce" },
+      ads: [ad],
+      proposals: [],
+      showDefaultPassword: false,
+    },
+    { text: "", kind: "ok" },
+    {},
+  );
+  assert.match(desk, /data-ad-form/);
+  assert.match(desk, /data-ad-preview/);
+  assert.match(desk, /data-edge="960"/);
+  assert.match(desk, /data-bytes="180000"/);
+  assert.match(desk, />Vypnout</);
+  const contributor = adminAds(
+    { ...ctx, path: "/redakce" },
+    {
+      signedIn: true,
+      user: { id: 8, role: "prispevovatel", name: "Jana" },
+      ads: [{ ...ad, authorId: 1 }],
+      proposals: [],
+      showDefaultPassword: false,
+    },
+    { text: "", kind: "ok" },
+    {},
+  );
+  assert.equal(contributor.includes(">Vypnout<"), false);
+  assert.match(contributor, /data-ad-preview/);
 });

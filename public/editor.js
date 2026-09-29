@@ -1,5 +1,15 @@
 const MAX_EDGE = 1600;
+const MAX_BYTES = 500_000;
 const START_QUALITY = 0.82;
+
+function photoLimits(input) {
+  const edge = Number(input.dataset.edge);
+  const bytes = Number(input.dataset.bytes);
+  return {
+    edge: Number.isInteger(edge) && edge >= 320 && edge <= MAX_EDGE ? edge : MAX_EDGE,
+    bytes: Number.isInteger(bytes) && bytes >= 40_000 && bytes <= MAX_BYTES ? bytes : MAX_BYTES,
+  };
+}
 
 for (const form of document.querySelectorAll("form")) {
   const fileInput = form.querySelector('input[type="file"][name="image"]');
@@ -10,9 +20,10 @@ for (const form of document.querySelectorAll("form")) {
     const input = fileInput;
     const file = input.files?.[0];
     if (!file || file.size === 0) return;
-    if (file.type === "image/webp" && file.size <= 500_000) {
+    const limits = photoLimits(input);
+    if (file.type === "image/webp" && file.size <= limits.bytes) {
       const small = await edgeOf(file);
-      if (small !== null && small <= MAX_EDGE) return;
+      if (small !== null && small <= limits.edge) return;
     }
     event.preventDefault();
     const button = form.querySelector('button[type="submit"]');
@@ -22,7 +33,7 @@ for (const form of document.querySelectorAll("form")) {
       button.textContent = "Zmenšuji fotku…";
     }
     try {
-      const next = await toWebp(file);
+      const next = await toWebp(file, photoLimits(input));
       const transfer = new DataTransfer();
       transfer.items.add(next);
       input.files = transfer.files;
@@ -51,9 +62,9 @@ async function edgeOf(file) {
   }
 }
 
-async function toWebp(file) {
+async function toWebp(file, limits) {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, limits.edge / Math.max(bitmap.width, bitmap.height));
   const width = Math.max(1, Math.round(bitmap.width * scale));
   const height = Math.max(1, Math.round(bitmap.height * scale));
   const canvas = document.createElement("canvas");
@@ -74,7 +85,7 @@ async function toWebp(file) {
   if (!blob || blob.type !== "image/webp") {
     throw new Error("Tenhle prohlížeč neumí uložit fotku jako WEBP.");
   }
-  while (blob.size > 500_000 && quality > 0.5) {
+  while (blob.size > limits.bytes && quality > 0.5) {
     quality = Math.round((quality - 0.1) * 10) / 10;
     const smaller = await blobOf(canvas, "image/webp", quality);
     if (!smaller) break;
@@ -333,4 +344,75 @@ function bootRich() {
   for (const rich of fields) mountRich(rich);
 }
 
+function bootAdPreview() {
+  const form = document.querySelector("[data-ad-form]");
+  if (!form) return;
+  const panel = form.querySelector("[data-ad-preview]");
+  if (!panel) return;
+  const titleNode = panel.querySelector("[data-ad='title']");
+  const bodyNode = panel.querySelector("[data-ad='body']");
+  const placeNode = panel.querySelector("[data-ad='place']");
+  const linkNode = panel.querySelector("[data-ad='link']");
+  const photo = panel.querySelector("[data-ad='photo']");
+  const linkNote = form.querySelector("[data-ad='link-note']");
+  const offNote = form.querySelector("[data-ad='off']");
+  const file = form.querySelector('input[type="file"][name="image"]');
+  const originalSrc = photo?.getAttribute("src") ?? "";
+  let objectUrl = "";
+
+  const paintText = (node, value) => {
+    if (!node) return;
+    const empty = node.dataset.empty ?? "";
+    const text = String(value ?? "").replace(/\s+/g, " ").trim();
+    node.textContent = text || empty;
+    node.classList.toggle("is-placeholder", !text && Boolean(empty));
+  };
+
+  const paint = () => {
+    paintText(titleNode, form.querySelector("[name='title']")?.value ?? "");
+    paintText(bodyNode, form.querySelector("[name='body']")?.value ?? "");
+    const place = String(form.querySelector("[name='place']")?.value ?? "").replace(/\s+/g, " ").trim();
+    if (placeNode) {
+      placeNode.textContent = place;
+      placeNode.hidden = !place;
+    }
+    const link = String(form.querySelector("[name='link']")?.value ?? "").trim();
+    if (linkNode) linkNode.hidden = !link;
+    if (linkNote) {
+      linkNote.textContent = link;
+      linkNote.hidden = !link;
+    }
+    const enabled = form.querySelector("[name='enabled']");
+    if (offNote) offNote.hidden = !enabled || enabled.checked;
+  };
+
+  form.addEventListener("input", paint);
+  form.addEventListener("change", paint);
+  file?.addEventListener("change", () => {
+    const next = file.files?.[0];
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = "";
+    if (!photo) return;
+    if (!next) {
+      if (originalSrc) {
+        photo.src = originalSrc;
+        photo.hidden = false;
+        panel.classList.add("has-photo");
+      } else {
+        photo.removeAttribute("src");
+        photo.hidden = true;
+        panel.classList.remove("has-photo");
+      }
+      paint();
+      return;
+    }
+    objectUrl = URL.createObjectURL(next);
+    photo.src = objectUrl;
+    photo.hidden = false;
+    panel.classList.add("has-photo");
+  });
+  paint();
+}
+
 bootRich();
+bootAdPreview();

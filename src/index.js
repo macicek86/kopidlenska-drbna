@@ -4,7 +4,9 @@ import {
   clearCookie,
   createContributor,
   ensureSchema,
+  loadAd,
   loadAdmin,
+  loadAds,
   loadArticle,
   loadCopy,
   loadPublic,
@@ -12,12 +14,14 @@ import {
   logout,
   media,
   rejectProposal,
+  removeAd,
   removeArticle,
   removeClosure,
   removeDoctor,
   removeDoctorChange,
   removeEvent,
   removeYard,
+  saveAd,
   saveArticle,
   saveClosure,
   saveCopy,
@@ -29,6 +33,7 @@ import {
   saveProposal,
   saveSite,
   saveYard,
+  setAdEnabled,
   sessionCookie,
   saveContributorAccess,
   setContributorActive,
@@ -38,6 +43,8 @@ import {
 } from "./db.js";
 import {
   aboutPage,
+  adPage,
+  adminAds,
   adminArticles,
   adminEvents,
   adminPassword,
@@ -46,16 +53,20 @@ import {
   adminTexts,
   adminDoctors,
   adminYards,
+  adsPage,
   articlePage,
   binsPage,
   brokenPage,
   doctorsPage,
   eventsPage,
   homePage,
+  missingAdPage,
   missingPage,
   newsPage,
   yardsPage,
 } from "./view.js";
+import { pickAd } from "./ads.js";
+import { pragueNow } from "./waste.js";
 import { WEEK_DAYS } from "./yards.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
@@ -76,6 +87,11 @@ const OK = {
   "dvur-smazan": "Sběrný dvůr je smazaný.",
   uzavreni: "Mimořádné uzavření je zapsané.",
   "uzavreni-smazane": "Mimořádné uzavření je zrušené.",
+  reklama: "Nabídka je uložená.",
+  "reklama-upravena": "Nabídka je upravená.",
+  "reklama-vypnuta": "Nabídka je vypnutá.",
+  "reklama-zapnuta": "Nabídka je zase zapnutá.",
+  "reklama-smazana": "Nabídka je smazaná.",
   lekar: "Ordinace je uložená.",
   "lekar-upraven": "Ordinace je upravená.",
   "lekar-smazan": "Ordinace je smazaná.",
@@ -187,6 +203,8 @@ async function formFields(request) {
     yardId: Number.isInteger(Number(text("yardId"))) && Number(text("yardId")) > 0 ? Number(text("yardId")) : undefined,
     specialty: text("specialty"),
     phone: text("phone"),
+    link: text("link"),
+    enabled: form.get("enabled") === "1",
     changeNote: text("changeNote"),
     doctorId: Number.isInteger(Number(text("doctorId"))) && Number(text("doctorId")) > 0 ? Number(text("doctorId")) : undefined,
     doctorWeek: WEEK_DAYS.map(({ day }) => ({
@@ -250,7 +268,19 @@ async function renderGet(request, env, url) {
     const slug = decodeURIComponent(path.slice("/zpravy/".length));
     const article = await loadArticle(env, slug);
     if (!article) return html(missingPage(ctx), 404);
-    return html(articlePage(article, ctx));
+    const ads = await loadAds(env, { enabledOnly: true });
+    const ad = pickAd(ads, `clanek:${article.slug}:${pragueNow().date}`);
+    return html(articlePage(article, ctx, { ad }));
+  }
+  if (path === "/reklamy") {
+    const data = await loadPublic(env);
+    return html(adsPage(data, ctx));
+  }
+  if (path.startsWith("/reklamy/")) {
+    const slug = decodeURIComponent(path.slice("/reklamy/".length));
+    const ad = await loadAd(env, slug);
+    if (!ad) return html(missingAdPage(ctx), 404);
+    return html(adPage(ad, ctx));
   }
   if (path === "/akce") {
     const data = await loadPublic(env);
@@ -276,6 +306,14 @@ async function renderGet(request, env, url) {
     const chiefOnly = new Set(["akce", "texty", "svoz", "lide"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
+    }
+    if (tab === "reklamy") {
+      return html(
+        adminAds(ctx, data, message, {
+          editingId: positiveParam(url, "id"),
+          confirmId: positiveParam(url, "smazat"),
+        }),
+      );
     }
     if (tab === "zpravy") {
       return html(
@@ -394,6 +432,25 @@ async function renderPost(request, env, url) {
     const result = await saveProfile(env, request, fields);
     if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/heslo?ok=jmeno");
+  }
+  if (path === "/redakce/reklamy/ulozit") {
+    const result = await saveAd(env, request, fields);
+    if (!result.ok) {
+      const back = fields.id ? `/redakce/reklamy?id=${fields.id}` : "/redakce/reklamy";
+      return redirect(withError(back, result.error));
+    }
+    return redirect(`/redakce/reklamy?ok=${fields.id ? "reklama-upravena" : "reklama"}`);
+  }
+  if (path === "/redakce/reklamy/stav") {
+    const result = await setAdEnabled(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/reklamy?chyba=${encodeURIComponent(result.error)}`);
+    return redirect(`/redakce/reklamy?ok=${result.enabled ? "reklama-zapnuta" : "reklama-vypnuta"}`);
+  }
+  if (path === "/redakce/reklamy/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/reklamy");
+    const result = await removeAd(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/reklamy?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/reklamy?ok=reklama-smazana");
   }
   if (path === "/redakce/zpravy/ulozit") {
     const result = await saveArticle(env, request, fields);

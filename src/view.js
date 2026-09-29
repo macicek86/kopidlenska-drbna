@@ -1,3 +1,4 @@
+import { PANEL_BYTES, PANEL_EDGE, pickAd, safeAdLink } from "./ads.js";
 import { byline, CATEGORIES, PERMISSIONS, userCan } from "./db.js";
 import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
@@ -36,6 +37,7 @@ function catLabel(copy, category) {
 const NAV = [
   ["/zpravy", "nav_news"],
   ["/akce", "nav_events"],
+  ["/reklamy", "nav_ads"],
   ["/popelnice", "nav_bins"],
   ["/sberne-dvory", "nav_yards"],
   ["/lekari", "nav_doctors"],
@@ -213,6 +215,7 @@ export function homePage(data, ctx) {
       <section class="block">
         <div class="section-head"><h2>${esc(tx(ctx.copy, "home_news_heading"))}</h2><a href="/zpravy">${esc(tx(ctx.copy, "home_news_all"))}</a></div>
         <div class="news-grid">${leadHtml}<div class="stack">${restHtml}</div></div>
+        ${adSlot(data, ctx, "titulka")}
       </section>
       <section class="block">
         <div class="section-head"><h2>${esc(tx(ctx.copy, "home_events_heading"))}</h2><a href="/akce">${esc(tx(ctx.copy, "home_events_all"))}</a></div>
@@ -231,19 +234,18 @@ export function newsPage(data, ctx, rubrika) {
       return `<a class="chip${filter === category ? " is-on" : ""}" href="${href}">${esc(label)}</a>`;
     })
     .join("");
-  const list = visible.length
-    ? visible
-        .map(
-          (article) => `<a class="card story" href="/zpravy/${esc(article.slug)}">
+  const cards = visible.map(
+    (article) => `<a class="card story" href="/zpravy/${esc(article.slug)}">
             ${article.imageKey ? `<img class="cover" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
             <p class="kicker">${esc(catLabel(ctx.copy, article.category))}</p>
             <h2>${esc(article.title)}</h2>
             <p class="muted">${esc(article.excerpt)}</p>
             <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
           </a>`,
-        )
-        .join("")
-    : `<p class="muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
+  );
+  const woven = contentAd(data, ctx, "zpravy");
+  if (woven && cards.length) cards.splice(Math.min(2, cards.length), 0, woven);
+  const list = cards.length ? cards.join("") : `<p class="muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "news_heading")} | ${tx(ctx.copy, "site_name")}`,
@@ -252,7 +254,8 @@ export function newsPage(data, ctx, rubrika) {
   });
 }
 
-export function articlePage(article, ctx) {
+export function articlePage(article, ctx, extras = {}) {
+  const ad = extras.ad ?? pickAd(extras.ads, `clanek:${article.slug}:${extras.today ?? ""}`);
   return layout({
     ...ctx,
     title: `${article.title} | ${tx(ctx.copy, "site_name")}`,
@@ -263,7 +266,117 @@ export function articlePage(article, ctx) {
       <h1 class="article-title">${esc(article.title)}</h1>
       ${articleMeta(article)}
       ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-      <div class="prose">${renderArticleHtml(article.body)}</div>`,
+      <div class="prose">${renderArticleHtml(article.body)}</div>
+      ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}`,
+  });
+}
+
+function contentAd(data, ctx, slot) {
+  const today = data.waste?.today ?? data.now?.date ?? "";
+  const ad = pickAd(data.ads, `${slot}:${today}`);
+  return ad ? adPanel(ad, ctx.copy) : "";
+}
+
+function adSlot(data, ctx, slot) {
+  const html = contentAd(data, ctx, slot);
+  return html ? `<div class="ad-slot">${html}</div>` : "";
+}
+
+function adLinkHtml(link, label, preview) {
+  if (!link) return "";
+  if (preview) return `<span>${esc(label)}</span>`;
+  const external = /^https?:\/\//i.test(link);
+  const attrs = external ? ` target="_blank" rel="noopener noreferrer"` : "";
+  return `<a href="${esc(link)}"${attrs}>${esc(label)}</a>`;
+}
+
+export function adPanel(ad, copy, options = {}) {
+  const preview = Boolean(options.preview);
+  const heading = options.heading === "h1" ? "h1" : "h3";
+  const link = typeof safeAdLink(ad.link) === "string" ? safeAdLink(ad.link) : "";
+  const flag = tx(copy, "ads_flag");
+  const sample = ad.sample ? ` · ${tx(copy, "ads_sample")}` : "";
+  const titleText = String(ad.title ?? "").trim();
+  const bodyText = String(ad.body ?? "").trim();
+  const placeText = String(ad.place ?? "").trim();
+  const titleShown = titleText || (preview ? "Název nabídky" : "");
+  const bodyShown = bodyText || (preview ? "Krátký text, který uvidí sousedé." : "");
+  const permalink = !preview && heading !== "h1" && ad.slug;
+  const titleInner = permalink ? `<a href="/reklamy/${esc(ad.slug)}">${esc(titleShown)}</a>` : esc(titleShown);
+  const when = ad.createdOn ? formatDayMonth(ad.createdOn) : "";
+  const who = byline(ad);
+  const meta = [when, who].filter(Boolean).join(" · ");
+  const more = adLinkHtml(link, tx(copy, "ads_more"), preview);
+  const photo = ad.imageKey
+    ? `<img class="ad-photo"${preview ? ` data-ad="photo"` : ""} src="${mediaUrl(ad.imageKey)}" alt="">`
+    : preview
+      ? `<img class="ad-photo" data-ad="photo" alt="" hidden>`
+      : "";
+  const placeRow =
+    placeText || preview
+      ? `<p class="ad-place"${preview ? ` data-ad="place"` : ""}${placeText ? "" : " hidden"}>${esc(placeText)}</p>`
+      : "";
+  const linkRow = preview
+    ? `<p class="ad-link" data-ad="link"${more ? "" : " hidden"}>${more || esc(tx(copy, "ads_more"))}</p>`
+    : more
+      ? `<p class="ad-link">${more}</p>`
+      : "";
+  const solo = heading === "h1" ? " ad-solo" : "";
+  const previewAttr = preview ? ` data-ad-preview aria-label="Náhled panelu"` : "";
+  const titleAttrs = preview
+    ? ` data-ad="title" data-empty="Název nabídky"${titleText ? "" : ` class="is-placeholder"`}`
+    : "";
+  const bodyAttrs = preview ? ` data-ad="body" data-empty="Krátký text, který uvidí sousedé."` : "";
+  const bodyClass = `ad-text${preview && !bodyText ? " is-placeholder" : ""}`;
+  return `<aside class="ad-panel${ad.imageKey ? " has-photo" : ""}${solo}"${previewAttr}>
+    <p class="ad-flag">${esc(flag)}${esc(sample)}</p>
+    <div class="ad-layout">
+      ${photo}
+      <div class="ad-copy">
+        <${heading}${titleAttrs}>${titleInner}</${heading}>
+        <p class="${bodyClass}"${bodyAttrs}>${esc(bodyShown)}</p>
+        ${placeRow}
+        ${linkRow}
+        ${meta ? `<p class="ad-meta">${esc(meta)}</p>` : ""}
+      </div>
+    </div>
+  </aside>`;
+}
+
+export function adsPage(data, ctx) {
+  const ads = data.ads ?? [];
+  const list = ads.length
+    ? ads.map((ad) => adPanel(ad, ctx.copy)).join("")
+    : `<p class="muted">${esc(tx(ctx.copy, "ads_empty"))}</p>`;
+  return layout({
+    ...ctx,
+    title: `${tx(ctx.copy, "ads_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "ads_description"),
+    body: `
+      <p class="eyebrow">${esc(tx(ctx.copy, "ads_eyebrow"))}</p>
+      <h1>${esc(tx(ctx.copy, "ads_heading"))}</h1>
+      <p class="lede">${esc(tx(ctx.copy, "ads_lede"))}</p>
+      <div class="stack">${list}</div>`,
+  });
+}
+
+export function adPage(ad, ctx) {
+  return layout({
+    ...ctx,
+    title: `${ad.title} | ${tx(ctx.copy, "site_name")}`,
+    description: ad.body,
+    body: `
+      <a class="back" href="/reklamy">${esc(tx(ctx.copy, "ads_back"))}</a>
+      ${adPanel(ad, ctx.copy, { heading: "h1" })}`,
+  });
+}
+
+export function missingAdPage(ctx) {
+  return layout({
+    ...ctx,
+    title: `${tx(ctx.copy, "ads_missing")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "ads_missing"),
+    body: `<h1>${esc(tx(ctx.copy, "ads_missing"))}</h1><a class="back" href="/reklamy">${esc(tx(ctx.copy, "ads_back"))}</a>`,
   });
 }
 
@@ -304,6 +417,7 @@ export function eventsPage(data, ctx) {
       <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "events_lede"))}</p>
       ${eventList(tx(ctx.copy, "events_upcoming"), upcoming, tx(ctx.copy, "events_upcoming_empty"))}
+      ${adSlot(data, ctx, "akce")}
       ${past.length ? eventList(tx(ctx.copy, "events_past"), past, "") : ""}`,
   });
 }
@@ -365,6 +479,7 @@ export function aboutPage(data, ctx) {
             <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
             <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
             <a href="/lekari">${esc(tx(ctx.copy, "about_doctors_link"))}</a>
+            <a href="/reklamy">${esc(tx(ctx.copy, "about_ads_link"))}</a>
             <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
           </div>
         </div>
@@ -418,9 +533,11 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
   const newsLabel = chief && waiting ? `Zprávy (${waiting})` : "Zprávy";
   const yardTab = ["/redakce/dvory", "dvory", "Sběrné dvory"];
   const doctorTab = ["/redakce/lekari", "lekari", "Lékaři"];
+  const adTab = ["/redakce/reklamy", "reklamy", "Reklamy"];
   const tabs = chief
     ? [
         ["/redakce/zpravy", "zpravy", newsLabel],
+        adTab,
         ["/redakce/akce", "akce", "Akce"],
         ["/redakce/texty", "texty", "Texty"],
         ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
@@ -431,6 +548,7 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
       ]
     : [
         ["/redakce/zpravy", "zpravy", "Zprávy"],
+        adTab,
         ...(userCan(data.user, "sberny_dvur") ? [yardTab] : []),
         ...(userCan(data.user, "doktori") ? [doctorTab] : []),
         ["/redakce/heslo", "heslo", "Heslo"],
@@ -734,7 +852,7 @@ export function adminPeople(ctx, data, message, disableId) {
     .join("");
   const form = `<form class="card form" method="post" action="/redakce/lide/ulozit">
     <h2>Nový přispěvatel</h2>
-    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Oprávnění jdou přidávat: teď je tu sběrný dvůr a lékaři.</p>
+    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Reklamu může přidat každý přihlášený, zvláštní oprávnění na to není. Oprávnění jdou přidávat: teď je tu sběrný dvůr a lékaři.</p>
     ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" autocomplete="off">`)}
     ${field("Alias", `<input class="${input}" name="alias" maxlength="60" autocomplete="off">`)}
     <span class="hint">Nepovinné. Když ho vyplní, na webu se ukáže místo jména. Sám si ho pak může změnit v záložce Heslo.</span>
@@ -1301,6 +1419,100 @@ export function adminDoctors(ctx, data, message, editingId, confirmId, cancelId)
     "lekari",
     message,
     `<div class="${chief ? "split" : "stack"}">${form}<ul class="stack plain">${list}</ul></div>`,
+  );
+}
+
+export function adminAds(ctx, data, message, query = {}) {
+  const chief = data.user?.role === "hlavni";
+  const ads = data.ads ?? [];
+  const editing = ads.find((item) => item.id === query.editingId) ?? null;
+  const draft = {
+    title: editing?.title ?? "",
+    body: editing?.body ?? "",
+    place: editing?.place ?? "",
+    link: editing?.link ?? "",
+    imageKey: editing?.imageKey ?? null,
+    sample: Boolean(editing?.sample),
+    slug: "",
+    createdOn: editing?.createdOn ?? "",
+    authorName: editing?.authorName ?? data.user?.name ?? "",
+    authorAlias: editing?.authorAlias ?? data.user?.alias ?? "",
+    enabled: editing ? editing.enabled : true,
+  };
+  const manageable = (ad) => chief || ad.authorId === data.user?.id;
+  const list = ads.length
+    ? ads
+        .map((item) => {
+          const own = manageable(item);
+          const confirm =
+            own && query.confirmId === item.id
+              ? `<form method="post" action="/redakce/reklamy/smazat">
+                  <input type="hidden" name="id" value="${item.id}">
+                  <input type="hidden" name="confirm" value="1">
+                  <button class="btn btn-primary" type="submit">Smazat</button>
+                </form>
+                <a class="btn btn-ghost" href="/redakce/reklamy">Nechat</a>`
+              : "";
+          const toggle = own
+            ? `<form method="post" action="/redakce/reklamy/stav">
+                <input type="hidden" name="id" value="${item.id}">
+                <input type="hidden" name="enabled" value="${item.enabled ? "0" : "1"}">
+                <button class="btn btn-line" type="submit">${item.enabled ? "Vypnout" : "Zapnout"}</button>
+              </form>`
+            : "";
+          const edit = own && query.confirmId !== item.id
+            ? `<a class="btn btn-line" href="/redakce/reklamy?id=${item.id}">Upravit</a>
+               <a class="btn btn-ghost" href="/redakce/reklamy?smazat=${item.id}">Smazat</a>`
+            : "";
+          const marks = [
+            item.place,
+            item.enabled ? "zapnutá" : "vypnutá",
+            item.sample ? "ukázka" : "",
+            credit(item),
+          ].filter(Boolean);
+          return `<li class="card">
+            <p class="kicker">${esc(marks.join(" · "))}</p>
+            <h3>${esc(item.title)}</h3>
+            <p class="muted">${esc(item.body)}</p>
+            ${confirm || toggle || edit ? `<div class="row">${confirm}${query.confirmId === item.id ? "" : toggle}${edit}</div>` : ""}
+          </li>`;
+        })
+        .join("")
+    : `<li class="card dashed muted">Zatím žádná nabídka.</li>`;
+  const form = `<form class="ad-editor" data-ad-form method="post" action="/redakce/reklamy/ulozit" enctype="multipart/form-data">
+      <div class="card form">
+        <h2>${editing ? "Upravit nabídku" : "Nová nabídka"}</h2>
+        <p class="muted">Neplacená místní reklama. Panel má na sobě nápis Reklama a občas se stejným vzhledem objeví i mezi zprávami. Vypnout ji jde v seznamu zvlášť, text se tím nemění.</p>
+        ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
+        ${field("Název", `<input class="${input}" name="title" required maxlength="80" value="${esc(draft.title)}">`)}
+        ${field("Text", `<textarea class="${input}" name="body" required maxlength="320" rows="4">${esc(draft.body)}</textarea>`)}
+        ${field("Místo", `<input class="${input}" name="place" maxlength="80" value="${esc(draft.place)}" placeholder="třeba Mlýnec">`)}
+        ${field("Odkaz", `<input class="${input}" name="link" maxlength="240" value="${esc(draft.link)}" placeholder="https://… nebo /cesta" inputmode="url">`)}
+        <span class="hint">Volitelný. Na panelu se ukáže jako Víc. Adresa začíná na https://, http://, mailto: nebo /.</span>
+        ${field(
+          "Fotka",
+          `<input class="${input}" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" data-edge="${PANEL_EDGE}" data-bytes="${PANEL_BYTES}">
+           <span class="hint">Volitelná. Před odesláním se v prohlížeči zmenší a uloží jako WEBP. Delší strana nejvýš ${PANEL_EDGE} px.${editing?.imageKey ? " Nová fotka nahradí tu současnou." : ""}</span>`,
+        )}
+        <label class="check"><input type="checkbox" name="enabled" value="1"${draft.enabled ? " checked" : ""}> Zobrazovat na webu</label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Uložit</button>
+          ${editing ? `<a class="btn btn-ghost" href="/redakce/reklamy">Nová</a>` : ""}
+        </div>
+      </div>
+      <div class="ad-stage">
+        <p class="hint">Tak bude panel vypadat na webu.</p>
+        ${adPanel(draft, ctx.copy, { preview: true })}
+        <p class="hint" data-ad="link-note"${draft.link ? "" : " hidden"}>${esc(draft.link)}</p>
+        <p class="hint" data-ad="off"${draft.enabled ? " hidden" : ""}>Tahle nabídka je vypnutá a na webu se neukáže.</p>
+      </div>
+    </form>`;
+  return adminShell(
+    ctx,
+    data,
+    "reklamy",
+    message,
+    `<div class="stack">${form}<p class="muted">Každou nabídku jde vypnout zvlášť, text se tím nemění. Svoji vypnete sami, cizí hlavní redaktor.</p><ul class="stack plain">${list}</ul></div>`,
   );
 }
 

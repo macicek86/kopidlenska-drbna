@@ -70,6 +70,7 @@ insert into copy (key, value) values
   ('brand_accent', 'drbna'),
   ('nav_news', 'Zprávy'),
   ('nav_events', 'Akce'),
+  ('nav_ads', 'Reklamy'),
   ('nav_bins', 'Popelnice'),
   ('nav_about', 'O nás'),
   ('menu_label', 'Menu'),
@@ -131,7 +132,18 @@ insert into copy (key, value) values
   ('about_lede', 'Kopidlenská drbna je místní noviny pro Kopidlno, Drahoraz, Mlýnec, Pševes a Ledkov. Píšeme zprávy, pozvánky a praktické věci, hlavně kdy vyvézt popelnici.'),
   ('about_disclaimer', 'Stránku neprovozuje Město Kopidlno. Vyhlášky, poplatky a úřední oznámení berte vždy z webu města.'),
   ('about_bins_link', 'Svoz popelnic'),
-  ('about_alt', 'Maskot Kopidlenské drbny')
+  ('about_alt', 'Maskot Kopidlenské drbny'),
+  ('about_ads_link', 'Reklamy'),
+  ('ads_description', 'Neplacené místní reklamy z Kopidlna a jeho částí.'),
+  ('ads_eyebrow', 'Rubrika'),
+  ('ads_heading', 'Reklamy'),
+  ('ads_lede', 'Neplacené nabídky od sousedů. Na panelu je napsáno, že jde o reklamu. Občas se stejný panel objeví i mezi zprávami nebo u pozvánky.'),
+  ('ads_empty', 'Zatím tu není žádná nabídka. Přidá ji kdokoli z redakce.'),
+  ('ads_back', 'Všechny reklamy'),
+  ('ads_flag', 'Reklama'),
+  ('ads_sample', 'ukázka'),
+  ('ads_more', 'Víc'),
+  ('ads_missing', 'Tahle reklama tu není')
 on conflict(key) do nothing;
 
 
@@ -258,6 +270,21 @@ create table if not exists doctors (
   hours text not null,
   sort_order integer not null default 0,
   published integer not null default 1
+);
+
+create table if not exists ads (
+  id integer primary key autoincrement,
+  slug text not null unique,
+  title text not null,
+  body text not null,
+  place text not null default '',
+  link text not null default '',
+  image_key text,
+  enabled integer not null default 1,
+  sample integer not null default 0,
+  author_id integer,
+  author_name text not null default '',
+  created_at text not null default (date('now'))
 );
 
 create table if not exists doctor_changes (
