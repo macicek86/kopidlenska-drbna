@@ -1,6 +1,6 @@
 @import url("/site-base.css");
 
-/* Dekorativni levy panel na titulce. Obrys se bere primo z oficialni vrstvy Obec v RUIAN (CUZK), kod obce Kopidlno 573060. */
+/* Dekorativni levy panel na titulce. Lokalni SVG je soucasti deploye, takze nezavisi na externi mape. */
 @media (min-width: 900px) {
   .hero {
     align-items: stretch;
@@ -10,7 +10,8 @@
     min-height: 100%;
     align-self: stretch;
     align-items: flex-start;
-    padding-bottom: 18rem;
+    padding-bottom: 19rem;
+    isolation: isolate;
   }
 
   .hero > .mascot img {
@@ -21,13 +22,17 @@
     content: "";
     position: absolute;
     left: 50%;
-    bottom: 0.5rem;
-    width: min(88%, 21rem);
+    bottom: 0.35rem;
+    z-index: 0;
+    width: min(94%, 23rem);
     aspect-ratio: 1;
-    transform: translateX(-50%) rotate(-3deg);
-    background: url("https://ags.cuzk.gov.cz/arcgis/rest/services/RUIAN/MapServer/export?bbox=-687000%2C-1031000%2C-673000%2C-1017000&bboxSR=5514&imageSR=5514&size=1000%2C1000&dpi=96&format=svg&transparent=true&dynamicLayers=%5B%7B%22id%22%3A12%2C%22source%22%3A%7B%22type%22%3A%22mapLayer%22%2C%22mapLayerId%22%3A12%7D%2C%22definitionExpression%22%3A%22kod+%3D+573060%22%2C%22drawingInfo%22%3A%7B%22renderer%22%3A%7B%22type%22%3A%22simple%22%2C%22symbol%22%3A%7B%22type%22%3A%22esriSFS%22%2C%22style%22%3A%22esriSFSSolid%22%2C%22color%22%3A%5B0%2C0%2C0%2C0%5D%2C%22outline%22%3A%7B%22type%22%3A%22esriSLS%22%2C%22style%22%3A%22esriSLSSolid%22%2C%22color%22%3A%5B199%2C67%2C77%2C255%5D%2C%22width%22%3A3%7D%7D%7D%2C%22showLabels%22%3Afalse%7D%7D%5D&f=image") center / contain no-repeat;
-    opacity: 0.16;
-    filter: saturate(0.75);
+    transform: translateX(-50%);
+    background-image: url("/kopidlno-outline.svg?v=3");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: contain;
+    opacity: 0.34;
+    filter: drop-shadow(0 7px 16px rgb(199 67 77 / 0.08));
     transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease;
     pointer-events: none;
   }
@@ -36,15 +41,15 @@
     content: "Dnes v Kopidlně";
     position: absolute;
     left: 50%;
-    bottom: 7.6rem;
-    z-index: 2;
+    bottom: 7.7rem;
+    z-index: 3;
     width: 12rem;
     transform: translateX(-50%);
     padding: 0.55rem 0.8rem;
-    border: 1px solid rgb(199 67 77 / 0.22);
+    border: 1px solid rgb(199 67 77 / 0.28);
     border-radius: 999px;
-    background: rgb(255 253 249 / 0.88);
-    box-shadow: 0 10px 30px rgb(83 49 32 / 0.08);
+    background: rgb(255 253 249 / 0.92);
+    box-shadow: 0 10px 30px rgb(83 49 32 / 0.09);
     color: var(--ink);
     font-family: var(--display);
     font-size: 1.05rem;
@@ -72,15 +77,15 @@
 
   .hero:has(.waste-teaser:hover) > .mascot::before,
   .hero:has(.waste-teaser:focus-within) > .mascot::before {
-    opacity: 0.3;
-    transform: translateX(-50%) rotate(0deg) scale(1.025);
-    filter: saturate(1);
+    opacity: 0.5;
+    transform: translateX(-50%) scale(1.025);
+    filter: drop-shadow(0 8px 18px rgb(199 67 77 / 0.14));
   }
 
   .hero:has(.waste-teaser:hover) > .mascot::after,
   .hero:has(.waste-teaser:focus-within) > .mascot::after {
     color: var(--brand-dark);
-    background: rgb(255 250 245 / 0.96);
+    background: rgb(255 250 245 / 0.97);
     transform: translateX(-50%) translateY(-2px);
   }
 }
