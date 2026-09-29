@@ -1,6 +1,6 @@
 @import url("/site-base.css");
 
-/* Dekorativni levy panel na titulce. Puvodni CSS zustava v site-base.css. */
+/* Dekorativni levy panel na titulce. Obrys se bere primo z oficialni vrstvy Obec v RUIAN (CUZK), kod obce Kopidlno 573060. */
 @media (min-width: 900px) {
   .hero {
     align-items: stretch;
@@ -25,7 +25,7 @@
     width: min(88%, 21rem);
     aspect-ratio: 1;
     transform: translateX(-50%) rotate(-3deg);
-    background: url("/kopidlno-outline.svg") center / contain no-repeat;
+    background: url("https://ags.cuzk.gov.cz/arcgis/rest/services/RUIAN/MapServer/export?bbox=-687000%2C-1031000%2C-673000%2C-1017000&bboxSR=5514&imageSR=5514&size=1000%2C1000&dpi=96&format=svg&transparent=true&dynamicLayers=%5B%7B%22id%22%3A12%2C%22source%22%3A%7B%22type%22%3A%22mapLayer%22%2C%22mapLayerId%22%3A12%7D%2C%22definitionExpression%22%3A%22kod+%3D+573060%22%2C%22drawingInfo%22%3A%7B%22renderer%22%3A%7B%22type%22%3A%22simple%22%2C%22symbol%22%3A%7B%22type%22%3A%22esriSFS%22%2C%22style%22%3A%22esriSFSSolid%22%2C%22color%22%3A%5B0%2C0%2C0%2C0%5D%2C%22outline%22%3A%7B%22type%22%3A%22esriSLS%22%2C%22style%22%3A%22esriSLSSolid%22%2C%22color%22%3A%5B199%2C67%2C77%2C255%5D%2C%22width%22%3A3%7D%7D%7D%2C%22showLabels%22%3Afalse%7D%7D%5D&f=image") center / contain no-repeat;
     opacity: 0.16;
     filter: saturate(0.75);
     transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease;
