@@ -287,6 +287,22 @@ create table if not exists ads (
   created_at text not null default (date('now'))
 );
 
+create table if not exists ad_proposals (
+  id integer primary key autoincrement,
+  ad_id integer,
+  author_id integer not null,
+  author_name text not null,
+  title text not null,
+  body text not null,
+  place text not null default '',
+  link text not null default '',
+  image_key text,
+  enabled integer not null default 1,
+  status text not null default 'pending',
+  note text not null default '',
+  created_at text not null default (date('now'))
+);
+
 create table if not exists doctor_changes (
   id integer primary key autoincrement,
   doctor_id integer not null,

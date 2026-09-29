@@ -462,6 +462,40 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.match(desk, /data-edge="960"/);
   assert.match(desk, /data-bytes="180000"/);
   assert.match(desk, />Vypnout</);
+  assert.match(desk, /action="\/redakce\/reklamy\/ulozit"/);
+  assert.match(desk, /Jde na web hned/);
+  const queued = adminAds(
+    { ...ctx, path: "/redakce" },
+    {
+      signedIn: true,
+      user: { id: 1, role: "hlavni", name: "Redakce" },
+      ads: [ad],
+      adProposals: [
+        {
+          id: 4,
+          adId: null,
+          title: "Vejce",
+          body: "Ráno na okně.",
+          place: "Drahoraz",
+          link: "",
+          imageKey: null,
+          enabled: true,
+          status: "pending",
+          note: "",
+          authorName: "Jana",
+          authorAlias: "",
+        },
+      ],
+      proposals: [],
+      showDefaultPassword: false,
+    },
+    { text: "", kind: "ok" },
+    { proposalId: 4 },
+  );
+  assert.match(queued, /Reklamy \(1\)/);
+  assert.match(queued, /Schválit a zveřejnit/);
+  assert.match(queued, /action="\/redakce\/reklamy\/schvalit"/);
+  assert.match(queued, /action="\/redakce\/reklamy\/vratit"/);
   const contributor = adminAds(
     { ...ctx, path: "/redakce" },
     {
@@ -475,5 +509,24 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
     {},
   );
   assert.equal(contributor.includes(">Vypnout<"), false);
+  assert.equal(contributor.includes("/redakce/reklamy/ulozit"), false);
   assert.match(contributor, /data-ad-preview/);
+  assert.match(contributor, /action="\/redakce\/reklamy\/navrh"/);
+  assert.match(contributor, /Poslat ke schválení/);
+  const own = adminAds(
+    { ...ctx, path: "/redakce" },
+    {
+      signedIn: true,
+      user: { id: 8, role: "prispevovatel", name: "Jana" },
+      ads: [{ ...ad, authorId: 8, authorName: "Jana" }],
+      adProposals: [],
+      proposals: [],
+      showDefaultPassword: false,
+    },
+    { text: "", kind: "ok" },
+    { editingId: 1 },
+  );
+  assert.match(own, /name="nabidka" value="1"/);
+  assert.match(own, /Poslat návrh/);
+  assert.match(own, />Vypnout</);
 });

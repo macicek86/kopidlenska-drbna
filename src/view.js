@@ -533,7 +533,8 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
   const newsLabel = chief && waiting ? `Zprávy (${waiting})` : "Zprávy";
   const yardTab = ["/redakce/dvory", "dvory", "Sběrné dvory"];
   const doctorTab = ["/redakce/lekari", "lekari", "Lékaři"];
-  const adTab = ["/redakce/reklamy", "reklamy", "Reklamy"];
+  const adWaiting = (data.adProposals ?? []).filter((item) => item.status === "pending").length;
+  const adTab = ["/redakce/reklamy", "reklamy", chief && adWaiting ? `Reklamy (${adWaiting})` : "Reklamy"];
   const tabs = chief
     ? [
         ["/redakce/zpravy", "zpravy", newsLabel],
@@ -852,7 +853,7 @@ export function adminPeople(ctx, data, message, disableId) {
     .join("");
   const form = `<form class="card form" method="post" action="/redakce/lide/ulozit">
     <h2>Nový přispěvatel</h2>
-    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Reklamu může přidat každý přihlášený, zvláštní oprávnění na to není. Oprávnění jdou přidávat: teď je tu sběrný dvůr a lékaři.</p>
+    <p class="muted">Přispěvatel píše své zprávy a může navrhnout úpravu jiných. Na web se dostanou, až je schválíte. Cizí text přímo nezmění. Reklamu může navrhnout každý přihlášený, zvláštní oprávnění na to není, a na web přijde taky až ji schválíte. Oprávnění jdou přidávat: teď je tu sběrný dvůr a lékaři.</p>
     ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" autocomplete="off">`)}
     ${field("Alias", `<input class="${input}" name="alias" maxlength="60" autocomplete="off">`)}
     <span class="hint">Nepovinné. Když ho vyplní, na webu se ukáže místo jména. Sám si ho pak může změnit v záložce Heslo.</span>
@@ -1422,68 +1423,29 @@ export function adminDoctors(ctx, data, message, editingId, confirmId, cancelId)
   );
 }
 
-export function adminAds(ctx, data, message, query = {}) {
-  const chief = data.user?.role === "hlavni";
-  const ads = data.ads ?? [];
-  const editing = ads.find((item) => item.id === query.editingId) ?? null;
-  const draft = {
-    title: editing?.title ?? "",
-    body: editing?.body ?? "",
-    place: editing?.place ?? "",
-    link: editing?.link ?? "",
-    imageKey: editing?.imageKey ?? null,
-    sample: Boolean(editing?.sample),
+function adDraft(source, user, sample) {
+  return {
+    title: source?.title ?? "",
+    body: source?.body ?? "",
+    place: source?.place ?? "",
+    link: source?.link ?? "",
+    imageKey: source?.imageKey ?? null,
+    sample: Boolean(sample && source?.sample),
     slug: "",
-    createdOn: editing?.createdOn ?? "",
-    authorName: editing?.authorName ?? data.user?.name ?? "",
-    authorAlias: editing?.authorAlias ?? data.user?.alias ?? "",
-    enabled: editing ? editing.enabled : true,
+    createdOn: source?.createdOn ?? "",
+    authorName: source?.authorName ?? user?.name ?? "",
+    authorAlias: source?.authorAlias ?? user?.alias ?? "",
+    enabled: source ? Boolean(source.enabled) : true,
   };
-  const manageable = (ad) => chief || ad.authorId === data.user?.id;
-  const list = ads.length
-    ? ads
-        .map((item) => {
-          const own = manageable(item);
-          const confirm =
-            own && query.confirmId === item.id
-              ? `<form method="post" action="/redakce/reklamy/smazat">
-                  <input type="hidden" name="id" value="${item.id}">
-                  <input type="hidden" name="confirm" value="1">
-                  <button class="btn btn-primary" type="submit">Smazat</button>
-                </form>
-                <a class="btn btn-ghost" href="/redakce/reklamy">Nechat</a>`
-              : "";
-          const toggle = own
-            ? `<form method="post" action="/redakce/reklamy/stav">
-                <input type="hidden" name="id" value="${item.id}">
-                <input type="hidden" name="enabled" value="${item.enabled ? "0" : "1"}">
-                <button class="btn btn-line" type="submit">${item.enabled ? "Vypnout" : "Zapnout"}</button>
-              </form>`
-            : "";
-          const edit = own && query.confirmId !== item.id
-            ? `<a class="btn btn-line" href="/redakce/reklamy?id=${item.id}">Upravit</a>
-               <a class="btn btn-ghost" href="/redakce/reklamy?smazat=${item.id}">Smazat</a>`
-            : "";
-          const marks = [
-            item.place,
-            item.enabled ? "zapnutá" : "vypnutá",
-            item.sample ? "ukázka" : "",
-            credit(item),
-          ].filter(Boolean);
-          return `<li class="card">
-            <p class="kicker">${esc(marks.join(" · "))}</p>
-            <h3>${esc(item.title)}</h3>
-            <p class="muted">${esc(item.body)}</p>
-            ${confirm || toggle || edit ? `<div class="row">${confirm}${query.confirmId === item.id ? "" : toggle}${edit}</div>` : ""}
-          </li>`;
-        })
-        .join("")
-    : `<li class="card dashed muted">Zatím žádná nabídka.</li>`;
-  const form = `<form class="ad-editor" data-ad-form method="post" action="/redakce/reklamy/ulozit" enctype="multipart/form-data">
+}
+
+function adEditorForm(ctx, { action, heading, help, banner = "", hidden = "", draft, submit, aside = "" }) {
+  return `<form class="ad-editor" data-ad-form method="post" action="${action}" enctype="multipart/form-data">
       <div class="card form">
-        <h2>${editing ? "Upravit nabídku" : "Nová nabídka"}</h2>
-        <p class="muted">Neplacená místní reklama. Panel má na sobě nápis Reklama a občas se stejným vzhledem objeví i mezi zprávami. Vypnout ji jde v seznamu zvlášť, text se tím nemění.</p>
-        ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
+        <h2>${heading}</h2>
+        <p class="muted">${help}</p>
+        ${banner}
+        ${hidden}
         ${field("Název", `<input class="${input}" name="title" required maxlength="80" value="${esc(draft.title)}">`)}
         ${field("Text", `<textarea class="${input}" name="body" required maxlength="320" rows="4">${esc(draft.body)}</textarea>`)}
         ${field("Místo", `<input class="${input}" name="place" maxlength="80" value="${esc(draft.place)}" placeholder="třeba Mlýnec">`)}
@@ -1492,12 +1454,12 @@ export function adminAds(ctx, data, message, query = {}) {
         ${field(
           "Fotka",
           `<input class="${input}" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" data-edge="${PANEL_EDGE}" data-bytes="${PANEL_BYTES}">
-           <span class="hint">Volitelná. Před odesláním se v prohlížeči zmenší a uloží jako WEBP. Delší strana nejvýš ${PANEL_EDGE} px.${editing?.imageKey ? " Nová fotka nahradí tu současnou." : ""}</span>`,
+           <span class="hint">Volitelná. Před odesláním se v prohlížeči zmenší a uloží jako WEBP. Delší strana nejvýš ${PANEL_EDGE} px.${draft.imageKey ? " Nová fotka nahradí tu současnou." : ""}</span>`,
         )}
         <label class="check"><input type="checkbox" name="enabled" value="1"${draft.enabled ? " checked" : ""}> Zobrazovat na webu</label>
         <div class="row">
-          <button class="btn btn-primary" type="submit">Uložit</button>
-          ${editing ? `<a class="btn btn-ghost" href="/redakce/reklamy">Nová</a>` : ""}
+          <button class="btn btn-primary" type="submit">${submit}</button>
+          ${aside}
         </div>
       </div>
       <div class="ad-stage">
@@ -1507,12 +1469,178 @@ export function adminAds(ctx, data, message, query = {}) {
         <p class="hint" data-ad="off"${draft.enabled ? " hidden" : ""}>Tahle nabídka je vypnutá a na webu se neukáže.</p>
       </div>
     </form>`;
+}
+
+function adProposalKind(item) {
+  return item.adId ? "Úprava nabídky" : "Nová nabídka";
+}
+
+function liveAdList(ads, data, query, { chief }) {
+  const manageable = (ad) => chief || ad.authorId === data.user?.id;
+  if (!ads.length) return `<li class="card dashed muted">Zatím žádná nabídka.</li>`;
+  return ads
+    .map((item) => {
+      const own = manageable(item);
+      const waiting = (data.adProposals ?? []).some((proposal) => proposal.adId === item.id && proposal.status === "pending");
+      const confirm =
+        own && query.confirmId === item.id
+          ? `<form method="post" action="/redakce/reklamy/smazat">
+              <input type="hidden" name="id" value="${item.id}">
+              <input type="hidden" name="confirm" value="1">
+              <button class="btn btn-primary" type="submit">Smazat</button>
+            </form>
+            <a class="btn btn-ghost" href="/redakce/reklamy">Nechat</a>`
+          : "";
+      const toggle = own
+        ? `<form method="post" action="/redakce/reklamy/stav">
+            <input type="hidden" name="id" value="${item.id}">
+            <input type="hidden" name="enabled" value="${item.enabled ? "0" : "1"}">
+            <button class="btn btn-line" type="submit">${item.enabled ? "Vypnout" : "Zapnout"}</button>
+          </form>`
+        : "";
+      const edit = own && query.confirmId !== item.id
+        ? `<a class="btn btn-line" href="/redakce/reklamy?id=${item.id}">Upravit</a>
+           <a class="btn btn-ghost" href="/redakce/reklamy?smazat=${item.id}">Smazat</a>`
+        : "";
+      const marks = [
+        item.place,
+        item.enabled ? "zapnutá" : "vypnutá",
+        item.sample ? "ukázka" : "",
+        waiting ? "úprava čeká" : "",
+        credit(item),
+      ].filter(Boolean);
+      return `<li class="card">
+        <p class="kicker">${esc(marks.join(" · "))}</p>
+        <h3>${esc(item.title)}</h3>
+        <p class="muted">${esc(item.body)}</p>
+        ${confirm || toggle || edit ? `<div class="row">${confirm}${query.confirmId === item.id ? "" : toggle}${edit}</div>` : ""}
+      </li>`;
+    })
+    .join("");
+}
+
+export function adminAds(ctx, data, message, query = {}) {
+  const chief = data.user?.role === "hlavni";
+  const ads = data.ads ?? [];
+  const proposals = data.adProposals ?? [];
+  if (chief) {
+    const proposal = proposals.find((item) => item.id === query.proposalId) ?? null;
+    const editing = proposal ? null : (ads.find((item) => item.id === query.editingId) ?? null);
+    const draft = adDraft(proposal ?? editing, proposal ? proposal : data.user, !proposal);
+    if (editing) {
+      draft.authorName = editing.authorName;
+      draft.authorAlias = editing.authorAlias;
+      draft.createdOn = editing.createdOn;
+    }
+    const queue = proposals
+      .map(
+        (item) => `<li class="card">
+          <p class="kicker">${adProposalKind(item)} · ${esc(credit(item))}</p>
+          <h3>${esc(item.title)}</h3>
+          <p class="muted">${esc(item.body)}</p>
+          ${item.adTitle ? `<p class="meta">K nabídce: ${esc(item.adTitle)}</p>` : ""}
+          <div class="row"><a class="btn btn-line" href="/redakce/reklamy?navrh=${item.id}">Otevřít</a></div>
+        </li>`,
+      )
+      .join("");
+    const form = proposal
+      ? `<div class="stack">${adEditorForm(ctx, {
+          action: "/redakce/reklamy/schvalit",
+          heading: proposal.adId ? "Schválit úpravu" : "Schválit nabídku",
+          help: proposal.adId
+            ? `Autor na webu: ${esc(credit(proposal))}. Text můžete před schválením upravit. Veřejné znění se změní, až úpravu schválíte.`
+            : `Autor na webu: ${esc(credit(proposal))}. Text můžete před schválením upravit. Na web přijde, až ji schválíte.`,
+          hidden: `<input type="hidden" name="id" value="${proposal.id}">`,
+          draft,
+          submit: "Schválit a zveřejnit",
+          aside: `<a class="btn btn-ghost" href="/redakce/reklamy">Zpět</a>`,
+        })}
+        <form class="card form" method="post" action="/redakce/reklamy/vratit">
+          <input type="hidden" name="id" value="${proposal.id}">
+          ${field("Poznámka pro autora", `<textarea class="${input}" name="note" maxlength="400" rows="3" placeholder="Co má dopracovat. Může zůstat prázdné."></textarea>`)}
+          <button class="btn btn-line" type="submit">Vrátit</button>
+        </form></div>`
+      : adEditorForm(ctx, {
+          action: "/redakce/reklamy/ulozit",
+          heading: editing ? "Upravit nabídku" : "Nová nabídka",
+          help: editing
+            ? "Úprava jde na web hned. Vypnout jde v seznamu zvlášť, text se tím nemění."
+            : `Jde na web hned a podepíše se jako ${esc(byline(data.user) || "Redakce")}. Návrh přispěvatele schvalujete vy.`,
+          hidden: editing ? `<input type="hidden" name="id" value="${editing.id}">` : "",
+          draft,
+          submit: "Uložit",
+          aside: editing ? `<a class="btn btn-ghost" href="/redakce/reklamy">Nová</a>` : "",
+        });
+    const queueHtml = queue
+      ? `<section class="block"><h2>Ke schválení</h2><ul class="stack plain">${queue}</ul></section>`
+      : "";
+    return adminShell(
+      ctx,
+      data,
+      "reklamy",
+      message,
+      `<div class="stack">${queueHtml}${form}<p class="muted">Každou zveřejněnou nabídku jde vypnout zvlášť, text se tím nemění. Návrh přispěvatele se na web dostane, až ho schválíte.</p><ul class="stack plain">${liveAdList(ads, data, query, { chief: true })}</ul></div>`,
+    );
+  }
+
+  const opened = proposals.find((item) => item.id === query.proposalId) ?? null;
+  const target = ads.find((item) => item.id === query.editingId && item.authorId === data.user?.id) ?? null;
+  const existingForTarget = target
+    ? (proposals.find((item) => item.adId === target.id) ?? null)
+    : null;
+  const proposal = opened ?? existingForTarget;
+  const source = proposal ?? target;
+  const draft = adDraft(source, data.user, false);
+  if (!proposal && target?.imageKey) draft.imageKey = target.imageKey;
+  const returned = proposal?.status === "rejected" && proposal.note
+    ? `<p class="banner">${esc(proposal.note)}</p>`
+    : proposal?.status === "rejected"
+      ? `<p class="banner">Hlavní redaktor návrh vrátil. Upravte ho a pošlete znovu.</p>`
+      : "";
+  const form = adEditorForm(ctx, {
+    action: "/redakce/reklamy/navrh",
+    heading: proposal?.adId || target ? "Úprava vaší nabídky" : proposal ? "Váš návrh" : "Nová nabídka",
+    help: proposal?.adId || target
+      ? "Veřejné znění se nezmění, dokud úpravu neschválí hlavní redaktor. Vypnout už zveřejněnou nabídku jde v seznamu hned."
+      : `Na web to přijde, až to schválí hlavní redaktor. Do té doby to tu můžete měnit. Podepíše se jako ${esc(byline(data.user) || "Redakce")}.`,
+    banner: returned,
+    hidden: `${proposal ? `<input type="hidden" name="id" value="${proposal.id}">` : ""}${target && !proposal ? `<input type="hidden" name="nabidka" value="${target.id}">` : ""}`,
+    draft,
+    submit: proposal ? "Uložit návrh" : target ? "Poslat návrh" : "Poslat ke schválení",
+    aside: proposal || target ? `<a class="btn btn-ghost" href="/redakce/reklamy">Nová</a>` : "",
+  });
+  const own = proposals
+    .map((item) => {
+      const confirm =
+        query.withdrawId === item.id
+          ? `<form method="post" action="/redakce/reklamy/stahnout">
+              <input type="hidden" name="id" value="${item.id}">
+              <input type="hidden" name="confirm" value="1">
+              <button class="btn btn-primary" type="submit">Opravdu stáhnout</button>
+            </form>
+            <a class="btn btn-ghost" href="/redakce/reklamy">Nechat</a>`
+          : `<a class="btn btn-ghost" href="/redakce/reklamy?stahnout=${item.id}">Stáhnout</a>`;
+      const state = item.status === "rejected" ? "Vráceno" : "Čeká na schválení";
+      return `<li class="card">
+        <p class="kicker">${adProposalKind(item)} · ${state}</p>
+        <h3>${esc(item.title)}</h3>
+        ${item.note ? `<p class="muted">${esc(item.note)}</p>` : ""}
+        <div class="row">
+          <a class="btn btn-line" href="/redakce/reklamy?navrh=${item.id}">Upravit</a>
+          ${confirm}
+        </div>
+      </li>`;
+    })
+    .join("");
   return adminShell(
     ctx,
     data,
     "reklamy",
     message,
-    `<div class="stack">${form}<p class="muted">Každou nabídku jde vypnout zvlášť, text se tím nemění. Svoji vypnete sami, cizí hlavní redaktor.</p><ul class="stack plain">${list}</ul></div>`,
+    `<div class="stack">${form}
+      <section class="block"><h2>Vaše návrhy</h2>${own ? `<ul class="stack plain">${own}</ul>` : `<p class="card dashed muted">Zatím tu nic nečeká.</p>`}</section>
+      <section class="block"><h2>Nabídky na webu</h2><ul class="stack plain">${liveAdList(ads, data, query, { chief: false })}</ul></section>
+    </div>`,
   );
 }
 
