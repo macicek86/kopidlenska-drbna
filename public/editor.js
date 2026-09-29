@@ -344,6 +344,16 @@ function bootRich() {
   for (const rich of fields) mountRich(rich);
 }
 
+function previewAdLink(raw) {
+  let value = String(raw ?? "").trim().replace(/[\u0000-\u001F\u007F]/g, "");
+  if (!value || value.length > 240 || /\s/.test(value)) return "";
+  if (/^www\./i.test(value)) value = `https://${value}`;
+  if (/^https:\/\//i.test(value) || /^http:\/\//i.test(value)) return value;
+  if (/^mailto:/i.test(value) && !/[<>"]/.test(value)) return value;
+  if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !value.includes(":")) return value;
+  return "";
+}
+
 function bootAdPreview() {
   const form = document.querySelector("[data-ad-form]");
   if (!form) return;
@@ -377,9 +387,10 @@ function bootAdPreview() {
       placeNode.hidden = !place;
     }
     const link = String(form.querySelector("[name='link']")?.value ?? "").trim();
-    if (linkNode) linkNode.hidden = !link;
+    const shown = previewAdLink(link);
+    if (linkNode) linkNode.hidden = !shown;
     if (linkNote) {
-      linkNote.textContent = link;
+      linkNote.textContent = shown ? `Víc vede na ${shown}` : "Odkaz se na panel nedostane.";
       linkNote.hidden = !link;
     }
     const enabled = form.querySelector("[name='enabled']");

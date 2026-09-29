@@ -121,7 +121,7 @@ function html(body, status = 200, cookie) {
     "x-content-type-options": "nosniff",
     "referrer-policy": "strict-origin-when-cross-origin",
     "content-security-policy":
-      "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
+      "default-src 'self'; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
   });
   if (cookie) headers.set("set-cookie", cookie);
   return new Response(body, { status, headers });
