@@ -1,91 +1,17 @@
 @import url("/site-base.css");
 
-/* Dekorativni levy panel na titulce. Lokalni SVG je soucasti deploye, takze nezavisi na externi mape. */
 @media (min-width: 900px) {
   .hero {
-    align-items: stretch;
+    align-items: start;
   }
 
   .hero > .mascot {
-    min-height: 100%;
-    align-self: stretch;
+    margin-top: 3rem;
+    min-height: 0;
     align-items: flex-start;
-    padding-bottom: 19rem;
-    isolation: isolate;
   }
 
-  .hero > .mascot img {
-    margin-inline: auto;
-  }
-
-  .hero > .mascot::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 0.35rem;
-    z-index: 0;
-    width: min(94%, 23rem);
-    aspect-ratio: 1;
-    transform: translateX(-50%);
-    background-image: url("/kopidlno-outline.svg?v=3");
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: contain;
-    opacity: 0.34;
-    filter: drop-shadow(0 7px 16px rgb(199 67 77 / 0.08));
-    transition: opacity 180ms ease, transform 180ms ease, filter 180ms ease;
-    pointer-events: none;
-  }
-
-  .hero > .mascot::after {
-    content: "Dnes v Kopidlně";
-    position: absolute;
-    left: 50%;
-    bottom: 7.7rem;
-    z-index: 3;
-    width: 12rem;
-    transform: translateX(-50%);
-    padding: 0.55rem 0.8rem;
-    border: 1px solid rgb(199 67 77 / 0.28);
-    border-radius: 999px;
-    background: rgb(255 253 249 / 0.92);
-    box-shadow: 0 10px 30px rgb(83 49 32 / 0.09);
-    color: var(--ink);
-    font-family: var(--display);
-    font-size: 1.05rem;
-    font-weight: 560;
-    text-align: center;
-    backdrop-filter: blur(5px);
-    transition: color 180ms ease, background 180ms ease, transform 180ms ease;
-    pointer-events: none;
-  }
-
-  .hero:has(.waste-teaser:has(a[href="/popelnice"]):hover) > .mascot::after,
-  .hero:has(.waste-teaser:has(a[href="/popelnice"]):focus-within) > .mascot::after {
-    content: "Popelnice";
-  }
-
-  .hero:has(.waste-teaser:has(a[href="/sberne-dvory"]):hover) > .mascot::after,
-  .hero:has(.waste-teaser:has(a[href="/sberne-dvory"]):focus-within) > .mascot::after {
-    content: "Sběrné dvory";
-  }
-
-  .hero:has(.waste-teaser:has(a[href="/lekari"]):hover) > .mascot::after,
-  .hero:has(.waste-teaser:has(a[href="/lekari"]):focus-within) > .mascot::after {
-    content: "Lékaři";
-  }
-
-  .hero:has(.waste-teaser:hover) > .mascot::before,
-  .hero:has(.waste-teaser:focus-within) > .mascot::before {
-    opacity: 0.5;
-    transform: translateX(-50%) scale(1.025);
-    filter: drop-shadow(0 8px 18px rgb(199 67 77 / 0.14));
-  }
-
-  .hero:has(.waste-teaser:hover) > .mascot::after,
-  .hero:has(.waste-teaser:focus-within) > .mascot::after {
-    color: var(--brand-dark);
-    background: rgb(255 250 245 / 0.97);
-    transform: translateX(-50%) translateY(-2px);
+  .hero > .mascot > img {
+    width: min(86%, 22rem);
   }
 }
