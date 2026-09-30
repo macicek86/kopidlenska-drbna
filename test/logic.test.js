@@ -5,6 +5,7 @@ import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
 import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../src/ads.js";
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
+import { text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 import { adPanel, adminAds, articlePage, homePage, layout, newsPage } from "../src/view.js";
 import {
@@ -544,6 +545,21 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.match(own, /name="nabidka" value="1"/);
   assert.match(own, /Poslat návrh/);
   assert.match(own, />Vypnout</);
+});
+
+test("popis titulky nemluví o popelnicích, stránka svozu ano", () => {
+  const home = text({}, "home_description");
+  assert.equal(home.includes("popelnic"), false);
+  assert.match(text({}, "bins_description"), /svoz/);
+  const html = layout({
+    title: "Kopidlenská drbna",
+    description: home,
+    path: "/",
+    origin: "https://kopidlenska-drbna.camledian.workers.dev",
+    body: "",
+    copy: {},
+  });
+  assert.match(html, /property="og:description" content="Místní zprávy a pozvánky pro Kopidlno a jeho části."/);
 });
 
 test("sdílení má og obrázek 1200×630", () => {

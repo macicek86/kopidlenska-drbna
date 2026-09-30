@@ -79,7 +79,7 @@ insert into copy (key, value) values
   ('footer_copy', '© 2026 Kopidlenská drbna'),
   ('footer_fine', 'Neoficiální informační stránka — není provozována Městem Kopidlno.'),
   ('footer_admin', 'Redakce'),
-  ('home_description', 'Místní zprávy, pozvánky a svoz popelnic pro Kopidlno a jeho části.'),
+  ('home_description', 'Místní zprávy a pozvánky pro Kopidlno a jeho části.'),
   ('hero_pill', 'Kopidlno a jeho části'),
   ('hero_title', 'Kopidlenská'),
   ('hero_accent', 'drbna'),

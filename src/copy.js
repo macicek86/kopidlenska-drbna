@@ -16,7 +16,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "footer_fine", label: "Patička, upřesnění", value: "Neoficiální informační stránka — není provozována Městem Kopidlno.", max: 240, long: true },
   { group: "Hlavička a patička", key: "footer_admin", label: "Odkaz do redakce", value: "Redakce", max: 40 },
 
-  { group: "Titulka", key: "home_description", label: "Popis titulky pro vyhledávače", value: "Místní zprávy, pozvánky a svoz popelnic pro Kopidlno a jeho části.", max: 240, long: true },
+  { group: "Titulka", key: "home_description", label: "Popis titulky pro vyhledávače", value: "Místní zprávy a pozvánky pro Kopidlno a jeho části.", max: 240, long: true },
   { group: "Titulka", key: "hero_pill", label: "Štítek nad nadpisem", value: "Kopidlno a jeho části", max: 80 },
   { group: "Titulka", key: "hero_title", label: "Velký nadpis, první řádek", value: "Kopidlenská", max: 80 },
   { group: "Titulka", key: "hero_accent", label: "Velký nadpis, druhý řádek", value: "drbna", max: 40 },
