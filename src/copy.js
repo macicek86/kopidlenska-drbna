@@ -22,7 +22,7 @@ export const COPY = [
   { group: "Titulka", key: "hero_title", label: "Velký nadpis, první řádek", value: "Kopidlenská", max: 80 },
   { group: "Titulka", key: "hero_accent", label: "Velký nadpis, druhý řádek", value: "drbna", max: 40 },
   { group: "Titulka", key: "hero_lede", label: "Úvodní odstavec", value: "Místní zprávy, pozvánky a sousedské novinky z Kopidlna, Drahorazi, Mlýnce, Pševesi a Ledkova. Neúřední, přehledné a odsud.", max: 500, long: true },
-  { group: "Titulka", key: "hero_alt", label: "Popis maskota", value: "Maskot Kopidlenské drbny, černobílý kozel", max: 160 },
+  { group: "Titulka", key: "hero_alt", label: "Popis maskota", value: "Koza Drběna, maskot Kopidlenské drbny", max: 160 },
   { group: "Titulka", key: "home_waste_eyebrow", label: "Nadpis u svozu na titulce", value: "Popelnice", max: 40 },
   { group: "Titulka", key: "home_waste_button", label: "Tlačítko na svoz", value: "Kdy se sváží", max: 40 },
   { group: "Titulka", key: "home_yards_button", label: "Tlačítko na sběrné dvory", value: "Sběrné dvory", max: 40 },
@@ -59,7 +59,7 @@ export const COPY = [
   { group: "Popelnice", key: "bins_pill", label: "Štítek nejbližšího svozu", value: "Nejbližší svoz", max: 40 },
   { group: "Popelnice", key: "bins_more", label: "Nadpis dalších termínů", value: "Další termíny", max: 40 },
   { group: "Popelnice", key: "bins_kind", label: "Druh odpadu", value: "Směsný komunální odpad", max: 80 },
-  { group: "Popelnice", key: "bins_alt", label: "Popis fotky popeláře", value: "Kozel v montérkách s popelnicí na kopidlenském náměstí", max: 160 },
+  { group: "Popelnice", key: "bins_alt", label: "Popis fotky popeláře", value: "Koza Drběna v montérkách s popelnicí na kopidlenském náměstí", max: 160 },
   { group: "Popelnice", key: "countdown_today", label: "Odpočet, svoz dnes", value: "Svoz je dnes.", max: 80 },
   { group: "Popelnice", key: "countdown_tomorrow", label: "Odpočet, svoz zítra", value: "Svoz je zítra.", max: 80 },
   { group: "Popelnice", key: "countdown_few", label: "Odpočet do 4 dnů, {n} je počet", value: "Za {n} dny.", max: 80 },
@@ -121,7 +121,7 @@ export const COPY = [
   { group: "Reklamy", key: "ads_sample", label: "Označení ukázky", value: "ukázka", max: 40 },
   { group: "Reklamy", key: "ads_more", label: "Text odkazu na panelu", value: "Víc", max: 40 },
   { group: "Reklamy", key: "ads_missing", label: "Chybějící reklama", value: "Tahle reklama tu není", max: 80 },
-  { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Maskot Kopidlenské drbny", max: 160 },
+  { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Koza Drběna, maskot Kopidlenské drbny", max: 160 },
 ];
 
 const BY_KEY = new Map(COPY.map((item) => [item.key, item]));
