@@ -40,7 +40,9 @@ import {
   loadOutageBoard,
   refreshOutages,
   removeOutageArea,
+  removeRubric,
   saveOutageAreas,
+  saveRubric,
   setAdEnabled,
   sessionCookie,
   saveContributorAccess,
@@ -68,6 +70,7 @@ import {
   brokenPage,
   doctorsPage,
   adminOutages,
+  adminRubrics,
   eventsPage,
   homePage,
   outagesPage,
@@ -114,6 +117,9 @@ const OK = {
   "lekar-hodiny": "Ordinační hodiny jsou uložené.",
   "lekar-zmena": "Dočasná změna je zapsaná.",
   "lekar-zmena-smazana": "Dočasná změna je zrušená.",
+  rubrika: "Rubrika je uložená.",
+  "rubrika-upravena": "Rubrika je upravená.",
+  "rubrika-smazana": "Rubrika je smazaná.",
   oblast: "Obec je přidaná a přehled je načtený.",
   "oblast-upravena": "Oblasti jsou uložené a přehled je načtený.",
   "oblast-smazana": "Obec je ze seznamu pryč.",
@@ -239,6 +245,8 @@ async function formFields(request) {
     changeNote: text("changeNote"),
     doctorId: Number.isInteger(Number(text("doctorId"))) && Number(text("doctorId")) > 0 ? Number(text("doctorId")) : undefined,
     code: text("code"),
+    parentId: Number.isInteger(Number(text("parentId"))) && Number(text("parentId")) > 0 ? Number(text("parentId")) : undefined,
+    rubricId: Number.isInteger(Number(text("rubric_id"))) && Number(text("rubric_id")) > 0 ? Number(text("rubric_id")) : undefined,
     areas: form.getAll("areaId").map((id, index) => ({
       id: String(id),
       name: String(form.getAll("areaName")[index] ?? ""),
@@ -372,7 +380,7 @@ async function renderGet(request, env, url, execution) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -396,6 +404,9 @@ async function renderGet(request, env, url, execution) {
           withdrawId: positiveParam(url, "stahnout"),
         }),
       );
+    }
+    if (tab === "rubriky") {
+      return html(adminRubrics(ctx, data, message, positiveParam(url, "id"), positiveParam(url, "smazat")));
     }
     if (tab === "akce") return html(adminEvents(ctx, data, message, positiveParam(url, "id"), positiveParam(url, "smazat")));
     if (tab === "texty") return html(adminTexts(ctx, data, message));
@@ -544,6 +555,20 @@ async function renderPost(request, env, url) {
     const result = await removeAd(env, request, fields.id);
     if (!result.ok) return redirect(`/redakce/reklamy?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/reklamy?ok=reklama-smazana");
+  }
+  if (path === "/redakce/rubriky/ulozit") {
+    const result = await saveRubric(env, request, fields);
+    if (!result.ok) {
+      const back = fields.id ? `/redakce/rubriky?id=${fields.id}` : "/redakce/rubriky";
+      return redirect(withError(back, result.error));
+    }
+    return redirect(`/redakce/rubriky?ok=${fields.id ? "rubrika-upravena" : "rubrika"}`);
+  }
+  if (path === "/redakce/rubriky/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/rubriky");
+    const result = await removeRubric(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/rubriky?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/rubriky?ok=rubrika-smazana");
   }
   if (path === "/redakce/zpravy/ulozit") {
     const result = await saveArticle(env, request, fields);

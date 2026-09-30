@@ -7,7 +7,8 @@ import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../s
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
-import { adPanel, adminAds, adminOutages, articlePage, homePage, layout, newsPage, outagesPage } from "../src/view.js";
+import { adPanel, adminAds, adminOutages, adminRubrics, articlePage, homePage, layout, newsPage, outagesPage } from "../src/view.js";
+import { articleInRubric, deleteRubricError, findRubric, parseRubricInput, rubricLabel } from "../src/rubrics.js";
 import {
   boardJson,
   buildBoard,
@@ -877,4 +878,93 @@ test("stránka odstávek bere uložený přehled a na titulce je jen blízká", 
   assert.match(desk, /Drahoraz, Mlýnec, Pševes a Ledkov/);
   assert.match(desk, /Smazat obec Jičín/);
   assert.match(desk, /Na webu se hledá v: Kopidlno/);
+});
+
+test("rubriku jde přidat, podrubrika patří jen pod hlavní a smazání hlídá zprávy", () => {
+  const sport = { id: 1, parentId: null, name: "Sport", slug: "sport", sortOrder: 10 };
+  const fotbal = { id: 2, parentId: 1, name: "Fotbal", slug: "fotbal", sortOrder: 20 };
+  const rubrics = [sport, fotbal];
+  assert.equal(parseRubricInput({ name: "Hokej", parentId: 1, sortOrder: "30" }, rubrics).name, "Hokej");
+  assert.equal(parseRubricInput({ name: " ", sortOrder: "0" }, rubrics).error, "Doplňte název rubriky.");
+  assert.equal(parseRubricInput({ name: "fotbal", parentId: 1, sortOrder: "30" }, rubrics).error, "Rubrika s tímhle názvem už je.");
+  assert.equal(
+    parseRubricInput({ id: 1, name: "Sport", parentId: 4, sortOrder: "10" }, [...rubrics, { id: 4, parentId: null, name: "Kultura" }]).error,
+    "Rubrika s podrubrikami nemůže být sama podrubrikou.",
+  );
+  assert.equal(parseRubricInput({ name: "Dorost", parentId: 2, sortOrder: "10" }, rubrics).error, "Podrubrika může patřit jen pod hlavní rubriku.");
+  assert.equal(deleteRubricError(sport, { children: 1, articles: 0, proposals: 0, topLevel: 2 }), "Nejdřív odeberte podrubriky.");
+  assert.equal(
+    deleteRubricError(fotbal, { children: 0, articles: 2, proposals: 0, topLevel: 2 }),
+    "V téhle rubrice jsou zprávy nebo návrhy. Nejdřív je přesuňte jinam.",
+  );
+  assert.equal(deleteRubricError(sport, { children: 0, articles: 0, proposals: 0, topLevel: 1 }), "Aspoň jedna rubrika musí zůstat.");
+  assert.equal(deleteRubricError(fotbal, { children: 0, articles: 0, proposals: 0, topLevel: 2 }), "");
+});
+
+test("filtr sportu zahrne fotbal a podrubrika se ukáže až po výběru", () => {
+  const rubrics = [
+    { id: 1, parentId: null, name: "Sport", slug: "sport", sortOrder: 50, articleCount: 0 },
+    { id: 2, parentId: 1, name: "Fotbal", slug: "fotbal", sortOrder: 10, articleCount: 1 },
+    { id: 3, parentId: null, name: "Kultura", slug: "kultura", sortOrder: 30, articleCount: 1 },
+  ];
+  const zapas = {
+    id: 1,
+    slug: "zapas",
+    title: "Zápas",
+    excerpt: "V sobotu.",
+    body: "Text.",
+    category: "Fotbal",
+    rubricId: 2,
+    parentName: "Sport",
+    imageKey: null,
+    createdOn: "2026-09-01",
+    authorName: "",
+  };
+  const koncert = {
+    ...zapas,
+    id: 2,
+    slug: "koncert",
+    title: "Koncert",
+    category: "Kultura",
+    rubricId: 3,
+    parentName: "",
+  };
+  assert.equal(rubricLabel(zapas), "Sport · Fotbal");
+  assert.equal(findRubric(rubrics, "Sport")?.id, 1);
+  assert.equal(findRubric(rubrics, "fotbal")?.id, 2);
+  assert.equal(articleInRubric(zapas, rubrics[0], rubrics), true);
+  assert.equal(articleInRubric(koncert, rubrics[0], rubrics), false);
+  assert.equal(articleInRubric(zapas, rubrics[1], rubrics), true);
+  assert.equal(articleInRubric(koncert, rubrics[1], rubrics), false);
+  const ctx = { path: "/zpravy", copy: {}, minimal: false, mainOrigin: "http://127.0.0.1:8787" };
+  const data = { articles: [zapas, koncert], ads: [], rubrics };
+  const all = newsPage(data, ctx, "");
+  assert.match(all, /href="\/zpravy\?rubrika=sport"/);
+  assert.equal(all.includes("rubrika=fotbal"), false);
+  assert.equal(all.includes("chips-sub"), false);
+  assert.match(all, /Zápas/);
+  assert.match(all, /Koncert/);
+  const sport = newsPage(data, ctx, "sport");
+  assert.match(sport, /chips-sub/);
+  assert.match(sport, /href="\/zpravy\?rubrika=fotbal"/);
+  assert.match(sport, /Zápas/);
+  assert.equal(sport.includes("Koncert"), false);
+  assert.match(sport, /<h1>Sport<\/h1>/);
+  const fotbal = newsPage(data, ctx, "Fotbal");
+  assert.match(fotbal, /Sport · Fotbal/);
+  assert.match(fotbal, /Zápas/);
+  assert.equal(fotbal.includes("Koncert"), false);
+  const desk = adminRubrics(
+    { path: "/redakce", copy: {} },
+    { signedIn: true, user: { role: "hlavni", name: "Redakce" }, showDefaultPassword: false, rubrics },
+    "",
+    undefined,
+    undefined,
+  );
+  assert.match(desk, /Nová rubrika/);
+  assert.match(desk, /action="\/redakce\/rubriky\/ulozit"/);
+  assert.match(desk, /Hlavní rubrika/);
+  assert.match(desk, /Podrubrika · Sport/);
+  assert.match(desk, />Fotbal</);
+  assert.match(desk, /href="\/redakce\/rubriky"/);
 });

@@ -1,5 +1,6 @@
 import { PANEL_BYTES, PANEL_EDGE, pickAd, safeAdLink } from "./ads.js";
-import { byline, CATEGORIES, PERMISSIONS, userCan } from "./db.js";
+import { byline, PERMISSIONS, userCan } from "./db.js";
+import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
 import { COPY, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel, weekdayName } from "./format.js";
 import { prepareArticleBody, renderArticleHtml } from "./rich.js";
@@ -17,22 +18,9 @@ import {
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 import { HOME_LEAD_DAYS as OUTAGE_LEAD_DAYS } from "./outages.js";
 
-const CATEGORY_KEY = {
-  Zprávy: "cat_zpravy",
-  Komunita: "cat_komunita",
-  Kultura: "cat_kultura",
-  Praktické: "cat_prakticke",
-  Sport: "cat_sport",
-};
-
 function externalHref(copy) {
   const value = tx(copy, "popelnice_url").trim();
   return /^https?:\/\//i.test(value) ? value : "https://popelnice.kopidlenskadrbna.org/";
-}
-
-function catLabel(copy, category) {
-  const key = CATEGORY_KEY[category];
-  return key ? tx(copy, key) : category;
 }
 
 const NAV = [
@@ -187,7 +175,7 @@ export function homePage(data, ctx) {
   const leadHtml = lead
     ? `<a class="card card-lead" href="/zpravy/${esc(lead.slug)}">
         ${lead.imageKey ? `<img class="cover" src="${mediaUrl(lead.imageKey)}" alt="">` : ""}
-        <p class="kicker">${esc(catLabel(ctx.copy, lead.category))}</p>
+        <p class="kicker">${esc(rubricLabel(lead))}</p>
         <h3>${esc(lead.title)}</h3>
         <p class="muted">${esc(lead.excerpt)}</p>
         <p class="meta">${esc(signedWhen(lead, formatDayMonth(lead.createdOn)))}</p>
@@ -196,7 +184,7 @@ export function homePage(data, ctx) {
   const restHtml = rest
     .map(
       (article) => `<a class="card card-side" href="/zpravy/${esc(article.slug)}">
-        <p class="kicker">${esc(catLabel(ctx.copy, article.category))}</p>
+        <p class="kicker">${esc(rubricLabel(article))}</p>
         <h3>${esc(article.title)}</h3>
       </a>`,
     )
@@ -254,20 +242,34 @@ export function homePage(data, ctx) {
   });
 }
 
+function chip(href, label, on) {
+  return `<a class="chip${on ? " is-on" : ""}" href="${href}">${esc(label)}</a>`;
+}
+
 export function newsPage(data, ctx, rubrika) {
-  const filter = rubrika && CATEGORIES.includes(rubrika) ? rubrika : "Vše";
-  const visible = filter === "Vše" ? data.articles : data.articles.filter((article) => article.category === filter);
-  const chips = ["Vše", ...CATEGORIES]
-    .map((category) => {
-      const href = category === "Vše" ? "/zpravy" : `/zpravy?rubrika=${encodeURIComponent(category)}`;
-      const label = category === "Vše" ? tx(ctx.copy, "chip_all") : catLabel(ctx.copy, category);
-      return `<a class="chip${filter === category ? " is-on" : ""}" href="${href}">${esc(label)}</a>`;
-    })
-    .join("");
+  const rubrics = rubricsFrom(data);
+  const selected = findRubric(rubrics, rubrika);
+  const visible = data.articles.filter((article) => articleInRubric(article, selected, rubrics));
+  const tops = rubrics.filter((item) => !item.parentId);
+  const chips = [
+    chip("/zpravy", tx(ctx.copy, "chip_all"), !selected),
+    ...tops.map((item) => {
+      const on = selected?.id === item.id || selected?.parentId === item.id;
+      return chip(`/zpravy?rubrika=${encodeURIComponent(item.slug)}`, item.name, on);
+    }),
+  ].join("");
+  const scope = rubricScope(rubrics, selected);
+  const children = scope ? rubrics.filter((item) => item.parentId === scope.id) : [];
+  const subChips = children.length
+    ? `<div class="chips chips-sub">${children
+        .map((item) => chip(`/zpravy?rubrika=${encodeURIComponent(item.slug)}`, item.name, selected?.id === item.id))
+        .join("")}</div>`
+    : "";
+  const heading = selected ? rubricLabel({ category: selected.name, parentName: selected.parentId ? scope?.name : "" }) : tx(ctx.copy, "news_heading");
   const cards = visible.map(
     (article) => `<a class="card story" href="/zpravy/${esc(article.slug)}">
             ${article.imageKey ? `<img class="cover" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-            <p class="kicker">${esc(catLabel(ctx.copy, article.category))}</p>
+            <p class="kicker">${esc(rubricLabel(article))}</p>
             <h2>${esc(article.title)}</h2>
             <p class="muted">${esc(article.excerpt)}</p>
             <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
@@ -278,9 +280,9 @@ export function newsPage(data, ctx, rubrika) {
   const list = cards.length ? cards.join("") : `<p class="muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
   return layout({
     ...ctx,
-    title: `${tx(ctx.copy, "news_heading")} | ${tx(ctx.copy, "site_name")}`,
+    title: `${heading} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "news_description"),
-    body: `<p class="eyebrow">${esc(tx(ctx.copy, "news_eyebrow"))}</p><h1>${esc(tx(ctx.copy, "news_heading"))}</h1><div class="chips">${chips}</div><div class="stack">${list}</div>`,
+    body: `<p class="eyebrow">${esc(tx(ctx.copy, "news_eyebrow"))}</p><h1>${esc(heading)}</h1><div class="chips">${chips}</div>${subChips}<div class="stack">${list}</div>`,
   });
 }
 
@@ -292,7 +294,7 @@ export function articlePage(article, ctx, extras = {}) {
     description: article.excerpt,
     body: `
       <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
-      <p class="eyebrow">${esc(catLabel(ctx.copy, article.category))}</p>
+      <p class="eyebrow">${esc(rubricLabel(article))}</p>
       <h1 class="article-title">${esc(article.title)}</h1>
       ${articleMeta(article)}
       ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
@@ -568,6 +570,7 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
   const tabs = chief
     ? [
         ["/redakce/zpravy", "zpravy", newsLabel],
+        ["/redakce/rubriky", "rubriky", "Rubriky"],
         adTab,
         ["/redakce/akce", "akce", "Akce"],
         ["/redakce/texty", "texty", "Texty"],
@@ -619,11 +622,34 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
   });
 }
 
-function categoryOptions(ctx, selected) {
-  return CATEGORIES.map(
-    (category) =>
-      `<option value="${esc(category)}"${selected === category ? " selected" : ""}>${esc(catLabel(ctx.copy, category))}</option>`,
-  ).join("");
+function rubricChosen(rubric, source, list) {
+  if (source?.rubricId) return rubric.id === Number(source.rubricId);
+  if (source?.category) return rubric.name === source.category;
+  const first = list.find((item) => !item.parentId);
+  return first?.id === rubric.id;
+}
+
+function rubricOptions(rubrics, source) {
+  const list = Array.isArray(rubrics) ? rubrics : rubricsFrom({});
+  const tops = list.filter((item) => !item.parentId);
+  const parts = [];
+  for (const top of tops) {
+    const children = list.filter((item) => item.parentId === top.id);
+    const topOption = `<option value="${top.id}"${rubricChosen(top, source, list) ? " selected" : ""}>${esc(top.name)}</option>`;
+    if (!children.length) {
+      parts.push(topOption);
+      continue;
+    }
+    parts.push(`<optgroup label="${esc(top.name)}">`);
+    parts.push(topOption);
+    for (const child of children) {
+      parts.push(
+        `<option value="${child.id}"${rubricChosen(child, source, list) ? " selected" : ""}>${esc(child.name)}</option>`,
+      );
+    }
+    parts.push("</optgroup>");
+  }
+  return parts.join("");
 }
 
 function richTextField(body) {
@@ -636,13 +662,12 @@ function richTextField(body) {
   </div>`;
 }
 
-function articleFields(ctx, source) {
-  const selected = source?.category ?? "Zprávy";
+function articleFields(source, rubrics) {
   return `
     ${field("Nadpis", `<input class="${input}" name="title" required maxlength="160" value="${esc(source?.title ?? "")}">`)}
     ${field("Perex", `<textarea class="${input}" name="excerpt" required maxlength="320" rows="3">${esc(source?.excerpt ?? "")}</textarea>`)}
     ${richTextField(source?.body ?? "")}
-    ${field("Rubrika", `<select class="${input}" name="category">${categoryOptions(ctx, selected)}</select>`)}
+    ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(rubrics, source)}</select><span class="hint">Podrubrika je v seznamu pod svou rubrikou. Třeba Fotbal pod Sportem.</span>`)}
     ${field("Fotka", photoControl(source))}`;
 }
 
@@ -676,7 +701,7 @@ function chiefArticles(ctx, data, message, query) {
             <a class="btn btn-ghost" href="/redakce/zpravy">Nechat</a>`
           : `<a class="btn btn-ghost" href="/redakce/zpravy?smazat=${item.id}">Smazat</a>`;
       return `<li class="card">
-        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${credit(item) ? ` · ${esc(credit(item))}` : ""}${item.published ? "" : " · skrytá"}${item.redacted ? " · redigováno" : ""}</p>
+        <p class="kicker">${esc(rubricLabel(item))}${credit(item) ? ` · ${esc(credit(item))}` : ""}${item.published ? "" : " · skrytá"}${item.redacted ? " · redigováno" : ""}</p>
         <h3>${esc(item.title)}</h3>
         <div class="row">
           <a class="btn btn-line" href="/redakce/zpravy?id=${item.id}">Upravit</a>
@@ -691,7 +716,7 @@ function chiefArticles(ctx, data, message, query) {
         <p class="muted">Autor na webu: ${esc(credit(proposal))}. Text můžete před schválením upravit, typicky češtinu. Ven se neukáže, co se měnilo. Když se znění liší od návrhu, u autora bude nanejvýš slovo Redigováno.</p>
         ${proposal.articleTitle ? `<p class="meta">Ke zprávě: ${esc(proposal.articleTitle)}</p>` : ""}
         <input type="hidden" name="id" value="${proposal.id}">
-        ${articleFields(ctx, proposal)}
+        ${articleFields(proposal, data.rubrics)}
         <div class="row">
           <button class="btn btn-primary" type="submit">Schválit a zveřejnit</button>
           <a class="btn btn-ghost" href="/redakce/zpravy">Zpět</a>
@@ -712,7 +737,7 @@ function chiefArticles(ctx, data, message, query) {
               : "Úprava jde na web hned."
         }</p>
         ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
-        ${articleFields(ctx, editing)}
+        ${articleFields(editing, data.rubrics)}
         <label class="check"><input type="checkbox" name="published" value="1"${editing ? (editing.published ? " checked" : "") : " checked"}> Zveřejnit</label>
         <div class="row">
           <button class="btn btn-primary" type="submit">Uložit</button>
@@ -768,7 +793,7 @@ function contributorArticles(ctx, data, message, query) {
     ${proposal ? `<input type="hidden" name="id" value="${proposal.id}">` : ""}
     ${target && !proposal ? `<input type="hidden" name="clanek" value="${target.id}">` : ""}
     ${proposal?.articleId ? `<input type="hidden" name="clanek" value="${proposal.articleId}">` : ""}
-    ${articleFields(ctx, formSource)}
+    ${articleFields(formSource, data.rubrics)}
     <div class="row">
       <button class="btn btn-primary" type="submit">${proposal ? "Uložit návrh" : target ? "Poslat návrh" : "Poslat ke schválení"}</button>
       ${proposal || target ? `<a class="btn btn-ghost" href="/redakce/zpravy">Nový</a>` : ""}
@@ -803,7 +828,7 @@ function contributorArticles(ctx, data, message, query) {
       const open = data.proposals.find((proposal) => proposal.articleId === item.id);
       const href = open ? `/redakce/zpravy?navrh=${open.id}` : `/redakce/zpravy?clanek=${item.id}`;
       return `<li class="card">
-        <p class="kicker">${esc(catLabel(ctx.copy, item.category))}${credit(item) ? ` · ${esc(credit(item))}` : ""}${mine ? " · vaše" : ""}</p>
+        <p class="kicker">${esc(rubricLabel(item))}${credit(item) ? ` · ${esc(credit(item))}` : ""}${mine ? " · vaše" : ""}</p>
         <h3>${esc(item.title)}</h3>
         <div class="row"><a class="btn btn-line" href="${href}">${mine ? "Upravit" : "Navrhnout úpravu"}</a></div>
       </li>`;
@@ -1549,6 +1574,76 @@ export function adminDoctors(ctx, data, message, editingId, confirmId, cancelId)
     message,
     `<div class="${chief ? "split" : "stack"}">${form}<ul class="stack plain">${list}</ul></div>`,
   );
+}
+
+function storyCount(count) {
+  const n = Number(count) || 0;
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  if (mod10 === 1 && mod100 !== 11) return `${n} zpráva`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} zprávy`;
+  return `${n} zpráv`;
+}
+
+export function adminRubrics(ctx, data, message, editingId, confirmId) {
+  const rubrics = Array.isArray(data.rubrics) ? data.rubrics : [];
+  const editing = rubrics.find((item) => item.id === editingId) ?? null;
+  const parents = rubrics.filter((item) => !item.parentId && item.id !== editing?.id);
+  const hasChildren = Boolean(editing && rubrics.some((item) => item.parentId === editing.id));
+  const nextSort = rubrics.length ? Math.min(999, Math.max(...rubrics.map((item) => item.sortOrder)) + 10) : 10;
+  const parentField = hasChildren
+    ? `<input type="hidden" name="parentId" value=""><p class="hint">Tahle rubrika má podrubriky, takže zůstává hlavní. Podrubriky nejdřív odeberte, kdybyste ji chtěli zařadit pod jinou.</p>`
+    : field(
+        "Zařadit pod",
+        `<select class="${input}" name="parentId"><option value="">Hlavní rubrika</option>${parents
+          .map(
+            (item) =>
+              `<option value="${item.id}"${editing?.parentId === item.id ? " selected" : ""}>${esc(item.name)}</option>`,
+          )
+          .join("")}</select>`,
+      );
+  const form = `<form class="card form" method="post" action="/redakce/rubriky/ulozit">
+      <h2>${editing ? "Upravit rubriku" : "Nová rubrika"}</h2>
+      <p class="muted">Hlavní rubriky jsou na stránce zpráv filtrem. Podrubrika patří pod jednu z nich, třeba Fotbal pod Sport. Filtr Sport ukáže i zprávy z podrubrik.</p>
+      ${editing ? `<input type="hidden" name="id" value="${editing.id}">` : ""}
+      ${field("Název", `<input class="${input}" name="name" required maxlength="40" value="${esc(editing?.name ?? "")}" placeholder="Fotbal">`)}
+      ${parentField}
+      ${field("Pořadí", `<input class="${input}" type="number" name="sortOrder" min="0" max="999" required value="${editing?.sortOrder ?? nextSort}">`)}
+      <span class="hint">Menší číslo je výš. Podrubrika se řadí mezi ostatními pod stejnou rubrikou.</span>
+      <div class="row">
+        <button class="btn btn-primary" type="submit">Uložit</button>
+        ${editing ? `<a class="btn btn-ghost" href="/redakce/rubriky">Nová</a>` : ""}
+      </div>
+    </form>`;
+  const renderItem = (item, child) => {
+    const parent = child ? rubrics.find((row) => row.id === item.parentId) : null;
+    const confirm =
+      confirmId === item.id
+        ? `<form method="post" action="/redakce/rubriky/smazat">
+            <input type="hidden" name="id" value="${item.id}">
+            <input type="hidden" name="confirm" value="1">
+            <button class="btn btn-primary" type="submit">Opravdu smazat</button>
+          </form>
+          <a class="btn btn-ghost" href="/redakce/rubriky">Nechat</a>`
+        : `<a class="btn btn-line" href="/redakce/rubriky?id=${item.id}">Upravit</a>
+           <a class="btn btn-ghost" href="/redakce/rubriky?smazat=${item.id}">Smazat</a>`;
+    return `<li class="card${child ? " rubric-child" : ""}">
+      <p class="kicker">${child ? `Podrubrika${parent ? ` · ${esc(parent.name)}` : ""}` : "Hlavní rubrika"} · ${esc(storyCount(item.articleCount))}</p>
+      <h3>${esc(item.name)}</h3>
+      <div class="row">${confirm}</div>
+    </li>`;
+  };
+  const tops = rubrics.filter((item) => !item.parentId);
+  const listed = [];
+  for (const top of tops) {
+    listed.push(renderItem(top, false));
+    for (const child of rubrics.filter((item) => item.parentId === top.id)) listed.push(renderItem(child, true));
+  }
+  for (const orphan of rubrics.filter((item) => item.parentId && !tops.some((top) => top.id === item.parentId))) {
+    listed.push(renderItem(orphan, true));
+  }
+  const list = listed.length ? listed.join("") : `<li class="card dashed muted">Zatím žádná rubrika.</li>`;
+  return adminShell(ctx, data, "rubriky", message, `<div class="split">${form}<ul class="stack plain">${list}</ul></div>`);
 }
 
 export function adminOutages(ctx, data, message, confirmId) {

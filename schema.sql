@@ -324,6 +324,34 @@ insert into outage_feed (id, payload)
 select 1, '[]'
 where not exists (select 1 from outage_feed where id = 1);
 
+create table if not exists rubrics (
+  id integer primary key autoincrement,
+  parent_id integer,
+  name text not null,
+  slug text not null unique,
+  sort_order integer not null default 0
+);
+
+insert into rubrics (parent_id, name, slug, sort_order)
+select null, 'Zprávy', 'zpravy', 10
+where not exists (select 1 from rubrics where slug = 'zpravy');
+
+insert into rubrics (parent_id, name, slug, sort_order)
+select null, 'Komunita', 'komunita', 20
+where not exists (select 1 from rubrics where slug = 'komunita');
+
+insert into rubrics (parent_id, name, slug, sort_order)
+select null, 'Kultura', 'kultura', 30
+where not exists (select 1 from rubrics where slug = 'kultura');
+
+insert into rubrics (parent_id, name, slug, sort_order)
+select null, 'Praktické', 'prakticke', 40
+where not exists (select 1 from rubrics where slug = 'prakticke');
+
+insert into rubrics (parent_id, name, slug, sort_order)
+select null, 'Sport', 'sport', 50
+where not exists (select 1 from rubrics where slug = 'sport');
+
 create table if not exists doctor_changes (
   id integer primary key autoincrement,
   doctor_id integer not null,

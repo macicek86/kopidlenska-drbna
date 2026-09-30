@@ -14,8 +14,9 @@ import {
   parseAreaInput,
   refreshNote,
 } from "./outages.js";
+import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
-export const CATEGORIES = ["Zprávy", "Komunita", "Kultura", "Praktické", "Sport"];
+export const CATEGORIES = SEED_RUBRICS.map((item) => item.name);
 export const PERMISSIONS = [
   {
     code: "sberny_dvur",
@@ -31,8 +32,9 @@ export const PERMISSIONS = [
 export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
 const COOKIE = "drbna_editor";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.image_key, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias";
-const ARTICLE_FROM = "articles a left join users u on u.id = a.author_id";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+const ARTICLE_FROM =
+  "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
 
 let schemaPromise = null;
 
@@ -119,7 +121,10 @@ function mapArticle(row) {
     title: String(row.title),
     excerpt: String(row.excerpt),
     body: String(row.body),
-    category: String(row.category),
+    category: row.rubric_name ? String(row.rubric_name) : String(row.category),
+    rubricId: row.rubric_id == null || row.rubric_id === "" ? null : Number(row.rubric_id),
+    parentName: row.parent_name ? String(row.parent_name) : "",
+    rubricSlug: row.rubric_slug ? String(row.rubric_slug) : "",
     imageKey: row.image_key ? String(row.image_key) : null,
     published: asBool(row.published),
     createdOn: String(row.created_at ?? "").slice(0, 10),
@@ -218,7 +223,9 @@ function mapProposal(row) {
     title: String(row.title),
     excerpt: String(row.excerpt),
     body: String(row.body),
-    category: String(row.category),
+    category: row.rubric_name ? String(row.rubric_name) : String(row.category),
+    rubricId: row.rubric_id == null || row.rubric_id === "" ? null : Number(row.rubric_id),
+    parentName: row.parent_name ? String(row.parent_name) : "",
     imageKey: row.image_key ? String(row.image_key) : null,
     submittedTitle: String(row.submitted_title),
     submittedExcerpt: String(row.submitted_excerpt),
@@ -409,6 +416,15 @@ async function createDeskTables(env) {
       fetching_at text
     )`,
   ).run();
+  await env.DB.prepare(
+    `create table if not exists rubrics (
+      id integer primary key autoincrement,
+      parent_id integer,
+      name text not null,
+      slug text not null unique,
+      sort_order integer not null default 0
+    )`,
+  ).run();
 }
 
 async function ensureUserColumns(env) {
@@ -433,6 +449,45 @@ async function ensureArticleColumns(env) {
   await addColumn(env, names, "author_id", "alter table articles add column author_id integer");
   await addColumn(env, names, "author_name", "alter table articles add column author_name text not null default ''");
   await addColumn(env, names, "redacted", "alter table articles add column redacted integer not null default 0");
+  await addColumn(env, names, "rubric_id", "alter table articles add column rubric_id integer");
+}
+
+async function ensureProposalColumns(env) {
+  const info = await env.DB.prepare("pragma table_info(proposals)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "rubric_id", "alter table proposals add column rubric_id integer");
+}
+
+async function seedRubrics(env) {
+  for (const item of SEED_RUBRICS) {
+    await env.DB.prepare(
+      `insert into rubrics (parent_id, name, slug, sort_order)
+       select null, ?, ?, ?
+       where not exists (select 1 from rubrics where slug = ?)`,
+    )
+      .bind(item.name, item.slug, item.sortOrder, item.slug)
+      .run();
+  }
+  for (const item of SEED_RUBRICS) {
+    await env.DB.prepare(
+      "update articles set rubric_id = (select id from rubrics where slug = ?) where rubric_id is null and category = ?",
+    )
+      .bind(item.slug, item.name)
+      .run();
+    await env.DB.prepare(
+      "update proposals set rubric_id = (select id from rubrics where slug = ?) where rubric_id is null and category = ?",
+    )
+      .bind(item.slug, item.name)
+      .run();
+  }
+  await env.DB.prepare(
+    `update articles set rubric_id = (select id from rubrics where rubrics.name = articles.category)
+     where rubric_id is null and exists (select 1 from rubrics where rubrics.name = articles.category)`,
+  ).run();
+  await env.DB.prepare(
+    `update proposals set rubric_id = (select id from rubrics where rubrics.name = proposals.category)
+     where rubric_id is null and exists (select 1 from rubrics where rubrics.name = proposals.category)`,
+  ).run();
 }
 
 async function migrateSession(env) {
@@ -556,7 +611,14 @@ async function migrateSchema(env) {
   const articlesTable = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'articles'",
   ).first();
-  if (articlesTable) await ensureArticleColumns(env);
+  if (articlesTable) {
+    await ensureArticleColumns(env);
+    const proposalsTable = await env.DB.prepare(
+      "select 1 as ok from sqlite_master where type = 'table' and name = 'proposals'",
+    ).first();
+    if (proposalsTable) await ensureProposalColumns(env);
+    await seedRubrics(env);
+  }
   await env.DB.prepare(
     `insert into users (login, name, password_hash, role)
      select 'redakce', 'Redakce', password_hash, 'hlavni' from settings
@@ -629,21 +691,46 @@ function readArticleFields(input) {
   const title = clip(input.title, 160);
   const excerpt = clip(input.excerpt, 320);
   const prepared = prepareArticleBody(clip(input.body, 20000));
-  const category = CATEGORIES.includes(input.category) ? input.category : "Zprávy";
   if (title.length < 3) return { error: "Doplňte nadpis." };
   if (excerpt.length < 3) return { error: "Doplňte krátký perex." };
   if (prepared.text.length < 3) return { error: "Doplňte text." };
-  return { title, excerpt, body: prepared.html, category };
+  return { title, excerpt, body: prepared.html };
+}
+
+async function resolveRubric(env, input) {
+  const raw = Number(input.rubricId ?? input.rubric_id);
+  if (Number.isInteger(raw) && raw > 0) {
+    const row = await env.DB.prepare("select id, name from rubrics where id = ?").bind(raw).first();
+    if (!row) return { error: "Vyberte rubriku." };
+    return { rubricId: Number(row.id), category: String(row.name) };
+  }
+  const name = clip(input.category, 40);
+  if (name) {
+    const row = await env.DB.prepare("select id, name from rubrics where name = ?").bind(name).first();
+    if (row) return { rubricId: Number(row.id), category: String(row.name) };
+  }
+  return { error: "Vyberte rubriku." };
+}
+
+async function readArticle(env, input) {
+  const fields = readArticleFields(input);
+  if (fields.error) return fields;
+  const rubric = await resolveRubric(env, input);
+  if (rubric.error) return rubric;
+  return { ...fields, category: rubric.category, rubricId: rubric.rubricId };
 }
 
 async function loadProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
-    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.image_key,
+    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key,
             p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at,
-            a.slug as article_slug, a.title as article_title, u.alias as author_alias
+            a.slug as article_slug, a.title as article_title, u.alias as author_alias,
+            r.name as rubric_name, parent.name as parent_name
      from proposals p
      left join articles a on a.id = p.article_id
      left join users u on u.id = p.author_id
+     left join rubrics r on r.id = p.rubric_id
+     left join rubrics parent on parent.id = r.parent_id
      ${whereSql}`,
   );
   const rows = binds.length ? await query.bind(...binds).all() : await query.all();
@@ -702,6 +789,31 @@ export async function loadDoctors(env, { publicOnly = false, today = null } = {}
   return doctors;
 }
 
+function mapRubric(row, articleCount = 0) {
+  return {
+    id: Number(row.id),
+    parentId: row.parent_id == null || row.parent_id === "" ? null : Number(row.parent_id),
+    name: String(row.name),
+    slug: String(row.slug),
+    sortOrder: Number(row.sort_order ?? 0),
+    articleCount,
+  };
+}
+
+export async function loadRubrics(env) {
+  const rows =
+    (await env.DB.prepare("select id, parent_id, name, slug, sort_order from rubrics order by sort_order asc, id asc").all())
+      .results ?? [];
+  const counts =
+    (
+      await env.DB.prepare(
+        "select rubric_id as id, count(*) as n from articles where rubric_id is not null group by rubric_id",
+      ).all()
+    ).results ?? [];
+  const byId = new Map(counts.map((row) => [Number(row.id), Number(row.n)]));
+  return rows.map((row) => mapRubric(row, byId.get(Number(row.id)) ?? 0));
+}
+
 export async function loadPublic(env) {
   const row = await settings(env);
   const now = pragueNow();
@@ -729,6 +841,7 @@ export async function loadPublic(env) {
     now,
     contactNote: String(row.contact_note),
     showDefaultPassword: asBool(row.password_is_default),
+    rubrics: await loadRubrics(env),
   };
 }
 
@@ -1073,8 +1186,10 @@ export async function loadAdmin(env, request) {
     adProposals: [],
     outageAreas: [],
     outages: emptyOutageBoard(),
+    rubrics: [],
   };
   if (!user) return base;
+  base.rubrics = await loadRubrics(env);
   base.ads = await loadAds(env);
   base.adProposals =
     user.role === "hlavni"
@@ -1245,11 +1360,11 @@ async function releaseImage(env, key) {
 export async function saveArticle(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const parsed = readArticleFields(input);
+  const parsed = await readArticle(env, input);
   if (parsed.error) return { ok: false, error: parsed.error };
   const stored = await storeImage(env, input.image);
   if (stored.error) return { ok: false, error: stored.error };
-  const { title, excerpt, body, category } = parsed;
+  const { title, excerpt, body, category, rubricId } = parsed;
 
   if (input.id) {
     const current = await env.DB.prepare(
@@ -1278,9 +1393,9 @@ export async function saveArticle(env, request, input) {
           ? 1
           : 0;
     await env.DB.prepare(
-      "update articles set title = ?, excerpt = ?, body = ?, category = ?, published = ?, image_key = ?, redacted = ? where id = ?",
+      "update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?, redacted = ? where id = ?",
     )
-      .bind(title, excerpt, body, category, input.published ? 1 : 0, imageKey, redacted, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, redacted, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     return { ok: true };
@@ -1288,10 +1403,10 @@ export async function saveArticle(env, request, input) {
 
   const slug = await uniqueSlug(env, slugify(title));
   await env.DB.prepare(
-    `insert into articles (slug, title, excerpt, body, category, image_key, published, created_at, author_id, author_name, redacted)
-     values (?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, 0)`,
+    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, published, created_at, author_id, author_name, redacted)
+     values (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, 0)`,
   )
-    .bind(slug, title, excerpt, body, category, stored.key, input.published ? 1 : 0, gate.user.id, gate.user.name)
+    .bind(slug, title, excerpt, body, category, rubricId, stored.key, input.published ? 1 : 0, gate.user.id, gate.user.name)
     .run();
   return { ok: true };
 }
@@ -1314,7 +1429,7 @@ export async function saveProposal(env, request, input) {
   const gate = await requireUser(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   if (gate.user.role !== "prispevovatel") return { ok: false, error: "Hlavní redaktor ukládá zprávy přímo." };
-  const parsed = readArticleFields(input);
+  const parsed = await readArticle(env, input);
   if (parsed.error) return { ok: false, error: parsed.error };
 
   let existing = null;
@@ -1353,7 +1468,7 @@ export async function saveProposal(env, request, input) {
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
       `update proposals
-       set title = ?, excerpt = ?, body = ?, category = ?, image_key = ?,
+       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
            submitted_title = ?, submitted_excerpt = ?, submitted_body = ?, submitted_category = ?,
            author_name = ?, status = 'pending', note = ''
        where id = ?`,
@@ -1363,6 +1478,7 @@ export async function saveProposal(env, request, input) {
         parsed.excerpt,
         parsed.body,
         parsed.category,
+        parsed.rubricId,
         imageKey,
         parsed.title,
         parsed.excerpt,
@@ -1378,9 +1494,9 @@ export async function saveProposal(env, request, input) {
 
   await env.DB.prepare(
     `insert into proposals (
-       article_id, author_id, author_name, title, excerpt, body, category, image_key,
+       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key,
        submitted_title, submitted_excerpt, submitted_body, submitted_category, status
-     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
   )
     .bind(
       articleId,
@@ -1390,6 +1506,7 @@ export async function saveProposal(env, request, input) {
       parsed.excerpt,
       parsed.body,
       parsed.category,
+      parsed.rubricId,
       stored.key,
       parsed.title,
       parsed.excerpt,
@@ -1425,7 +1542,7 @@ export async function approveProposal(env, request, input) {
     .bind(input.id)
     .first();
   if (!proposal || proposal.status !== "pending") return { ok: false, error: "Ten návrh už tu není." };
-  const parsed = readArticleFields(input);
+  const parsed = await readArticle(env, input);
   if (parsed.error) return { ok: false, error: parsed.error };
 
   let article = null;
@@ -1461,16 +1578,16 @@ export async function approveProposal(env, request, input) {
     if (imageKey) nextImage = imageKey;
     const redacted = redactedFlag(article.redacted, submitted, finalText) ? 1 : 0;
     await env.DB.prepare(
-      "update articles set title = ?, excerpt = ?, body = ?, category = ?, image_key = ?, published = 1, redacted = ? where id = ?",
+      "update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, published = 1, redacted = ? where id = ?",
     )
-      .bind(parsed.title, parsed.excerpt, parsed.body, parsed.category, nextImage, redacted, article.id)
+      .bind(parsed.title, parsed.excerpt, parsed.body, parsed.category, parsed.rubricId, nextImage, redacted, article.id)
       .run();
     if (previousArticleImage && previousArticleImage !== nextImage) await releaseImage(env, previousArticleImage);
   } else {
     const slug = await uniqueSlug(env, slugify(parsed.title));
     await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, image_key, published, created_at, author_id, author_name, redacted)
-       values (?, ?, ?, ?, ?, ?, 1, date('now'), ?, ?, ?)`,
+      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, published, created_at, author_id, author_name, redacted)
+       values (?, ?, ?, ?, ?, ?, ?, 1, date('now'), ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -1478,6 +1595,7 @@ export async function approveProposal(env, request, input) {
         parsed.excerpt,
         parsed.body,
         parsed.category,
+        parsed.rubricId,
         imageKey,
         proposal.author_id,
         proposal.author_name,
@@ -1487,9 +1605,9 @@ export async function approveProposal(env, request, input) {
   }
 
   await env.DB.prepare(
-    "update proposals set title = ?, excerpt = ?, body = ?, category = ?, image_key = ?, status = 'approved', note = '' where id = ?",
+    "update proposals set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, status = 'approved', note = '' where id = ?",
   )
-    .bind(parsed.title, parsed.excerpt, parsed.body, parsed.category, imageKey, proposal.id)
+    .bind(parsed.title, parsed.excerpt, parsed.body, parsed.category, parsed.rubricId, imageKey, proposal.id)
     .run();
   if (stored.key && previousProposalImage && previousProposalImage !== stored.key) {
     await releaseImage(env, previousProposalImage);
@@ -1989,6 +2107,105 @@ export async function removeOutageArea(env, request, id) {
   if (!gate.ok) return gate;
   const result = await env.DB.prepare("delete from outage_areas where id = ?").bind(id).run();
   if (!wrote(result)) return { ok: false, error: "Tu obec v seznamu nemám." };
+  return { ok: true };
+}
+
+async function uniqueRubricSlug(env, base) {
+  let slug = base;
+  let n = 2;
+  for (;;) {
+    const row = await env.DB.prepare("select id from rubrics where slug = ?").bind(slug).first();
+    if (!row) return slug;
+    slug = `${base}-${n}`;
+    n += 1;
+  }
+}
+
+function rubricSlugBase(name) {
+  const slug = slugify(name);
+  return slug === "prispevek" ? "rubrika" : slug;
+}
+
+async function renameRubricLabels(env, id, previous, name) {
+  await env.DB.batch([
+    env.DB.prepare("update articles set category = ? where rubric_id = ? or (rubric_id is null and category = ?)").bind(
+      name,
+      id,
+      previous,
+    ),
+    env.DB.prepare("update proposals set category = ? where rubric_id = ? or (rubric_id is null and category = ?)").bind(
+      name,
+      id,
+      previous,
+    ),
+    env.DB.prepare(
+      "update proposals set submitted_category = ? where rubric_id = ? or (rubric_id is null and submitted_category = ?)",
+    ).bind(name, id, previous),
+  ]);
+}
+
+export async function saveRubric(env, request, input) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  const rubrics = await loadRubrics(env);
+  const parsed = parseRubricInput(input, rubrics);
+  if (parsed.error) return { ok: false, error: parsed.error };
+  if (input.id) {
+    const current = rubrics.find((item) => item.id === Number(input.id));
+    if (!current) return { ok: false, error: "Tahle rubrika už tu není." };
+    await env.DB.prepare("update rubrics set name = ?, parent_id = ?, sort_order = ? where id = ?")
+      .bind(parsed.name, parsed.parentId, parsed.sortOrder, current.id)
+      .run();
+    if (current.name !== parsed.name) await renameRubricLabels(env, current.id, current.name, parsed.name);
+    return { ok: true, updated: true };
+  }
+  const slug = await uniqueRubricSlug(env, rubricSlugBase(parsed.name));
+  try {
+    await env.DB.prepare("insert into rubrics (parent_id, name, slug, sort_order) values (?, ?, ?, ?)").bind(
+      parsed.parentId,
+      parsed.name,
+      slug,
+      parsed.sortOrder,
+    ).run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/unique/i.test(message)) return { ok: false, error: "Rubrika s tímhle názvem už je." };
+    throw error;
+  }
+  return { ok: true, updated: false };
+}
+
+export async function removeRubric(env, request, id) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  const row = await env.DB.prepare("select id, parent_id, name from rubrics where id = ?").bind(id).first();
+  if (!row) return { ok: false, error: "Tahle rubrika už tu není." };
+  const rubric = {
+    id: Number(row.id),
+    parentId: row.parent_id == null || row.parent_id === "" ? null : Number(row.parent_id),
+    name: String(row.name),
+  };
+  const children = await env.DB.prepare("select count(*) as n from rubrics where parent_id = ?").bind(id).first();
+  const articles = await env.DB.prepare(
+    "select count(*) as n from articles where rubric_id = ? or (rubric_id is null and category = ?)",
+  )
+    .bind(id, rubric.name)
+    .first();
+  const proposals = await env.DB.prepare(
+    `select count(*) as n from proposals
+     where status in ('pending', 'rejected') and (rubric_id = ? or category = ? or submitted_category = ?)`,
+  )
+    .bind(id, rubric.name, rubric.name)
+    .first();
+  const tops = await env.DB.prepare("select count(*) as n from rubrics where parent_id is null").first();
+  const error = deleteRubricError(rubric, {
+    children: Number(children?.n ?? 0),
+    articles: Number(articles?.n ?? 0),
+    proposals: Number(proposals?.n ?? 0),
+    topLevel: Number(tops?.n ?? 0),
+  });
+  if (error) return { ok: false, error };
+  await env.DB.prepare("delete from rubrics where id = ?").bind(id).run();
   return { ok: true };
 }
 
