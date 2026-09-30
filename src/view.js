@@ -15,7 +15,7 @@ import {
 } from "./doctors.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 
-function externalHref(copy) {
+export function externalHref(copy) {
   const value = tx(copy, "popelnice_url").trim();
   return /^https?:\/\//i.test(value) ? value : "https://popelnice.kopidlenskadrbna.org/";
 }
@@ -403,33 +403,6 @@ export function binsPage(waste, ctx, { showExternal, standaloneTitle }) {
       <section class="card block">
         <h2>${esc(tx(ctx.copy, "bins_more"))}</h2>
         <div class="dates">${dates}</div>
-      </section>`,
-  });
-}
-
-export function aboutPage(data, ctx) {
-  return layout({
-    ...ctx,
-    title: `${tx(ctx.copy, "nav_about")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "about_description"),
-    body: `
-      <section class="about">
-        <img src="/kozel-maskot.webp" alt="${esc(tx(ctx.copy, "about_alt"))}">
-        <div>
-          <p class="eyebrow">${esc(tx(ctx.copy, "about_eyebrow"))}</p>
-          <h1>${esc(tx(ctx.copy, "about_heading"))}</h1>
-          <p class="lede">${esc(tx(ctx.copy, "about_lede"))}</p>
-          <p>${esc(tx(ctx.copy, "about_disclaimer"))}</p>
-          <p>${esc(data.contactNote)}</p>
-          <div class="row links">
-            <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
-            <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
-            <a href="/lekari">${esc(tx(ctx.copy, "about_doctors_link"))}</a>
-            <a href="/odstavky">${esc(tx(ctx.copy, "about_outages_link"))}</a>
-            <a href="/reklamy">${esc(tx(ctx.copy, "about_ads_link"))}</a>
-            <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
-          </div>
-        </div>
       </section>`,
   });
 }

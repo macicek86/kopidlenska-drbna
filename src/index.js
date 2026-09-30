@@ -53,7 +53,6 @@ import {
   withdrawProposal,
 } from "./db.js";
 import {
-  aboutPage,
   adPage,
   adsPage,
   binsPage,
@@ -66,6 +65,7 @@ import {
   missingPage,
   yardsPage,
 } from "./view.js";
+import { aboutPage } from "./about.js";
 import { articlePage, newsPage } from "./news.js";
 import {
   adminAds,

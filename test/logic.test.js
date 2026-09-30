@@ -9,6 +9,7 @@ import { text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 import { adPanel, homePage, layout, outagesPage } from "../src/view.js";
 import { articlePage, newsPage } from "../src/news.js";
+import { aboutPage, paragraphs } from "../src/about.js";
 import { adminAds, adminOutages, adminRubrics } from "../src/admin/index.js";
 import { articleInRubric, deleteRubricError, findRubric, parseRubricInput, rubricLabel } from "../src/rubrics.js";
 import {
@@ -975,4 +976,12 @@ test("filtr sportu zahrne fotbal a podrubrika se ukáže až po výběru", () =>
   assert.match(desk, /Podrubrika · Sport/);
   assert.match(desk, />Fotbal</);
   assert.match(desk, /href="\/redakce\/rubriky"/);
+});
+
+test("stránka O nás dělí volný text na odstavce", () => {
+  assert.deepEqual(paragraphs("První.\r\n\r\nDruhý\nřádek.\n  \n\nTřetí."), ["První.", "Druhý\nřádek.", "Třetí."]);
+  const html = aboutPage({ contactNote: "Pište na <drbna>" }, { path: "/o-nas", copy: { about_body: "Úvod.\n\nDalší <b>odstavec</b>." } });
+  assert.match(html, /<p class="lede">Úvod\.<\/p>/);
+  assert.match(html, /<p>Další &lt;b&gt;odstavec&lt;\/b&gt;\.<\/p>/);
+  assert.match(html, /Pište na &lt;drbna&gt;/);
 });

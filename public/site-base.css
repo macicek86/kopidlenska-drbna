@@ -545,6 +545,9 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .date-tile span { display: block; color: var(--muted); font-size: 0.92rem; }
 
 .about img { width: min(100%, 14rem); margin: 0 auto; display: block; }
+.about-text p { max-width: 38rem; line-height: 1.6; }
+.about-text .links { margin-top: 1.2rem; }
+.about-contact { font-weight: 700; }
 
 .login, .narrow { max-width: 34rem; }
 
@@ -800,7 +803,8 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
   .cards-3, .dates { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dates.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pair { grid-template-columns: 1fr 1fr; }
-  .about { grid-template-columns: 16rem 1fr; align-items: center; }
+  .about { grid-template-columns: 16rem 1fr; align-items: start; }
+  .about img { position: sticky; top: 1.5rem; }
 }
 
 @media (min-width: 900px) {

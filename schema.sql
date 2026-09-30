@@ -129,8 +129,15 @@ insert into copy (key, value) values
   ('about_description', 'Sousedská, ne úřední stránka pro Kopidlno a jeho části.'),
   ('about_eyebrow', 'O stránce'),
   ('about_heading', 'Sousedská, ne úřední'),
-  ('about_lede', 'Kopidlenská drbna je místní noviny pro Kopidlno, Drahoraz, Mlýnec, Pševes a Ledkov. Píšeme zprávy, pozvánky a praktické věci, hlavně kdy vyvézt popelnici.'),
-  ('about_disclaimer', 'Stránku neprovozuje Město Kopidlno. Vyhlášky, poplatky a úřední oznámení berte vždy z webu města.'),
+  ('about_body', 'Kopidlenská drbna je sousedský projekt od místních pro místní.
+
+Vznikla proto, aby bylo jednodušší zjistit, co se u nás děje, co se chystá, kam vyrazit nebo co by nám nemělo uniknout. Najdete tu praktické informace, pozvánky, zajímavosti i obyčejné sousedské zprávy.
+
+Drbnu provozuje Daniel Meca ve svém volném čase a na vlastní náklady. Není to stránka města, úřadu ani žádné politické strany.
+
+Je to prostě místo, kde si můžeme mezi sebou předávat informace, tipy a novinky z našeho okolí.
+
+Máte něco, co by měli vědět i ostatní? Dejte nám vědět. Drbna je tu pro nás všechny.'),
   ('about_bins_link', 'Svoz popelnic'),
   ('about_alt', 'Maskot Kopidlenské drbny'),
   ('about_ads_link', 'Reklamy'),

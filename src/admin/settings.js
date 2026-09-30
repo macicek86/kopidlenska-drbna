@@ -9,8 +9,8 @@ function saveBar(label) {
   return `<div class="save-bar"><span class="save-bar-note" data-dirty-note>Máte neuložené změny.</span><button class="btn btn-primary" type="submit">${label}</button></div>`;
 }
 
-function textField(label, value, control, long = false) {
-  return `<div class="text-field${long ? " text-field-long" : ""}" data-search="${esc(`${label} ${value}`.toLowerCase())}">${field(esc(label), control)}</div>`;
+function textField(label, value, control, long = false, hint = "") {
+  return `<div class="text-field${long ? " text-field-long" : ""}" data-search="${esc(`${label} ${value}`.toLowerCase())}">${field(esc(label), control, esc(hint))}</div>`;
 }
 
 function contactField(value) {
@@ -31,9 +31,9 @@ export function adminTexts(ctx, data, message) {
         .map((row) => {
           const value = tx(ctx.copy, row.key);
           const control = row.long
-            ? `<textarea class="${input}" name="${row.key}" rows="3" maxlength="${row.max}" required>${esc(value)}</textarea>`
+            ? `<textarea class="${input}" name="${row.key}" rows="${row.rows ?? 3}" maxlength="${row.max}" required>${esc(value)}</textarea>`
             : `<input class="${input}" name="${row.key}" maxlength="${row.max}" required value="${esc(value)}">`;
-          return textField(row.label, value, control, row.long);
+          return textField(row.label, value, control, row.long, row.hint);
         })
         .join("");
       const extra = group.name === "O nás" ? contactField(data.contactNote) : "";
