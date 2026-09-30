@@ -1,9 +1,9 @@
 import { pickAd, safeAdLink } from "./ads.js";
 import { byline } from "./db.js";
-import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
+import { esc, mediaUrl } from "./html.js";
+import { rubricKicker } from "./rubric-nav.js";
 import { text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
-import { renderArticleHtml } from "./rich.js";
 import { civilWeekday } from "./waste.js";
 import {
   HOME_LEAD_DAYS,
@@ -40,22 +40,7 @@ function siteOrigin(origin, mainOrigin) {
   return /^https?:\/\//i.test(value) ? value : "";
 }
 
-const AMP = "\u0026amp;";
-const LT = "\u0026lt;";
-const GT = "\u0026gt;";
-const QUOT = "\u0026quot;";
-
-export function esc(value) {
-  return String(value ?? "")
-    .replace(/&/g, AMP)
-    .replace(/</g, LT)
-    .replace(/>/g, GT)
-    .replace(/"/g, QUOT);
-}
-
-export function mediaUrl(key) {
-  return `/media/${key.split("/").map(encodeURIComponent).join("/")}`;
-}
+export { esc, mediaUrl } from "./html.js";
 
 function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
@@ -141,7 +126,7 @@ export function flashOf(message) {
   return { text: String(message ?? ""), kind: "ok" };
 }
 
-function signedWhen(article, when) {
+export function signedWhen(article, when) {
   const name = byline(article);
   return name ? `${when} · ${name}` : when;
 }
@@ -159,12 +144,6 @@ export function closureLabel(closure) {
   return `${formatLong(closure.startsOn)} – ${formatLong(closure.endsOn)}`;
 }
 
-function articleMeta(article) {
-  const base = signedWhen(article, formatLong(article.createdOn));
-  const mark = article.redacted ? ` · <span class="redigovano">Redigováno</span>` : "";
-  return `<p class="meta">${esc(base)}${mark}</p>`;
-}
-
 export function homePage(data, ctx) {
   const lead = data.articles[0];
   const rest = data.articles.slice(1, 4);
@@ -172,7 +151,7 @@ export function homePage(data, ctx) {
   const leadHtml = lead
     ? `<a class="card card-lead" href="/zpravy/${esc(lead.slug)}">
         ${lead.imageKey ? `<img class="cover" src="${mediaUrl(lead.imageKey)}" alt="">` : ""}
-        <p class="kicker">${esc(rubricLabel(lead))}</p>
+        ${rubricKicker(lead)}
         <h3>${esc(lead.title)}</h3>
         <p class="muted">${esc(lead.excerpt)}</p>
         <p class="meta">${esc(signedWhen(lead, formatDayMonth(lead.createdOn)))}</p>
@@ -181,7 +160,7 @@ export function homePage(data, ctx) {
   const restHtml = rest
     .map(
       (article) => `<a class="card card-side" href="/zpravy/${esc(article.slug)}">
-        <p class="kicker">${esc(rubricLabel(article))}</p>
+        ${rubricKicker(article)}
         <h3>${esc(article.title)}</h3>
       </a>`,
     )
@@ -239,68 +218,7 @@ export function homePage(data, ctx) {
   });
 }
 
-function chip(href, label, on) {
-  return `<a class="chip${on ? " is-on" : ""}" href="${href}">${esc(label)}</a>`;
-}
-
-export function newsPage(data, ctx, rubrika) {
-  const rubrics = rubricsFrom(data);
-  const selected = findRubric(rubrics, rubrika);
-  const visible = data.articles.filter((article) => articleInRubric(article, selected, rubrics));
-  const tops = rubrics.filter((item) => !item.parentId);
-  const chips = [
-    chip("/zpravy", tx(ctx.copy, "chip_all"), !selected),
-    ...tops.map((item) => {
-      const on = selected?.id === item.id || selected?.parentId === item.id;
-      return chip(`/zpravy?rubrika=${encodeURIComponent(item.slug)}`, item.name, on);
-    }),
-  ].join("");
-  const scope = rubricScope(rubrics, selected);
-  const children = scope ? rubrics.filter((item) => item.parentId === scope.id) : [];
-  const subChips = children.length
-    ? `<div class="chips chips-sub">${children
-        .map((item) => chip(`/zpravy?rubrika=${encodeURIComponent(item.slug)}`, item.name, selected?.id === item.id))
-        .join("")}</div>`
-    : "";
-  const heading = selected ? rubricLabel({ category: selected.name, parentName: selected.parentId ? scope?.name : "" }) : tx(ctx.copy, "news_heading");
-  const cards = visible.map(
-    (article) => `<a class="card story" href="/zpravy/${esc(article.slug)}">
-            ${article.imageKey ? `<img class="cover" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-            <p class="kicker">${esc(rubricLabel(article))}</p>
-            <h2>${esc(article.title)}</h2>
-            <p class="muted">${esc(article.excerpt)}</p>
-            <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
-          </a>`,
-  );
-  const woven = contentAd(data, ctx);
-  if (woven && cards.length) cards.splice(Math.min(2, cards.length), 0, woven);
-  const list = cards.length ? cards.join("") : `<p class="muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
-  return layout({
-    ...ctx,
-    title: `${heading} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "news_description"),
-    body: `<p class="eyebrow">${esc(tx(ctx.copy, "news_eyebrow"))}</p><h1>${esc(heading)}</h1><div class="chips">${chips}</div>${subChips}<div class="stack">${list}</div>`,
-  });
-}
-
-export function articlePage(article, ctx, extras = {}) {
-  const ad = Object.hasOwn(extras, "ad") ? extras.ad : pickAd(extras.ads);
-  return layout({
-    ...ctx,
-    title: `${article.title} | ${tx(ctx.copy, "site_name")}`,
-    description: article.excerpt,
-    body: `
-      <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
-      <p class="eyebrow">${esc(rubricLabel(article))}</p>
-      <h1 class="article-title">${esc(article.title)}</h1>
-      ${articleMeta(article)}
-      ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-      <div class="prose">${renderArticleHtml(article.body)}</div>
-      ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}`,
-  });
-}
-
-function contentAd(data, ctx) {
+export function contentAd(data, ctx) {
   const ad = Object.hasOwn(data, "ad") ? data.ad : pickAd(data.ads);
   return ad ? adPanel(ad, ctx.copy) : "";
 }

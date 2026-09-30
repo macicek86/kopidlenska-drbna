@@ -7,7 +7,8 @@ import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../s
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
-import { adPanel, articlePage, homePage, layout, newsPage, outagesPage } from "../src/view.js";
+import { adPanel, homePage, layout, outagesPage } from "../src/view.js";
+import { articlePage, newsPage } from "../src/news.js";
 import { adminAds, adminOutages, adminRubrics } from "../src/admin/index.js";
 import { articleInRubric, deleteRubricError, findRubric, parseRubricInput, rubricLabel } from "../src/rubrics.js";
 import {
@@ -942,17 +943,24 @@ test("filtr sportu zahrne fotbal a podrubrika se ukáže až po výběru", () =>
   const all = newsPage(data, ctx, "");
   assert.match(all, /href="\/zpravy\?rubrika=sport"/);
   assert.equal(all.includes("rubrika=fotbal"), false);
-  assert.equal(all.includes("chips-sub"), false);
+  assert.equal(all.includes("rubric-sub"), false);
+  assert.match(all, /class="rubric-tab has-sub" href="\/zpravy\?rubrika=sport"/);
+  assert.match(all, /2 zprávy/);
   assert.match(all, /Zápas/);
   assert.match(all, /Koncert/);
   const sport = newsPage(data, ctx, "sport");
-  assert.match(sport, /chips-sub/);
+  assert.match(sport, /class="rubric-sub"/);
+  assert.match(sport, /Všechno<span class="sub-count">1<\/span>/);
+  assert.equal(sport.includes("rubrika=kultura"), true);
   assert.match(sport, /href="\/zpravy\?rubrika=fotbal"/);
   assert.match(sport, /Zápas/);
   assert.equal(sport.includes("Koncert"), false);
   assert.match(sport, /<h1>Sport<\/h1>/);
   const fotbal = newsPage(data, ctx, "Fotbal");
-  assert.match(fotbal, /Sport · Fotbal/);
+  assert.match(fotbal, /<title>Sport · Fotbal \|/);
+  assert.match(fotbal, /<h1>Fotbal<\/h1>/);
+  assert.match(fotbal, /class="sub-chip is-on" href="\/zpravy\?rubrika=fotbal" aria-current="page"/);
+  assert.match(fotbal, /class="crumbs"[^]*rubrika=sport">Sport<\/a>/);
   assert.match(fotbal, /Zápas/);
   assert.equal(fotbal.includes("Koncert"), false);
   const desk = adminRubrics(

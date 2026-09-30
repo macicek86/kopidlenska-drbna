@@ -56,7 +56,6 @@ import {
   aboutPage,
   adPage,
   adsPage,
-  articlePage,
   binsPage,
   brokenPage,
   doctorsPage,
@@ -65,9 +64,9 @@ import {
   outagesPage,
   missingAdPage,
   missingPage,
-  newsPage,
   yardsPage,
 } from "./view.js";
+import { articlePage, newsPage } from "./news.js";
 import {
   adminAds,
   adminArticles,

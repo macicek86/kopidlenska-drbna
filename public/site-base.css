@@ -305,14 +305,6 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .redigovano { color: var(--muted); font-weight: 600; }
 
-.chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 1rem 0; }
-
-.chips-sub { margin-top: -0.35rem; }
-
-.chips-sub .chip { font-size: 0.92rem; }
-
-.rubric-child { margin-left: 1.15rem; }
-
 .article-title { max-width: 18ch; }
 
 .article-photo, .bin-photo img { width: 100%; border-radius: var(--radius); object-fit: cover; }

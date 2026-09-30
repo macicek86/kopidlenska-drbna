@@ -125,6 +125,7 @@ function mapArticle(row) {
     rubricId: row.rubric_id == null || row.rubric_id === "" ? null : Number(row.rubric_id),
     parentName: row.parent_name ? String(row.parent_name) : "",
     rubricSlug: row.rubric_slug ? String(row.rubric_slug) : "",
+    parentSlug: row.parent_slug ? String(row.parent_slug) : "",
     imageKey: row.image_key ? String(row.image_key) : null,
     published: asBool(row.published),
     createdOn: String(row.created_at ?? "").slice(0, 10),
