@@ -6,12 +6,14 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 - `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`)
 - `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…)
+- `src/photo.js`: fotka u zprávy (bod výřezu jako třídy `fx-*`/`fy-*`, popisek, detail bez ořezu); `src/images.js`: ukládání fotek do R2
 - `src/admin/`: redakce, jeden modul na sekci (`articles.js`, `ads.js`, `doctors.js`…)
   - `shell.js`: rozvržení s postranním menu a přihlášení
   - `ui.js`: stavební prvky (`modal`, `panel`, `item`, `badge`, `field`, `confirmForm`…)
   - `hours.js`: mřížky otevíracích a ordinačních hodin
 - `public/admin.css`, `public/admin.js`: vzhled a chování redakce
 - `public/editor.js`: editor textu (Trix), zmenšení fotky, náhled reklamy. Nový obsah oživí událost `drbna:mount`.
+- `public/photo-pick.js`: v redakci náhled výřezu fotky a ťuknutí na místo, které má zůstat vidět
 
 ## Redakce: jak fungují okna
 

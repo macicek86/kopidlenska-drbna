@@ -1,6 +1,7 @@
 @import url("/site-base.css");
 @import url("/rubrics.css");
 @import url("/ads.css");
+@import url("/photos.css");
 
 @media (min-width: 900px) {
   .hero {

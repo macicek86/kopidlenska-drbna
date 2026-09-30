@@ -1,6 +1,8 @@
 import { AD_SEEDS, readAdFields } from "./ads.js";
 import { COPY } from "./copy.js";
 import { hashPassword, verifyPassword } from "./password.js";
+import { releaseImage, storeImage } from "./images.js";
+import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
 import { DOCTOR_SEEDS, changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
@@ -32,7 +34,7 @@ export const PERMISSIONS = [
 export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
 const COOKIE = "drbna_editor";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 const ARTICLE_FROM =
   "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
 
@@ -127,6 +129,8 @@ function mapArticle(row) {
     rubricSlug: row.rubric_slug ? String(row.rubric_slug) : "",
     parentSlug: row.parent_slug ? String(row.parent_slug) : "",
     imageKey: row.image_key ? String(row.image_key) : null,
+    imageFocus: String(row.image_focus ?? ""),
+    imageCaption: String(row.image_caption ?? ""),
     published: asBool(row.published),
     createdOn: String(row.created_at ?? "").slice(0, 10),
     authorId: row.author_id == null || row.author_id === "" ? null : Number(row.author_id),
@@ -228,6 +232,8 @@ function mapProposal(row) {
     rubricId: row.rubric_id == null || row.rubric_id === "" ? null : Number(row.rubric_id),
     parentName: row.parent_name ? String(row.parent_name) : "",
     imageKey: row.image_key ? String(row.image_key) : null,
+    imageFocus: String(row.image_focus ?? ""),
+    imageCaption: String(row.image_caption ?? ""),
     submittedTitle: String(row.submitted_title),
     submittedExcerpt: String(row.submitted_excerpt),
     submittedBody: String(row.submitted_body),
@@ -451,12 +457,16 @@ async function ensureArticleColumns(env) {
   await addColumn(env, names, "author_name", "alter table articles add column author_name text not null default ''");
   await addColumn(env, names, "redacted", "alter table articles add column redacted integer not null default 0");
   await addColumn(env, names, "rubric_id", "alter table articles add column rubric_id integer");
+  await addColumn(env, names, "image_focus", "alter table articles add column image_focus text not null default ''");
+  await addColumn(env, names, "image_caption", "alter table articles add column image_caption text not null default ''");
 }
 
 async function ensureProposalColumns(env) {
   const info = await env.DB.prepare("pragma table_info(proposals)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
   await addColumn(env, names, "rubric_id", "alter table proposals add column rubric_id integer");
+  await addColumn(env, names, "image_focus", "alter table proposals add column image_focus text not null default ''");
+  await addColumn(env, names, "image_caption", "alter table proposals add column image_caption text not null default ''");
 }
 
 async function seedRubrics(env) {
@@ -695,7 +705,13 @@ function readArticleFields(input) {
   if (title.length < 3) return { error: "Doplňte nadpis." };
   if (excerpt.length < 3) return { error: "Doplňte krátký perex." };
   if (prepared.text.length < 3) return { error: "Doplňte text." };
-  return { title, excerpt, body: prepared.html };
+  return {
+    title,
+    excerpt,
+    body: prepared.html,
+    imageFocus: readFocus(input.imageFocus),
+    imageCaption: readCaption(input.imageCaption),
+  };
 }
 
 async function resolveRubric(env, input) {
@@ -723,7 +739,7 @@ async function readArticle(env, input) {
 
 async function loadProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
-    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key,
+    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key, p.image_focus, p.image_caption,
             p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at,
             a.slug as article_slug, a.title as article_title, u.alias as author_alias,
             r.name as rubric_name, parent.name as parent_name
@@ -1325,39 +1341,6 @@ async function uniqueSlug(env, base) {
   }
 }
 
-const IMAGE_TYPES = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/gif": "gif",
-};
-
-export async function storeImage(env, file, folder = "clanky") {
-  if (!(file instanceof File) || file.size === 0) return { key: null };
-  if (file.size > 4 * 1024 * 1024) return { error: "Fotka může mít nejvýš 4 MB." };
-  const ext = IMAGE_TYPES[file.type];
-  if (!ext) return { error: "Fotka musí být JPG, PNG, WEBP nebo GIF." };
-  const prefix = folder === "reklamy" ? "reklamy" : "clanky";
-  const key = `${prefix}/${crypto.randomUUID()}.${ext}`;
-  await env.BUCKET.put(key, await file.arrayBuffer(), {
-    httpMetadata: { contentType: file.type },
-  });
-  return { key };
-}
-
-async function releaseImage(env, key) {
-  if (!key) return;
-  const article = await env.DB.prepare("select 1 as ok from articles where image_key = ?").bind(key).first();
-  if (article) return;
-  const proposal = await env.DB.prepare("select 1 as ok from proposals where image_key = ?").bind(key).first();
-  if (proposal) return;
-  const ad = await env.DB.prepare("select 1 as ok from ads where image_key = ?").bind(key).first();
-  if (ad) return;
-  const adProposal = await env.DB.prepare("select 1 as ok from ad_proposals where image_key = ?").bind(key).first();
-  if (adProposal) return;
-  await env.BUCKET.delete(key);
-}
-
 export async function saveArticle(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
@@ -1365,7 +1348,7 @@ export async function saveArticle(env, request, input) {
   if (parsed.error) return { ok: false, error: parsed.error };
   const stored = await storeImage(env, input.image);
   if (stored.error) return { ok: false, error: stored.error };
-  const { title, excerpt, body, category, rubricId } = parsed;
+  const { title, excerpt, body, category, rubricId, imageFocus, imageCaption } = parsed;
 
   if (input.id) {
     const current = await env.DB.prepare(
@@ -1394,9 +1377,10 @@ export async function saveArticle(env, request, input) {
           ? 1
           : 0;
     await env.DB.prepare(
-      "update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?, redacted = ? where id = ?",
+      `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
+         image_focus = ?, image_caption = ?, redacted = ? where id = ?`,
     )
-      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, redacted, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, redacted, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     return { ok: true };
@@ -1404,10 +1388,10 @@ export async function saveArticle(env, request, input) {
 
   const slug = await uniqueSlug(env, slugify(title));
   await env.DB.prepare(
-    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, published, created_at, author_id, author_name, redacted)
-     values (?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, 0)`,
+    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, 0)`,
   )
-    .bind(slug, title, excerpt, body, category, rubricId, stored.key, input.published ? 1 : 0, gate.user.id, gate.user.name)
+    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, input.published ? 1 : 0, gate.user.id, gate.user.name)
     .run();
   return { ok: true };
 }
@@ -1469,7 +1453,7 @@ export async function saveProposal(env, request, input) {
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
       `update proposals
-       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
+       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, image_focus = ?, image_caption = ?,
            submitted_title = ?, submitted_excerpt = ?, submitted_body = ?, submitted_category = ?,
            author_name = ?, status = 'pending', note = ''
        where id = ?`,
@@ -1481,6 +1465,8 @@ export async function saveProposal(env, request, input) {
         parsed.category,
         parsed.rubricId,
         imageKey,
+        parsed.imageFocus,
+        parsed.imageCaption,
         parsed.title,
         parsed.excerpt,
         parsed.body,
@@ -1495,9 +1481,9 @@ export async function saveProposal(env, request, input) {
 
   await env.DB.prepare(
     `insert into proposals (
-       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key,
+       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption,
        submitted_title, submitted_excerpt, submitted_body, submitted_category, status
-     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
   )
     .bind(
       articleId,
@@ -1509,6 +1495,8 @@ export async function saveProposal(env, request, input) {
       parsed.category,
       parsed.rubricId,
       stored.key,
+      parsed.imageFocus,
+      parsed.imageCaption,
       parsed.title,
       parsed.excerpt,
       parsed.body,
@@ -1579,16 +1567,28 @@ export async function approveProposal(env, request, input) {
     if (imageKey) nextImage = imageKey;
     const redacted = redactedFlag(article.redacted, submitted, finalText) ? 1 : 0;
     await env.DB.prepare(
-      "update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, published = 1, redacted = ? where id = ?",
+      `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
+         image_focus = ?, image_caption = ?, published = 1, redacted = ? where id = ?`,
     )
-      .bind(parsed.title, parsed.excerpt, parsed.body, parsed.category, parsed.rubricId, nextImage, redacted, article.id)
+      .bind(
+        parsed.title,
+        parsed.excerpt,
+        parsed.body,
+        parsed.category,
+        parsed.rubricId,
+        nextImage,
+        parsed.imageFocus,
+        parsed.imageCaption,
+        redacted,
+        article.id,
+      )
       .run();
     if (previousArticleImage && previousArticleImage !== nextImage) await releaseImage(env, previousArticleImage);
   } else {
     const slug = await uniqueSlug(env, slugify(parsed.title));
     await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, published, created_at, author_id, author_name, redacted)
-       values (?, ?, ?, ?, ?, ?, ?, 1, date('now'), ?, ?, ?)`,
+      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, date('now'), ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -1598,6 +1598,8 @@ export async function approveProposal(env, request, input) {
         parsed.category,
         parsed.rubricId,
         imageKey,
+        parsed.imageFocus,
+        parsed.imageCaption,
         proposal.author_id,
         proposal.author_name,
         textWasEdited(submitted, finalText) ? 1 : 0,
@@ -1606,9 +1608,20 @@ export async function approveProposal(env, request, input) {
   }
 
   await env.DB.prepare(
-    "update proposals set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, status = 'approved', note = '' where id = ?",
+    `update proposals set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
+       image_focus = ?, image_caption = ?, status = 'approved', note = '' where id = ?`,
   )
-    .bind(parsed.title, parsed.excerpt, parsed.body, parsed.category, parsed.rubricId, imageKey, proposal.id)
+    .bind(
+      parsed.title,
+      parsed.excerpt,
+      parsed.body,
+      parsed.category,
+      parsed.rubricId,
+      imageKey,
+      parsed.imageFocus,
+      parsed.imageCaption,
+      proposal.id,
+    )
     .run();
   if (stored.key && previousProposalImage && previousProposalImage !== stored.key) {
     await releaseImage(env, previousProposalImage);
@@ -2247,9 +2260,4 @@ export async function saveCopy(env, request) {
     return { ok: false, error: "Texty se neuložily. Spusťte znovu npm run nasadit, ať se v databázi doplní tabulka textů." };
   }
   return { ok: true };
-}
-
-export async function media(env, key) {
-  if (!key || key.includes("..") || key.startsWith("/")) return null;
-  return env.BUCKET.get(key);
 }

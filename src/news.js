@@ -2,7 +2,8 @@
 import { pickAd } from "./ads.js";
 import { text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
-import { esc, mediaUrl } from "./html.js";
+import { esc } from "./html.js";
+import { articleFigure, storyPhoto } from "./photo.js";
 import { renderArticleHtml } from "./rich.js";
 import { articleCrumbs, newsCount, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
 import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
@@ -11,12 +12,14 @@ import { adPanel, contentAd, layout, signedWhen } from "./view.js";
 const SCRIPT = `<script src="/site.js" defer></script>`;
 
 function storyCard(article) {
-  return `<a class="card story" href="/zpravy/${esc(article.slug)}">
-            ${article.imageKey ? `<img class="cover" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
-            ${rubricKicker(article)}
-            <h2>${esc(article.title)}</h2>
-            <p class="muted">${esc(article.excerpt)}</p>
-            <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
+  return `<a class="card story${article.imageKey ? " has-photo" : ""}" href="/zpravy/${esc(article.slug)}">
+            ${storyPhoto(article, "story-photo")}
+            <div class="story-text">
+              ${rubricKicker(article)}
+              <h2>${esc(article.title)}</h2>
+              <p class="muted">${esc(article.excerpt)}</p>
+              <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
+            </div>
           </a>`;
 }
 
@@ -66,7 +69,7 @@ export function articlePage(article, ctx, extras = {}) {
       ${articleCrumbs(article)}
       <h1 class="article-title">${esc(article.title)}</h1>
       ${articleMeta(article)}
-      ${article.imageKey ? `<img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="">` : ""}
+      ${articleFigure(article)}
       <div class="prose">${renderArticleHtml(article.body)}</div>
       ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}`,
   });

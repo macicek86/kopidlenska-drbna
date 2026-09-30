@@ -10,6 +10,7 @@ import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 import { adPanel, homePage, layout, outagesPage } from "../src/view.js";
 import { articlePage, newsPage } from "../src/news.js";
 import { aboutPage, paragraphs } from "../src/about.js";
+import { articleFigure, captionHtml, focusClass, readCaption, readFocus, storyPhoto } from "../src/photo.js";
 import { adminAds, adminOutages, adminRubrics } from "../src/admin/index.js";
 import { articleInRubric, deleteRubricError, findRubric, parseRubricInput, rubricLabel } from "../src/rubrics.js";
 import {
@@ -984,4 +985,37 @@ test("stránka O nás dělí volný text na odstavce", () => {
   assert.match(html, /<p class="lede">Úvod\.<\/p>/);
   assert.match(html, /<p>Další &lt;b&gt;odstavec&lt;\/b&gt;\.<\/p>/);
   assert.match(html, /Pište na &lt;drbna&gt;/);
+});
+
+test("bod výřezu fotky se zaokrouhlí na desítky a nese ho třída", () => {
+  assert.equal(readFocus("47 28"), "50 30");
+  assert.equal(readFocus("-5 140"), "0 100");
+  assert.equal(readFocus(""), "");
+  assert.equal(readFocus("50"), "");
+  assert.equal(readFocus("x 20"), "");
+  assert.equal(focusClass("50 30"), "fx-5 fy-3");
+  assert.equal(focusClass(""), "");
+  const card = storyPhoto({ imageKey: "clanky/a.webp", imageFocus: "20 80" }, "story-photo");
+  assert.match(card, /class="story-photo fx-2 fy-8"/);
+  assert.doesNotMatch(card, /style=/);
+  assert.equal(storyPhoto({ imageKey: null }, "cover"), "");
+});
+
+test("detail zprávy ukáže fotku celou a pod ní popisek", () => {
+  assert.equal(readCaption("  Foto:\n  Jana  "), "Foto: Jana");
+  assert.equal(readCaption("x".repeat(300)).length, 200);
+  const html = articleFigure({ imageKey: "clanky/a.webp", imageCaption: "Foto: <Jana>" });
+  assert.match(html, /<figcaption>Foto: &lt;Jana&gt;<\/figcaption>/);
+  assert.match(html, /class="article-photo"/);
+  assert.doesNotMatch(articleFigure({ imageKey: "clanky/a.webp", imageCaption: "" }), /figcaption/);
+});
+
+test("popisek fotky prolinkuje licenci Creative Commons", () => {
+  assert.equal(
+    captionHtml("Foto: Petr, CC BY-SA 4.0"),
+    'Foto: Petr, <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.cs" target="_blank" rel="noopener noreferrer">CC BY-SA 4.0</a>',
+  );
+  assert.match(captionHtml("CC BY 3.0"), /licenses\/by\/3\.0\//);
+  assert.match(captionHtml("Foto: CC0"), /publicdomain\/zero\/1\.0/);
+  assert.equal(captionHtml("Foto: <b>Jana</b>"), "Foto: &lt;b&gt;Jana&lt;/b&gt;");
 });

@@ -82,11 +82,13 @@ function document({ title, body, rich = false, bodyClass = "adm" }) {
   <link rel="stylesheet" href="/site.css">
   ${rich ? `<link rel="stylesheet" href="/vendor/trix/trix.css">` : ""}
   <link rel="stylesheet" href="/admin.css">
+  <link rel="stylesheet" href="/photo-pick.css">
 </head>
 <body class="${bodyClass}">
 ${body}
 ${rich ? `<script src="/vendor/trix/trix.umd.min.js" defer></script>` : ""}
 <script src="/editor.js" defer></script>
+<script src="/photo-pick.js" defer></script>
 <script src="/admin.js" defer></script>
 </body>
 </html>`;

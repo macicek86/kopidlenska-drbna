@@ -13,7 +13,6 @@ import {
   loadPublic,
   login,
   logout,
-  media,
   rejectAdProposal,
   rejectProposal,
   removeAd,
@@ -66,6 +65,7 @@ import {
   yardsPage,
 } from "./view.js";
 import { aboutPage } from "./about.js";
+import { media } from "./images.js";
 import { articlePage, newsPage } from "./news.js";
 import {
   adminAds,
@@ -228,6 +228,8 @@ async function formFields(request) {
     category: text("category"),
     published: form.get("published") === "1",
     image: form.get("image"),
+    imageFocus: text("image_focus"),
+    imageCaption: text("image_caption"),
     place: text("place"),
     startsOn: text("startsOn"),
     startsTime: text("startsTime"),

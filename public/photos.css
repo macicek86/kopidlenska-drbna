@@ -1,0 +1,82 @@
+/* Fotky u zpráv. Karty ořezávají do pevného poměru podle bodu výřezu, detail ukazuje fotku celou. */
+
+.cover, .story-photo {
+  display: block;
+  width: calc(100% + 2.3rem);
+  max-width: none;
+  margin: -1.1rem -1.15rem 0.8rem;
+  border-radius: var(--radius) var(--radius) 0 0;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: cover;
+  object-position: var(--fx, 50%) var(--fy, 50%);
+  background: var(--paper-deep);
+}
+
+/* Bod výřezu z redakce: x a y po desítkách procent. */
+.fx-0 { --fx: 0%; }
+.fx-1 { --fx: 10%; }
+.fx-2 { --fx: 20%; }
+.fx-3 { --fx: 30%; }
+.fx-4 { --fx: 40%; }
+.fx-5 { --fx: 50%; }
+.fx-6 { --fx: 60%; }
+.fx-7 { --fx: 70%; }
+.fx-8 { --fx: 80%; }
+.fx-9 { --fx: 90%; }
+.fx-10 { --fx: 100%; }
+.fy-0 { --fy: 0%; }
+.fy-1 { --fy: 10%; }
+.fy-2 { --fy: 20%; }
+.fy-3 { --fy: 30%; }
+.fy-4 { --fy: 40%; }
+.fy-5 { --fy: 50%; }
+.fy-6 { --fy: 60%; }
+.fy-7 { --fy: 70%; }
+.fy-8 { --fy: 80%; }
+.fy-9 { --fy: 90%; }
+.fy-10 { --fy: 100%; }
+
+.story-text > :last-child { margin-bottom: 0; }
+
+.article-figure { margin: 1rem 0 1.4rem; }
+
+.article-frame {
+  display: flex;
+  justify-content: center;
+  background: var(--paper-deep);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.article-photo {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: min(75vh, 42rem);
+  object-fit: contain;
+}
+
+.article-figure figcaption {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+@media (min-width: 720px) {
+  .story.has-photo {
+    display: grid;
+    grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr);
+    gap: 1.2rem;
+    align-items: center;
+  }
+
+  .story.has-photo .story-photo {
+    width: 100%;
+    margin: 0;
+    aspect-ratio: 3 / 2;
+    border-radius: calc(var(--radius) - 0.6rem);
+  }
+}

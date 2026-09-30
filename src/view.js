@@ -1,6 +1,7 @@
 import { pickAd, safeAdLink } from "./ads.js";
 import { byline } from "./db.js";
 import { esc, mediaUrl } from "./html.js";
+import { storyPhoto } from "./photo.js";
 import { rubricKicker } from "./rubric-nav.js";
 import { text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
@@ -150,7 +151,7 @@ export function homePage(data, ctx) {
   const upcoming = data.events.filter((event) => event.startsOn >= data.waste.today).slice(0, 3);
   const leadHtml = lead
     ? `<a class="card card-lead" href="/zpravy/${esc(lead.slug)}">
-        ${lead.imageKey ? `<img class="cover" src="${mediaUrl(lead.imageKey)}" alt="">` : ""}
+        ${storyPhoto(lead, "cover")}
         ${rubricKicker(lead)}
         <h3>${esc(lead.title)}</h3>
         <p class="muted">${esc(lead.excerpt)}</p>

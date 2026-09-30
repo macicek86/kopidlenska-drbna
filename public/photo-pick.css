@@ -1,0 +1,47 @@
+/* Výběr výřezu fotky v redakci. */
+
+.photo-pick { display: grid; gap: 0.6rem; margin-top: 0.5rem; }
+.photo-pick[hidden], .photo-now[hidden] { display: none; }
+
+.photo-pick-title { margin: 0; font-weight: 700; font-size: 0.92rem; }
+
+.photo-pick-full {
+  position: relative;
+  justify-self: start;
+  max-width: 100%;
+  line-height: 0;
+  cursor: crosshair;
+  border-radius: var(--r-sm);
+  outline-offset: 3px;
+}
+
+.photo-pick-full img {
+  display: block;
+  max-width: 100%;
+  max-height: 16rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+}
+
+.photo-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: -0.8rem 0 0 -0.8rem;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: rgba(198, 64, 76, 0.55);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.photo-pick-previews { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.photo-pick-previews figure { margin: 0; display: grid; gap: 0.25rem; }
+.photo-pick-previews figcaption { color: var(--muted); font-size: 0.8rem; }
+
+.photo-crop { width: 8.5rem; overflow: hidden; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--paper-deep); }
+.photo-crop img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.photo-crop-list { aspect-ratio: 3 / 2; }
+.photo-crop-wide { aspect-ratio: 16 / 9; }
