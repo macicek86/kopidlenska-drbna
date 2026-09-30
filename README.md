@@ -34,7 +34,7 @@ Domény musí být na stejném účtu. Stejné řádky jsou připravené zakomen
 
 Adresa `/redakce`. Účty jsou dvou druhů.
 
-Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v záložce Heslo. Může zprávy, akce, texty, svoz, sběrné dvory i účty. Jeho vlastní zpráva jde na web hned. Výchozí jméno pod článkem je Redakce. V záložce Heslo si každý nastaví jméno a volitelný alias. Když alias používá, na webu se u jeho zpráv ukáže alias.
+Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v záložce Heslo. Může zprávy, akce, texty, svoz, sběrné dvory, odstávky elektřiny i účty. Jeho vlastní zpráva jde na web hned. Výchozí jméno pod článkem je Redakce. V záložce Heslo si každý nastaví jméno a volitelný alias. Když alias používá, na webu se u jeho zpráv ukáže alias.
 
 Přispěvatele přidá hlavní redaktor v záložce Lidé: jméno pod článkem, volitelný alias, přihlašovací jméno, heslo a oprávnění. Teď je tu oprávnění Sběrný dvůr. Přispěvatel píše nové zprávy a u zveřejněné zprávy, i cizí, může jen navrhnout úpravu. Na web se dostane až to, co hlavní redaktor schválí. Cizí text přímo nezmění a návrh úpravy jeho vlastní zprávy taky čeká na schválení. Člověk s oprávněním na sběrný dvůr navíc zapíše mimořádné uzavření a důvod. Dvůr, popis a otevírací dobu mění jen hlavní redaktor.
 

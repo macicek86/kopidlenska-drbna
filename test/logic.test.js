@@ -7,7 +7,19 @@ import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../s
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
-import { adPanel, adminAds, articlePage, homePage, layout, newsPage } from "../src/view.js";
+import { adPanel, adminAds, adminOutages, articlePage, homePage, layout, newsPage, outagesPage } from "../src/view.js";
+import {
+  boardJson,
+  buildBoard,
+  fetchAreaOutages,
+  feedIsStale,
+  mergeFresh,
+  normalizeTownPayload,
+  outageSpan,
+  parseAreaInput,
+  placeLabel,
+  refreshNote,
+} from "../src/outages.js";
 import {
   DOCTOR_SEEDS,
   HOME_LEAD_DAYS,
@@ -580,4 +592,289 @@ test("sdílení má og obrázek 1200×630", () => {
   assert.match(html, /property="og:description" content="Zprávy &amp; pozvánky &quot;z Kopidlna&quot;."/);
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
   assert.match(html, /property="og:image:alt" content="Kopidlenská drbna"/);
+});
+
+const JICIN_OUTAGE = {
+  outages: null,
+  outages_in_town: [
+    {
+      id: "110061121360",
+      announcement_key: "pdf/301307931-daqcb65ct0gcmo4g4m8g.pdf",
+      opened_at: "2026-10-15T06:30:00Z",
+      fix_expected_at: "2026-10-15T10:30:00Z",
+      addresses: {
+        towns: [
+          {
+            name: "Jičín",
+            code: 572659,
+            district: "Jičín",
+            cadastral_territories: [{ name: "Jičín", code: 659541, plots: [{ cadastral_code: "659541", plot: "2290" }] }],
+            town_districts: [
+              {
+                town_parts: [
+                  {
+                    name: "Holínské Předměstí",
+                    streets: [{ name: "Jiráskova", house_nums: "44", ev_nums: "", street_nums: "" }],
+                  },
+                  {
+                    name: "Pševes",
+                    streets: [{ name: "", house_nums: "12", ev_nums: "3", street_nums: "5" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        orphan_territories: [{ plots: [{ cadastral_code: "669171", plot: "2290" }] }],
+      },
+    },
+  ],
+};
+
+test("odpověď widgetu ČEZ se složí do adres, parcel a odkazu na oznámení", () => {
+  const empty = normalizeTownPayload({ outages: null }, { code: "573060", name: "Kopidlno" });
+  assert.equal(empty.ok, true);
+  assert.deepEqual(empty.outages, []);
+  assert.equal(normalizeTownPayload({ outages_in_town: {} }, { code: "573060", name: "Kopidlno" }).ok, false);
+
+  const parsed = normalizeTownPayload(JICIN_OUTAGE, { code: "572659", name: "Jičín" });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.outages.length, 1);
+  const outage = parsed.outages[0];
+  assert.equal(outage.id, "110061121360");
+  assert.equal(outage.areaCode, "572659");
+  assert.equal(outage.announcementUrl, "https://cdn.bezstavy.cz/pdf/301307931-daqcb65ct0gcmo4g4m8g.pdf");
+  assert.equal(outage.places[0].street, "Jiráskova");
+  assert.equal(outage.places[0].houseNums, "44");
+  assert.equal(outage.places[0].evNums, null);
+  assert.equal(outage.places[1].street, null);
+  assert.equal(outage.places[1].houseNums, "12");
+  assert.equal(outage.places[1].evNums, "3");
+  assert.equal(outage.places[1].streetNums, "5");
+  assert.equal(placeLabel(outage.places[1]), "Pševes, Jičín · bez ulice · popisná 12, evidenční 3, orientační 5");
+  assert.deepEqual(outage.parcels, [
+    { cadastralCode: "659541", plot: "2290" },
+    { cadastralCode: "669171", plot: "2290" },
+  ]);
+  assert.equal(outageSpan(outage), "Čtvrtek 15. října, 08:30–12:30");
+  assert.equal(
+    normalizeTownPayload(
+      {
+        outages_in_town: [
+          { id: "1", opened_at: "2026-10-15T06:30:00Z" },
+          { id: "1", opened_at: "2026-10-16T06:30:00Z" },
+        ],
+        outages: [{ id: "1", opened_at: "2026-10-17T06:30:00Z" }],
+      },
+      { code: "573060", name: "Kopidlno" },
+    ).outages.length,
+    1,
+  );
+  assert.equal(normalizeTownPayload({ outages_in_town: [{ announcement_key: "https://evil.test/a.pdf" }] }, { code: "573060", name: "Kopidlno" }).outages.length, 0);
+  const badLink = normalizeTownPayload(
+    { outages_in_town: [{ id: "9", announcement_key: "pdf/../tajne.pdf" }] },
+    { code: "573060", name: "Kopidlno" },
+  );
+  assert.equal(badLink.outages[0].announcementUrl, null);
+});
+
+test("probíhající a blízká odstávka se ukáže, skončená zmizí", () => {
+  const now = new Date("2026-09-30T10:00:00.000Z");
+  const area = [{ code: "573060", name: "Kopidlno" }];
+  const row = (id, openedAt, fixExpectedAt) => ({
+    id,
+    areaCode: "573060",
+    openedAt,
+    fixExpectedAt,
+    announcementUrl: null,
+    places: [],
+    parcels: [],
+  });
+  const board = buildBoard({
+    fetchedAt: "2026-09-30T10:00:00.000Z",
+    status: "ok",
+    areas: area,
+    now,
+    outages: [
+      row("past", "2026-09-30T05:00:00Z", "2026-09-30T08:00:00Z"),
+      row("now", "2026-09-30T06:00:00Z", "2026-09-30T16:00:00Z"),
+      row("soon", "2026-10-07T06:30:00Z", "2026-10-07T10:30:00Z"),
+      row("later", "2026-10-08T06:30:00Z", "2026-10-08T10:30:00Z"),
+    ],
+  });
+  assert.deepEqual(board.items.map((item) => item.id), ["now", "soon", "later"]);
+  assert.deepEqual(board.items.map((item) => item.phase), ["now", "soon", "later"]);
+  assert.equal(board.checked, "Naposledy ověřeno 30. 9. 2026 v 12:00.");
+  assert.equal(feedIsStale({ fetchedAt: null }, now.getTime()), true);
+  assert.equal(feedIsStale({ fetchedAt: "2026-09-30T09:00:00.000Z" }, now.getTime()), false);
+  assert.equal(feedIsStale({ fetchedAt: "2026-09-30T03:00:00.000Z" }, now.getTime()), true);
+
+  const evening = normalizeTownPayload(
+    {
+      outages_in_town: [
+        { id: "noc", opened_at: "2026-10-15T20:00:00Z", fix_expected_at: "2026-10-16T04:00:00Z" },
+      ],
+    },
+    { code: "573060", name: "Kopidlno" },
+  ).outages[0];
+  assert.equal(outageSpan(evening), "Čtvrtek 15. října 22:00 – pátek 16. října 06:00");
+
+  const json = boardJson(board);
+  assert.equal(json.outages[0].area_code, "573060");
+  assert.equal(json.outages[0].state, "Právě probíhá");
+  assert.equal(json.fetched_at, "2026-09-30T10:00:00.000Z");
+});
+
+test("víc obcí se ptá postupně a neúspěch nenechá smazat starší přehled", async () => {
+  const slept = [];
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls += 1;
+    if (calls === 1) return Response.json({ outages: null });
+    if (calls === 5) return Response.json({ outages_in_town: "špatně" });
+    return Response.json({ outages: null, outages_in_town: [] });
+  };
+  const areas = [1, 2, 3, 4, 5].map((n) => ({ code: `10000${n}`, name: `Obec ${n}` }));
+  const results = await fetchAreaOutages(areas, {
+    fetchImpl,
+    sleep: (ms) => {
+      slept.push(ms);
+      return Promise.resolve();
+    },
+  });
+  assert.equal(results[0].ok, true);
+  assert.equal(results[0].outages.length, 0);
+  assert.deepEqual(slept, [1100]);
+  assert.equal(results[4].ok, false);
+  assert.equal(refreshNote(results).status, "partial");
+  assert.match(refreshNote(results).note, /Obec 5/);
+
+  let retries = 0;
+  const [retried] = await fetchAreaOutages([{ code: "573060", name: "Kopidlno" }], {
+    fetchImpl: async () => {
+      retries += 1;
+      if (retries === 1) return new Response("{}", { status: 429, headers: { "Retry-After": "1" } });
+      return Response.json({
+        outages: null,
+        outages_in_town: [{ id: 7, opened_at: "2026-10-15T06:30:00Z", announcement_key: "/pdf/a.pdf" }],
+      });
+    },
+    sleep: (ms) => {
+      slept.push(ms);
+      return Promise.resolve();
+    },
+  });
+  assert.equal(retried.ok, true);
+  assert.equal(retried.outages[0].id, "7");
+  assert.equal(retried.outages[0].announcementUrl, "https://cdn.bezstavy.cz/pdf/a.pdf");
+  assert.equal(slept.at(-1), 1000);
+
+  const merged = mergeFresh(
+    [{ id: "stara", areaCode: "573060" }, { id: "jinde", areaCode: "572659" }],
+    [
+      { ok: false, code: "573060", name: "Kopidlno", outages: [] },
+      { ok: true, code: "572659", name: "Jičín", outages: [{ id: "nova", areaCode: "572659" }] },
+    ],
+  );
+  assert.deepEqual(merged.map((item) => item.id), ["nova", "stara"]);
+  assert.equal(refreshNote([{ ok: false, code: "1", name: "Kopidlno" }]).status, "error");
+  assert.equal(parseAreaInput({ name: "  Kopidlno  ", code: "573060", enabled: true, sortOrder: "0" }).area.sortOrder, 0);
+  assert.equal(parseAreaInput({ name: "X", code: "573060" }).ok, false);
+  assert.match(parseAreaInput({ name: "Libáň", code: "12" }).error, /šest číslic/);
+});
+
+test("stránka odstávek bere uložený přehled a na titulce je jen blízká", () => {
+  const now = new Date("2026-09-30T10:00:00.000Z");
+  const soon = buildBoard({
+    fetchedAt: "2026-09-30T10:00:00.000Z",
+    areas: [{ code: "573060", name: "Kopidlno" }],
+    now,
+    outages: [
+      {
+        id: "1",
+        areaCode: "573060",
+        openedAt: "2026-10-05T06:30:00Z",
+        fixExpectedAt: "2026-10-05T08:30:00Z",
+        announcementUrl: "https://cdn.bezstavy.cz/pdf/a.pdf",
+        places: [
+          {
+            town: "<script>",
+            part: "Pševes",
+            street: "Jiráskova",
+            houseNums: "44",
+            evNums: null,
+            streetNums: null,
+            district: "Jičín",
+          },
+        ],
+        parcels: [{ cadastralCode: "659541", plot: "2290" }],
+      },
+    ],
+  });
+  const page = outagesPage({ outages: soon }, { path: "/odstavky", copy: {}, origin: "http://127.0.0.1:8787" });
+  assert.equal(page.includes("<script>"), false);
+  assert.match(page, /&lt;script&gt;/);
+  assert.match(page, /cdn\.bezstavy\.cz\/pdf\/a\.pdf/);
+  assert.equal(page.includes("api.bezstavy.cz"), false);
+  assert.match(page, /Chystá se/);
+  assert.match(page, /Parcela 2290/);
+  assert.match(page, /href="https:\/\/www\.bezstavy\.cz\/"/);
+
+  const ctx = { path: "/", copy: {}, minimal: false, mainOrigin: "http://127.0.0.1:8787" };
+  const waste = {
+    today: "2026-09-30",
+    nextDate: "2026-10-05",
+    daysUntil: 5,
+    note: "",
+    holidayNote: "",
+    weekday: 1,
+    weekParity: 1,
+    stepDays: 14,
+  };
+  const bare = { articles: [], events: [], yards: [], doctors: [], waste, ads: [], contactNote: "" };
+  const plain = homePage(bare, ctx);
+  const teased = homePage({ ...bare, outages: soon }, ctx);
+  assert.equal(plain.includes("Chystá se"), false);
+  assert.match(teased, /Chystá se/);
+  assert.equal((teased.match(/href="\/odstavky"/g) ?? []).length, (plain.match(/href="\/odstavky"/g) ?? []).length + 1);
+
+  const later = buildBoard({
+    fetchedAt: "2026-09-30T10:00:00.000Z",
+    areas: [{ code: "573060", name: "Kopidlno" }],
+    now,
+    outages: [
+      {
+        id: "2",
+        areaCode: "573060",
+        openedAt: "2026-11-01T06:30:00Z",
+        fixExpectedAt: "2026-11-01T10:30:00Z",
+        announcementUrl: null,
+        places: [],
+        parcels: [],
+      },
+    ],
+  });
+  const quiet = homePage({ ...bare, outages: later }, ctx);
+  assert.equal(quiet.includes("Naplánováno"), false);
+  const desk = adminOutages(
+    { path: "/redakce", copy: {} },
+    {
+      signedIn: true,
+      user: { role: "hlavni", name: "Redakce" },
+      showDefaultPassword: false,
+      outageAreas: [
+        { id: 1, code: "573060", name: "Kopidlno", enabled: true, sortOrder: 0 },
+        { id: 2, code: "572659", name: "Jičín", enabled: false, sortOrder: 10 },
+      ],
+      outages: soon,
+    },
+    "",
+    2,
+  );
+  assert.match(desk, /name="areaOn" value="1" checked/);
+  assert.match(desk, /name="areaOn" value="2"/);
+  assert.equal(desk.includes('value="2" checked'), false);
+  assert.match(desk, /Drahoraz, Mlýnec, Pševes a Ledkov/);
+  assert.match(desk, /Smazat obec Jičín/);
+  assert.match(desk, /Na webu se hledá v: Kopidlno/);
 });

@@ -36,6 +36,11 @@ import {
   saveProposal,
   saveSite,
   saveYard,
+  addOutageArea,
+  loadOutageBoard,
+  refreshOutages,
+  removeOutageArea,
+  saveOutageAreas,
   setAdEnabled,
   sessionCookie,
   saveContributorAccess,
@@ -62,14 +67,17 @@ import {
   binsPage,
   brokenPage,
   doctorsPage,
+  adminOutages,
   eventsPage,
   homePage,
+  outagesPage,
   missingAdPage,
   missingPage,
   newsPage,
   yardsPage,
 } from "./view.js";
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
+import { boardJson, feedIsStale } from "./outages.js";
 import { WEEK_DAYS } from "./yards.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
@@ -106,6 +114,11 @@ const OK = {
   "lekar-hodiny": "Ordinační hodiny jsou uložené.",
   "lekar-zmena": "Dočasná změna je zapsaná.",
   "lekar-zmena-smazana": "Dočasná změna je zrušená.",
+  oblast: "Obec je přidaná a přehled je načtený.",
+  "oblast-upravena": "Oblasti jsou uložené a přehled je načtený.",
+  "oblast-smazana": "Obec je ze seznamu pryč.",
+  odstavky: "Přehled odstávek je načtený.",
+  "odstavky-castecne": "Přehled je načtený, ale u některé obce to nevyšlo.",
   navrh: "Návrh čeká na schválení.",
   "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
   "navrh-stazen": "Návrh je stažený.",
@@ -225,6 +238,14 @@ async function formFields(request) {
     adId: Number.isInteger(Number(text("nabidka"))) && Number(text("nabidka")) > 0 ? Number(text("nabidka")) : undefined,
     changeNote: text("changeNote"),
     doctorId: Number.isInteger(Number(text("doctorId"))) && Number(text("doctorId")) > 0 ? Number(text("doctorId")) : undefined,
+    code: text("code"),
+    areas: form.getAll("areaId").map((id, index) => ({
+      id: String(id),
+      name: String(form.getAll("areaName")[index] ?? ""),
+      code: String(form.getAll("areaCode")[index] ?? ""),
+      sortOrder: String(form.getAll("areaSort")[index] ?? ""),
+      enabled: form.getAll("areaOn").map(String).includes(String(id)),
+    })),
     doctorWeek: WEEK_DAYS.map(({ day }) => ({
       day,
       morning: {
@@ -245,7 +266,23 @@ async function formFields(request) {
   };
 }
 
-async function renderGet(request, env, url) {
+function kickOutageRefresh(env, ctx, board) {
+  if (!ctx?.waitUntil || !feedIsStale(board)) return;
+  ctx.waitUntil(refreshOutages(env).catch(() => {}));
+}
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=300",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
+async function renderGet(request, env, url, execution) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const base = ctxFor(request, path);
   const minimalHome = base.minimal && path === "/";
@@ -276,8 +313,19 @@ async function renderGet(request, env, url) {
   }
   if (path === "/") {
     const data = await loadPublic(env);
+    kickOutageRefresh(env, execution, data.outages);
     const ad = chooseAd(request, data.ads);
     return htmlAd(request, homePage({ ...data, ad }, ctx), ad);
+  }
+  if (path === "/odstavky.json") {
+    const board = await loadOutageBoard(env);
+    kickOutageRefresh(env, execution, board);
+    return json(boardJson(board));
+  }
+  if (path === "/odstavky") {
+    const data = await loadPublic(env);
+    kickOutageRefresh(env, execution, data.outages);
+    return html(outagesPage(data, ctx));
   }
   if (path === "/zpravy") {
     const data = await loadPublic(env);
@@ -324,7 +372,7 @@ async function renderGet(request, env, url) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -382,6 +430,7 @@ async function renderGet(request, env, url) {
         ),
       );
     }
+    if (tab === "odstavky") return html(adminOutages(ctx, data, message, positiveParam(url, "smazat")));
     if (tab === "lide") return html(adminPeople(ctx, data, message, positiveParam(url, "vypnout")));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
@@ -578,6 +627,29 @@ async function renderPost(request, env, url) {
     if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
   }
+  if (path === "/redakce/odstavky/pridat") {
+    const result = await addOutageArea(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
+    if (result.warn) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.warn)}`);
+    return redirect(`/redakce/odstavky?ok=${result.partial ? "odstavky-castecne" : "oblast"}`);
+  }
+  if (path === "/redakce/odstavky/ulozit") {
+    const result = await saveOutageAreas(env, request, fields);
+    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
+    if (result.warn) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.warn)}`);
+    return redirect(`/redakce/odstavky?ok=${result.partial ? "odstavky-castecne" : "oblast-upravena"}`);
+  }
+  if (path === "/redakce/odstavky/smazat") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/odstavky");
+    const result = await removeOutageArea(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/odstavky?ok=oblast-smazana");
+  }
+  if (path === "/redakce/odstavky/nacist") {
+    const result = await refreshOutages(env, request);
+    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
+    return redirect(`/redakce/odstavky?ok=${result.partial ? "odstavky-castecne" : "odstavky"}`);
+  }
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);
     if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
@@ -604,7 +676,7 @@ function withError(path, error) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, execution) {
     const url = new URL(request.url);
     try {
       await ensureSchema(env);
@@ -612,7 +684,7 @@ export default {
         return env.ASSETS.fetch(request);
       }
       if (request.method === "GET" || request.method === "HEAD") {
-        const response = await renderGet(request, env, url);
+        const response = await renderGet(request, env, url, execution);
         return request.method === "HEAD" ? new Response(null, { status: response.status, headers: response.headers }) : response;
       }
       if (request.method === "POST") return await renderPost(request, env, url);
@@ -621,5 +693,9 @@ export default {
       const message = error instanceof Error ? error.message : "Neznámá chyba.";
       return html(brokenPage(message), 500);
     }
+  },
+  async scheduled(_event, env, ctx) {
+    await ensureSchema(env);
+    ctx.waitUntil(refreshOutages(env).catch(() => {}));
   },
 };

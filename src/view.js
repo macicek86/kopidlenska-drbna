@@ -15,6 +15,7 @@ import {
   spanSummary,
 } from "./doctors.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
+import { HOME_LEAD_DAYS as OUTAGE_LEAD_DAYS } from "./outages.js";
 
 const CATEGORY_KEY = {
   Zprávy: "cat_zpravy",
@@ -41,6 +42,7 @@ const NAV = [
   ["/popelnice", "nav_bins"],
   ["/sberne-dvory", "nav_yards"],
   ["/lekari", "nav_doctors"],
+  ["/odstavky", "nav_outages"],
   ["/o-nas", "nav_about"],
 ];
 
@@ -237,6 +239,7 @@ export function homePage(data, ctx) {
           </div>
           ${yardsTeaser(data, ctx)}
           ${doctorsTeaser(data, ctx)}
+          ${outagesTeaser(data, ctx)}
         </div>
       </section>
       <section class="block">
@@ -505,6 +508,7 @@ export function aboutPage(data, ctx) {
             <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
             <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
             <a href="/lekari">${esc(tx(ctx.copy, "about_doctors_link"))}</a>
+            <a href="/odstavky">${esc(tx(ctx.copy, "about_outages_link"))}</a>
             <a href="/reklamy">${esc(tx(ctx.copy, "about_ads_link"))}</a>
             <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
           </div>
@@ -570,6 +574,7 @@ function adminShell(ctx, data, tab, message, inner, options = {}) {
         ["/redakce/svoz", "svoz", "Popelnice a kontakt"],
         yardTab,
         doctorTab,
+        ["/redakce/odstavky", "odstavky", "Odstávky"],
         ["/redakce/lide", "lide", "Lidé"],
         ["/redakce/heslo", "heslo", "Heslo"],
       ]
@@ -1065,6 +1070,30 @@ function doctorsTeaser(data, ctx) {
   </div>`;
 }
 
+function outagesTeaser(data, ctx) {
+  const items = (data.outages?.items ?? [])
+    .filter((item) => item.phase === "now" || item.phase === "soon")
+    .slice(0, 3);
+  if (!items.length) return "";
+  const lines = items
+    .map((item) => {
+      const kind = item.phase === "now" ? "is-closure" : "is-later";
+      const where = item.placeLabels?.[0] ?? "";
+      return `<li class="${kind}">
+        <p class="yard-home-name">${esc(item.areaName)}</p>
+        <p class="yard-home-state">${esc(item.state)}</p>
+        <p class="yard-home-detail">${esc(item.when)}</p>
+        ${where ? `<p class="yard-home-detail">${esc(where)}</p>` : ""}
+      </li>`;
+    })
+    .join("");
+  return `<div class="card waste-teaser">
+    <p class="eyebrow">${esc(tx(ctx.copy, "home_outages_button"))}</p>
+    <ul class="yard-home">${lines}</ul>
+    <div class="row"><a class="btn btn-primary" href="/odstavky">${esc(tx(ctx.copy, "home_outages_button"))}</a></div>
+  </div>`;
+}
+
 function dayLabel(day) {
   return WEEK_DAYS.find((item) => item.day === day)?.label ?? "";
 }
@@ -1357,6 +1386,63 @@ export function doctorsPage(data, ctx) {
   });
 }
 
+function outageCard(item, { showArea, copy }) {
+  const places = (item.placeLabels ?? [])
+    .map((label) => `<li>${esc(label)}</li>`)
+    .join("");
+  const more = item.morePlaces
+    ? `<p class="muted outage-more">A dalších ${esc(item.morePlaces)} míst.</p>`
+    : "";
+  const parcels = item.parcelLine ? `<p class="meta">${esc(item.parcelLine)}</p>` : "";
+  const pdf = item.announcementUrl
+    ? `<p><a href="${esc(item.announcementUrl)}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "outages_announcement"))}</a></p>`
+    : "";
+  return `<article class="card yard">
+    ${showArea ? `<p class="kicker">${esc(item.areaName)}</p>` : ""}
+    <p class="outage-state is-${esc(item.phase)}">${esc(item.state)}</p>
+    <p class="outage-when">${esc(item.when)}</p>
+    ${places ? `<ul class="outage-places">${places}</ul>` : ""}
+    ${more}
+    ${parcels}
+    ${pdf}
+  </article>`;
+}
+
+function outageEmpty(board, copy) {
+  if (!board.areas.length) return tx(copy, "outages_none_watched");
+  if (!board.fetchedAt) return tx(copy, "outages_waiting");
+  return tx(copy, "outages_empty");
+}
+
+export function outagesPage(data, ctx) {
+  const board = data.outages ?? { items: [], areas: [], fetchedAt: null, status: "", note: "", checked: "" };
+  const showArea = board.areas.length > 1;
+  const current = board.items.filter((item) => item.phase === "now");
+  const planned = board.items.filter((item) => item.phase !== "now");
+  const section = (heading, items) =>
+    items.length
+      ? `<section class="block"><h2>${esc(heading)}</h2><div class="stack">${items
+          .map((item) => outageCard(item, { showArea, copy: ctx.copy }))
+          .join("")}</div></section>`
+      : "";
+  const list = board.items.length
+    ? `${section(tx(ctx.copy, "outages_current"), current)}${section(tx(ctx.copy, "outages_planned"), planned)}`
+    : `<p class="card dashed muted">${esc(outageEmpty(board, ctx.copy))}</p>`;
+  return layout({
+    ...ctx,
+    title: `${tx(ctx.copy, "outages_heading")} | ${tx(ctx.copy, "site_name")}`,
+    description: tx(ctx.copy, "outages_description"),
+    body: `
+      <p class="eyebrow">${esc(tx(ctx.copy, "outages_eyebrow"))}</p>
+      <h1>${esc(tx(ctx.copy, "outages_heading"))}</h1>
+      <p class="lede">${esc(tx(ctx.copy, "outages_lede"))}</p>
+      ${board.note ? `<p class="banner">${esc(board.note)}</p>` : ""}
+      ${board.checked ? `<p class="meta">${esc(board.checked)}</p>` : ""}
+      ${list}
+      <p class="fine">${esc(tx(ctx.copy, "outages_disclaimer"))} <a href="https://www.bezstavy.cz/" target="_blank" rel="noopener noreferrer">${esc(tx(ctx.copy, "outages_source"))}</a></p>`,
+  });
+}
+
 function doctorChangeAdmin(doctor, cancelId) {
   const items = doctor.changes.length
     ? doctor.changes
@@ -1463,6 +1549,76 @@ export function adminDoctors(ctx, data, message, editingId, confirmId, cancelId)
     message,
     `<div class="${chief ? "split" : "stack"}">${form}<ul class="stack plain">${list}</ul></div>`,
   );
+}
+
+export function adminOutages(ctx, data, message, confirmId) {
+  const areas = data.outageAreas ?? [];
+  const board = data.outages ?? { items: [], areas: [], checked: "", note: "" };
+  const confirming = areas.find((area) => area.id === confirmId) ?? null;
+  const rows = areas
+    .map((area) => {
+      const remove =
+        confirming?.id === area.id
+          ? ""
+          : `<a class="btn btn-ghost" href="/redakce/odstavky?smazat=${area.id}">Smazat</a>`;
+      return `<li class="card">
+        <input type="hidden" name="areaId" value="${area.id}">
+        ${field("Název", `<input class="${input}" name="areaName" required maxlength="80" value="${esc(area.name)}">`)}
+        ${field("Kód obce", `<input class="${input}" name="areaCode" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" value="${esc(area.code)}" autocomplete="off">`)}
+        ${field("Pořadí", `<input class="${input}" type="number" name="areaSort" min="0" max="999" required value="${esc(area.sortOrder)}">`)}
+        <label class="check"><input type="checkbox" name="areaOn" value="${area.id}"${area.enabled ? " checked" : ""}> Hledat v téhle obci</label>
+        ${remove ? `<div class="row">${remove}</div>` : ""}
+      </li>`;
+    })
+    .join("");
+  const confirmForm = confirming
+    ? `<form class="card" method="post" action="/redakce/odstavky/smazat">
+        <p>Smazat obec ${esc(confirming.name)} (${esc(confirming.code)})?</p>
+        <input type="hidden" name="id" value="${confirming.id}">
+        <input type="hidden" name="confirm" value="1">
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Opravdu smazat</button>
+          <a class="btn btn-ghost" href="/redakce/odstavky">Nechat</a>
+        </div>
+      </form>`
+    : "";
+  const saveForm = areas.length
+    ? `<form class="stack" method="post" action="/redakce/odstavky/ulozit">
+        <ul class="stack plain">${rows}</ul>
+        <button class="btn btn-primary" type="submit">Uložit oblasti</button>
+      </form>`
+    : `<p class="card dashed muted">Zatím se nehlídá žádná obec.</p>`;
+  const watched = board.areas.map((area) => area.name).join(", ");
+  const preview = board.items.length
+    ? `<section class="block"><h2>Jak to vypadá na webu</h2><div class="stack">${board.items
+        .map((item) => outageCard(item, { showArea: board.areas.length > 1, copy: ctx.copy }))
+        .join("")}</div></section>`
+    : board.fetchedAt
+      ? `<p class="card dashed muted">${esc(outageEmpty(board, ctx.copy))}</p>`
+      : "";
+  const body = `<div class="stack">
+    <section class="card">
+      <h2>Hlídané obce</h2>
+      <p class="muted">Drbna se ptá veřejného widgetu ČEZ Distribuce na odstávky v zaškrtnutých obcích. Načítá to worker, párkrát denně, a web pak čte uložený přehled. Na titulce se odstávka ukáže, když právě probíhá nebo začíná do ${OUTAGE_LEAD_DAYS} dní. Části Kopidlna, tedy Drahoraz, Mlýnec, Pševes a Ledkov, patří pod kód 573060. Další obec přidejte jejím šestimístným kódem.</p>
+      <p class="meta">${esc(board.checked || "Ještě se nenačítalo.")}</p>
+      ${watched ? `<p class="meta">Na webu se hledá v: ${esc(watched)}.</p>` : ""}
+      ${board.note ? `<p class="banner">${esc(board.note)}</p>` : ""}
+      <form method="post" action="/redakce/odstavky/nacist"><button class="btn btn-line" type="submit">Načíst teď</button></form>
+    </section>
+    ${confirmForm}
+    ${saveForm}
+    <form class="card form" method="post" action="/redakce/odstavky/pridat">
+      <h2>Další obec</h2>
+      ${field("Název", `<input class="${input}" name="name" required maxlength="80" placeholder="Třeba Jičíněves">`)}
+      ${field("Kód obce", `<input class="${input}" name="code" required inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="573060" autocomplete="off">`)}
+      ${field("Pořadí", `<input class="${input}" type="number" name="sortOrder" min="0" max="999" value="100">`)}
+      <span class="hint">Menší číslo je na stránce výš. Kód je šest číslic z registru obcí.</span>
+      <label class="check"><input type="checkbox" name="enabled" value="1" checked> Hledat v téhle obci</label>
+      <button class="btn btn-primary" type="submit">Přidat obec</button>
+    </form>
+    ${preview}
+  </div>`;
+  return adminShell(ctx, data, "odstavky", message, body);
 }
 
 function adDraft(source, user, sample) {

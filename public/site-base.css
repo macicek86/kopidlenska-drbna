@@ -753,6 +753,25 @@ a.card { display: block; text-decoration: none; color: inherit; }
   font-weight: 700;
 }
 
+.outage-state { margin: 0; font-weight: 700; }
+.outage-state.is-now { color: var(--brand); }
+.outage-state.is-soon { color: var(--soon); }
+.outage-when {
+  margin: 0.15rem 0 0.35rem;
+  font-family: var(--display);
+  font-size: clamp(1.25rem, 3vw, 1.55rem);
+  line-height: 1.25;
+  text-wrap: balance;
+}
+.outage-places { list-style: none; margin: 0.7rem 0 0; padding: 0; }
+.outage-places li {
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.outage-more { margin: 0.35rem 0 0; }
+
 .note { font-weight: 700; }
 .note-ok { color: var(--pine); }
 .note-bad { color: var(--brand); }

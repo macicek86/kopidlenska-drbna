@@ -16,6 +16,9 @@ database_id = "6b49d75b-58bf-433d-91be-1869f543a388"
 binding = "BUCKET"
 bucket_name = "kopidlenska-drbna"
 
+[triggers]
+crons = ["15 */4 * * *"]
+
 # routes = [
 #   { pattern = "kopidlenskadrbna.org", custom_domain = true },
 #   { pattern = "www.kopidlenskadrbna.org", custom_domain = true },

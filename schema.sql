@@ -303,6 +303,27 @@ create table if not exists ad_proposals (
   created_at text not null default (date('now'))
 );
 
+create table if not exists outage_areas (
+  id integer primary key autoincrement,
+  code text not null unique,
+  name text not null,
+  enabled integer not null default 1,
+  sort_order integer not null default 100
+);
+
+create table if not exists outage_feed (
+  id integer primary key,
+  fetched_at text,
+  status text not null default '',
+  note text not null default '',
+  payload text not null default '[]',
+  fetching_at text
+);
+
+insert into outage_feed (id, payload)
+select 1, '[]'
+where not exists (select 1 from outage_feed where id = 1);
+
 create table if not exists doctor_changes (
   id integer primary key autoincrement,
   doctor_id integer not null,
