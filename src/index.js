@@ -689,7 +689,7 @@ export default {
     const url = new URL(request.url);
     try {
       await ensureSchema(env);
-      if (request.method === "GET" && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
+      if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
         return env.ASSETS.fetch(request);
       }
       if (request.method === "GET" || request.method === "HEAD") {
