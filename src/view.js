@@ -302,7 +302,7 @@ export function adsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "ads_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "ads_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "ads_lede"))}</p>
-      <div class="stack">${list}</div>`,
+      <div class="ads-grid">${list}</div>`,
   });
 }
 
