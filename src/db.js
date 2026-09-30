@@ -1921,14 +1921,13 @@ export async function saveSite(env, request, input) {
   if (!Number.isInteger(stepDays) || stepDays < 7 || stepDays > 56) {
     return { ok: false, error: "Interval musí být mezi 7 a 56 dny." };
   }
-  const contactNote = clip(input.contactNote, 600);
   const wasteNote = clip(input.wasteNote, 800);
   const holidayNote = clip(input.holidayNote, 160);
-  if (contactNote.length < 3 || wasteNote.length < 3) return { ok: false, error: "Doplňte texty pro návštěvníky." };
+  if (wasteNote.length < 3) return { ok: false, error: "Doplňte vysvětlení svozu." };
   await env.DB.prepare(
-    `update settings set contact_note = ?, waste_note = ?, holiday_note = ?, weekday = ?, week_parity = ?, step_days = ? where id = 1`,
+    `update settings set waste_note = ?, holiday_note = ?, weekday = ?, week_parity = ?, step_days = ? where id = 1`,
   )
-    .bind(contactNote, wasteNote, holidayNote, weekday, weekParity, stepDays)
+    .bind(wasteNote, holidayNote, weekday, weekParity, stepDays)
     .run();
   return { ok: true };
 }
@@ -2227,7 +2226,9 @@ export async function saveCopy(env, request) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   const form = await request.formData();
-  const statements = [];
+  const contactNote = clip(form.get("contactNote"), 600);
+  if (contactNote.length < 3) return { ok: false, error: "Doplňte kontakt na stránce O nás." };
+  const statements = [env.DB.prepare("update settings set contact_note = ? where id = 1").bind(contactNote)];
   for (const item of COPY) {
     const value = clip(form.get(item.key), item.max);
     if (!value) return { ok: false, error: `Doplňte pole: ${item.label}.` };

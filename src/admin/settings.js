@@ -9,6 +9,15 @@ function saveBar(label) {
   return `<div class="save-bar"><span class="save-bar-note" data-dirty-note>Máte neuložené změny.</span><button class="btn btn-primary" type="submit">${label}</button></div>`;
 }
 
+function textField(label, value, control, long = false) {
+  return `<div class="text-field${long ? " text-field-long" : ""}" data-search="${esc(`${label} ${value}`.toLowerCase())}">${field(esc(label), control)}</div>`;
+}
+
+function contactField(value) {
+  const label = "Kontakt na redakci";
+  return textField(label, value, `<textarea class="${input}" name="contactNote" rows="3" maxlength="600" required>${esc(value)}</textarea>`, true);
+}
+
 export function adminTexts(ctx, data, message) {
   const groups = [];
   for (const row of COPY) {
@@ -24,12 +33,13 @@ export function adminTexts(ctx, data, message) {
           const control = row.long
             ? `<textarea class="${input}" name="${row.key}" rows="3" maxlength="${row.max}" required>${esc(value)}</textarea>`
             : `<input class="${input}" name="${row.key}" maxlength="${row.max}" required value="${esc(value)}">`;
-          return `<div class="text-field${row.long ? " text-field-long" : ""}" data-search="${esc(`${row.label} ${value}`.toLowerCase())}">${field(esc(row.label), control)}</div>`;
+          return textField(row.label, value, control, row.long);
         })
         .join("");
+      const extra = group.name === "O nás" ? contactField(data.contactNote) : "";
       return `<details class="text-group"${index === 0 ? " open" : ""}>
-        <summary><span>${esc(group.name)}</span><small>${group.items.length}</small></summary>
-        <div class="text-group-body">${fields}</div>
+        <summary><span>${esc(group.name)}</span><small>${group.items.length + (extra ? 1 : 0)}</small></summary>
+        <div class="text-group-body">${extra}${fields}</div>
       </details>`;
     })
     .join("");
@@ -39,7 +49,7 @@ export function adminTexts(ctx, data, message) {
         <label class="filter">${icon("search")}<input type="search" placeholder="Hledat text…" data-text-filter aria-label="Hledat text"></label>
         <button class="btn btn-sm btn-ghost" type="button" data-expand>Rozbalit vše</button>
       </div>
-      ${callout("Zprávy a pozvánky mají vlastní sekce. Kontakt, vysvětlení svozu a poznámka ke svátkům jsou v Popelnicích.")}
+      ${callout("Zprávy a pozvánky mají vlastní sekce. Den svozu, jeho vysvětlení a poznámka ke svátkům jsou v Popelnicích.")}
       <div class="text-groups">${blocks}</div>
       ${saveBar("Uložit texty")}
     </form>`;
@@ -51,7 +61,7 @@ export function adminSite(ctx, data, message) {
   const days = [1, 2, 3, 4, 5, 6, 0]
     .map((day) => `<option value="${day}"${waste.weekday === day ? " selected" : ""}>${weekdayName(day)}</option>`)
     .join("");
-  const body = `${pageHead("Popelnice a kontakt", "Pravidlo svozu, stejné jako na popelnice.kopidlenskadrbna.org, a kontakt na stránce O nás.")}
+  const body = `${pageHead("Popelnice", "Pravidlo svozu, stejné jako na popelnice.kopidlenskadrbna.org.")}
     <form class="settings-form" method="post" action="/redakce/svoz/ulozit" data-dirty>
       <section class="panel">
         <header class="panel-head"><h2>Svoz</h2><p class="panel-note">Příští svoz: <b>${esc(formatLong(waste.nextDate))}</b></p></header>
@@ -71,15 +81,9 @@ export function adminSite(ctx, data, message) {
           ${field("Poznámka ke svátkům", `<input class="${input}" name="holidayNote" maxlength="160" value="${esc(waste.holidayNote)}">`)}
         </div>
       </section>
-      <section class="panel">
-        <header class="panel-head"><h2>Kontakt</h2></header>
-        <div class="form">
-          ${field("Kontakt na stránce O nás", `<textarea class="${input}" name="contactNote" rows="3" maxlength="600">${esc(data.contactNote)}</textarea>`)}
-        </div>
-      </section>
       ${saveBar("Uložit")}
     </form>`;
-  return adminShell(ctx, data, "svoz", message, body, { title: "Popelnice a kontakt" });
+  return adminShell(ctx, data, "svoz", message, body, { title: "Popelnice" });
 }
 
 export function adminPassword(ctx, data, message) {

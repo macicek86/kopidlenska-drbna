@@ -25,7 +25,7 @@ function nav(data) {
     {
       name: "Služby",
       links: [
-        chief && ["svoz", "Popelnice a kontakt", "bin"],
+        chief && ["svoz", "Popelnice", "bin"],
         (chief || userCan(data.user, "sberny_dvur")) && ["dvory", "Sběrné dvory", "recycle"],
         (chief || userCan(data.user, "doktori")) && ["lekari", "Lékaři", "cross"],
         chief && ["odstavky", "Odstávky", "bolt"],

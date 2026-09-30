@@ -240,7 +240,6 @@ async function formFields(request) {
     articleId: Number.isInteger(Number(text("clanek"))) && Number(text("clanek")) > 0 ? Number(text("clanek")) : undefined,
     current: text("current"),
     next: text("next"),
-    contactNote: text("contactNote"),
     wasteNote: text("wasteNote"),
     holidayNote: text("holidayNote"),
     weekday: text("weekday"),
