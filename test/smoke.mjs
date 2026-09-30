@@ -18,7 +18,7 @@ assert(/Svoz je dnes|Svoz je zítra|Za \d+ dn/.test(home.text), "countdown missi
 assert(home.text.includes("/kozel-maskot.webp"), "mascot missing");
 assert(!home.text.includes("<script"), "unexpected script");
 
-const css = await get("/site.css");
+const css = await get("/site-base.css");
 assert(css.status === 200 && css.text.includes("--brand"), "css missing");
 
 const article = await get("/zpravy/vitejte");
@@ -187,7 +187,7 @@ const chiefAgain = await signIn("redakce", "Drbna2026");
 const desk = await fetch(base + "/redakce/zpravy", { headers: { cookie: chiefAgain } });
 const deskHtml = await desk.text();
 const titlePattern = draftTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-const proposalMatch = deskHtml.match(new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,400}?/redakce/zpravy\\?navrh=(\\d+)`));
+const proposalMatch = deskHtml.match(new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,1200}?/redakce/zpravy\\?navrh=(\\d+)`));
 assert(proposalMatch, "proposal missing from the desk");
 const approved = await postForm("/redakce/zpravy/schvalit", chiefAgain, {
   id: proposalMatch[1],
@@ -213,7 +213,7 @@ await postForm("/redakce/odhlasit", chiefAgain, {});
 const janaAgain = await signIn(contributorLogin, "hesloheslo");
 const deskForId = await fetch(base + "/redakce/zpravy", { headers: { cookie: janaAgain } });
 const idMatch = (await deskForId.text()).match(
-  new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,250}?/redakce/zpravy\\?clanek=(\\d+)`),
+  new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,1200}?/redakce/zpravy\\?clanek=(\\d+)`),
 );
 assert(idMatch, "contributor cannot open their article");
 const edited = await postForm("/redakce/zpravy/navrh", janaAgain, {
@@ -230,7 +230,7 @@ assert(duringReview.text.includes(draftBody) && !duringReview.text.includes(prop
 await postForm("/redakce/odhlasit", janaAgain, {});
 const editorAgain = await signIn("redakce", "Drbna2026");
 const reviewDesk = await (await fetch(base + "/redakce/zpravy", { headers: { cookie: editorAgain } })).text();
-const reviewMatch = reviewDesk.match(new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,400}?/redakce/zpravy\\?navrh=(\\d+)`));
+const reviewMatch = reviewDesk.match(new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,1200}?/redakce/zpravy\\?navrh=(\\d+)`));
 assert(reviewMatch, "edit proposal missing");
 const fixed = await postForm("/redakce/zpravy/schvalit", editorAgain, {
   id: reviewMatch[1],

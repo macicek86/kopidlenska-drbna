@@ -11,9 +11,14 @@ function photoLimits(input) {
   };
 }
 
-for (const form of document.querySelectorAll("form")) {
+function bootPhotos(root) {
+  for (const form of root.querySelectorAll("form")) bindPhoto(form);
+}
+
+function bindPhoto(form) {
   const fileInput = form.querySelector('input[type="file"][name="image"]');
-  if (!fileInput) continue;
+  if (!fileInput || form.dataset.photoBound) return;
+  form.dataset.photoBound = "1";
   let ready = false;
   form.addEventListener("submit", async (event) => {
     if (ready) return;
@@ -330,8 +335,10 @@ function mountRich(rich) {
   markEmpty();
 }
 
-function bootRich() {
-  const fields = document.querySelectorAll(".rich");
+let trixReady = false;
+
+function bootRich(root) {
+  const fields = root.querySelectorAll(".rich");
   if (!fields.length) return;
   if (!window.Trix) {
     for (const rich of fields) {
@@ -340,7 +347,10 @@ function bootRich() {
     }
     return;
   }
-  configureTrix();
+  if (!trixReady) {
+    configureTrix();
+    trixReady = true;
+  }
   for (const rich of fields) mountRich(rich);
 }
 
@@ -354,9 +364,13 @@ function previewAdLink(raw) {
   return "";
 }
 
-function bootAdPreview() {
-  const form = document.querySelector("[data-ad-form]");
-  if (!form) return;
+function bootAdPreview(root) {
+  for (const form of root.querySelectorAll("[data-ad-form]")) bindAdPreview(form);
+}
+
+function bindAdPreview(form) {
+  if (form.dataset.previewBound) return;
+  form.dataset.previewBound = "1";
   const panel = form.querySelector("[data-ad-preview]");
   if (!panel) return;
   const titleNode = panel.querySelector("[data-ad='title']");
@@ -425,5 +439,12 @@ function bootAdPreview() {
   paint();
 }
 
-bootRich();
-bootAdPreview();
+// Redakce vkládá okna načtená na pozadí. Po vložení pošle drbna:mount a tady se oživí.
+function boot(root) {
+  bootPhotos(root);
+  bootRich(root);
+  bootAdPreview(root);
+}
+
+document.addEventListener("drbna:mount", (event) => boot(event.target instanceof Element ? event.target : document));
+boot(document);

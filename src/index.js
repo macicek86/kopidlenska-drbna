@@ -55,22 +55,11 @@ import {
 import {
   aboutPage,
   adPage,
-  adminAds,
-  adminArticles,
-  adminEvents,
-  adminPassword,
-  adminPeople,
-  adminSite,
-  adminTexts,
-  adminDoctors,
-  adminYards,
   adsPage,
   articlePage,
   binsPage,
   brokenPage,
   doctorsPage,
-  adminOutages,
-  adminRubrics,
   eventsPage,
   homePage,
   outagesPage,
@@ -79,6 +68,20 @@ import {
   newsPage,
   yardsPage,
 } from "./view.js";
+import {
+  adminAds,
+  adminArticles,
+  adminDoctors,
+  adminEvents,
+  adminOutages,
+  adminOverview,
+  adminPassword,
+  adminPeople,
+  adminRubrics,
+  adminSite,
+  adminTexts,
+  adminYards,
+} from "./admin/index.js";
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
 import { WEEK_DAYS } from "./yards.js";
@@ -193,6 +196,25 @@ function messageFrom(url) {
 function positiveParam(url, name) {
   const id = Number(url.searchParams.get(name));
   return Number.isInteger(id) && id > 0 ? id : undefined;
+}
+
+// Co má redakce otevřít v okně. Každá sekce si z toho vezme, co zná.
+function adminQuery(url) {
+  return {
+    fresh: url.searchParams.has("novy"),
+    editingId: positiveParam(url, "id"),
+    confirmId: positiveParam(url, "smazat"),
+    proposalId: positiveParam(url, "navrh"),
+    targetId: positiveParam(url, "clanek"),
+    withdrawId: positiveParam(url, "stahnout"),
+    cancelId: positiveParam(url, "zrusit"),
+    closureYardId: positiveParam(url, "uzavreni"),
+    hoursId: positiveParam(url, "hodiny"),
+    changeId: positiveParam(url, "zmena"),
+    accessId: positiveParam(url, "upravit"),
+    passwordId: positiveParam(url, "heslo"),
+    disableId: positiveParam(url, "vypnout"),
+  };
 }
 
 async function formFields(request) {
@@ -375,74 +397,37 @@ async function renderGet(request, env, url, execution) {
     const data = await loadPublic(env);
     return html(doctorsPage(data, ctx));
   }
-  if (path === "/redakce") return redirect("/redakce/zpravy");
+  if (path === "/redakce") return redirect("/redakce/prehled");
   if (path.startsWith("/redakce/")) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
     const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
-      return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
+      return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
-    if (tab === "reklamy") {
-      return html(
-        adminAds(ctx, data, message, {
-          editingId: positiveParam(url, "id"),
-          confirmId: positiveParam(url, "smazat"),
-          proposalId: positiveParam(url, "navrh"),
-          withdrawId: positiveParam(url, "stahnout"),
-        }),
-      );
-    }
-    if (tab === "zpravy") {
-      return html(
-        adminArticles(ctx, data, message, {
-          editingId: positiveParam(url, "id"),
-          confirmId: positiveParam(url, "smazat"),
-          proposalId: positiveParam(url, "navrh"),
-          targetId: positiveParam(url, "clanek"),
-          withdrawId: positiveParam(url, "stahnout"),
-        }),
-      );
-    }
-    if (tab === "rubriky") {
-      return html(adminRubrics(ctx, data, message, positiveParam(url, "id"), positiveParam(url, "smazat")));
-    }
-    if (tab === "akce") return html(adminEvents(ctx, data, message, positiveParam(url, "id"), positiveParam(url, "smazat")));
+    const query = adminQuery(url);
+    if (tab === "prehled") return html(adminOverview(ctx, data, message));
+    if (tab === "reklamy") return html(adminAds(ctx, data, message, query));
+    if (tab === "zpravy") return html(adminArticles(ctx, data, message, query));
+    if (tab === "rubriky") return html(adminRubrics(ctx, data, message, query));
+    if (tab === "akce") return html(adminEvents(ctx, data, message, query));
     if (tab === "texty") return html(adminTexts(ctx, data, message));
     if (tab === "svoz") return html(adminSite(ctx, data, message));
     if (tab === "dvory") {
       if (data.signedIn && !userCan(data.user, "sberny_dvur")) {
-        return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Na sběrné dvory potřebuješ oprávnění.")}`);
+        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na sběrné dvory potřebuješ oprávnění.")}`);
       }
-      return html(
-        adminYards(
-          ctx,
-          data,
-          message,
-          positiveParam(url, "id"),
-          positiveParam(url, "smazat"),
-          positiveParam(url, "zrusit"),
-        ),
-      );
+      return html(adminYards(ctx, data, message, query));
     }
     if (tab === "lekari") {
       if (data.signedIn && !userCan(data.user, "doktori")) {
-        return redirect(`/redakce/zpravy?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
+        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
       }
-      return html(
-        adminDoctors(
-          ctx,
-          data,
-          message,
-          positiveParam(url, "id"),
-          positiveParam(url, "smazat"),
-          positiveParam(url, "zrusit"),
-        ),
-      );
+      return html(adminDoctors(ctx, data, message, query));
     }
-    if (tab === "odstavky") return html(adminOutages(ctx, data, message, positiveParam(url, "smazat")));
-    if (tab === "lide") return html(adminPeople(ctx, data, message, positiveParam(url, "vypnout")));
+    if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
+    if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
   return html(missingPage({ ...ctx, path: "/" }), 404);
@@ -463,12 +448,12 @@ async function renderPost(request, env, url) {
 
   if (path === "/redakce/prihlasit") {
     const result = await login(env, fields.login, fields.password);
-    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy", sessionCookie(result.token, https));
+    if (!result.ok) return redirect(`/redakce/prehled?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/prehled", sessionCookie(result.token, https));
   }
   if (path === "/redakce/odhlasit") {
     await logout(env, request);
-    return redirect("/redakce/zpravy", clearCookie(https));
+    return redirect("/redakce/prehled", clearCookie(https));
   }
   if (path === "/redakce/zpravy/navrh") {
     const result = await saveProposal(env, request, fields);

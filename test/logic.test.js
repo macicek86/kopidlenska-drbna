@@ -7,7 +7,8 @@ import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../s
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
-import { adPanel, adminAds, adminOutages, adminRubrics, articlePage, homePage, layout, newsPage, outagesPage } from "../src/view.js";
+import { adPanel, articlePage, homePage, layout, newsPage, outagesPage } from "../src/view.js";
+import { adminAds, adminOutages, adminRubrics } from "../src/admin/index.js";
 import { articleInRubric, deleteRubricError, findRubric, parseRubricInput, rubricLabel } from "../src/rubrics.js";
 import {
   boardJson,
@@ -521,7 +522,7 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
     { text: "", kind: "ok" },
     { proposalId: 4 },
   );
-  assert.match(queued, /Reklamy \(1\)/);
+  assert.match(queued, /Reklamy<\/span><b class="adm-count"[^>]*>1<\/b>/);
   assert.match(queued, /Schválit a zveřejnit/);
   assert.match(queued, /action="\/redakce\/reklamy\/schvalit"/);
   assert.match(queued, /action="\/redakce\/reklamy\/vratit"/);
@@ -870,7 +871,7 @@ test("stránka odstávek bere uložený přehled a na titulce je jen blízká", 
       outages: soon,
     },
     "",
-    2,
+    { confirmId: 2 },
   );
   assert.match(desk, /name="areaOn" value="1" checked/);
   assert.match(desk, /name="areaOn" value="2"/);
@@ -958,8 +959,7 @@ test("filtr sportu zahrne fotbal a podrubrika se ukáže až po výběru", () =>
     { path: "/redakce", copy: {} },
     { signedIn: true, user: { role: "hlavni", name: "Redakce" }, showDefaultPassword: false, rubrics },
     "",
-    undefined,
-    undefined,
+    {},
   );
   assert.match(desk, /Nová rubrika/);
   assert.match(desk, /action="\/redakce\/rubriky\/ulozit"/);

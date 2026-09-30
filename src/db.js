@@ -1686,7 +1686,7 @@ export async function setContributorPassword(env, request, input) {
   if (password.length < 8) return { ok: false, error: "Heslo musí mít aspoň 8 znaků." };
   const row = await env.DB.prepare("select id, role from users where id = ?").bind(input.id).first();
   if (!row) return { ok: false, error: "Ten účet už tu není." };
-  if (row.role !== "prispevovatel") return { ok: false, error: "Heslo hlavního redaktora se mění v záložce Heslo." };
+  if (row.role !== "prispevovatel") return { ok: false, error: "Heslo hlavního redaktora se mění v sekci Můj účet." };
   await env.DB.prepare("update users set password_hash = ?, session_token = null where id = ?")
     .bind(await hashPassword(password), row.id)
     .run();

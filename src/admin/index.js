@@ -1,0 +1,11 @@
+export { adminAds } from "./ads.js";
+export { adminArticles } from "./articles.js";
+export { adminDoctors } from "./doctors.js";
+export { adminEvents } from "./events.js";
+export { adminOutages } from "./outages.js";
+export { adminOverview } from "./overview.js";
+export { adminPeople } from "./people.js";
+export { adminRubrics } from "./rubrics.js";
+export { adminPassword, adminSite, adminTexts } from "./settings.js";
+export { adminYards } from "./yards.js";
+export { ADMIN_TABS } from "./shell.js";

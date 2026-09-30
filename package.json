@@ -10,9 +10,13 @@
     "check": "node --test test/*.test.js",
     "db:local": "wrangler d1 execute kopidlenska-drbna --local --file=./schema.sql",
     "nasadit": "node nasadit.mjs",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "nahled:db": "wrangler d1 execute kopidlenska-drbna --local --persist-to .wrangler/nahled --file=./schema.sql",
+    "nahled": "wrangler dev --port 8788 --persist-to .wrangler/nahled",
+    "screens": "BASE=${BASE:-http://127.0.0.1:8788} node test/screens.mjs"
   },
   "devDependencies": {
+    "playwright-core": "^1.63.0",
     "wrangler": "^4.42.0"
   }
 }
