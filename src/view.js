@@ -44,6 +44,15 @@ const NAV = [
   ["/o-nas", "nav_about"],
 ];
 
+const OG_IMAGE = "/og.webp";
+const OG_WIDTH = 1200;
+const OG_HEIGHT = 630;
+
+function siteOrigin(origin, mainOrigin) {
+  const value = String(origin || mainOrigin || "").trim().replace(/\/$/, "");
+  return /^https?:\/\//i.test(value) ? value : "";
+}
+
 const AMP = "\u0026amp;";
 const LT = "\u0026lt;";
 const GT = "\u0026gt;";
@@ -65,8 +74,13 @@ function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
 
-export function layout({ title, description, path, minimal, mainOrigin, body, script = "", head = "", copy = {} }) {
+export function layout({ title, description, path, minimal, mainOrigin, origin, body, script = "", head = "", copy = {} }) {
   const brandHref = minimal ? "/popelnice" : "/";
+  const base = siteOrigin(origin, mainOrigin);
+  const pagePath = typeof path === "string" && path.startsWith("/") ? path : "/";
+  const pageUrl = base ? `${base}${pagePath}` : "";
+  const ogImage = base ? `${base}${OG_IMAGE}` : OG_IMAGE;
+  const siteName = tx(copy, "site_name");
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const links = NAV.map(
     ([href, key]) =>
@@ -86,6 +100,19 @@ export function layout({ title, description, path, minimal, mainOrigin, body, sc
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="cs_CZ">
+  <meta property="og:site_name" content="${esc(siteName)}">
+  <meta property="og:title" content="${esc(title)}">
+  <meta property="og:description" content="${esc(description)}">
+  ${pageUrl ? `<meta property="og:url" content="${esc(pageUrl)}">` : ""}
+  <meta property="og:image" content="${esc(ogImage)}">
+  <meta property="og:image:type" content="image/webp">
+  <meta property="og:image:width" content="${OG_WIDTH}">
+  <meta property="og:image:height" content="${OG_HEIGHT}">
+  <meta property="og:image:alt" content="${esc(siteName)}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="${esc(ogImage)}">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

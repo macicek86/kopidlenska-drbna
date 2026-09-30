@@ -160,7 +160,7 @@ function ctxFor(request, path) {
   const url = new URL(request.url);
   const minimal = url.hostname.startsWith("popelnice.");
   const host = minimal ? url.hostname.replace(/^popelnice\./, "") : url.hostname;
-  return { path, minimal, mainOrigin: `${url.protocol}//${host}` };
+  return { path, minimal, mainOrigin: `${url.protocol}//${host}`, origin: url.origin };
 }
 
 function messageFrom(url) {

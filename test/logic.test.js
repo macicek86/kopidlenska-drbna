@@ -6,7 +6,7 @@ import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
 import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../src/ads.js";
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
-import { adPanel, adminAds, articlePage, homePage, newsPage } from "../src/view.js";
+import { adPanel, adminAds, articlePage, homePage, layout, newsPage } from "../src/view.js";
 import {
   DOCTOR_SEEDS,
   HOME_LEAD_DAYS,
@@ -544,4 +544,24 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.match(own, /name="nabidka" value="1"/);
   assert.match(own, /Poslat návrh/);
   assert.match(own, />Vypnout</);
+});
+
+test("sdílení má og obrázek 1200×630", () => {
+  const origin = "https://kopidlenska-drbna.camledian.workers.dev";
+  const html = layout({
+    title: "Kopidlenská drbna",
+    description: 'Zprávy & pozvánky "z Kopidlna".',
+    path: "/zpravy",
+    origin,
+    body: "",
+    copy: {},
+  });
+  assert.match(html, /property="og:image" content="https:\/\/kopidlenska-drbna\.camledian\.workers\.dev\/og\.webp"/);
+  assert.match(html, /property="og:image:type" content="image\/webp"/);
+  assert.match(html, /property="og:image:width" content="1200"/);
+  assert.match(html, /property="og:image:height" content="630"/);
+  assert.match(html, /property="og:url" content="https:\/\/kopidlenska-drbna\.camledian\.workers\.dev\/zpravy"/);
+  assert.match(html, /property="og:description" content="Zprávy &amp; pozvánky &quot;z Kopidlna&quot;."/);
+  assert.match(html, /name="twitter:card" content="summary_large_image"/);
+  assert.match(html, /property="og:image:alt" content="Kopidlenská drbna"/);
 });
