@@ -56,7 +56,7 @@ const ARTICLE_FIELDS =
 const ARTICLE_FROM =
   "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
 
-let schemaPromise = null;
+let schemaReady = false;
 
 export function textWasEdited(before, after) {
   return (
@@ -571,19 +571,12 @@ async function migrateSchema(env) {
   return true;
 }
 
-export function ensureSchema(env) {
-  if (!schemaPromise) {
-    schemaPromise = migrateSchema(env).then(
-      (done) => {
-        if (!done) schemaPromise = null;
-      },
-      (error) => {
-        schemaPromise = null;
-        throw error;
-      },
-    );
-  }
-  return schemaPromise;
+// Kontrola schématu jednou za instanci Workeru. Každý požadavek ji dělá sám, dokud jednou celá neproběhne.
+// Nesdílet rozběhnutý slib mezi požadavky: když se požadavek, který ho spustil, zruší (zavřená stránka,
+// obnovení), Cloudflare zruší i jeho dotazy, slib se nikdy nedokončí a všechny další požadavky by visely.
+export async function ensureSchema(env) {
+  if (schemaReady) return;
+  if (await migrateSchema(env)) schemaReady = true;
 }
 
 async function attachPermissions(env, accounts) {
