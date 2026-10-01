@@ -290,6 +290,7 @@ async function formFields(request) {
     feedUrl: text("feedUrl"),
     persona: text("persona"),
     football: text("football"),
+    articleText: text("text"),
     autoPublish: form.get("autoPublish") === "1",
     clubUrl: text("clubUrl"),
     previews: form.get("previews") === "1",
@@ -652,7 +653,7 @@ async function renderPost(request, env, url, execution) {
     (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??
-    (await drbenaPost(path, request, env, fields));
+    (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena")));
   if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);

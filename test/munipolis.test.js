@@ -9,6 +9,7 @@ import { outagesPage, homePage } from "../src/view.js";
 import { adminDrbena, adminMunipolis, adminOutages } from "../src/admin/index.js";
 import { refLink } from "../src/admin/imports.js";
 import { DEFAULT_FOOTBALL, DEFAULT_FOOTBALL_VOICE, DEFAULT_PERSONA, ownFootball, ownPersona, voiceFor } from "../src/drbena.js";
+import { readTry, tryVoice } from "../src/drbena-try.js";
 
 const FEED = `<?xml version="1.0" encoding="utf-8" ?>
 <rss version="2.0"><channel><title>RSS 2.0 Feed</title>
@@ -338,4 +339,41 @@ test("redakce ukáže povahu Drběny a nastavení importů na ni odkáže", () =
   assert.match(page, /klubovou šálou/);
   assert.match(page, /Vlastní text/);
   assert.match(adminMunipolis(CTX, { ...data, importSettings: null, importItems: [] }, "", { importSettings: true }), /href="\/redakce\/drbena"/);
+});
+
+test("zkouška povahy napíše ukázku podle neuložené povahy a nic neuloží", async () => {
+  const env = { DB: { prepare: () => ({ bind() { return this; }, all: async () => ({ results: [{ id: 1, name: "Zprávy", slug: "zpravy" }] }) }) } };
+  let asked = null;
+  const askCity = async (_env, args) => {
+    asked = args;
+    return { ok: true, decision: "vytvorit", article: { title: "Drběna jde na trh", excerpt: "V sobotu je trh.", body: "<p>Trh na náměstí.</p>" }, event: null, notice: null };
+  };
+  const input = readTry({ kind: "mesto", title: "Trh", articleText: "V sobotu bude na náměstí farmářský trh od osmi.", persona: "Jsem jiná koza.", football: "" });
+  const result = await tryVoice(env, input, { askCity });
+  assert.equal(result.ok, true);
+  assert.equal(asked.force, true);
+  assert.match(asked.voice, /^Jsem jiná koza\./);
+  assert.deepEqual(asked.rubricSlugs, ["zpravy"]);
+
+  let ball = null;
+  await tryVoice(env, readTry({ kind: "zapas", articleText: "Kopidlno vyhrálo doma 3:1, góly dali Novák a Dvořák.", persona: "", football: "" }), {
+    askBall: async (_env, args) => ((ball = args), { ok: true, article: { title: "x", excerpt: "y", body: "<p>z</p>" } }),
+  });
+  assert.equal(ball.item.kind, "zapas");
+  assert.match(ball.voice, /klubovou šálou/);
+
+  assert.equal((await tryVoice(env, readTry({ articleText: "krátké" }), { askCity })).ok, false);
+
+  const data = { signedIn: true, user: { id: 1, login: "admin", name: "Admin", role: "hlavni" }, drbena: { persona: "", football: "" } };
+  const page = adminDrbena(CTX, data, "", { input, result });
+  assert.match(page, /name="persona"[^>]*>Jsem jiná koza\.<\/textarea>/);
+  assert.match(page, /class="panel form is-dirty"/);
+  assert.match(page, /neuložené povahy/);
+  assert.match(page, /<h3>Drběna jde na trh<\/h3>/);
+  assert.match(page, /formaction="\/redakce\/drbena\/zkusit#ukazka"/);
+  const fresh = adminDrbena(CTX, data, "");
+  assert.doesNotMatch(fresh, /id="ukazka"/);
+  assert.match(fresh, /value="Pozvánka na Drakiádu 2026"/);
+  assert.match(fresh, /name="text"[^>]*>Město Kopidlno a Sbor/);
+  assert.doesNotMatch(page, /Drakiád/);
 });
