@@ -6,6 +6,9 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 - `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`)
 - `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…)
+- `src/db.js`: data webu; `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/outages-db.js` odstávky elektřiny
+- `src/notices.js` + `src/notices-db.js`: odstávky vody a uzavírky (uzavírky zatím jen v redakci, viz `PUBLIC_NOTICE_KINDS`); `src/outages-view.js` stránka a karta odstávek
+- `src/munipolis/`: import zpráv města (`feed.js` RSS, `ai.js` volání Claude, `store.js` D1, `run.js` průchod). Spouští ho cron a tlačítko v redakci. Klíč je tajemství `ANTHROPIC_API_KEY`
 - `src/photo.js`: fotka u zprávy (bod výřezu jako třídy `fx-*`/`fy-*`, popisek, detail bez ořezu); `src/images.js`: ukládání fotek do R2
 - `src/admin/`: redakce, jeden modul na sekci (`articles.js`, `ads.js`, `doctors.js`…)
   - `shell.js`: rozvržení s postranním menu a přihlášení
@@ -33,6 +36,8 @@ npm run screens            # snímky redakce do .screens/ (desktop i mobil, i ot
 npm run screens -- lekari  # jen vybrané sekce
 LOGIN=jana PASSWORD=… OUT=.screens/prispevatel npm run screens   # pohled přispěvatele
 ```
+
+Import z Munipolisu jde v náhledu vyzkoušet bez skutečného Claude: `npx wrangler dev --port 8788 --persist-to .wrangler/nahled --var ANTHROPIC_API_KEY:x --var ANTHROPIC_BASE_URL:http://127.0.0.1:<port>` a na tom portu malý server, který na `POST /v1/messages` vrátí JSON podle schématu z `outputSchema()`.
 
 ## Kontroly
 

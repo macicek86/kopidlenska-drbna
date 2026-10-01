@@ -20,6 +20,29 @@ export async function storeImage(env, file, folder = "clanky") {
   return { key };
 }
 
+// Obrázek z cizího webu (třeba z Munipolisu). Vrací bajty a typ, nebo null, když to není rozumná fotka.
+export async function fetchImage(url, { fetchImpl = fetch } = {}) {
+  if (!/^https:\/\//i.test(String(url ?? ""))) return null;
+  let response;
+  try {
+    response = await fetchImpl(url, { signal: AbortSignal.timeout(20_000), redirect: "follow" });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const type = String(response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!IMAGE_TYPES[type]) return null;
+  const bytes = await response.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > 4 * 1024 * 1024) return null;
+  return { bytes, type };
+}
+
+export async function storeImageBytes(env, image) {
+  const key = `clanky/${crypto.randomUUID()}.${IMAGE_TYPES[image.type]}`;
+  await env.BUCKET.put(key, image.bytes, { httpMetadata: { contentType: image.type } });
+  return key;
+}
+
 export async function releaseImage(env, key) {
   if (!key) return;
   const article = await env.DB.prepare("select 1 as ok from articles where image_key = ?").bind(key).first();

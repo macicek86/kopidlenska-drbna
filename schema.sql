@@ -317,3 +317,55 @@ create table if not exists doctor_changes (
   created_by integer,
   created_at text not null default (date('now'))
 );
+
+create table if not exists notices (
+  id integer primary key autoincrement,
+  kind text not null,
+  title text not null,
+  starts_on text not null,
+  starts_time text not null default '',
+  ends_on text not null default '',
+  ends_time text not null default '',
+  places text not null default '',
+  note text not null default '',
+  source_url text not null default '',
+  published integer not null default 0,
+  created_at text not null default (date('now'))
+);
+
+create table if not exists import_settings (
+  id integer primary key,
+  enabled integer not null default 0,
+  feed_url text not null default '',
+  auto_publish integer not null default 0,
+  voice text not null default '',
+  since text not null default '',
+  checked_at text,
+  status text not null default '',
+  note text not null default '',
+  running_at text
+);
+
+create table if not exists import_items (
+  id integer primary key autoincrement,
+  guid text not null unique,
+  link text not null default '',
+  title text not null,
+  text text not null default '',
+  images text not null default '[]',
+  published_at text not null default '',
+  status text not null default 'nove',
+  reason text not null default '',
+  duplicate_of text not null default '',
+  article_id integer,
+  proposal_id integer,
+  event_id integer,
+  notice_id integer,
+  attempts integer not null default 0,
+  created_at text not null default (datetime('now')),
+  processed_at text
+);
+
+insert into import_settings (id)
+select 1
+where not exists (select 1 from import_settings where id = 1);

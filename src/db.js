@@ -7,15 +7,24 @@ import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
 import { DOCTOR_SEEDS, changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
+import { KOPIDLNO } from "./outages.js";
+import { emptyOutageBoard, loadOutageAreas, loadOutageBoard } from "./outages-db.js";
 import {
-  KOPIDLNO,
-  MAX_AREAS,
-  buildBoard,
-  fetchAreaOutages,
-  mergeFresh,
-  parseAreaInput,
-  refreshNote,
-} from "./outages.js";
+  addColumn,
+  asBool,
+  clip,
+  currentUser,
+  mapAccount,
+  normalizeLogin,
+  readCookie,
+  requireChief,
+  requireUser,
+  slugify,
+  uniqueSlug,
+  userCan,
+} from "./db-core.js";
+import { ensureNoticeTables, loadNoticeBoard, loadNotices } from "./notices-db.js";
+import { ensureImportTables, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
 export const CATEGORIES = SEED_RUBRICS.map((item) => item.name);
@@ -31,58 +40,21 @@ export const PERMISSIONS = [
     detail: "Může měnit ordinační hodiny a dočasnou změnu. Ordinaci samotnou pořád zakládá hlavní redaktor.",
   },
 ];
+export { clearCookie, readCookie, sessionCookie, userCan } from "./db-core.js";
+export {
+  addOutageArea,
+  loadOutageBoard,
+  refreshOutages,
+  removeOutageArea,
+  saveOutageAreas,
+} from "./outages-db.js";
 export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
-const COOKIE = "drbna_editor";
 const ARTICLE_FIELDS =
   "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 const ARTICLE_FROM =
   "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
 
 let schemaPromise = null;
-
-function clip(value, max) {
-  return String(value ?? "")
-    .replace(/\r\n/g, "\n")
-    .trim()
-    .slice(0, max);
-}
-
-function asBool(value) {
-  return value === 1 || value === true || value === "1";
-}
-
-function normalizeLogin(value) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
-function slugify(input) {
-  const map = {
-    á: "a",
-    č: "c",
-    ď: "d",
-    é: "e",
-    ě: "e",
-    í: "i",
-    ň: "n",
-    ó: "o",
-    ř: "r",
-    š: "s",
-    ť: "t",
-    ú: "u",
-    ů: "u",
-    ý: "y",
-    ž: "z",
-  };
-  let out = "";
-  for (const ch of input.toLowerCase()) out += map[ch] ?? ch;
-  const slug = out
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80);
-  return slug || "prispevek";
-}
 
 export function textWasEdited(before, after) {
   return (
@@ -102,12 +74,6 @@ export function byline(person) {
   const alias = String(person.alias ?? person.authorAlias ?? "").trim();
   if (alias) return alias;
   return String(person.name ?? person.authorName ?? "").trim();
-}
-
-export function userCan(user, code) {
-  if (!user) return false;
-  if (user.role === "hlavni") return true;
-  return Array.isArray(user.permissions) && user.permissions.includes(code);
 }
 
 export function knownPermissions(values) {
@@ -149,18 +115,6 @@ function mapEvent(row) {
     startsTime: String(row.starts_time ?? ""),
     description: String(row.description ?? ""),
     published: asBool(row.published),
-  };
-}
-
-function mapAccount(row, permissions = []) {
-  return {
-    id: Number(row.id),
-    login: String(row.login),
-    name: String(row.name),
-    alias: String(row.alias ?? "").trim(),
-    role: String(row.role),
-    active: asBool(row.active),
-    permissions,
   };
 }
 
@@ -261,27 +215,6 @@ function wasteFrom(row) {
     note: String(row.waste_note),
     holidayNote: String(row.holiday_note),
   };
-}
-
-export function readCookie(request) {
-  const raw = request.headers.get("cookie") ?? "";
-  for (const part of raw.split(";")) {
-    const [name, ...rest] = part.trim().split("=");
-    if (name === COOKIE) return decodeURIComponent(rest.join("="));
-  }
-  return null;
-}
-
-export function sessionCookie(token, secure) {
-  const parts = [`${COOKIE}=${encodeURIComponent(token)}`, "HttpOnly", "Path=/", "SameSite=Lax", "Max-Age=2592000"];
-  if (secure) parts.push("Secure");
-  return parts.join("; ");
-}
-
-export function clearCookie(secure) {
-  const parts = [`${COOKIE}=`, "HttpOnly", "Path=/", "SameSite=Lax", "Max-Age=0"];
-  if (secure) parts.push("Secure");
-  return parts.join("; ");
 }
 
 async function createDeskTables(env) {
@@ -440,16 +373,6 @@ async function ensureUserColumns(env) {
   await addColumn(env, names, "alias", "alter table users add column alias text not null default ''");
 }
 
-async function addColumn(env, present, name, sql) {
-  if (present.has(name)) return;
-  try {
-    await env.DB.prepare(sql).run();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/duplicate column/i.test(message)) throw error;
-  }
-}
-
 async function ensureArticleColumns(env) {
   const info = await env.DB.prepare("pragma table_info(articles)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
@@ -604,6 +527,8 @@ async function seedAds(env) {
 
 async function migrateSchema(env) {
   await createDeskTables(env);
+  await ensureNoticeTables(env);
+  await ensureImportTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
@@ -655,11 +580,6 @@ export function ensureSchema(env) {
   return schemaPromise;
 }
 
-async function permissionCodes(env, userId) {
-  const rows = await env.DB.prepare("select code from user_permissions where user_id = ?").bind(userId).all();
-  return (rows.results ?? []).map((row) => String(row.code));
-}
-
 async function attachPermissions(env, accounts) {
   if (!accounts.length) return accounts;
   const rows = (await env.DB.prepare("select user_id, code from user_permissions").all()).results ?? [];
@@ -671,31 +591,6 @@ async function attachPermissions(env, accounts) {
     byUser.set(id, list);
   }
   return accounts.map((account) => ({ ...account, permissions: byUser.get(account.id) ?? [] }));
-}
-
-async function currentUser(env, request) {
-  const token = readCookie(request);
-  if (!token || token.length < 20) return null;
-  const row = await env.DB.prepare(
-    "select id, login, name, alias, role, active from users where session_token = ? and active = 1",
-  )
-    .bind(token)
-    .first();
-  if (!row) return null;
-  return mapAccount(row, await permissionCodes(env, row.id));
-}
-
-async function requireUser(env, request) {
-  const user = await currentUser(env, request);
-  if (!user) return { ok: false, error: "Přihlaste se do redakce." };
-  return { ok: true, user };
-}
-
-async function requireChief(env, request) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return gate;
-  if (gate.user.role !== "hlavni") return { ok: false, error: "Tohle mění jen hlavní redaktor." };
-  return gate;
 }
 
 function readArticleFields(input) {
@@ -854,6 +749,7 @@ export async function loadPublic(env) {
     doctors: await loadDoctors(env, { publicOnly: true, today }),
     ads: await loadAds(env, { enabledOnly: true }),
     outages: await loadOutageBoard(env),
+    water: await loadNoticeBoard(env),
     waste: buildWasteView(wasteFrom(row), today),
     now,
     contactNote: String(row.contact_note),
@@ -1203,6 +1099,9 @@ export async function loadAdmin(env, request) {
     adProposals: [],
     outageAreas: [],
     outages: emptyOutageBoard(),
+    notices: [],
+    importSettings: null,
+    importItems: [],
     rubrics: [],
   };
   if (!user) return base;
@@ -1231,6 +1130,10 @@ export async function loadAdmin(env, request) {
   if (user.role === "hlavni") {
     base.outageAreas = await loadOutageAreas(env);
     base.outages = await loadOutageBoard(env);
+    base.notices = await loadNotices(env);
+    base.importSettings = await loadImportSettings(env);
+    base.importItems = await loadImportItems(env);
+    base.hasApiKey = Boolean(env.ANTHROPIC_API_KEY);
     base.events = (
       await env.DB.prepare(
         `select id, title, place, starts_on, starts_time, description, published
@@ -1327,17 +1230,6 @@ async function writePermissions(env, userId, codes) {
   await env.DB.prepare("delete from user_permissions where user_id = ?").bind(userId).run();
   for (const code of codes) {
     await env.DB.prepare("insert into user_permissions (user_id, code) values (?, ?)").bind(userId, code).run();
-  }
-}
-
-async function uniqueSlug(env, base) {
-  let slug = base;
-  let n = 2;
-  for (;;) {
-    const row = await env.DB.prepare("select id from articles where slug = ?").bind(slug).first();
-    if (!row) return slug;
-    slug = `${base}-${n}`;
-    n += 1;
   }
 }
 
@@ -1942,184 +1834,6 @@ export async function saveSite(env, request, input) {
   )
     .bind(wasteNote, holidayNote, weekday, weekParity, stepDays)
     .run();
-  return { ok: true };
-}
-
-function emptyOutageBoard() {
-  return buildBoard();
-}
-
-function parseOutagePayload(text) {
-  try {
-    const data = JSON.parse(text || "[]");
-    return Array.isArray(data) ? data.filter((item) => item && typeof item === "object") : [];
-  } catch {
-    return [];
-  }
-}
-
-function mapOutageArea(row) {
-  return {
-    id: Number(row.id),
-    code: String(row.code),
-    name: String(row.name),
-    enabled: asBool(row.enabled),
-    sortOrder: Number(row.sort_order ?? 0),
-  };
-}
-
-async function loadOutageAreas(env) {
-  const rows = await env.DB.prepare(
-    "select id, code, name, enabled, sort_order from outage_areas order by sort_order asc, name asc, id asc",
-  ).all();
-  return (rows.results ?? []).map(mapOutageArea);
-}
-
-export async function loadOutageBoard(env) {
-  const areas = (await loadOutageAreas(env)).filter((area) => area.enabled);
-  const row = await env.DB.prepare("select fetched_at, status, note, payload from outage_feed where id = 1").first();
-  return buildBoard({
-    fetchedAt: row?.fetched_at ? String(row.fetched_at) : null,
-    status: String(row?.status ?? ""),
-    note: String(row?.note ?? ""),
-    areas,
-    outages: parseOutagePayload(row?.payload),
-  });
-}
-
-function wrote(result) {
-  return Number(result?.meta?.changes ?? result?.changes ?? 0) > 0;
-}
-
-async function lockOutageFeed(env) {
-  await env.DB.prepare(
-    "insert into outage_feed (id, payload) select 1, '[]' where not exists (select 1 from outage_feed where id = 1)",
-  ).run();
-  const now = new Date();
-  const token = `${now.toISOString()}-${crypto.randomUUID()}`;
-  const stale = new Date(now.getTime() - 2 * 60 * 1000).toISOString();
-  const result = await env.DB.prepare(
-    "update outage_feed set fetching_at = ? where id = 1 and (fetching_at is null or fetching_at = '' or fetching_at < ?)",
-  )
-    .bind(token, stale)
-    .run();
-  return wrote(result) ? token : "";
-}
-
-async function unlockOutageFeed(env, token) {
-  if (!token) return;
-  await env.DB.prepare("update outage_feed set fetching_at = null where id = 1 and fetching_at = ?").bind(token).run();
-}
-
-async function writeOutageFeed(env, { fetchedAt, status, note, payload }) {
-  await env.DB.prepare("update outage_feed set fetched_at = ?, status = ?, note = ?, payload = ? where id = 1")
-    .bind(fetchedAt, status, note, JSON.stringify(payload))
-    .run();
-}
-
-export async function refreshOutages(env, request = null, options = {}) {
-  if (request) {
-    const gate = await requireChief(env, request);
-    if (!gate.ok) return gate;
-  }
-  const lock = await lockOutageFeed(env);
-  if (!lock) return { ok: false, kept: false, error: "Načítání už běží. Zkuste to za chvíli." };
-  try {
-    const enabled = (await loadOutageAreas(env)).filter((area) => area.enabled).slice(0, MAX_AREAS);
-    const fetchedAt = new Date().toISOString();
-    if (!enabled.length) {
-      await writeOutageFeed(env, { fetchedAt, status: "ok", note: "", payload: [] });
-      return { ok: true, partial: false, count: 0 };
-    }
-    const previous = parseOutagePayload(
-      (await env.DB.prepare("select payload from outage_feed where id = 1").first())?.payload,
-    );
-    const results = await fetchAreaOutages(enabled, options);
-    const summary = refreshNote(results);
-    const payload = mergeFresh(previous, results);
-    await writeOutageFeed(env, { fetchedAt, status: summary.status, note: summary.note, payload });
-    if (summary.status === "error") return { ok: false, kept: true, error: summary.note };
-    return { ok: true, partial: summary.status === "partial", note: summary.note, count: payload.length };
-  } finally {
-    await unlockOutageFeed(env, lock);
-  }
-}
-
-async function afterAreaChange(env) {
-  const fresh = await refreshOutages(env);
-  if (fresh.ok && fresh.partial) return { ok: true, partial: true };
-  if (fresh.ok) return { ok: true };
-  return { ok: true, warn: `Změna je uložená. ${fresh.error}` };
-}
-
-export async function addOutageArea(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return gate;
-  const parsed = parseAreaInput(input);
-  if (!parsed.ok) return parsed;
-  const count = await env.DB.prepare("select count(*) as n from outage_areas").first();
-  if (Number(count?.n) >= MAX_AREAS) return { ok: false, error: "Oblastí může být nejvýš 12." };
-  try {
-    await env.DB.prepare("insert into outage_areas (code, name, enabled, sort_order) values (?, ?, ?, ?)")
-      .bind(parsed.area.code, parsed.area.name, parsed.area.enabled ? 1 : 0, parsed.area.sortOrder)
-      .run();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/unique/i.test(message)) return { ok: false, error: "Tahle obec už v seznamu je." };
-    throw error;
-  }
-  return afterAreaChange(env);
-}
-
-export async function saveOutageAreas(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return gate;
-  const rows = Array.isArray(input?.areas) ? input.areas : [];
-  if (!rows.length) return { ok: false, error: "V seznamu není žádná obec." };
-  const parsed = [];
-  for (const row of rows) {
-    const item = parseAreaInput(row);
-    if (!item.ok) return item;
-    const id = Number(row.id);
-    if (!Number.isInteger(id) || id <= 0) return { ok: false, error: "Tu obec v seznamu nemám." };
-    parsed.push({ id, ...item.area });
-  }
-  if (new Set(parsed.map((area) => area.code)).size !== parsed.length) {
-    return { ok: false, error: "Každá obec potřebuje vlastní kód." };
-  }
-  const existing = await loadOutageAreas(env);
-  const known = new Set(existing.map((area) => area.id));
-  if (parsed.length !== existing.length || parsed.some((area) => !known.has(area.id))) {
-    return { ok: false, error: "Seznam obcí se mezitím změnil. Načtěte stránku znovu." };
-  }
-  try {
-    await env.DB.batch([
-      ...parsed.map((area, index) =>
-        env.DB.prepare("update outage_areas set code = ? where id = ?").bind(`~${index}`, area.id),
-      ),
-      ...parsed.map((area) =>
-        env.DB.prepare("update outage_areas set code = ?, name = ?, enabled = ?, sort_order = ? where id = ?").bind(
-          area.code,
-          area.name,
-          area.enabled ? 1 : 0,
-          area.sortOrder,
-          area.id,
-        ),
-      ),
-    ]);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (/unique/i.test(message)) return { ok: false, error: "Tahle obec už v seznamu je." };
-    throw error;
-  }
-  return afterAreaChange(env);
-}
-
-export async function removeOutageArea(env, request, id) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return gate;
-  const result = await env.DB.prepare("delete from outage_areas where id = ?").bind(id).run();
-  if (!wrote(result)) return { ok: false, error: "Tu obec v seznamu nemám." };
   return { ok: true };
 }
 

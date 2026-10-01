@@ -1,6 +1,7 @@
 import { HOME_LEAD_DAYS } from "../outages.js";
 import { esc, outageCard, outageEmpty } from "../view.js";
 import { adminShell } from "./shell.js";
+import { noticeDialogs, noticePanels } from "./notices.js";
 import { callout, cancelLink, check, confirmForm, field, formFoot, icon, input, modal, modalLink, openButton, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/odstavky";
@@ -47,8 +48,12 @@ export function adminOutages(ctx, data, message, query = {}) {
     ? `<div class="outage-preview">${board.items.map((row) => outageCard(row, { showArea: board.areas.length > 1, copy: ctx.copy })).join("")}</div>`
     : `<p class="empty">${esc(outageEmpty(board, ctx.copy))}</p>`;
 
-  const dialogs = [modal({ id: "nova-obec", title: "Další obec", close: BASE, open: Boolean(query.fresh) && !confirming, body: addForm() })];
-  if (confirming) {
+  const notices = noticeDialogs(data.notices ?? [], query);
+  const dialogs = [
+    modal({ id: "nova-obec", title: "Další obec", close: BASE, open: Boolean(query.fresh) && !confirming && !notices.busy, body: addForm() }),
+    notices.html,
+  ];
+  if (confirming && !notices.busy) {
     dialogs.push(
       modal({
         id: "okno",
@@ -67,10 +72,12 @@ export function adminOutages(ctx, data, message, query = {}) {
   }
 
   const body = `${pageHead(
-    "Odstávky elektřiny",
-    `Drbna se párkrát denně ptá veřejného widgetu ČEZ Distribuce na odstávky v zaškrtnutých obcích. Na titulce se odstávka ukáže, když právě probíhá nebo začíná do ${HOME_LEAD_DAYS} dní.`,
-    openButton("nova-obec", `${BASE}?novy=1`, "Přidat obec"),
+    "Odstávky",
+    `Vodu a uzavírky zapisuje redakce nebo je připraví Koza Drběna ze zpráv města. Elektřinu se drbna párkrát denně ptá veřejného widgetu ČEZ Distribuce. Na titulce se odstávka ukáže, když právě probíhá nebo začíná do ${HOME_LEAD_DAYS} dní.`,
+    `${openButton("nova-obec", `${BASE}?novy=1`, "Přidat obec", "btn-line")}${openButton("nove-oznameni", `${BASE}?nove-oznameni=1`, "Odstávka vody")}`,
   )}
+    ${noticePanels(data.notices ?? [])}
+    <h2 class="adm-subhead">Elektřina</h2>
     <section class="panel status-panel">
       <div class="status-line">
         <span class="status-ico">${icon("clock")}</span>

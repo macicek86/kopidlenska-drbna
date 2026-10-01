@@ -15,6 +15,9 @@ import {
   spanSummary,
 } from "./doctors.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
+import { outagesTeaser } from "./outages-view.js";
+
+export { outageCard, outageEmpty, outagesPage } from "./outages-view.js";
 
 export function externalHref(copy) {
   const value = tx(copy, "popelnice_url").trim();
@@ -460,30 +463,6 @@ function doctorsTeaser(data, ctx) {
   </div>`;
 }
 
-function outagesTeaser(data, ctx) {
-  const items = (data.outages?.items ?? [])
-    .filter((item) => item.phase === "now" || item.phase === "soon")
-    .slice(0, 3);
-  if (!items.length) return "";
-  const lines = items
-    .map((item) => {
-      const kind = item.phase === "now" ? "is-closure" : "is-later";
-      const where = item.placeLabels?.[0] ?? "";
-      return `<li class="${kind}">
-        <p class="yard-home-name">${esc(item.areaName)}</p>
-        <p class="yard-home-state">${esc(item.state)}</p>
-        <p class="yard-home-detail">${esc(item.when)}</p>
-        ${where ? `<p class="yard-home-detail">${esc(where)}</p>` : ""}
-      </li>`;
-    })
-    .join("");
-  return `<div class="card waste-teaser">
-    <p class="eyebrow">${esc(tx(ctx.copy, "home_outages_button"))}</p>
-    <ul class="yard-home">${lines}</ul>
-    <div class="row"><a class="btn btn-primary" href="/odstavky">${esc(tx(ctx.copy, "home_outages_button"))}</a></div>
-  </div>`;
-}
-
 export function dayLabel(day) {
   return WEEK_DAYS.find((item) => item.day === day)?.label ?? "";
 }
@@ -644,63 +623,6 @@ export function doctorsPage(data, ctx) {
       <h1>${esc(tx(ctx.copy, "doctors_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "doctors_lede"))}</p>
       <div class="stack">${cards}</div>`,
-  });
-}
-
-export function outageCard(item, { showArea, copy }) {
-  const places = (item.placeLabels ?? [])
-    .map((label) => `<li>${esc(label)}</li>`)
-    .join("");
-  const more = item.morePlaces
-    ? `<p class="muted outage-more">A dalších ${esc(item.morePlaces)} míst.</p>`
-    : "";
-  const parcels = item.parcelLine ? `<p class="meta">${esc(item.parcelLine)}</p>` : "";
-  const pdf = item.announcementUrl
-    ? `<p><a href="${esc(item.announcementUrl)}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "outages_announcement"))}</a></p>`
-    : "";
-  return `<article class="card yard">
-    ${showArea ? `<p class="kicker">${esc(item.areaName)}</p>` : ""}
-    <p class="outage-state is-${esc(item.phase)}">${esc(item.state)}</p>
-    <p class="outage-when">${esc(item.when)}</p>
-    ${places ? `<ul class="outage-places">${places}</ul>` : ""}
-    ${more}
-    ${parcels}
-    ${pdf}
-  </article>`;
-}
-
-export function outageEmpty(board, copy) {
-  if (!board.areas.length) return tx(copy, "outages_none_watched");
-  if (!board.fetchedAt) return tx(copy, "outages_waiting");
-  return tx(copy, "outages_empty");
-}
-
-export function outagesPage(data, ctx) {
-  const board = data.outages ?? { items: [], areas: [], fetchedAt: null, status: "", note: "", checked: "" };
-  const showArea = board.areas.length > 1;
-  const current = board.items.filter((item) => item.phase === "now");
-  const planned = board.items.filter((item) => item.phase !== "now");
-  const section = (heading, items) =>
-    items.length
-      ? `<section class="block"><h2>${esc(heading)}</h2><div class="stack">${items
-          .map((item) => outageCard(item, { showArea, copy: ctx.copy }))
-          .join("")}</div></section>`
-      : "";
-  const list = board.items.length
-    ? `${section(tx(ctx.copy, "outages_current"), current)}${section(tx(ctx.copy, "outages_planned"), planned)}`
-    : `<p class="card dashed muted">${esc(outageEmpty(board, ctx.copy))}</p>`;
-  return layout({
-    ...ctx,
-    title: `${tx(ctx.copy, "outages_heading")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "outages_description"),
-    body: `
-      <p class="eyebrow">${esc(tx(ctx.copy, "outages_eyebrow"))}</p>
-      <h1>${esc(tx(ctx.copy, "outages_heading"))}</h1>
-      <p class="lede">${esc(tx(ctx.copy, "outages_lede"))}</p>
-      ${board.note ? `<p class="banner">${esc(board.note)}</p>` : ""}
-      ${board.checked ? `<p class="meta">${esc(board.checked)}</p>` : ""}
-      ${list}
-      <p class="fine">${esc(tx(ctx.copy, "outages_disclaimer"))} <a href="https://www.bezstavy.cz/" target="_blank" rel="noopener noreferrer">${esc(tx(ctx.copy, "outages_source"))}</a></p>`,
   });
 }
 

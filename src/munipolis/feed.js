@@ -1,0 +1,115 @@
+// RSS z Munipolisu: rozebrání kanálu na zprávy s textem a obrázky. Bez sítě, ať jde testovat.
+
+export const DEFAULT_FEED_URL = "https://kopidlno.munipolis.cz/rss";
+export const USER_AGENT = "KopidlenskaDrbna/1.0 (+https://kopidlenskadrbna.org)";
+const MAX_ITEMS = 40;
+const MAX_TEXT = 12000;
+
+const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+
+export function decodeEntities(value) {
+  return String(value ?? "").replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (all, body) => {
+    if (body[0] === "#") {
+      const hex = body[1] === "x" || body[1] === "X";
+      const code = Number.parseInt(body.slice(hex ? 2 : 1), hex ? 16 : 10);
+      return Number.isInteger(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+    }
+    return NAMED[body.toLowerCase()] ?? all;
+  });
+}
+
+function unwrap(value) {
+  const text = String(value ?? "").trim();
+  const cdata = text.match(/^<!\[CDATA\[([\s\S]*)\]\]>$/);
+  return cdata ? cdata[1] : decodeEntities(text);
+}
+
+function tag(block, name) {
+  const match = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i"));
+  return match ? unwrap(match[1]) : "";
+}
+
+// Text zprávy pro AI i pro náhled v redakci: odstavce oddělené prázdným řádkem, bez značek.
+export function htmlToText(html) {
+  const text = String(html ?? "")
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "\n• ")
+    .replace(/<\/li>/gi, "")
+    .replace(/<\/(p|div|h[1-6]|ul|ol|blockquote)>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "");
+  return decodeEntities(text)
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, MAX_TEXT);
+}
+
+export function imagesIn(html) {
+  const found = [];
+  for (const match of String(html ?? "").matchAll(/<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)) {
+    const url = decodeEntities(match[1]).trim();
+    if (/^https:\/\//i.test(url) && !found.includes(url)) found.push(url);
+  }
+  return found;
+}
+
+function isoStamp(value) {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+}
+
+export function parseFeed(xml) {
+  const text = String(xml ?? "");
+  if (!/<rss[\s>]/i.test(text) && !/<channel[\s>]/i.test(text)) return { ok: false, items: [] };
+  const items = [];
+  for (const match of text.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)) {
+    const block = match[1];
+    const link = tag(block, "link").trim();
+    const guid = tag(block, "guid").trim() || link;
+    const title = htmlToText(tag(block, "title")).replace(/\s+/g, " ").slice(0, 300);
+    if (!guid || !title) continue;
+    const html = tag(block, "description");
+    items.push({
+      guid: guid.slice(0, 300),
+      link: /^https:\/\//i.test(link) ? link.slice(0, 300) : "",
+      title,
+      text: htmlToText(html),
+      images: imagesIn(html).slice(0, 3),
+      publishedAt: isoStamp(tag(block, "pubDate")),
+    });
+    if (items.length >= MAX_ITEMS) break;
+  }
+  return { ok: true, items };
+}
+
+export async function fetchFeed(url, { fetchImpl = fetch } = {}) {
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      headers: { Accept: "application/rss+xml, application/xml, text/xml", "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(20_000),
+      redirect: "follow",
+    });
+  } catch {
+    return { ok: false, error: "Munipolis neodpověděl.", items: [] };
+  }
+  if (!response.ok) return { ok: false, error: `Munipolis odpověděl ${response.status}.`, items: [] };
+  const parsed = parseFeed(await response.text());
+  if (!parsed.ok) return { ok: false, error: "Na adrese není RSS.", items: [] };
+  return { ok: true, error: "", items: parsed.items };
+}
+
+export function readFeedUrl(value) {
+  const url = String(value ?? "").trim();
+  if (!url) return DEFAULT_FEED_URL;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return "";
+    return parsed.toString().slice(0, 300);
+  } catch {
+    return "";
+  }
+}

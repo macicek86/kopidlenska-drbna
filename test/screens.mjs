@@ -16,6 +16,7 @@ const TABS = [
   "rubriky",
   "reklamy",
   "akce",
+  "munipolis",
   "texty",
   "svoz",
   "dvory",
@@ -34,6 +35,11 @@ const TABS = [
   "lekari?zmena=1",
   "lide?novy=1",
   "rubriky?smazat=1",
+  "munipolis?nastaveni=1",
+  "munipolis?zprava=1",
+  "odstavky?nove-oznameni=1",
+  "odstavky?oznameni=1",
+  "zpravy?navrh=1",
 ];
 
 function chromePath() {

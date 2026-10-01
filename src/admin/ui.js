@@ -21,6 +21,7 @@ const ICONS = {
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
   search: '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  inbox: '<path d="M3.5 13.5 6 5.5h12l2.5 8"/><path d="M3.5 13.5v5h17v-5h-5a3.5 3.5 0 0 1-7 0z"/>',
   clock: '<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
 };
 

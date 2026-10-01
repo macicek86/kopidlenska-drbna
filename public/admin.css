@@ -316,6 +316,14 @@
 .status-main { margin: 0; font-weight: 700; }
 .status-sub { margin: 0.1rem 0 0; color: var(--muted); font-size: 0.9rem; }
 .status-panel .callout { margin-top: 0.8rem; }
+.adm-subhead { margin: 1.6rem 0 0.7rem; font-family: var(--display); font-size: 1.35rem; font-weight: 650; }
+
+/* Zpráva z Munipolisu */
+.import-detail { display: grid; gap: 0.8rem; }
+.import-detail > p { margin: 0; }
+.import-source { max-height: 22rem; overflow-y: auto; padding: 0.8rem 1rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); }
+.import-source p { margin: 0 0 0.7rem; }
+.import-source p:last-child { margin-bottom: 0; }
 .outage-preview { display: grid; gap: 0.7rem; }
 .outage-preview .card { border-radius: var(--r); box-shadow: none; padding: 1rem; }
 

@@ -35,12 +35,9 @@ import {
   saveProposal,
   saveSite,
   saveYard,
-  addOutageArea,
   loadOutageBoard,
   refreshOutages,
-  removeOutageArea,
   removeRubric,
-  saveOutageAreas,
   saveRubric,
   setAdEnabled,
   sessionCookie,
@@ -72,6 +69,7 @@ import {
   adminArticles,
   adminDoctors,
   adminEvents,
+  adminMunipolis,
   adminOutages,
   adminOverview,
   adminPassword,
@@ -84,6 +82,10 @@ import {
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
 import { WEEK_DAYS } from "./yards.js";
+import { html, json, redirect, sameOrigin, secure, withError } from "./http.js";
+import { OUTAGE_OK, outagePost } from "./post-outages.js";
+import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
+import { runImport } from "./munipolis/run.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
@@ -122,11 +124,6 @@ const OK = {
   rubrika: "Rubrika je uložená.",
   "rubrika-upravena": "Rubrika je upravená.",
   "rubrika-smazana": "Rubrika je smazaná.",
-  oblast: "Obec je přidaná a přehled je načtený.",
-  "oblast-upravena": "Oblasti jsou uložené a přehled je načtený.",
-  "oblast-smazana": "Obec je ze seznamu pryč.",
-  odstavky: "Přehled odstávek je načtený.",
-  "odstavky-castecne": "Přehled je načtený, ale u některé obce to nevyšlo.",
   navrh: "Návrh čeká na schválení.",
   "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
   "navrh-stazen": "Návrh je stažený.",
@@ -137,24 +134,9 @@ const OK = {
   "clovek-zapnut": "Účet je zase aktivní.",
   "clovek-heslo": "Heslo přispěvatele je nastavené.",
   "clovek-udaje": "Alias a oprávnění jsou uložené.",
+  ...OUTAGE_OK,
+  ...IMPORT_OK,
 };
-
-function secure(request) {
-  return new URL(request.url).protocol === "https:";
-}
-
-function html(body, status = 200, cookie) {
-  const headers = new Headers({
-    "content-type": "text/html; charset=utf-8",
-    "cache-control": "no-store",
-    "x-content-type-options": "nosniff",
-    "referrer-policy": "strict-origin-when-cross-origin",
-    "content-security-policy":
-      "default-src 'self'; img-src 'self' data: blob:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; form-action 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'",
-  });
-  if (cookie) headers.set("set-cookie", cookie);
-  return new Response(body, { status, headers });
-}
 
 function chooseAd(request, ads) {
   return pickAd(ads, { avoidId: readSeenAd(request.headers.get("cookie")) });
@@ -163,18 +145,6 @@ function chooseAd(request, ads) {
 function htmlAd(request, body, ad) {
   const cookie = ad?.id != null ? seenAdCookie(ad.id, secure(request)) : undefined;
   return html(body, 200, cookie);
-}
-
-function redirect(location, cookie) {
-  const headers = new Headers({ location, "cache-control": "no-store" });
-  if (cookie) headers.set("set-cookie", cookie);
-  return new Response(null, { status: 303, headers });
-}
-
-function sameOrigin(request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-  return origin === new URL(request.url).origin;
 }
 
 function ctxFor(request, path) {
@@ -213,6 +183,10 @@ function adminQuery(url) {
     accessId: positiveParam(url, "upravit"),
     passwordId: positiveParam(url, "heslo"),
     disableId: positiveParam(url, "vypnout"),
+    noticeId: positiveParam(url, "oznameni"),
+    noticeFresh: url.searchParams.has("nove-oznameni"),
+    importId: positiveParam(url, "zprava"),
+    importSettings: url.searchParams.has("nastaveni"),
   };
 }
 
@@ -293,23 +267,19 @@ async function formFields(request) {
     })),
     permissions: form.getAll("permission").map((item) => String(item)),
     confirm: text("confirm") === "1",
+    kind: text("kind"),
+    endsTime: text("endsTime"),
+    places: text("places"),
+    sourceUrl: text("sourceUrl"),
+    feedUrl: text("feedUrl"),
+    voice: text("voice"),
+    autoPublish: form.get("autoPublish") === "1",
   };
 }
 
 function kickOutageRefresh(env, ctx, board) {
   if (!ctx?.waitUntil || !feedIsStale(board)) return;
   ctx.waitUntil(refreshOutages(env).catch(() => {}));
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=300",
-      "x-content-type-options": "nosniff",
-    },
-  });
 }
 
 async function renderGet(request, env, url, execution) {
@@ -402,7 +372,7 @@ async function renderGet(request, env, url, execution) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -427,6 +397,7 @@ async function renderGet(request, env, url, execution) {
       return html(adminDoctors(ctx, data, message, query));
     }
     if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
+    if (tab === "munipolis") return html(adminMunipolis(ctx, data, message, query));
     if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
@@ -637,29 +608,8 @@ async function renderPost(request, env, url) {
     if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
   }
-  if (path === "/redakce/odstavky/pridat") {
-    const result = await addOutageArea(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
-    if (result.warn) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.warn)}`);
-    return redirect(`/redakce/odstavky?ok=${result.partial ? "odstavky-castecne" : "oblast"}`);
-  }
-  if (path === "/redakce/odstavky/ulozit") {
-    const result = await saveOutageAreas(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
-    if (result.warn) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.warn)}`);
-    return redirect(`/redakce/odstavky?ok=${result.partial ? "odstavky-castecne" : "oblast-upravena"}`);
-  }
-  if (path === "/redakce/odstavky/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/odstavky");
-    const result = await removeOutageArea(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/odstavky?ok=oblast-smazana");
-  }
-  if (path === "/redakce/odstavky/nacist") {
-    const result = await refreshOutages(env, request);
-    if (!result.ok) return redirect(`/redakce/odstavky?chyba=${encodeURIComponent(result.error)}`);
-    return redirect(`/redakce/odstavky?ok=${result.partial ? "odstavky-castecne" : "odstavky"}`);
-  }
+  const section = (await outagePost(path, request, env, fields)) ?? (await munipolisPost(path, request, env, fields));
+  if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);
     if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
@@ -678,11 +628,6 @@ function deskQuery(fields) {
   if (fields.id) return `/redakce/zpravy?navrh=${fields.id}`;
   if (fields.articleId) return `/redakce/zpravy?clanek=${fields.articleId}`;
   return "/redakce/zpravy";
-}
-
-function withError(path, error) {
-  const join = path.includes("?") ? "&" : "?";
-  return `${path}${join}chyba=${encodeURIComponent(error)}`;
 }
 
 export default {
@@ -707,5 +652,6 @@ export default {
   async scheduled(_event, env, ctx) {
     await ensureSchema(env);
     ctx.waitUntil(refreshOutages(env).catch(() => {}));
+    ctx.waitUntil(runImport(env).catch(() => {}));
   },
 };

@@ -8,6 +8,8 @@ function nav(data) {
   const adWaiting = (data.adProposals ?? []).filter((item) => item.status === "pending").length;
   const returned = chief ? 0 : (data.proposals ?? []).filter((item) => item.status === "rejected").length;
   const adReturned = chief ? 0 : (data.adProposals ?? []).filter((item) => item.status === "rejected").length;
+  const importFailed = (data.importItems ?? []).filter((item) => item.status === "chyba").length;
+  const noticesWaiting = (data.notices ?? []).filter((item) => !item.published && item.sourceUrl).length;
   const groups = [
     {
       name: "",
@@ -19,6 +21,7 @@ function nav(data) {
         ["zpravy", "Zprávy", "news", chief ? waiting : returned],
         chief && ["rubriky", "Rubriky", "folder"],
         chief && ["akce", "Akce", "calendar"],
+        chief && ["munipolis", "Munipolis", "inbox", importFailed],
         ["reklamy", "Reklamy", "megaphone", chief ? adWaiting : adReturned],
       ],
     },
@@ -28,7 +31,7 @@ function nav(data) {
         chief && ["svoz", "Popelnice", "bin"],
         (chief || userCan(data.user, "sberny_dvur")) && ["dvory", "Sběrné dvory", "recycle"],
         (chief || userCan(data.user, "doktori")) && ["lekari", "Lékaři", "cross"],
-        chief && ["odstavky", "Odstávky", "bolt"],
+        chief && ["odstavky", "Odstávky", "bolt", noticesWaiting],
       ],
     },
     {
@@ -57,7 +60,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "reklamy", "svoz", "dvory", "lekari", "odstavky", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "munipolis", "reklamy", "svoz", "dvory", "lekari", "odstavky", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";
