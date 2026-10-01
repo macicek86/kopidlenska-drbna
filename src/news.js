@@ -69,8 +69,10 @@ export function articlePage(article, ctx, extras = {}) {
       ${articleCrumbs(article)}
       <h1 class="article-title">${esc(article.title)}</h1>
       ${articleMeta(article)}
-      ${articleFigure(article)}
-      <div class="prose">${renderArticleHtml(article.body)}</div>
+      <div class="article-body${article.imageKey ? " has-photo" : ""}">
+        ${articleFigure(article)}
+        <div class="prose">${renderArticleHtml(article.body)}</div>
+      </div>
       ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}`,
   });
 }

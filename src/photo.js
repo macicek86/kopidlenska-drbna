@@ -50,11 +50,19 @@ export function captionHtml(caption) {
   });
 }
 
-// V detailu se fotka nikdy neořezává. Fotka na výšku je užší a má kolem sebe podklad.
+// Strana fotky v detailu: u jedné zprávy pořád stejná, mezi zprávami se střídá „náhodně“.
+export function figureSide(article) {
+  let sum = 0;
+  for (const char of String(article.slug ?? "")) sum = (sum * 31 + char.charCodeAt(0)) >>> 0;
+  return sum % 2 ? "left" : "right";
+}
+
+// V detailu se fotka nikdy neořezává. Na mobilu je nahoře přes celou šířku,
+// na počítači stojí vlevo nebo vpravo a text ji obtéká, delší text pokračuje pod ní.
 export function articleFigure(article) {
   if (!article.imageKey) return "";
   const caption = readCaption(article.imageCaption);
-  return `<figure class="article-figure">
+  return `<figure class="article-figure is-${figureSide(article)}">
         <div class="article-frame"><img class="article-photo" src="${mediaUrl(article.imageKey)}" alt="${esc(caption)}"></div>
         ${caption ? `<figcaption>${captionHtml(caption)}</figcaption>` : ""}
       </figure>`;

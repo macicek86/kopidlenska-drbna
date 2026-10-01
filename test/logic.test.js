@@ -10,7 +10,7 @@ import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 import { adPanel, homePage, layout, outagesPage } from "../src/view.js";
 import { articlePage, newsPage } from "../src/news.js";
 import { aboutPage, paragraphs } from "../src/about.js";
-import { articleFigure, captionHtml, focusClass, readCaption, readFocus, storyPhoto } from "../src/photo.js";
+import { articleFigure, captionHtml, figureSide, focusClass, readCaption, readFocus, storyPhoto } from "../src/photo.js";
 import { adminAds, adminOutages, adminRubrics } from "../src/admin/index.js";
 import { articleInRubric, deleteRubricError, findRubric, parseRubricInput, rubricLabel } from "../src/rubrics.js";
 import {
@@ -1008,6 +1008,13 @@ test("detail zprávy ukáže fotku celou a pod ní popisek", () => {
   assert.match(html, /<figcaption>Foto: &lt;Jana&gt;<\/figcaption>/);
   assert.match(html, /class="article-photo"/);
   assert.doesNotMatch(articleFigure({ imageKey: "clanky/a.webp", imageCaption: "" }), /figcaption/);
+});
+
+test("fotka v detailu stojí u zprávy pořád na stejné straně, mezi zprávami se střídá", () => {
+  const sides = ["a", "b", "c", "d", "e", "f"].map((slug) => figureSide({ slug }));
+  assert.deepEqual(new Set(sides), new Set(["left", "right"]));
+  assert.equal(figureSide({ slug: "pout" }), figureSide({ slug: "pout" }));
+  assert.match(articleFigure({ slug: "pout", imageKey: "clanky/a.webp" }), /article-figure is-(left|right)/);
 });
 
 test("popisek fotky prolinkuje licenci Creative Commons", () => {

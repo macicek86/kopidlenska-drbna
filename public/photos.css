@@ -79,4 +79,28 @@
     aspect-ratio: 3 / 2;
     border-radius: calc(var(--radius) - 0.6rem);
   }
+
+  /* Detail zprávy na počítači: fotka vlevo nebo vpravo, text ji obtéká.
+     Výška fotky je omezená a šířka se dopočítá z jejího poměru, takže fotka na výšku
+     je úzká a vysoká, na šířku široká a nízká. Popisek šířku fotky nemění. */
+  .article-body.has-photo { max-width: 48rem; }
+
+  .article-body.has-photo .prose { max-width: none; }
+
+  .article-body::after { content: ""; display: block; clear: both; }
+
+  .article-figure.is-right { float: right; margin: 0.35rem 0 1rem 1.6rem; }
+
+  .article-figure.is-left { float: left; margin: 0.35rem 1.6rem 1rem 0; }
+
+  .article-figure.is-left, .article-figure.is-right { max-width: 46%; }
+
+  .article-figure .article-frame { display: block; background: none; }
+
+  .article-figure .article-photo { max-height: min(70vh, 28rem); }
+
+  .article-figure figcaption { contain: inline-size; }
+
+  /* Seznamy a citace vedle fotky drží pohromadě, ať odrážky nezajedou pod ni. */
+  .article-body.has-photo .prose :is(ul, ol, blockquote) { display: flow-root; }
 }
