@@ -2,15 +2,15 @@
 import { MODEL } from "../claude.js";
 import { DEFAULT_FOOTBALL_VOICE, KIND_LABEL } from "../fotbal/ai.js";
 import { DEFAULT_CLUB_URL } from "../fotbal/club.js";
-import { footballRunning, INTERVALS } from "../fotbal/store.js";
-import { STATUS } from "../munipolis/store.js";
+import { DEFAULT_FRESH_DAYS, footballRunning, INTERVALS } from "../fotbal/store.js";
 import { esc } from "../view.js";
 import { rubricOptions } from "./articles.js";
-import { refLink, stamp, textBlock, TONE, waitingCount, workingNote } from "./munipolis.js";
+import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/fotbal";
+const PICK = "vyber-aktualit";
 
 function day(date) {
   const match = String(date ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -24,7 +24,7 @@ function results(entry) {
 function statusBadges(entry) {
   const made = results(entry);
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
-  return `${badge(STATUS[entry.status] ?? entry.status, TONE[entry.status] ?? "")}${badge(KIND_LABEL[entry.kind] ?? entry.kind)}${
+  return `${statusBadge(entry)}${badge(KIND_LABEL[entry.kind] ?? entry.kind)}${
     made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""
   }${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`;
 }
@@ -34,15 +34,9 @@ function entryItem(entry) {
     title: entry.title,
     meta: [day(entry.publishedOn), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
     badges: statusBadges(entry),
-    actions: modalLink(`${BASE}?zprava=${entry.id}`, "Detail"),
+    actions: `${pickBox(entry, PICK)}${modalLink(`${BASE}?zprava=${entry.id}`, "Detail")}`,
     search: `${entry.title} ${entry.reason}`,
   });
-}
-
-function processButton(entry) {
-  if (entry.status === "hotovo") return "";
-  const label = entry.status === "preskoceno" || entry.status === "duplicita" ? "Přesto zpracovat" : "Zpracovat teď";
-  return `<form method="post" action="${BASE}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Drběna čte…">${label}</button></form>`;
 }
 
 function entryDetail(entry) {
@@ -53,7 +47,7 @@ function entryDetail(entry) {
     <div class="import-source">${textBlock(entry.text)}</div>
     ${entry.extra ? `<p class="item-sub">Doplněno z rozpisu a tabulky:</p><div class="import-source">${textBlock(entry.extra)}</div>` : ""}
     ${source ? `<p class="item-sub">${source}</p>` : ""}
-    <div class="form-foot">${cancelLink(BASE, "Zavřít")}<span class="form-foot-gap"></span>${processButton(entry)}</div>
+    <div class="form-foot">${cancelLink(BASE, "Zavřít")}<span class="form-foot-gap"></span>${processButton(BASE, entry)}</div>
   </div>`;
 }
 
@@ -63,8 +57,9 @@ function intervalOptions(current) {
 
 function settingsForm(settings, rubrics) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
-    ${check("enabled", "1", settings.enabled, "Kontrolovat web klubu", "Při prvním zapnutí vezme jen aktuality z posledního týdne.")}
+    ${check("enabled", "1", settings.enabled, "Kontrolovat web klubu automaticky", "Nové aktuality rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď aktuality jen načte a zpracuje se, co vyberete.")}
     ${field("Jak často", `<select class="${input}" name="intervalHours">${intervalOptions(settings.intervalHours)}</select>`)}
+    ${field("Automaticky jen aktuality z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na webu klubu, u zápasu podle dne, kdy se hrál. Starší (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká každý článek jako návrh na schválení.")}
     ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(rubrics, { rubricId: settings.rubricId })}</select>`)}
     ${check("previews", "1", settings.previews, "Psát pozvánky na zápasy", "Když klub ohlásí zápas, který se teprve hraje.")}
@@ -96,7 +91,7 @@ function statusPanel(data, settings, entries, here) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji aktuality…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: footballRunning(settings), waiting: waitingCount(entries), enabled: settings.enabled, here, busy: "Drběna právě píše. Jeden článek jí trvá asi půl minuty, stránka se sama obnoví." })}
+    ${workingNote({ running: footballRunning(settings), entries, enabled: settings.enabled, here, busy: "Drběna právě píše vybrané aktuality. Jeden článek jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -111,11 +106,11 @@ export function adminFootball(ctx, data, message, query = {}) {
   if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
   const body = `${pageHead(
     "Fotbal",
-    "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu.",
+    "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu. Po ručním načtení zpracuje jen to, co zaškrtnete.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries, open ? `${BASE}?zprava=${open.id}` : BASE)}
-    ${panel({ id: "aktuality-klubu", title: "Aktuality klubu", count: entries.length, filter: entries.length > 6 ? "Hledat v aktualitách…" : "", body: list(entries.map(entryItem), "Zatím žádná aktualita. Klikněte na Zkontrolovat teď.") })}
+    ${panel({ id: "aktuality-klubu", title: "Aktuality klubu", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat v aktualitách…" : "", body: list(entries.map(entryItem), "Zatím žádná aktualita. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "fotbal", message, body, { title: "Fotbal" });
 }

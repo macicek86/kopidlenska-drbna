@@ -3,8 +3,8 @@ import test from "node:test";
 import { adminFootball } from "../src/admin/index.js";
 import { footballSchema, footballText, readFootballDecision } from "../src/fotbal/ai.js";
 import { clubPages, czechDate, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList, readClubUrl } from "../src/fotbal/club.js";
-import { clubSource, matchExtra } from "../src/fotbal/run.js";
-import { footballDue, footballRunning, footballSince } from "../src/fotbal/store.js";
+import { clubSource, footballSourceDate, matchExtra } from "../src/fotbal/run.js";
+import { footballDue, footballRunning } from "../src/fotbal/store.js";
 
 const BASE = "https://www.fkkopidlno.cz/";
 
@@ -160,9 +160,6 @@ test("kdy se fotbal kontroluje a odkdy bere aktuality", () => {
   assert.equal(footballDue({ enabled: true, intervalHours: 24, checkedAt: "2026-10-01T00:15:00Z" }, now), false);
   assert.equal(footballDue({ enabled: true, intervalHours: 24, checkedAt: "2026-09-30T20:15:10Z" }, now), true);
   assert.equal(footballDue({ enabled: true, intervalHours: 24, checkedAt: "2026-10-01T16:15:00Z", status: "error" }, now), true);
-  assert.equal(footballSince("", true, "2026-10-01"), "2026-09-24");
-  assert.equal(footballSince("2026-01-01", true, "2026-10-01"), "2026-01-01");
-  assert.equal(footballSince("", false, "2026-10-01"), "");
   assert.equal(footballRunning({ runningAt: "2026-10-01T20:16:00.000Z-abc" }, now), true);
   assert.equal(footballRunning({ runningAt: "2026-10-01T20:14:00.000Z-abc" }, now), false);
   assert.equal(footballRunning({ runningAt: "" }, now), false);
@@ -215,5 +212,39 @@ test("když Drběna píše, redakce to ukáže a obnoví se; jinak řekne, kolik
   assert.match(busy, /Drběna právě píše/);
   const idle = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
   assert.doesNotMatch(idle, /data-refresh=/);
-  assert.match(idle, /Na zpracování čeká 1\./);
+  assert.match(idle, /Na automatické zpracování čeká 1\. Dopíše je cron/);
+  assert.match(idle, /name="ids" value="2" form="vyber-aktualit"/);
+  assert.match(idle, /<form id="vyber-aktualit" method="post" action="\/redakce\/fotbal\/vybrat">/);
+});
+
+test("ručně načtené čekají na výběr, vybrané se píšou a stránka se obnovuje", () => {
+  const row = (id, status, manual = false) => ({ id, guid: `${id}:zapas`, kind: "zapas", link: "", title: `Zápas ${id}`, text: "", extra: "", images: [], cover: "", publishedOn: "2026-09-23", status, reason: "", duplicateOf: "", attempts: 0, manual, articleId: null, proposalId: status === "hotovo" ? 4 : null });
+  const data = {
+    signedIn: true,
+    user: { id: 1, role: "hlavni", name: "Redakce", permissions: [] },
+    hasApiKey: true,
+    rubrics: [],
+    footballSettings: { enabled: false, autoPublish: false, clubUrl: BASE, voice: "", rubricId: null, previews: true, clubNews: false, useCrest: true, intervalHours: 24, checkedAt: "", status: "", note: "", runningAt: "" },
+    footballItems: [row(1, "nacteno"), row(2, "hotovo"), row(3, "nove", true)],
+  };
+  const ctx = { path: "/redakce/fotbal", copy: {}, mainOrigin: "", origin: "" };
+  const page = adminFootball(ctx, data, { text: "", kind: "ok" }, {});
+  assert.match(page, /Načteno, čeká na výběr/);
+  assert.match(page, /Vybráno, Drběna se k tomu dostane/);
+  assert.match(page, /data-refresh="8"[^>]*>Drběna právě píše vybrané aktuality\. Jeden článek jí trvá asi půl minuty\. Vybraných zbývá 1\./);
+  assert.match(page, /value="1" form="vyber-aktualit"/);
+  assert.doesNotMatch(page, /value="2" form=/);
+  assert.doesNotMatch(page, /value="3" form=/);
+  const loaded = adminFootball(ctx, { ...data, footballItems: [row(1, "nacteno")] }, { text: "", kind: "ok" }, {});
+  assert.match(loaded, /Načteno a čeká na výběr: 1\./);
+  assert.match(loaded, /datum ze zdroje/);
+});
+
+test("ručně vybraný zápas dostane datum, kdy se hrál, nikdy ne budoucí", () => {
+  const report = { kind: "zapas", publishedOn: "2026-09-23", text: "8. liga, čtvrtek 24. 9. 2026 od 16:30", extra: "Soutěž: 8. liga\n\nZápas: FK Kopidlno B – TJ Sokol Chomutice, 2026-09-24 16:30, výsledek 7:6" };
+  assert.equal(footballSourceDate(report, "2026-10-01"), "2026-09-24");
+  assert.equal(footballSourceDate({ ...report, extra: "" }, "2026-10-01"), "2026-09-24");
+  assert.equal(footballSourceDate({ ...report, extra: "", text: "" }, "2026-10-01"), "2026-09-23");
+  assert.equal(footballSourceDate({ kind: "pozvanka", publishedOn: "2026-09-30", text: "sobota 3. 10. 2026", extra: "" }, "2026-10-01"), "2026-09-30");
+  assert.equal(footballSourceDate({ kind: "clanek", publishedOn: "2026-12-30", text: "", extra: "" }, "2026-10-01"), "");
 });

@@ -1,37 +1,14 @@
 // Redakce: import zpráv z Munipolisu. Nastavení, stav poslední kontroly a co Koza Drběna se zprávami udělala.
-import { formatShort } from "../format.js";
 import { DEFAULT_VOICE, MODEL } from "../munipolis/ai.js";
 import { DEFAULT_FEED_URL } from "../munipolis/feed.js";
-import { importRunning, MAX_ATTEMPTS, STATUS } from "../munipolis/store.js";
+import { DEFAULT_FRESH_DAYS, importRunning } from "../munipolis/store.js";
 import { esc } from "../view.js";
-import { pragueNow } from "../waste.js";
+import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
-import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
+import { callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/munipolis";
-
-export const TONE = { nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad" };
-
-// Kam vede značka, kterou Claude použil v duplicate_of nebo kterou zpráva vytvořila.
-export function refLink(ref) {
-  const [kind, id] = String(ref ?? "").split(":");
-  const links = {
-    zprava: ["/redakce/zpravy?id=", "Zpráva"],
-    navrh: ["/redakce/zpravy?navrh=", "Návrh zprávy"],
-    akce: ["/redakce/akce?id=", "Akce"],
-    odstavka: ["/redakce/odstavky?oznameni=", "Odstávka"],
-    munipolis: [`${BASE}?zprava=`, "Zpráva z Munipolisu"],
-  };
-  if (!links[kind] || !/^\d+$/.test(id ?? "")) return "";
-  return `<a href="${links[kind][0]}${id}">${esc(links[kind][1])} #${id}</a>`;
-}
-
-export function stamp(iso) {
-  const parsed = Date.parse(iso);
-  if (!Number.isFinite(parsed)) return "";
-  const clock = pragueNow(new Date(parsed));
-  return `${formatShort(clock.date)} v ${clock.time}`;
-}
+const PICK = "vyber-zprav";
 
 function results(entry) {
   return [
@@ -48,26 +25,10 @@ function entryItem(entry) {
   return item({
     title: entry.title,
     meta: [stamp(entry.publishedAt), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
-    badges: `${badge(STATUS[entry.status] ?? entry.status, TONE[entry.status] ?? "")}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
-    actions: modalLink(`${BASE}?zprava=${entry.id}`, "Detail"),
+    badges: `${statusBadge(entry)}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
+    actions: `${pickBox(entry, PICK)}${modalLink(`${BASE}?zprava=${entry.id}`, "Detail")}`,
     search: `${entry.title} ${entry.reason}`,
   });
-}
-
-function processButton(entry) {
-  if (entry.status === "hotovo") return "";
-  const label = entry.status === "preskoceno" || entry.status === "duplicita" ? "Přesto zpracovat" : "Zpracovat teď";
-  return `<form method="post" action="${BASE}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Drběna čte…">${label}</button></form>`;
-}
-
-export function textBlock(text) {
-  const paragraphs = String(text ?? "")
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => `<p>${esc(part).replace(/\n/g, "<br>")}</p>`)
-    .join("");
-  return paragraphs || `<p class="muted">Zpráva nemá text. Údaje jsou nejspíš jen na obrázku.</p>`;
 }
 
 function entryDetail(entry) {
@@ -76,38 +37,25 @@ function entryDetail(entry) {
   const images = entry.images.map((url, index) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Obrázek ${index + 1}</a>`).join(" · ");
   const source = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Původní zpráva</a>` : "";
   return `<div class="import-detail">
-    <p class="item-badges">${badge(STATUS[entry.status] ?? entry.status, TONE[entry.status] ?? "")}<span class="item-sub">${esc(stamp(entry.publishedAt))}</span></p>
+    <p class="item-badges">${statusBadge(entry)}<span class="item-sub">${esc(stamp(entry.publishedAt))}</span></p>
     ${entry.reason ? callout(`<b>Drběna:</b> ${esc(entry.reason)}`, entry.status === "chyba" ? "bad" : "info") : ""}
     ${made.length ? `<p>Vzniklo: ${made.join(" · ")}</p>` : ""}
     ${duplicate ? `<p>Stejná věc už je tady: ${duplicate}</p>` : ""}
     <div class="import-source">${textBlock(entry.text)}</div>
     ${source || images ? `<p class="item-sub">${[source, images].filter(Boolean).join(" · ")}</p>` : ""}
-    <div class="form-foot">${cancelLink(BASE, "Zavřít")}<span class="form-foot-gap"></span>${processButton(entry)}</div>
+    <div class="form-foot">${cancelLink(BASE, "Zavřít")}<span class="form-foot-gap"></span>${processButton(BASE, entry)}</div>
   </div>`;
 }
 
 function settingsForm(settings) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
-    ${check("enabled", "1", settings.enabled, "Kontrolovat Munipolis", "Drbna se podívá každé čtyři hodiny. Při prvním zapnutí vezme jen zprávy z posledních tří dnů.")}
+    ${check("enabled", "1", settings.enabled, "Kontrolovat Munipolis automaticky", "Drbna se podívá každé čtyři hodiny a nové zprávy rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď zprávy jen načte a zpracuje se, co vyberete.")}
+    ${field("Automaticky jen zprávy z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na Munipolisu. Starší zprávy (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce a odstávky jako skryté.")}
     ${field("Adresa RSS", `<input class="${input}" type="url" name="feedUrl" required maxlength="300" value="${esc(settings.feedUrl || DEFAULT_FEED_URL)}">`)}
     ${field("Jak Drběna píše", `<textarea class="${input}" name="voice" rows="7" maxlength="3000">${esc(settings.voice || DEFAULT_VOICE)}</textarea>`, "Pokyny pro styl textů. Pravidla o faktech, rubrikách a duplicitách platí vždy.")}
     ${formFoot("Uložit", cancelLink(BASE))}
   </form>`;
-}
-
-export function waitingCount(entries) {
-  return entries.filter((entry) => entry.status === "nove" || (entry.status === "chyba" && entry.attempts < MAX_ATTEMPTS)).length;
-}
-
-// Co importu zbývá. Když Drběna zrovna pracuje, stránka se po chvíli sama obnoví (public/admin.js, data-refresh).
-export function workingNote({ running, waiting, enabled, here, busy }) {
-  if (running) return `<div class="callout callout-info" data-refresh="8" data-refresh-url="${esc(here)}">${esc(busy)}</div>`;
-  if (!waiting) return "";
-  const later = enabled
-    ? "Dopíše je cron (běží každé čtyři hodiny), nebo hned kliknutí na Zkontrolovat teď."
-    : "Kontrola je vypnutá, takže je dopíše jen kliknutí na Zkontrolovat teď.";
-  return callout(`Na zpracování čeká ${waiting}. ${later}`, "info");
 }
 
 function statusPanel(data, settings, entries, here) {
@@ -127,7 +75,7 @@ function statusPanel(data, settings, entries, here) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji zprávy…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: importRunning(settings), waiting: waitingCount(entries), enabled: settings.enabled, here, busy: "Drběna právě čte zprávy města. Jedna jí trvá asi půl minuty, stránka se sama obnoví." })}
+    ${workingNote({ running: importRunning(settings), entries, enabled: settings.enabled, here, busy: "Drběna právě čte vybrané zprávy města. Jedna jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -142,11 +90,11 @@ export function adminMunipolis(ctx, data, message, query = {}) {
   if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
   const body = `${pageHead(
     "Munipolis",
-    "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek a přepisuje je po svém. Když už stejná věc na drbně je, nechá ji být.",
+    "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek a přepisuje je po svém. Když už stejná věc na drbně je, nechá ji být. Po ručním načtení zpracuje jen to, co zaškrtnete.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries, open ? `${BASE}?zprava=${open.id}` : BASE)}
-    ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map(entryItem), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
+    ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map(entryItem), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "munipolis", message, body, { title: "Munipolis" });
 }

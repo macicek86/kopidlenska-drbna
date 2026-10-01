@@ -339,7 +339,7 @@ create table if not exists import_settings (
   feed_url text not null default '',
   auto_publish integer not null default 0,
   voice text not null default '',
-  since text not null default '',
+  fresh_days integer not null default 3,
   checked_at text,
   status text not null default '',
   note text not null default '',
@@ -361,6 +361,7 @@ create table if not exists import_items (
   proposal_id integer,
   event_id integer,
   notice_id integer,
+  manual integer not null default 0,
   attempts integer not null default 0,
   created_at text not null default (datetime('now')),
   processed_at text
@@ -382,7 +383,7 @@ create table if not exists football_settings (
   club_news integer not null default 0,
   use_crest integer not null default 1,
   interval_hours integer not null default 24,
-  since text not null default '',
+  fresh_days integer not null default 7,
   crest_url text not null default '',
   crest_key text not null default '',
   checked_at text,
@@ -407,6 +408,7 @@ create table if not exists football_items (
   duplicate_of text not null default '',
   article_id integer,
   proposal_id integer,
+  manual integer not null default 0,
   attempts integer not null default 0,
   created_at text not null default (datetime('now')),
   processed_at text

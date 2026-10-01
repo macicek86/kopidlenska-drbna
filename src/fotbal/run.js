@@ -1,5 +1,14 @@
 // Jeden průchod fotbalu: stáhnout aktuality FK Kopidlno, doplnit je z rozpisu a tabulky a nechat Drběnu napsat článek.
-import { CLICK_BUDGET_MS, CLICK_LOCK_SECONDS, CRON_BUDGET_MS, CRON_LOCK_SECONDS, drain, inBackground } from "../background.js";
+import {
+  CLICK_BUDGET_MS,
+  CLICK_LOCK_SECONDS,
+  CRON_BUDGET_MS,
+  CRON_LOCK_SECONDS,
+  drain,
+  inBackground,
+  isFresh,
+  STALE_REASON,
+} from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
 import { requireChief } from "../db-core.js";
 import { fetchImage, storeImageBytes } from "../images.js";
@@ -7,13 +16,13 @@ import { MAX_ATTEMPTS } from "../munipolis/store.js";
 import { USER_AGENT } from "../munipolis/feed.js";
 import { addDays, pragueNow } from "../waste.js";
 import { askFootball } from "./ai.js";
-import { clubPages, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList } from "./club.js";
+import { clubPages, czechDate, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList } from "./club.js";
 import {
   countWaiting,
   finishFootballItem,
+  selectFootballItems,
   footballDue,
   knownGuids,
-  loadFootballItem,
   loadFootballSettings,
   lockFootball,
   rememberFootballItem,
@@ -61,13 +70,15 @@ export function matchExtra(match, detail, matchDetail) {
     .join("\n\n");
 }
 
-// Projde úvodní stránku a aktuality klubu. Nové aktuality uloží do fronty, starší a vypnuté rovnou odloží.
-export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
+// Projde úvodní stránku a aktuality klubu. Nové aktuality uloží do fronty, starší (podle data ve zdroji) a vypnuté rovnou odloží.
+// Při ručním načtení (`manual`) počkají všechny, až redakce vybere, které zpracovat.
+export async function collectNews(env, settings, { fetchImpl = fetch, manual = false } = {}) {
   const home = await fetchPage(settings.clubUrl, fetchImpl);
   if (!home.ok) return home;
   const pages = clubPages(home.html, settings.clubUrl);
   const list = await fetchPage(pages.news, fetchImpl);
   if (!list.ok) return list;
+  const today = pragueNow().date;
   const news = parseNewsList(list.html, settings.clubUrl).map((entry) => ({ ...entry, kind: newsKind(entry.title) }));
   if (!news.length) return { ok: false, error: "Na webu klubu nejsou žádné aktuality. Nezměnil se web?" };
   const known = await knownGuids(env, news.map((entry) => `${entry.id}:${entry.kind}`));
@@ -102,9 +113,11 @@ export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
       images: detail.images.slice(0, 1),
       cover: detail.cover,
     };
-    const old = settings.since && item.publishedOn && item.publishedOn < settings.since;
+    const old = !isFresh(footballSourceDate(item, today), today, settings.freshDays);
     const off = (entry.kind === "pozvanka" && !settings.previews) || (entry.kind === "clanek" && !settings.clubNews);
-    if (old) await rememberFootballItem(env, item, { status: "stare" });
+    if (manual) {
+      if (await rememberFootballItem(env, item, { status: "nacteno" })) added += 1;
+    } else if (old) await rememberFootballItem(env, item, { status: "stare", reason: STALE_REASON });
     else if (off) await rememberFootballItem(env, item, { status: "preskoceno", reason: "Tenhle druh aktualit je v nastavení vypnutý." });
     else if (await rememberFootballItem(env, item)) added += 1;
   }
@@ -151,8 +164,20 @@ async function articleImage(env, item, settings, fetchImpl) {
   return key;
 }
 
-export async function processFootball(env, item, settings, { force = false, fetchImpl = fetch, ask = askFootball } = {}) {
+// Datum ze zdroje pro ručně vybranou aktualitu. U zápasu den, kdy se hrál (klub aktualitu zakládá už před zápasem).
+export function footballSourceDate(item, today) {
+  const dates = [item.publishedOn];
+  if (item.kind === "zapas") {
+    dates.push(item.extra.match(/^Zápas: [^\n]*?, (\d{4}-\d{2}-\d{2})/m)?.[1] ?? czechDate(item.text));
+  }
+  const best = dates.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date ?? "")).sort().at(-1) ?? "";
+  return best && best <= today ? best : "";
+}
+
+// Ručně vybranou aktualitu Drběna napíše vždy (redakce rozhodla) a s datem ze zdroje. Cron píše s dnešním datem.
+export async function processFootball(env, item, settings, { fetchImpl = fetch, ask = askFootball } = {}) {
   const today = pragueNow().date;
+  const force = item.manual;
   const answer = await ask(env, { item, known: await knownContent(env, today), voice: settings.voice, today, force });
   if (!answer.ok) {
     await finishFootballItem(env, item.id, { status: "chyba", reason: answer.error });
@@ -169,6 +194,7 @@ export async function processFootball(env, item, settings, { force = false, fetc
     sourceHtml: clubSource(item.link),
     autoPublish: settings.autoPublish,
     rubric: await targetRubric(env, settings),
+    publishOn: item.manual ? footballSourceDate(item, today) : "",
   });
   await finishFootballItem(env, item.id, { status: "hotovo", reason: answer.reason, ...made });
   return { ok: true, status: "hotovo" };
@@ -186,9 +212,19 @@ function summary(results, added, waiting) {
   return { status: failed.length ? (done ? "partial" : "error") : "ok", note: parts.join(" ") };
 }
 
-async function writeBatch(env, settings, { added, checked, fetchImpl, ask, budgetMs, max }) {
+// Další aktualita z fronty. Automatická, která mezitím zestárla (třeba po dlouhé pauze), jde stranou mezi starší.
+async function nextFresh(env, settings, manualOnly) {
+  const today = pragueNow().date;
+  for (;;) {
+    const [item] = await waitingFootballItems(env, 1, MAX_ATTEMPTS, { manualOnly });
+    if (!item || item.manual || isFresh(footballSourceDate(item, today), today, settings.freshDays)) return item;
+    await env.DB.prepare("update football_items set status = 'stare', reason = ? where id = ?").bind(STALE_REASON, item.id).run();
+  }
+}
+
+async function writeBatch(env, settings, { added, checked, fetchImpl, ask, budgetMs, max, manualOnly = false }) {
   const results = await drain({
-    next: async () => (await waitingFootballItems(env, 1, MAX_ATTEMPTS))[0],
+    next: () => nextFresh(env, settings, manualOnly),
     handle: (item) => processFootball(env, item, settings, { fetchImpl, ask }),
     budgetMs,
     max,
@@ -198,39 +234,64 @@ async function writeBatch(env, settings, { added, checked, fetchImpl, ask, budge
   return result;
 }
 
-// Tlačítko „Zkontrolovat teď“: aktuality stáhne hned, články píše na pozadí a stránka se mezitím obnovuje.
-export async function checkFootballNow(env, request, { ctx = null, fetchImpl = fetch, ask = askFootball } = {}) {
+const BUSY = "Drběna už na fotbale pracuje. Počkejte, stránka se sama obnoví.";
+
+// Tlačítko „Zkontrolovat teď“: jen načte nové aktuality. Zpracuje se až to, co redakce vybere.
+export async function checkFootballNow(env, request, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadFootballSettings(env);
   const lock = await lockFootball(env, CLICK_LOCK_SECONDS);
-  if (!lock) return { ok: false, error: "Drběna už na fotbale pracuje. Počkejte, stránka se sama obnoví." };
-  let handedOff = false;
+  if (!lock) return { ok: false, error: BUSY };
   try {
-    const collected = await collectNews(env, settings, { fetchImpl });
+    const collected = await collectNews(env, settings, { fetchImpl, manual: true });
     if (!collected.ok) {
       await writeFootballStatus(env, { status: "error", note: collected.error });
-      return { ok: false, error: collected.error };
+      return collected;
     }
-    const work = async () => {
-      try {
-        await writeBatch(env, settings, { added: collected.added, checked: true, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
-      } finally {
-        await unlockFootball(env, lock);
-      }
-    };
-    handedOff = inBackground(ctx, work);
-    if (!handedOff) await work();
-    return { ok: true, background: handedOff };
+    const note = collected.added ? `Načteno nových aktualit: ${collected.added}. Vyberte, které má Drběna zpracovat.` : "Nic nového.";
+    await writeFootballStatus(env, { status: "ok", note });
+    return { ok: true, added: collected.added };
   } finally {
-    if (!handedOff) await unlockFootball(env, lock);
+    await unlockFootball(env, lock);
   }
 }
 
+// Ručně vybrané aktuality píše na pozadí po krátkých dávkách. Volá se po výběru i při každém otevření stránky Fotbal,
+// takže se fronta vybraných dopisuje, dokud je stránka otevřená (sama se obnovuje).
+export async function continueFootball(env, { ctx = null, fetchImpl = fetch, ask = askFootball } = {}) {
+  if (!(await countWaiting(env, MAX_ATTEMPTS, { manualOnly: true }))) return { ok: true, idle: true };
+  const lock = await lockFootball(env, CLICK_LOCK_SECONDS);
+  if (!lock) return { ok: true, busy: true };
+  const settings = await loadFootballSettings(env);
+  const work = async () => {
+    try {
+      await writeBatch(env, settings, { added: 0, checked: false, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK, manualOnly: true });
+    } finally {
+      await unlockFootball(env, lock);
+    }
+  };
+  if (inBackground(ctx, work)) return { ok: true, background: true };
+  await work();
+  return { ok: true };
+}
+
+// Redakce zaškrtla aktuality (nebo klikla na „Zpracovat teď“ u jedné). Hotové se znovu nepíšou.
+export async function selectFootball(env, request, ids, options = {}) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  const marked = await selectFootballItems(env, ids);
+  if (!marked) return { ok: false, error: "Vyberte aspoň jednu aktualitu, která ještě není zpracovaná." };
+  const started = await continueFootball(env, options);
+  return { ok: true, marked, background: Boolean(started.background || started.busy) };
+}
+
 // Cron každé čtyři hodiny: web klubu stáhne, jen když je čas (podle nastavení), frontu ale dopisuje pokaždé.
+// Ručně vybrané má přednost a píše je s datem ze zdroje.
 export async function runFootball(env, { fetchImpl = fetch, ask = askFootball } = {}) {
   const settings = await loadFootballSettings(env);
-  if (!settings.enabled) return { ok: true, skipped: true };
+  const manualWaiting = await countWaiting(env, MAX_ATTEMPTS, { manualOnly: true });
+  if (!settings.enabled && !manualWaiting) return { ok: true, skipped: true };
   const lock = await lockFootball(env, CRON_LOCK_SECONDS);
   if (!lock) return { ok: true, skipped: true };
   try {
@@ -244,33 +305,17 @@ export async function runFootball(env, { fetchImpl = fetch, ask = askFootball } 
       }
       added = collected.added;
     }
-    const result = await writeBatch(env, settings, { added, checked, fetchImpl, ask, budgetMs: CRON_BUDGET_MS, max: BATCH_CRON });
+    const result = await writeBatch(env, settings, {
+      added,
+      checked,
+      fetchImpl,
+      ask,
+      budgetMs: CRON_BUDGET_MS,
+      max: BATCH_CRON,
+      manualOnly: !settings.enabled,
+    });
     return { ok: result.status !== "error", note: result.note };
   } finally {
     await unlockFootball(env, lock);
   }
-}
-
-// Ruční zpracování jedné aktuality. Přeskočenou nebo duplicitní zpracuje i proti Claudovu názoru. Píše se na pozadí.
-export async function runFootballOne(env, request, id, { ctx = null, fetchImpl = fetch, ask = askFootball } = {}) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return gate;
-  const item = id ? await loadFootballItem(env, id) : null;
-  if (!item) return { ok: false, error: "Tahle aktualita ve frontě není." };
-  if (item.status === "hotovo") return { ok: false, error: "Tahle aktualita už je zpracovaná." };
-  const lock = await lockFootball(env, CLICK_LOCK_SECONDS);
-  if (!lock) return { ok: false, error: "Drběna už na fotbale pracuje. Počkejte, stránka se sama obnoví." };
-  const settings = await loadFootballSettings(env);
-  const force = item.status === "preskoceno" || item.status === "duplicita";
-  let outcome = null;
-  const work = async () => {
-    try {
-      outcome = await processFootball(env, item, settings, { force, fetchImpl, ask });
-    } finally {
-      await unlockFootball(env, lock);
-    }
-  };
-  if (inBackground(ctx, work)) return { ok: true, background: true };
-  await work();
-  return outcome;
 }

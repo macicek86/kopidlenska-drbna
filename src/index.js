@@ -88,9 +88,11 @@ import { WEEK_DAYS } from "./yards.js";
 import { html, json, redirect, sameOrigin, secure, withError } from "./http.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
-import { runImport } from "./munipolis/run.js";
+import { continueImport, runImport } from "./munipolis/run.js";
+import { loadImportSettings } from "./munipolis/store.js";
 import { FOOTBALL_OK, footballPost } from "./post-fotbal.js";
-import { runFootball } from "./fotbal/run.js";
+import { continueFootball, runFootball } from "./fotbal/run.js";
+import { loadFootballSettings } from "./fotbal/store.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
@@ -285,6 +287,8 @@ async function formFields(request) {
     clubNews: form.get("clubNews") === "1",
     useCrest: form.get("useCrest") === "1",
     intervalHours: text("intervalHours"),
+    ids: form.getAll("ids").map(Number),
+    freshDays: text("freshDays"),
   };
 }
 
@@ -408,8 +412,15 @@ async function renderGet(request, env, url, execution) {
       return html(adminDoctors(ctx, data, message, query));
     }
     if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
-    if (tab === "munipolis") return html(adminMunipolis(ctx, data, message, query));
-    if (tab === "fotbal") return html(adminFootball(ctx, data, message, query));
+    if (tab === "munipolis") {
+      // Otevřená stránka dopisuje, co redakce vybrala (na pozadí, po krátkých dávkách).
+      if (data.signedIn && (await continueImport(env, { ctx: execution })).background) data.importSettings = await loadImportSettings(env);
+      return html(adminMunipolis(ctx, data, message, query));
+    }
+    if (tab === "fotbal") {
+      if (data.signedIn && (await continueFootball(env, { ctx: execution })).background) data.footballSettings = await loadFootballSettings(env);
+      return html(adminFootball(ctx, data, message, query));
+    }
     if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }

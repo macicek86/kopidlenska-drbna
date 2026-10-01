@@ -480,3 +480,8 @@
 @media (prefers-reduced-motion: reduce) {
   .modal[open]:modal, .toast, .modal-loading span { animation: none; }
 }
+
+/* Výběr položek importu ke zpracování (Munipolis, fotbal) */
+.pick { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.55rem; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.pick input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--brand); }
+.pick:has(input:checked) { border-color: var(--brand); background: var(--surface-2); }

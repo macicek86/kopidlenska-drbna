@@ -1,20 +1,22 @@
 // Import z Munipolisu v D1: nastavení, zapamatované zprávy a autorka Koza Drběna.
-import { lockHeld, lockRow, unlockRow } from "../background.js";
-import { asBool, clip, requireChief } from "../db-core.js";
+import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
+import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { hashPassword } from "../password.js";
 import { DEFAULT_FEED_URL, readFeedUrl } from "./feed.js";
 
 export const BOT_LOGIN = "drbena";
 export const BOT_NAME = "Koza Drběna";
 export const STATUS = {
+  nacteno: "Načteno, čeká na výběr",
   nove: "Čeká na zpracování",
-  stare: "Starší než zapnutí importu",
+  stare: "Starší, čeká na výběr",
   hotovo: "Zpracováno",
   preskoceno: "Přeskočeno",
   duplicita: "Duplicita",
   chyba: "Chyba",
 };
 export const MAX_ATTEMPTS = 3;
+export const DEFAULT_FRESH_DAYS = 3;
 
 export const IMPORT_TABLES = [
   `create table if not exists import_settings (
@@ -23,7 +25,7 @@ export const IMPORT_TABLES = [
     feed_url text not null default '',
     auto_publish integer not null default 0,
     voice text not null default '',
-    since text not null default '',
+    fresh_days integer not null default 3,
     checked_at text,
     status text not null default '',
     note text not null default '',
@@ -44,6 +46,7 @@ export const IMPORT_TABLES = [
     proposal_id integer,
     event_id integer,
     notice_id integer,
+    manual integer not null default 0,
     attempts integer not null default 0,
     created_at text not null default (datetime('now')),
     processed_at text
@@ -52,6 +55,15 @@ export const IMPORT_TABLES = [
 
 export async function ensureImportTables(env) {
   for (const sql of IMPORT_TABLES) await env.DB.prepare(sql).run();
+  const info = await env.DB.prepare("pragma table_info(import_items)").all();
+  await addColumn(env, new Set((info.results ?? []).map((row) => row.name)), "manual", "alter table import_items add column manual integer not null default 0");
+  const settingsInfo = await env.DB.prepare("pragma table_info(import_settings)").all();
+  await addColumn(
+    env,
+    new Set((settingsInfo.results ?? []).map((row) => row.name)),
+    "fresh_days",
+    "alter table import_settings add column fresh_days integer not null default 3",
+  );
   await env.DB.prepare("insert into import_settings (id) select 1 where not exists (select 1 from import_settings where id = 1)").run();
 }
 
@@ -61,7 +73,7 @@ function mapSettings(row) {
     feedUrl: String(row?.feed_url ?? "") || DEFAULT_FEED_URL,
     autoPublish: asBool(row?.auto_publish),
     voice: String(row?.voice ?? ""),
-    since: String(row?.since ?? ""),
+    freshDays: readFreshDays(row?.fresh_days, DEFAULT_FRESH_DAYS),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
     note: String(row?.note ?? ""),
@@ -71,7 +83,7 @@ function mapSettings(row) {
 
 export async function loadImportSettings(env) {
   const row = await env.DB.prepare(
-    "select enabled, feed_url, auto_publish, voice, since, checked_at, status, note, running_at from import_settings where id = 1",
+    "select enabled, feed_url, auto_publish, voice, fresh_days, checked_at, status, note, running_at from import_settings where id = 1",
   ).first();
   return mapSettings(row);
 }
@@ -101,13 +113,14 @@ export function mapImportItem(row) {
     proposalId: row.proposal_id == null ? null : Number(row.proposal_id),
     eventId: row.event_id == null ? null : Number(row.event_id),
     noticeId: row.notice_id == null ? null : Number(row.notice_id),
+    manual: asBool(row.manual),
     attempts: Number(row.attempts ?? 0),
     processedAt: row.processed_at ? String(row.processed_at) : "",
   };
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, attempts, processed_at";
+  "id, guid, link, title, text, images, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at";
 
 export async function loadImportItems(env, limit = 40) {
   const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from import_items order by published_at desc, id desc limit ?`)
@@ -121,29 +134,32 @@ export async function loadImportItem(env, id) {
   return row ? mapImportItem(row) : null;
 }
 
-export async function waitingItems(env, limit) {
+export async function waitingItems(env, limit, { manualOnly = false } = {}) {
   const rows = await env.DB.prepare(
-    `select ${ITEM_FIELDS} from import_items
-     where status = 'nove' or (status = 'chyba' and attempts < ?)
-     order by published_at asc, id asc limit ?`,
+    `select ${ITEM_FIELDS} from import_items where ${queuedWhere(manualOnly)}
+     order by manual desc, published_at asc, id asc limit ?`,
   )
     .bind(MAX_ATTEMPTS, limit)
     .all();
   return (rows.results ?? []).map(mapImportItem);
 }
 
-// Nové zprávy z kanálu si zapamatuje. Co vyšlo před zapnutím importu, jen odloží stranou.
-export async function rememberItems(env, items, since) {
+export const countWaitingItems = (env, options) => countQueued(env, "import_items", MAX_ATTEMPTS, options);
+export const selectImportItems = (env, ids) => markManual(env, "import_items", ids);
+
+// Nové zprávy z kanálu si zapamatuje. Starší (`isOld`) jen odloží stranou.
+// Při ručním načtení počkají všechny, až redakce vybere, které zpracovat.
+export async function rememberItems(env, items, { manual = false, isOld = () => false } = {}) {
   let added = 0;
   for (const item of items) {
-    const old = since && item.publishedAt && item.publishedAt < since;
+    const status = manual ? "nacteno" : isOld(item) ? "stare" : "nove";
     const result = await env.DB.prepare(
-      `insert or ignore into import_items (guid, link, title, text, images, published_at, status)
-       values (?, ?, ?, ?, ?, ?, ?)`,
+      `insert or ignore into import_items (guid, link, title, text, images, published_at, status, reason)
+       values (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-      .bind(item.guid, item.link, item.title, item.text, JSON.stringify(item.images), item.publishedAt, old ? "stare" : "nove")
+      .bind(item.guid, item.link, item.title, item.text, JSON.stringify(item.images), item.publishedAt, status, status === "stare" ? STALE_REASON : "")
       .run();
-    if (Number(result?.meta?.changes ?? 0) > 0 && !old) added += 1;
+    if (Number(result?.meta?.changes ?? 0) > 0 && status !== "stare") added += 1;
   }
   return added;
 }
@@ -179,28 +195,15 @@ export function importRunning(settings, now = new Date()) {
   return lockHeld(settings.runningAt, now);
 }
 
-export async function countWaitingItems(env) {
-  const row = await env.DB.prepare("select count(*) as n from import_items where status = 'nove' or (status = 'chyba' and attempts < ?)")
-    .bind(MAX_ATTEMPTS)
-    .first();
-  return Number(row?.n ?? 0);
-}
-
-// Při prvním zapnutí si drbna poznamená, odkdy zprávy brát, ať nezahltí redakci celým archivem.
-export function sinceFor(previous, enabled, now = new Date()) {
-  if (previous || !enabled) return previous;
-  return new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
-}
 
 export async function saveImportSettings(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const feedUrl = readFeedUrl(input.feedUrl);
   if (!feedUrl) return { ok: false, error: "Adresa RSS musí začínat https://." };
-  const current = await loadImportSettings(env);
   const voice = clip(input.voice, 3000);
-  await env.DB.prepare("update import_settings set enabled = ?, feed_url = ?, auto_publish = ?, voice = ?, since = ? where id = 1")
-    .bind(input.enabled ? 1 : 0, feedUrl, input.autoPublish ? 1 : 0, voice, sinceFor(current.since, input.enabled))
+  await env.DB.prepare("update import_settings set enabled = ?, feed_url = ?, auto_publish = ?, voice = ?, fresh_days = ? where id = 1")
+    .bind(input.enabled ? 1 : 0, feedUrl, input.autoPublish ? 1 : 0, voice, readFreshDays(input.freshDays, DEFAULT_FRESH_DAYS))
     .run();
   return { ok: true };
 }

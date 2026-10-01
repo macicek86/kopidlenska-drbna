@@ -1,33 +1,38 @@
-// Formuláře sekce Fotbal: nastavení, ruční kontrola webu klubu a zpracování jedné aktuality.
-import { checkFootballNow, runFootballOne } from "./fotbal/run.js";
+// Formuláře sekce Fotbal: nastavení, ruční načtení webu klubu a zpracování vybraných aktualit.
+import { checkFootballNow, selectFootball } from "./fotbal/run.js";
 import { saveFootballSettings } from "./fotbal/store.js";
 import { redirect, withError } from "./http.js";
-import { pragueNow } from "./waste.js";
 
 const BASE = "/redakce/fotbal";
 
 export const FOOTBALL_OK = {
   "fotbal-nastaveni": "Nastavení fotbalu je uložené.",
-  "fotbal-hotovo": "Web klubu je zkontrolovaný.",
-  "fotbal-zprava": "Aktualita je zpracovaná.",
-  "fotbal-bezi": "Drběna píše. Stránka se sama obnoví, až bude hotovo.",
+  "fotbal-nacteno": "Aktuality jsou načtené. Zaškrtněte, které má Drběna zpracovat.",
+  "fotbal-nic": "Na webu klubu není nic nového.",
+  "fotbal-bezi": "Drběna píše vybrané. Stránka se sama obnoví, až bude hotovo.",
 };
 
 export async function footballPost(path, request, env, fields, ctx) {
   if (path === `${BASE}/ulozit`) {
-    const result = await saveFootballSettings(env, request, fields, pragueNow().date);
+    const result = await saveFootballSettings(env, request, fields);
     if (!result.ok) return redirect(withError(`${BASE}?nastaveni=1`, result.error));
     return redirect(`${BASE}?ok=fotbal-nastaveni`);
   }
   if (path === `${BASE}/zkontrolovat`) {
-    const result = await checkFootballNow(env, request, { ctx });
+    const result = await checkFootballNow(env, request);
     if (!result.ok) return redirect(withError(BASE, result.error));
-    return redirect(`${BASE}?ok=${result.background ? "fotbal-bezi" : "fotbal-hotovo"}`);
+    return redirect(`${BASE}?ok=${result.added ? "fotbal-nacteno" : "fotbal-nic"}`);
+  }
+  if (path === `${BASE}/vybrat`) {
+    const result = await selectFootball(env, request, fields.ids, { ctx });
+    if (!result.ok) return redirect(withError(BASE, result.error));
+    return redirect(`${BASE}?ok=fotbal-bezi`);
   }
   if (path === `${BASE}/zpracovat`) {
-    const result = await runFootballOne(env, request, fields.id, { ctx });
-    if (!result.ok) return redirect(withError(fields.id ? `${BASE}?zprava=${fields.id}` : BASE, result.error));
-    return redirect(`${BASE}?zprava=${fields.id}&ok=${result.background ? "fotbal-bezi" : "fotbal-zprava"}`);
+    const back = fields.id ? `${BASE}?zprava=${fields.id}` : BASE;
+    const result = await selectFootball(env, request, [fields.id], { ctx });
+    if (!result.ok) return redirect(withError(back, result.error));
+    return redirect(`${back}${back.includes("?") ? "&" : "?"}ok=fotbal-bezi`);
   }
   return null;
 }

@@ -1,5 +1,5 @@
 import { byline } from "../db.js";
-import { formatLong } from "../format.js";
+import { formatLong, formatShort } from "../format.js";
 import { readFocus } from "../photo.js";
 import { prepareArticleBody } from "../rich.js";
 import { rubricLabel, rubricsFrom } from "../rubrics.js";
@@ -130,6 +130,8 @@ function reviewForm(data, proposal) {
   return `<form class="form" method="post" action="${BASE}/schvalit" enctype="multipart/form-data">
       ${callout(`Autor na webu: <b>${esc(credit(proposal))}</b>. Text můžete před schválením upravit, typicky češtinu. Ven se neukáže, co se měnilo. Když se znění liší od návrhu, u autora bude nanejvýš slovo Redigováno.${
         proposal.articleTitle ? `<br>Ke zprávě: <b>${esc(proposal.articleTitle)}</b>` : ""
+      }${
+        proposal.publishOn && !proposal.articleId ? `<br>Vyjde s datem ze zdroje: <b>${esc(formatShort(proposal.publishOn))}</b>` : ""
       }`)}
       ${hidden("id", proposal.id)}
       ${articleFields(proposal, data.rubrics)}

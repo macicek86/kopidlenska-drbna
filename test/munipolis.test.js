@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { htmlToText, imagesIn, parseFeed, readFeedUrl } from "../src/munipolis/feed.js";
 import { contextText, outputSchema, readDecision, systemPrompt, userText, DEFAULT_VOICE } from "../src/munipolis/ai.js";
-import { outcomeOf, sourceParagraph } from "../src/munipolis/run.js";
-import { sinceFor } from "../src/munipolis/store.js";
+import { importSourceDate, outcomeOf, sourceParagraph } from "../src/munipolis/run.js";
+import { isFresh, readFreshDays } from "../src/background.js";
 import { noticeBoard, noticePhase, noticeSpan, parseNoticeInput } from "../src/notices.js";
 import { outagesPage, homePage } from "../src/view.js";
 import { adminMunipolis, adminOutages } from "../src/admin/index.js";
-import { refLink } from "../src/admin/munipolis.js";
+import { refLink } from "../src/admin/imports.js";
 
 const FEED = `<?xml version="1.0" encoding="utf-8" ?>
 <rss version="2.0"><channel><title>RSS 2.0 Feed</title>
@@ -171,11 +171,14 @@ test("odkaz na zdroj a shrnutí výsledku pro další zprávy", () => {
   assert.equal(outcomeOf({ status: "duplicita", duplicateOf: "zprava:12" }), "duplicita s zprava:12");
 });
 
-test("při prvním zapnutí se import omezí na poslední tři dny", () => {
-  const now = new Date("2026-10-01T10:00:00Z");
-  assert.equal(sinceFor("", true, now), "2026-09-28T10:00:00.000Z");
-  assert.equal(sinceFor("2026-01-01T00:00:00.000Z", true, now), "2026-01-01T00:00:00.000Z");
-  assert.equal(sinceFor("", false, now), "");
+test("automatika bere jen čerstvé zprávy podle data ve zdroji", () => {
+  assert.equal(isFresh("2026-09-28", "2026-10-01", 3), true);
+  assert.equal(isFresh("2026-09-27", "2026-10-01", 3), false);
+  assert.equal(isFresh("", "2026-10-01", 3), true);
+  assert.equal(readFreshDays("7", 3), 7);
+  assert.equal(readFreshDays("0", 3), 3);
+  assert.equal(readFreshDays("abc", 3), 3);
+  assert.equal(readFreshDays("61", 3), 3);
 });
 
 test("oznámení o vodě se ověří a dostane fázi a čas", () => {
@@ -303,5 +306,12 @@ test("redakce Munipolisu ukáže, že Drběna čte, a obnoví se", () => {
   assert.match(busy, /data-refresh="8" data-refresh-url="\/redakce\/munipolis"/);
   const idle = adminMunipolis(CTX, { ...data, importSettings: { ...data.importSettings, runningAt: "" } }, { text: "", kind: "ok" }, {});
   assert.doesNotMatch(idle, /data-refresh=/);
-  assert.match(idle, /Na zpracování čeká 1\. Kontrola je vypnutá/);
+  assert.match(idle, /Na zpracování čeká 1\. Kontrola je vypnutá, zaškrtněte je/);
+  assert.match(idle, /value="7" form="vyber-zprav"/);
+});
+
+test("ručně vybraná zpráva z Munipolisu dostane pražský den zveřejnění", () => {
+  assert.equal(importSourceDate({ publishedAt: "2026-09-29T22:30:00.000Z" }, "2026-10-01"), "2026-09-30");
+  assert.equal(importSourceDate({ publishedAt: "" }, "2026-10-01"), "");
+  assert.equal(importSourceDate({ publishedAt: "2026-10-05T10:00:00.000Z" }, "2026-10-01"), "");
 });

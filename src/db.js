@@ -197,6 +197,7 @@ function mapProposal(row) {
     status: String(row.status),
     note: String(row.note ?? ""),
     createdOn: String(row.created_at ?? "").slice(0, 10),
+    publishOn: String(row.publish_on ?? ""),
   };
 }
 
@@ -392,6 +393,8 @@ async function ensureProposalColumns(env) {
   await addColumn(env, names, "rubric_id", "alter table proposals add column rubric_id integer");
   await addColumn(env, names, "image_focus", "alter table proposals add column image_focus text not null default ''");
   await addColumn(env, names, "image_caption", "alter table proposals add column image_caption text not null default ''");
+  // Datum, se kterým má zpráva po schválení vyjít (import podle data ve zdroji). Prázdné = den schválení.
+  await addColumn(env, names, "publish_on", "alter table proposals add column publish_on text not null default ''");
 }
 
 async function seedRubrics(env) {
@@ -638,7 +641,7 @@ async function readArticle(env, input) {
 async function loadProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
     `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key, p.image_focus, p.image_caption,
-            p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at,
+            p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at, p.publish_on,
             a.slug as article_slug, a.title as article_title, u.alias as author_alias,
             r.name as rubric_name, parent.name as parent_name
      from proposals p
@@ -1112,7 +1115,7 @@ export async function approveProposal(env, request, input) {
   if (!input.id) return { ok: false, error: "Ten návrh už tu není." };
   const proposal = await env.DB.prepare(
     `select id, article_id, author_id, author_name, image_key, submitted_title, submitted_excerpt,
-            submitted_body, submitted_category, status
+            submitted_body, submitted_category, status, publish_on
      from proposals where id = ?`,
   )
     .bind(input.id)
@@ -1175,7 +1178,7 @@ export async function approveProposal(env, request, input) {
     const slug = await uniqueSlug(env, slugify(parsed.title));
     await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, date('now'), ?, ?, ?)`,
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -1187,6 +1190,7 @@ export async function approveProposal(env, request, input) {
         imageKey,
         parsed.imageFocus,
         parsed.imageCaption,
+        String(proposal.publish_on ?? ""),
         proposal.author_id,
         proposal.author_name,
         textWasEdited(submitted, finalText) ? 1 : 0,
