@@ -72,11 +72,11 @@ export const SOURCE_DATE_NOTE = "Ručně vybrané dostanou datum ze zdroje, ať 
 
 // Co importu zbývá. Dokud Drběna píše vybrané, stránka se po chvíli sama obnoví (public/admin.js, data-refresh)
 // a každé otevření stránky pošle další dávku (src/index.js).
-export function workingNote({ running, entries, enabled, here, busy }) {
+export function workingNote({ running, entries, enabled, busy }) {
   const pickedCount = entries.filter(picked).length;
   if (running || pickedCount) {
     const left = pickedCount ? ` Vybraných zbývá ${pickedCount}.` : "";
-    return `<div class="callout callout-info" data-refresh="8" data-refresh-url="${esc(here)}">${esc(busy)}${left} Stránka se sama obnoví.</div>`;
+    return `<div class="callout callout-info" data-refresh="8">${esc(busy)}${left} Stránka se sama obnoví.</div>`;
   }
   const notes = [];
   const loaded = entries.filter((entry) => entry.status === "nacteno").length;

@@ -369,12 +369,58 @@ document.addEventListener("click", (event) => {
 
 /* --- Obnova, když redakce na něco čeká (Drběna píše fotbal) ---------------- */
 
+// Stránku stáhne na pozadí a vymění jen obsah. Otevřené okno zůstane otevřené (jinak by při každé obnově bliklo)
+// a jen dostane nový obsah, když ho server vykreslil jako otevřené. Bez JS se stránka neobnovuje vůbec.
+async function softRefresh() {
+  const url = currentUrl();
+  const response = await fetch(url, { credentials: "same-origin" });
+  if (!response.ok || new URL(response.url).pathname !== location.pathname) throw new Error("jinam");
+  const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+  const fresh = doc.getElementById("obsah");
+  const main = document.getElementById("obsah");
+  if (!fresh || !main) throw new Error("bez obsahu");
+  if (currentUrl() !== url) return;
+  const filters = new Map([...main.querySelectorAll("[data-filter]")].map((box) => [box.dataset.filter, box.value]));
+  const kept = new Map([...document.querySelectorAll("dialog[open][id]")].map((dialog) => [dialog.id, dialog]));
+  for (const node of [...main.childNodes]) if (!kept.has(node.id)) node.remove();
+  for (const node of [...fresh.childNodes]) {
+    const dialog = node.id ? kept.get(node.id) : null;
+    if (dialog) {
+      if (node.hasAttribute("data-autoopen") && !isDirty(dialog)) {
+        dialog.querySelector(".modal-body")?.replaceWith(document.importNode(node.querySelector(".modal-body"), true));
+        bindForms(dialog);
+        dialog.dispatchEvent(new CustomEvent("drbna:mount", { bubbles: true }));
+      }
+      continue;
+    }
+    if (node instanceof HTMLDialogElement) {
+      node.removeAttribute("open");
+      node.removeAttribute("data-autoopen");
+    }
+    main.append(document.importNode(node, true));
+  }
+  for (const box of main.querySelectorAll("[data-filter]")) {
+    const value = filters.get(box.dataset.filter);
+    if (!value) continue;
+    box.value = value;
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  bindForms(main);
+  main.dispatchEvent(new CustomEvent("drbna:mount", { bubbles: true }));
+}
+
 function scheduleRefresh() {
   const holder = document.querySelector("[data-refresh]");
   if (!holder) return;
-  setTimeout(() => {
-    if (document.querySelector("[data-dirty].is-dirty, dialog[open] form.is-dirty")) return scheduleRefresh();
-    location.replace(holder.dataset.refreshUrl || location.pathname);
+  setTimeout(async () => {
+    const busy = document.querySelector("[data-dirty].is-dirty, dialog[open] form.is-dirty, input[name=ids]:checked");
+    if (busy || submitting) return scheduleRefresh();
+    try {
+      await softRefresh();
+    } catch {
+      return location.replace(currentUrl());
+    }
+    scheduleRefresh();
   }, Number(holder.dataset.refresh || 10) * 1000);
 }
 

@@ -304,7 +304,7 @@ test("redakce Munipolisu ukáže, že Drběna čte, a obnoví se", () => {
     ],
   };
   const busy = adminMunipolis(CTX, data, { text: "", kind: "ok" }, {});
-  assert.match(busy, /data-refresh="8" data-refresh-url="\/redakce\/munipolis"/);
+  assert.match(busy, /data-refresh="8"/);
   const idle = adminMunipolis(CTX, { ...data, importSettings: { ...data.importSettings, runningAt: "" } }, { text: "", kind: "ok" }, {});
   assert.doesNotMatch(idle, /data-refresh=/);
   assert.match(idle, /Na zpracování čeká 1\. Kontrola je vypnutá, zaškrtněte je/);

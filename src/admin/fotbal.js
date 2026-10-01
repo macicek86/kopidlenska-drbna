@@ -71,7 +71,7 @@ function settingsForm(settings, rubrics) {
   </form>`;
 }
 
-function statusPanel(data, settings, entries, here) {
+function statusPanel(data, settings, entries) {
   const checked = settings.checkedAt ? `Naposledy zkontrolováno ${stamp(settings.checkedAt)}.` : "Ještě se nekontrolovalo.";
   const often = (INTERVALS.find(([hours]) => hours === settings.intervalHours)?.[1] ?? "").toLocaleLowerCase("cs");
   const mode = settings.enabled
@@ -91,7 +91,7 @@ function statusPanel(data, settings, entries, here) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji aktuality…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: footballRunning(settings), entries, enabled: settings.enabled, here, busy: "Drběna právě píše vybrané aktuality. Jeden článek jí trvá asi půl minuty." })}
+    ${workingNote({ running: footballRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě píše vybrané aktuality. Jeden článek jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -109,7 +109,7 @@ export function adminFootball(ctx, data, message, query = {}) {
     "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu. Po ručním načtení zpracuje jen to, co zaškrtnete.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
-    ${statusPanel(data, settings, entries, open ? `${BASE}?zprava=${open.id}` : BASE)}
+    ${statusPanel(data, settings, entries)}
     ${panel({ id: "aktuality-klubu", title: "Aktuality klubu", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat v aktualitách…" : "", body: list(entries.map(entryItem), "Zatím žádná aktualita. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "fotbal", message, body, { title: "Fotbal" });

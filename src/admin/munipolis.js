@@ -58,7 +58,7 @@ function settingsForm(settings) {
   </form>`;
 }
 
-function statusPanel(data, settings, entries, here) {
+function statusPanel(data, settings, entries) {
   const checked = settings.checkedAt ? `Naposledy zkontrolováno ${stamp(settings.checkedAt)}.` : "Ještě se nekontrolovalo.";
   const mode = settings.enabled ? (settings.autoPublish ? "Zapnuto, rovnou zveřejňuje." : "Zapnuto, všechno čeká na schválení.") : "Vypnuto. Kontrolovat jde jen ručně.";
   const keyWarn = data.hasApiKey
@@ -75,7 +75,7 @@ function statusPanel(data, settings, entries, here) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji zprávy…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: importRunning(settings), entries, enabled: settings.enabled, here, busy: "Drběna právě čte vybrané zprávy města. Jedna jí trvá asi půl minuty." })}
+    ${workingNote({ running: importRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte vybrané zprávy města. Jedna jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -93,7 +93,7 @@ export function adminMunipolis(ctx, data, message, query = {}) {
     "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek a přepisuje je po svém. Když už stejná věc na drbně je, nechá ji být. Po ručním načtení zpracuje jen to, co zaškrtnete.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
-    ${statusPanel(data, settings, entries, open ? `${BASE}?zprava=${open.id}` : BASE)}
+    ${statusPanel(data, settings, entries)}
     ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map(entryItem), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "munipolis", message, body, { title: "Munipolis" });

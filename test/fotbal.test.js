@@ -209,7 +209,7 @@ test("když Drběna píše, redakce to ukáže a obnoví se; jinak řekne, kolik
   const settings = { enabled: true, autoPublish: false, clubUrl: BASE, voice: "", rubricId: null, previews: true, clubNews: false, useCrest: true, intervalHours: 24, checkedAt: "", status: "", note: "" };
   const ctx = { path: "/redakce/fotbal", copy: {}, mainOrigin: "", origin: "" };
   const busy = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "2999-01-01T00:00:00.000Z-x" } }, { text: "", kind: "ok" }, { importId: 2 });
-  assert.match(busy, /data-refresh="8" data-refresh-url="\/redakce\/fotbal\?zprava=2"/);
+  assert.match(busy, /data-refresh="8"/);
   assert.match(busy, /Drběna právě píše/);
   const idle = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
   assert.doesNotMatch(idle, /data-refresh=/);
