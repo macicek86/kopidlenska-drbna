@@ -328,7 +328,7 @@ test("povaha Drběny: výchozí text se neukládá, vlastní ano a fotbal ji dop
   assert.equal(voiceFor({ persona: "Jsem koza.", football: "" }), "Jsem koza.");
   assert.equal(voiceFor({ persona: "Jsem koza.", football: "Fandím." }, "fotbal"), "Jsem koza.\n\nU fotbalu:\nFandím.");
   assert.match(voiceFor(null, "fotbal"), /klubovou šálou/);
-  assert.match(systemPrompt(""), /odstěhovala z ohrady mezi lidi/);
+  assert.match(systemPrompt(""), /O sobě vždy ve třetí osobě/);
 });
 
 test("redakce ukáže povahu Drběny a nastavení importů na ni odkáže", () => {
