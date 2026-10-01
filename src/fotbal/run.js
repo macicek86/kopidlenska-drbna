@@ -11,6 +11,8 @@ import {
 } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
 import { requireChief } from "../db-core.js";
+import { loadDrbena } from "../drbena-db.js";
+import { voiceFor } from "../drbena.js";
 import { fetchImage, storeImageBytes } from "../images.js";
 import { MAX_ATTEMPTS } from "../munipolis/store.js";
 import { USER_AGENT } from "../munipolis/feed.js";
@@ -178,7 +180,7 @@ export function footballSourceDate(item, today) {
 export async function processFootball(env, item, settings, { fetchImpl = fetch, ask = askFootball } = {}) {
   const today = pragueNow().date;
   const force = item.manual;
-  const answer = await ask(env, { item, known: await knownContent(env, today), voice: settings.voice, today, force });
+  const answer = await ask(env, { item, known: await knownContent(env, today), voice: voiceFor(await loadDrbena(env), "fotbal"), today, force });
   if (!answer.ok) {
     await finishFootballItem(env, item.id, { status: "chyba", reason: answer.error });
     return { ok: false, error: answer.error };

@@ -8,6 +8,7 @@ const ICONS = {
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   megaphone: '<path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>',
   calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  pen: '<path d="M4.5 19.5h4l10.5-10.5-4-4L4.5 15.5z"/><path d="m13 7 4 4"/>',
   text: '<path d="M5 6V4.5h14V6"/><path d="M12 4.5v15"/><path d="M9 19.5h6"/>',
   bin: '<path d="M4.5 7h15"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 13h9l1-13"/><path d="M10 11v5.5M14 11v5.5"/>',
   recycle: '<path d="M7 19H4.5l3.2-5.5"/><path d="M17 19h2.5l-3.2-5.5"/><path d="M9.3 5.5 12 3l2.7 2.5"/><path d="M7.7 13.5 12 5.8l4.3 7.7"/><path d="M7 19h10"/>',

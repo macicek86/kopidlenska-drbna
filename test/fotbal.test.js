@@ -188,7 +188,7 @@ test("redakce fotbalu ukáže stav, aktuality, detail a nastavení", () => {
   assert.match(page, /Po zápase/);
   assert.match(page, /Doplněno z rozpisu a tabulky/);
   assert.match(page, /<option value="9" selected>Fotbal<\/option>/);
-  assert.match(page, /koza Drběna/);
+  assert.match(page, /href="\/redakce\/drbena"/);
   assert.match(page, /href="\/redakce\/fotbal"[^>]*aria-current="page"/);
   assert.match(page, /adm-count[^>]*>1</);
   assert.doesNotMatch(page, /ANTHROPIC_API_KEY/);

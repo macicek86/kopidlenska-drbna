@@ -1,11 +1,11 @@
 // Redakce: fotbal z webu FK Kopidlno. Nastavení, stav poslední kontroly a co Koza Drběna s aktualitami udělala.
 import { MODEL } from "../claude.js";
-import { DEFAULT_FOOTBALL_VOICE, KIND_LABEL } from "../fotbal/ai.js";
+import { KIND_LABEL } from "../fotbal/ai.js";
 import { DEFAULT_CLUB_URL } from "../fotbal/club.js";
 import { DEFAULT_FRESH_DAYS, footballRunning, INTERVALS } from "../fotbal/store.js";
 import { esc } from "../view.js";
 import { rubricOptions } from "./articles.js";
-import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, workingNote } from "./imports.js";
+import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
@@ -66,7 +66,7 @@ function settingsForm(settings, rubrics) {
     ${check("clubNews", "1", settings.clubNews, "Psát i o ostatních zprávách klubu", "Dotace, brigády, kroniky… Drběna sama vynechá, co čtenáře nezajímá.")}
     ${check("useCrest", "1", settings.useCrest, "Bez fotky dát ke článku znak klubu", "Když aktualita nemá vlastní fotku.")}
     ${field("Web klubu", `<input class="${input}" type="url" name="clubUrl" required maxlength="300" value="${esc(settings.clubUrl || DEFAULT_CLUB_URL)}">`)}
-    ${field("Jak Drběna píše o fotbale", `<textarea class="${input}" name="voice" rows="8" maxlength="3000">${esc(settings.voice || DEFAULT_FOOTBALL_VOICE)}</textarea>`, "Pokyny pro styl textů. Pravidla o faktech a duplicitách platí vždy.")}
+    ${VOICE_NOTE}
     ${formFoot("Uložit", cancelLink(BASE))}
   </form>`;
 }
@@ -97,7 +97,7 @@ function statusPanel(data, settings, entries, here) {
 }
 
 export function adminFootball(ctx, data, message, query = {}) {
-  const settings = data.footballSettings ?? { clubUrl: DEFAULT_CLUB_URL, voice: "", enabled: false, autoPublish: false, previews: true, clubNews: false, useCrest: true, intervalHours: 24, rubricId: null };
+  const settings = data.footballSettings ?? { clubUrl: DEFAULT_CLUB_URL, enabled: false, autoPublish: false, previews: true, clubNews: false, useCrest: true, intervalHours: 24, rubricId: null };
   const entries = data.footballItems ?? [];
   const open = entries.find((entry) => entry.id === query.importId) ?? null;
   const dialogs = [

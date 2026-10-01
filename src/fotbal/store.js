@@ -16,7 +16,7 @@ export const FOOTBALL_TABLES = [
     enabled integer not null default 0,
     club_url text not null default '',
     auto_publish integer not null default 0,
-    voice text not null default '',
+    voice text not null default '', -- dřív povaha Drběny, teď je v drbena_settings
     rubric_id integer,
     previews integer not null default 1,
     club_news integer not null default 0,
@@ -89,7 +89,6 @@ function mapSettings(row) {
     enabled: asBool(row?.enabled),
     clubUrl: String(row?.club_url ?? "") || DEFAULT_CLUB_URL,
     autoPublish: asBool(row?.auto_publish),
-    voice: String(row?.voice ?? ""),
     rubricId: row?.rubric_id == null ? null : Number(row.rubric_id),
     previews: row ? asBool(row.previews) : true,
     clubNews: asBool(row?.club_news),
@@ -107,7 +106,7 @@ function mapSettings(row) {
 
 export async function loadFootballSettings(env) {
   const row = await env.DB.prepare(
-    `select enabled, club_url, auto_publish, voice, rubric_id, previews, club_news, use_crest, interval_hours, fresh_days, crest_url, crest_key,
+    `select enabled, club_url, auto_publish, rubric_id, previews, club_news, use_crest, interval_hours, fresh_days, crest_url, crest_key,
        checked_at, status, note, running_at from football_settings where id = 1`,
   ).first();
   return mapSettings(row);
@@ -251,14 +250,13 @@ export async function saveFootballSettings(env, request, input) {
   if (!rubric) return { ok: false, error: "Vyberte rubriku." };
   const interval = Number(input.intervalHours);
   await env.DB.prepare(
-    `update football_settings set enabled = ?, club_url = ?, auto_publish = ?, voice = ?, rubric_id = ?, previews = ?, club_news = ?, use_crest = ?,
+    `update football_settings set enabled = ?, club_url = ?, auto_publish = ?, rubric_id = ?, previews = ?, club_news = ?, use_crest = ?,
        interval_hours = ?, fresh_days = ? where id = 1`,
   )
     .bind(
       input.enabled ? 1 : 0,
       clubUrl,
       input.autoPublish ? 1 : 0,
-      clip(input.voice, 3000),
       rubric.id,
       input.previews ? 1 : 0,
       input.clubNews ? 1 : 0,

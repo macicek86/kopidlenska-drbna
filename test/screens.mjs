@@ -23,6 +23,7 @@ const TABS = [
   "dvory",
   "lekari",
   "odstavky",
+  "drbena",
   "lide",
   "heslo",
   // Otevřená okna. Název souboru je adresa bez lomítek.

@@ -11,6 +11,8 @@ import {
 } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
 import { requireChief } from "../db-core.js";
+import { loadDrbena } from "../drbena-db.js";
+import { voiceFor } from "../drbena.js";
 import { fetchImage, storeImageBytes } from "../images.js";
 import { insertNotice, loadNotices } from "../notices-db.js";
 import { addDays, pragueNow } from "../waste.js";
@@ -140,7 +142,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
     known: await knownContent(env, item.id, today),
     images,
     rubricSlugs: [...rubrics.keys()],
-    voice: settings.voice,
+    voice: voiceFor(await loadDrbena(env)),
     today,
     force,
   });

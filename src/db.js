@@ -27,6 +27,7 @@ import {
 import { ensureNoticeTables, loadNoticeBoard, loadNotices } from "./notices-db.js";
 import { ensureImportTables, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { ensureFootballTables, loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
+import { ensureDrbenaTable, loadDrbena } from "./drbena-db.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
 export const CATEGORIES = SEED_RUBRICS.map((item) => item.name);
@@ -535,6 +536,7 @@ async function migrateSchema(env) {
   await ensureNoticeTables(env);
   await ensureImportTables(env);
   await ensureFootballTables(env);
+  await ensureDrbenaTable(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
@@ -791,6 +793,7 @@ export async function loadAdmin(env, request) {
     importItems: [],
     footballSettings: null,
     footballItems: [],
+    drbena: null,
     rubrics: [],
   };
   if (!user) return base;
@@ -824,6 +827,7 @@ export async function loadAdmin(env, request) {
     base.importItems = await loadImportItems(env);
     base.footballSettings = await loadFootballSettings(env);
     base.footballItems = await loadFootballItems(env);
+    base.drbena = await loadDrbena(env);
     base.hasApiKey = Boolean(env.ANTHROPIC_API_KEY);
     base.events = (
       await env.DB.prepare(

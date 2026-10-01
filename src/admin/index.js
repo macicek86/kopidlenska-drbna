@@ -1,6 +1,7 @@
 export { adminAds } from "./ads.js";
 export { adminArticles } from "./articles.js";
 export { adminDoctors } from "./doctors.js";
+export { adminDrbena } from "./drbena.js";
 export { adminEvents } from "./events.js";
 export { adminFootball } from "./fotbal.js";
 export { adminMunipolis } from "./munipolis.js";

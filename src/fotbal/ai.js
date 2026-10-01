@@ -1,10 +1,9 @@
 // Claude napíše z aktuality FK Kopidlno článek hlasem kozy Drběny: zprávu po zápase, pozvánku nebo klubovou novinku.
 import { callClaude } from "../claude.js";
-import { DEFAULT_VOICE } from "../munipolis/ai.js";
 import { prepareArticleBody } from "../rich.js";
+import { DEFAULT_FOOTBALL_VOICE } from "../drbena.js";
 
-export const DEFAULT_FOOTBALL_VOICE = `${DEFAULT_VOICE}
-U fotbalu Drběna fandí Kopidlnu z ohrady za brankou. Raduje se z gólů, po prohře hráče povzbudí, soupeře nikdy nezesměšňuje. Fotbalové výrazy používá přirozeně, ale text musí pochopit i babička, která na hřišti nikdy nebyla.`;
+export { DEFAULT_FOOTBALL_VOICE };
 
 const RULES = `Dostaneš jednu aktualitu z webu fotbalového klubu FK Kopidlno a přehled toho, co už na webu Kopidlenská drbna je. Napiš z ní článek do fotbalové rubriky drbny.
 

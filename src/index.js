@@ -70,6 +70,7 @@ import {
   adminAds,
   adminArticles,
   adminDoctors,
+  adminDrbena,
   adminEvents,
   adminMunipolis,
   adminFootball,
@@ -88,6 +89,7 @@ import { WEEK_DAYS } from "./yards.js";
 import { html, json, redirect, sameOrigin, secure, withError } from "./http.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
+import { DRBENA_OK, drbenaPost } from "./post-drbena.js";
 import { continueImport, runImport } from "./munipolis/run.js";
 import { loadImportSettings } from "./munipolis/store.js";
 import { FOOTBALL_OK, footballPost } from "./post-fotbal.js";
@@ -143,6 +145,7 @@ const OK = {
   "clovek-udaje": "Alias a oprávnění jsou uložené.",
   ...OUTAGE_OK,
   ...IMPORT_OK,
+  ...DRBENA_OK,
   ...FOOTBALL_OK,
 };
 
@@ -280,7 +283,8 @@ async function formFields(request) {
     places: text("places"),
     sourceUrl: text("sourceUrl"),
     feedUrl: text("feedUrl"),
-    voice: text("voice"),
+    persona: text("persona"),
+    football: text("football"),
     autoPublish: form.get("autoPublish") === "1",
     clubUrl: text("clubUrl"),
     previews: form.get("previews") === "1",
@@ -387,7 +391,7 @@ async function renderGet(request, env, url, execution) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "drbena"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -421,6 +425,7 @@ async function renderGet(request, env, url, execution) {
       if (data.signedIn && (await continueFootball(env, { ctx: execution })).background) data.footballSettings = await loadFootballSettings(env);
       return html(adminFootball(ctx, data, message, query));
     }
+    if (tab === "drbena") return html(adminDrbena(ctx, data, message));
     if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
@@ -634,7 +639,8 @@ async function renderPost(request, env, url, execution) {
   const section =
     (await outagePost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
-    (await footballPost(path, request, env, fields, execution));
+    (await footballPost(path, request, env, fields, execution)) ??
+    (await drbenaPost(path, request, env, fields));
   if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);

@@ -2,13 +2,10 @@
 import { callClaude, MODEL } from "../claude.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
+import { DEFAULT_VOICE } from "../drbena.js";
 
-export { MODEL };
+export { MODEL, DEFAULT_VOICE };
 const MAX_IMAGE_BYTES = 3_700_000;
-
-export const DEFAULT_VOICE = `Píšeš jako koza Drběna, maskot Kopidlenské drbny. Jsi zvědavá a vlídná sousedka z Kopidlna, která se všechno dozví první.
-Píšeš česky, krátce a srozumitelně, s lehkým humorem a občas kozí poznámkou (mečení, tráva, ohrada), ale nikdy na úkor faktů.
-Sousedy oslovuješ přátelsky. Nikoho nezesměšňuješ. Vážné věci, třeba úmrtí, nehody nebo výpadky, píšeš bez vtipů.`;
 
 const RULES = `Dostaneš jednu zprávu z městského Munipolisu Kopidlna a přehled toho, co už na webu Kopidlenská drbna je.
 

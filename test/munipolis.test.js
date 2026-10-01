@@ -6,8 +6,9 @@ import { importSourceDate, outcomeOf, sourceParagraph } from "../src/munipolis/r
 import { isFresh, readFreshDays } from "../src/background.js";
 import { noticeBoard, noticePhase, noticeSpan, parseNoticeInput } from "../src/notices.js";
 import { outagesPage, homePage } from "../src/view.js";
-import { adminMunipolis, adminOutages } from "../src/admin/index.js";
+import { adminDrbena, adminMunipolis, adminOutages } from "../src/admin/index.js";
 import { refLink } from "../src/admin/imports.js";
+import { DEFAULT_FOOTBALL, DEFAULT_FOOTBALL_VOICE, DEFAULT_PERSONA, ownFootball, ownPersona, voiceFor } from "../src/drbena.js";
 
 const FEED = `<?xml version="1.0" encoding="utf-8" ?>
 <rss version="2.0"><channel><title>RSS 2.0 Feed</title>
@@ -314,4 +315,27 @@ test("ručně vybraná zpráva z Munipolisu dostane pražský den zveřejnění"
   assert.equal(importSourceDate({ publishedAt: "2026-09-29T22:30:00.000Z" }, "2026-10-01"), "2026-09-30");
   assert.equal(importSourceDate({ publishedAt: "" }, "2026-10-01"), "");
   assert.equal(importSourceDate({ publishedAt: "2026-10-05T10:00:00.000Z" }, "2026-10-01"), "");
+});
+
+test("povaha Drběny: výchozí text se neukládá, vlastní ano a fotbal ji doplní", () => {
+  assert.ok(DEFAULT_FOOTBALL_VOICE.length <= 3000 + 1500);
+  assert.equal(ownPersona(DEFAULT_PERSONA.replace(/\n/g, "\r\n") + "\n"), "");
+  assert.equal(ownPersona(DEFAULT_FOOTBALL_VOICE), "");
+  assert.equal(ownFootball(DEFAULT_FOOTBALL), "");
+  const past = "Píšeš jako koza Drběna, maskot Kopidlenské drbny. Jsi zvědavá a vlídná sousedka z Kopidlna, která se všechno dozví první.\nPíšeš česky, krátce a srozumitelně, s lehkým humorem a občas kozí poznámkou (mečení, tráva, ohrada), ale nikdy na úkor faktů.\nSousedy oslovuješ přátelsky. Nikoho nezesměšňuješ. Vážné věci, třeba úmrtí, nehody nebo výpadky, píšeš bez vtipů.";
+  assert.equal(ownPersona(past), "");
+  assert.equal(ownPersona("  Piš jako básník.  "), "Piš jako básník.");
+  assert.equal(voiceFor({ persona: "Jsem koza.", football: "" }), "Jsem koza.");
+  assert.equal(voiceFor({ persona: "Jsem koza.", football: "Fandím." }, "fotbal"), "Jsem koza.\n\nU fotbalu:\nFandím.");
+  assert.match(voiceFor(null, "fotbal"), /klubovou šálou/);
+  assert.match(systemPrompt(""), /odstěhovala z ohrady mezi lidi/);
+});
+
+test("redakce ukáže povahu Drběny a nastavení importů na ni odkáže", () => {
+  const data = { signedIn: true, user: { id: 1, login: "admin", name: "Admin", role: "hlavni" }, drbena: { persona: "Jsem koza.", football: "" } };
+  const page = adminDrbena(CTX, data, "");
+  assert.match(page, /name="persona"[^>]*>Jsem koza\.<\/textarea>/);
+  assert.match(page, /klubovou šálou/);
+  assert.match(page, /Vlastní text/);
+  assert.match(adminMunipolis(CTX, { ...data, importSettings: null, importItems: [] }, "", { importSettings: true }), /href="\/redakce\/drbena"/);
 });

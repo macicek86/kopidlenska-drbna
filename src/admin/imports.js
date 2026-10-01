@@ -91,3 +91,6 @@ export function workingNote({ running, entries, enabled, here, busy }) {
   }
   return notes.map((note) => callout(esc(note), "info")).join("");
 }
+
+// V nastavení importů místo pole s povahou: ta je společná na stránce Koza Drběna.
+export const VOICE_NOTE = `<p class="hint">Jak Drběna píše, se nastavuje na stránce <a href="/redakce/drbena">Koza Drběna</a>.</p>`;

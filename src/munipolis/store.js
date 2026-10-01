@@ -24,7 +24,7 @@ export const IMPORT_TABLES = [
     enabled integer not null default 0,
     feed_url text not null default '',
     auto_publish integer not null default 0,
-    voice text not null default '',
+    voice text not null default '', -- dřív povaha Drběny, teď je v drbena_settings
     fresh_days integer not null default 3,
     checked_at text,
     status text not null default '',
@@ -72,7 +72,6 @@ function mapSettings(row) {
     enabled: asBool(row?.enabled),
     feedUrl: String(row?.feed_url ?? "") || DEFAULT_FEED_URL,
     autoPublish: asBool(row?.auto_publish),
-    voice: String(row?.voice ?? ""),
     freshDays: readFreshDays(row?.fresh_days, DEFAULT_FRESH_DAYS),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
@@ -83,7 +82,7 @@ function mapSettings(row) {
 
 export async function loadImportSettings(env) {
   const row = await env.DB.prepare(
-    "select enabled, feed_url, auto_publish, voice, fresh_days, checked_at, status, note, running_at from import_settings where id = 1",
+    "select enabled, feed_url, auto_publish, fresh_days, checked_at, status, note, running_at from import_settings where id = 1",
   ).first();
   return mapSettings(row);
 }
@@ -201,9 +200,8 @@ export async function saveImportSettings(env, request, input) {
   if (!gate.ok) return gate;
   const feedUrl = readFeedUrl(input.feedUrl);
   if (!feedUrl) return { ok: false, error: "Adresa RSS musí začínat https://." };
-  const voice = clip(input.voice, 3000);
-  await env.DB.prepare("update import_settings set enabled = ?, feed_url = ?, auto_publish = ?, voice = ?, fresh_days = ? where id = 1")
-    .bind(input.enabled ? 1 : 0, feedUrl, input.autoPublish ? 1 : 0, voice, readFreshDays(input.freshDays, DEFAULT_FRESH_DAYS))
+  await env.DB.prepare("update import_settings set enabled = ?, feed_url = ?, auto_publish = ?, fresh_days = ? where id = 1")
+    .bind(input.enabled ? 1 : 0, feedUrl, input.autoPublish ? 1 : 0, readFreshDays(input.freshDays, DEFAULT_FRESH_DAYS))
     .run();
   return { ok: true };
 }

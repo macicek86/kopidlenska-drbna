@@ -371,6 +371,13 @@ insert into import_settings (id)
 select 1
 where not exists (select 1 from import_settings where id = 1);
 
+-- Povaha kozy Drběny pro texty od Claude. Prázdné pole = výchozí text z src/drbena.js. Řádek založí worker (src/drbena-db.js).
+create table if not exists drbena_settings (
+  id integer primary key,
+  persona text not null default '',
+  football text not null default ''
+);
+
 -- Řádek nastavení fotbalu a podrubriku Fotbal založí worker při prvním spuštění (src/fotbal/store.js).
 create table if not exists football_settings (
   id integer primary key,

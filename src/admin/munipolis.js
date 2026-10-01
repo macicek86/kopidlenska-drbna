@@ -1,9 +1,9 @@
 // Redakce: import zpráv z Munipolisu. Nastavení, stav poslední kontroly a co Koza Drběna se zprávami udělala.
-import { DEFAULT_VOICE, MODEL } from "../munipolis/ai.js";
+import { MODEL } from "../munipolis/ai.js";
 import { DEFAULT_FEED_URL } from "../munipolis/feed.js";
 import { DEFAULT_FRESH_DAYS, importRunning } from "../munipolis/store.js";
 import { esc } from "../view.js";
-import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, workingNote } from "./imports.js";
+import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
@@ -53,7 +53,7 @@ function settingsForm(settings) {
     ${field("Automaticky jen zprávy z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na Munipolisu. Starší zprávy (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce a odstávky jako skryté.")}
     ${field("Adresa RSS", `<input class="${input}" type="url" name="feedUrl" required maxlength="300" value="${esc(settings.feedUrl || DEFAULT_FEED_URL)}">`)}
-    ${field("Jak Drběna píše", `<textarea class="${input}" name="voice" rows="7" maxlength="3000">${esc(settings.voice || DEFAULT_VOICE)}</textarea>`, "Pokyny pro styl textů. Pravidla o faktech, rubrikách a duplicitách platí vždy.")}
+    ${VOICE_NOTE}
     ${formFoot("Uložit", cancelLink(BASE))}
   </form>`;
 }
@@ -81,7 +81,7 @@ function statusPanel(data, settings, entries, here) {
 }
 
 export function adminMunipolis(ctx, data, message, query = {}) {
-  const settings = data.importSettings ?? { feedUrl: DEFAULT_FEED_URL, voice: "", enabled: false, autoPublish: false };
+  const settings = data.importSettings ?? { feedUrl: DEFAULT_FEED_URL, enabled: false, autoPublish: false };
   const entries = data.importItems ?? [];
   const open = entries.find((entry) => entry.id === query.importId) ?? null;
   const dialogs = [
