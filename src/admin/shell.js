@@ -9,6 +9,7 @@ function nav(data) {
   const returned = chief ? 0 : (data.proposals ?? []).filter((item) => item.status === "rejected").length;
   const adReturned = chief ? 0 : (data.adProposals ?? []).filter((item) => item.status === "rejected").length;
   const importFailed = (data.importItems ?? []).filter((item) => item.status === "chyba").length;
+  const footballFailed = (data.footballItems ?? []).filter((item) => item.status === "chyba").length;
   const noticesWaiting = (data.notices ?? []).filter((item) => !item.published && item.sourceUrl).length;
   const groups = [
     {
@@ -22,6 +23,7 @@ function nav(data) {
         chief && ["rubriky", "Rubriky", "folder"],
         chief && ["akce", "Akce", "calendar"],
         chief && ["munipolis", "Munipolis", "inbox", importFailed],
+        chief && ["fotbal", "Fotbal", "ball", footballFailed],
         ["reklamy", "Reklamy", "megaphone", chief ? adWaiting : adReturned],
       ],
     },
@@ -60,7 +62,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "munipolis", "reklamy", "svoz", "dvory", "lekari", "odstavky", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "reklamy", "svoz", "dvory", "lekari", "odstavky", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

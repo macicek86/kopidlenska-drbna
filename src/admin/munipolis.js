@@ -10,7 +10,7 @@ import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, 
 
 const BASE = "/redakce/munipolis";
 
-const TONE = { nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad" };
+export const TONE = { nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad" };
 
 // Kam vede značka, kterou Claude použil v duplicate_of nebo kterou zpráva vytvořila.
 export function refLink(ref) {
@@ -26,7 +26,7 @@ export function refLink(ref) {
   return `<a href="${links[kind][0]}${id}">${esc(links[kind][1])} #${id}</a>`;
 }
 
-function stamp(iso) {
+export function stamp(iso) {
   const parsed = Date.parse(iso);
   if (!Number.isFinite(parsed)) return "";
   const clock = pragueNow(new Date(parsed));
@@ -60,7 +60,7 @@ function processButton(entry) {
   return `<form method="post" action="${BASE}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Drběna čte…">${label}</button></form>`;
 }
 
-function textBlock(text) {
+export function textBlock(text) {
   const paragraphs = String(text ?? "")
     .split(/\n{2,}/)
     .map((part) => part.trim())

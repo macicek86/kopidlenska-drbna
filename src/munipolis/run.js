@@ -1,13 +1,12 @@
 // Jeden průchod importu: stáhnout RSS, nové zprávy dát Claudovi a výsledek uložit jako návrh, akci nebo odstávku.
-import { requireChief, slugify, uniqueSlug } from "../db-core.js";
+import { saveBotArticle } from "../bot-article.js";
+import { requireChief } from "../db-core.js";
 import { fetchImage, storeImageBytes } from "../images.js";
-import { prepareArticleBody } from "../rich.js";
 import { insertNotice, loadNotices } from "../notices-db.js";
 import { addDays, pragueNow } from "../waste.js";
 import { askClaude } from "./ai.js";
 import { fetchFeed } from "./feed.js";
 import {
-  ensureBot,
   finishItem,
   loadImportItem,
   loadImportSettings,
@@ -101,44 +100,6 @@ async function rubricMap(env) {
   return new Map(list.map((row) => [String(row.slug), { id: Number(row.id), name: String(row.name) }]));
 }
 
-async function saveArticle(env, { article, imageKey, link, autoPublish, rubric }) {
-  const bot = await ensureBot(env);
-  const body = prepareArticleBody(`${article.body}${sourceParagraph(link)}`).html;
-  if (autoPublish) {
-    const slug = await uniqueSlug(env, slugify(article.title));
-    const result = await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
-       values (?, ?, ?, ?, ?, ?, ?, '', ?, 1, date('now'), ?, ?, 0)`,
-    )
-      .bind(slug, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, article.imageCaption, bot.id, bot.name)
-      .run();
-    return { articleId: Number(result.meta.last_row_id) };
-  }
-  const result = await env.DB.prepare(
-    `insert into proposals (
-       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption,
-       submitted_title, submitted_excerpt, submitted_body, submitted_category, status
-     ) values (null, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, 'pending')`,
-  )
-    .bind(
-      bot.id,
-      bot.name,
-      article.title,
-      article.excerpt,
-      body,
-      rubric.name,
-      rubric.id,
-      imageKey,
-      article.imageCaption,
-      article.title,
-      article.excerpt,
-      body,
-      rubric.name,
-    )
-    .run();
-  return { proposalId: Number(result.meta.last_row_id) };
-}
-
 async function downloadImages(urls, fetchImpl) {
   const images = [];
   for (const url of urls.slice(0, 2)) {
@@ -176,10 +137,10 @@ export async function processItem(env, item, settings, { force = false, fetchImp
     const imageKey = images[0] ? await storeImageBytes(env, images[0]) : null;
     Object.assign(
       made,
-      await saveArticle(env, {
+      await saveBotArticle(env, {
         article: answer.article,
         imageKey,
-        link: item.link,
+        sourceHtml: sourceParagraph(item.link),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
       }),

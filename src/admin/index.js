@@ -2,6 +2,7 @@ export { adminAds } from "./ads.js";
 export { adminArticles } from "./articles.js";
 export { adminDoctors } from "./doctors.js";
 export { adminEvents } from "./events.js";
+export { adminFootball } from "./fotbal.js";
 export { adminMunipolis } from "./munipolis.js";
 export { adminOutages } from "./outages.js";
 export { adminOverview } from "./overview.js";

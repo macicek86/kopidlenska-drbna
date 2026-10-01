@@ -1,9 +1,9 @@
 // Claude roztřídí zprávu z Munipolisu, pozná duplicitu a přepíše ji hlasem kozy Drběny.
-import Anthropic from "@anthropic-ai/sdk";
+import { callClaude, MODEL } from "../claude.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
 
-export const MODEL = "claude-opus-5-5";
+export { MODEL };
 const MAX_IMAGE_BYTES = 3_700_000;
 
 export const DEFAULT_VOICE = `Píšeš jako koza Drběna, maskot Kopidlenské drbny. Jsi zvědavá a vlídná sousedka z Kopidlna, která se všechno dozví první.
@@ -216,43 +216,12 @@ function base64(bytes) {
 
 // Jedno volání Claude. `images` jsou už stažené obrázky ({ bytes, type }).
 export async function askClaude(env, { item, known, images = [], rubricSlugs, voice, today, force = false }) {
-  if (!env.ANTHROPIC_API_KEY) return { ok: false, error: "Chybí klíč ANTHROPIC_API_KEY." };
-  const client = new Anthropic({
-    apiKey: env.ANTHROPIC_API_KEY,
-    baseURL: env.ANTHROPIC_BASE_URL || undefined,
-    maxRetries: 2,
-    timeout: 180_000,
-  });
   // API bere obrázek do 5 MB v base64. Větší plakát Claude neuvidí, ale k návrhu se uloží.
   const content = [
     ...images.filter((image) => image.bytes.byteLength <= MAX_IMAGE_BYTES).map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
     { type: "text", text: userText(item, known, { today, force }) },
   ];
-  let response;
-  try {
-    response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort: "medium", format: { type: "json_schema", schema: outputSchema(rubricSlugs) } },
-      system: systemPrompt(voice),
-      messages: [{ role: "user", content }],
-    });
-  } catch (error) {
-    if (error instanceof Anthropic.AuthenticationError) return { ok: false, error: "Claude nepřijal klíč. Zkontrolujte ANTHROPIC_API_KEY." };
-    if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude je teď přetížený. Zkusí se to příště." };
-    if (error instanceof Anthropic.APIError) return { ok: false, error: `Claude odpověděl chybou ${error.status ?? ""}.`.replace(" .", ".") };
-    return { ok: false, error: "Claude neodpověděl." };
-  }
-  if (response.stop_reason === "refusal") return { ok: false, error: "Claude tuhle zprávu odmítl zpracovat." };
-  if (response.stop_reason === "max_tokens") return { ok: false, error: "Claudova odpověď se nevešla. Zkuste to znovu." };
-  const text = (response.content ?? []).filter((block) => block.type === "text").map((block) => block.text).join("");
-  let raw;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return { ok: false, error: "Claudova odpověď nešla přečíst." };
-  }
-  return readDecision(raw, { rubricSlugs, force });
+  const answer = await callClaude(env, { system: systemPrompt(voice), content, schema: outputSchema(rubricSlugs) });
+  if (!answer.ok) return answer;
+  return readDecision(answer.raw, { rubricSlugs, force });
 }

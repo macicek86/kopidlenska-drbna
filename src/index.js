@@ -1,29 +1,22 @@
 import {
-  approveAdProposal,
   approveProposal,
   changePassword,
   clearCookie,
   createContributor,
   ensureSchema,
-  loadAd,
   loadAdmin,
-  loadAds,
   loadArticle,
   loadCopy,
   loadPublic,
   login,
   logout,
-  rejectAdProposal,
   rejectProposal,
-  removeAd,
   removeArticle,
   removeClosure,
   removeDoctor,
   removeDoctorChange,
   removeEvent,
   removeYard,
-  saveAd,
-  saveAdProposal,
   saveArticle,
   saveClosure,
   saveCopy,
@@ -39,15 +32,24 @@ import {
   refreshOutages,
   removeRubric,
   saveRubric,
-  setAdEnabled,
   sessionCookie,
   saveContributorAccess,
   setContributorActive,
   setContributorPassword,
   userCan,
-  withdrawAdProposal,
   withdrawProposal,
 } from "./db.js";
+import {
+  approveAdProposal,
+  loadAd,
+  loadAds,
+  rejectAdProposal,
+  removeAd,
+  saveAd,
+  saveAdProposal,
+  setAdEnabled,
+  withdrawAdProposal,
+} from "./ads-db.js";
 import {
   adPage,
   adsPage,
@@ -70,6 +72,7 @@ import {
   adminDoctors,
   adminEvents,
   adminMunipolis,
+  adminFootball,
   adminOutages,
   adminOverview,
   adminPassword,
@@ -86,6 +89,8 @@ import { html, json, redirect, sameOrigin, secure, withError } from "./http.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
 import { runImport } from "./munipolis/run.js";
+import { FOOTBALL_OK, footballPost } from "./post-fotbal.js";
+import { runFootball } from "./fotbal/run.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
@@ -136,6 +141,7 @@ const OK = {
   "clovek-udaje": "Alias a oprávnění jsou uložené.",
   ...OUTAGE_OK,
   ...IMPORT_OK,
+  ...FOOTBALL_OK,
 };
 
 function chooseAd(request, ads) {
@@ -274,6 +280,11 @@ async function formFields(request) {
     feedUrl: text("feedUrl"),
     voice: text("voice"),
     autoPublish: form.get("autoPublish") === "1",
+    clubUrl: text("clubUrl"),
+    previews: form.get("previews") === "1",
+    clubNews: form.get("clubNews") === "1",
+    useCrest: form.get("useCrest") === "1",
+    intervalHours: text("intervalHours"),
   };
 }
 
@@ -372,7 +383,7 @@ async function renderGet(request, env, url, execution) {
     const data = await loadAdmin(env, request);
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -398,13 +409,14 @@ async function renderGet(request, env, url, execution) {
     }
     if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
     if (tab === "munipolis") return html(adminMunipolis(ctx, data, message, query));
+    if (tab === "fotbal") return html(adminFootball(ctx, data, message, query));
     if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
   return html(missingPage({ ...ctx, path: "/" }), 404);
 }
 
-async function renderPost(request, env, url) {
+async function renderPost(request, env, url, execution) {
   if (!sameOrigin(request)) return new Response("Cizí původ.", { status: 403 });
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const https = secure(request);
@@ -608,7 +620,8 @@ async function renderPost(request, env, url) {
     if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
   }
-  const section = (await outagePost(path, request, env, fields)) ?? (await munipolisPost(path, request, env, fields));
+  const section = (await outagePost(path, request, env, fields)) ?? (await munipolisPost(path, request, env, fields)) ??
+    (await footballPost(path, request, env, fields, execution));
   if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);
@@ -642,7 +655,7 @@ export default {
         const response = await renderGet(request, env, url, execution);
         return request.method === "HEAD" ? new Response(null, { status: response.status, headers: response.headers }) : response;
       }
-      if (request.method === "POST") return await renderPost(request, env, url);
+      if (request.method === "POST") return await renderPost(request, env, url, execution);
       return new Response("Metoda není povolená.", { status: 405 });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Neznámá chyba.";
@@ -653,5 +666,6 @@ export default {
     await ensureSchema(env);
     ctx.waitUntil(refreshOutages(env).catch(() => {}));
     ctx.waitUntil(runImport(env).catch(() => {}));
+    ctx.waitUntil(runFootball(env).catch(() => {}));
   },
 };

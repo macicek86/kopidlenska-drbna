@@ -369,3 +369,45 @@ create table if not exists import_items (
 insert into import_settings (id)
 select 1
 where not exists (select 1 from import_settings where id = 1);
+
+-- Řádek nastavení fotbalu a podrubriku Fotbal založí worker při prvním spuštění (src/fotbal/store.js).
+create table if not exists football_settings (
+  id integer primary key,
+  enabled integer not null default 0,
+  club_url text not null default '',
+  auto_publish integer not null default 0,
+  voice text not null default '',
+  rubric_id integer,
+  previews integer not null default 1,
+  club_news integer not null default 0,
+  use_crest integer not null default 1,
+  interval_hours integer not null default 24,
+  since text not null default '',
+  crest_url text not null default '',
+  crest_key text not null default '',
+  checked_at text,
+  status text not null default '',
+  note text not null default '',
+  running_at text
+);
+
+create table if not exists football_items (
+  id integer primary key autoincrement,
+  guid text not null unique,
+  kind text not null,
+  link text not null default '',
+  title text not null,
+  text text not null default '',
+  extra text not null default '',
+  images text not null default '[]',
+  cover text not null default '',
+  published_on text not null default '',
+  status text not null default 'nove',
+  reason text not null default '',
+  duplicate_of text not null default '',
+  article_id integer,
+  proposal_id integer,
+  attempts integer not null default 0,
+  created_at text not null default (datetime('now')),
+  processed_at text
+);

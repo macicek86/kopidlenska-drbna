@@ -33,7 +33,7 @@ function rubricChosen(rubric, source, list) {
   return first?.id === rubric.id;
 }
 
-function rubricOptions(rubrics, source) {
+export function rubricOptions(rubrics, source) {
   const all = Array.isArray(rubrics) ? rubrics : rubricsFrom({});
   const parts = [];
   for (const top of all.filter((row) => !row.parentId)) {

@@ -367,10 +367,22 @@ document.addEventListener("click", (event) => {
   if (close) dismissToast(close.closest("[data-toast]"));
 });
 
+/* --- Obnova, když redakce na něco čeká (Drběna píše fotbal) ---------------- */
+
+function scheduleRefresh() {
+  const holder = document.querySelector("[data-refresh]");
+  if (!holder) return;
+  setTimeout(() => {
+    if (document.querySelector("[data-dirty].is-dirty, dialog[open] form.is-dirty")) return scheduleRefresh();
+    location.replace(holder.dataset.refreshUrl || location.pathname);
+  }, Number(holder.dataset.refresh || 10) * 1000);
+}
+
 /* --- Start --------------------------------------------------------------- */
 
 cleanFlashFromUrl();
 bindForms(document);
+scheduleRefresh();
 document.querySelector(".adm-link.is-on")?.scrollIntoView({ block: "nearest", inline: "center" });
 const first = document.querySelector("dialog[data-autoopen]");
 if (first) openDialog(first);
