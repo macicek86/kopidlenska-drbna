@@ -3,10 +3,10 @@ import { MODEL } from "../claude.js";
 import { DEFAULT_FOOTBALL_VOICE, KIND_LABEL } from "../fotbal/ai.js";
 import { DEFAULT_CLUB_URL } from "../fotbal/club.js";
 import { footballRunning, INTERVALS } from "../fotbal/store.js";
-import { MAX_ATTEMPTS, STATUS } from "../munipolis/store.js";
+import { STATUS } from "../munipolis/store.js";
 import { esc } from "../view.js";
 import { rubricOptions } from "./articles.js";
-import { refLink, stamp, textBlock, TONE } from "./munipolis.js";
+import { refLink, stamp, textBlock, TONE, waitingCount, workingNote } from "./munipolis.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
@@ -76,21 +76,6 @@ function settingsForm(settings, rubrics) {
   </form>`;
 }
 
-function waitingCount(entries) {
-  return entries.filter((entry) => entry.status === "nove" || (entry.status === "chyba" && entry.attempts < MAX_ATTEMPTS)).length;
-}
-
-// Když Drběna zrovna píše, stránka se po chvíli sama obnoví (public/admin.js, data-refresh).
-function workingNote(settings, entries, here) {
-  if (footballRunning(settings)) {
-    return `<div class="callout callout-info" data-refresh="8" data-refresh-url="${esc(here)}">Drběna právě píše. Jeden článek jí trvá asi půl minuty, stránka se sama obnoví.</div>`;
-  }
-  const waiting = waitingCount(entries);
-  if (!waiting) return "";
-  const later = settings.enabled ? "Dopíše je při další kontrole (cron běží každé čtyři hodiny), nebo hned po kliknutí na Zkontrolovat teď." : "Kontrola je vypnutá, takže je dopíše jen kliknutí na Zkontrolovat teď.";
-  return callout(`Na zpracování čeká ${waiting}. ${later}`, "info");
-}
-
 function statusPanel(data, settings, entries, here) {
   const checked = settings.checkedAt ? `Naposledy zkontrolováno ${stamp(settings.checkedAt)}.` : "Ještě se nekontrolovalo.";
   const often = (INTERVALS.find(([hours]) => hours === settings.intervalHours)?.[1] ?? "").toLocaleLowerCase("cs");
@@ -111,7 +96,7 @@ function statusPanel(data, settings, entries, here) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji aktuality…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote(settings, entries, here)}
+    ${workingNote({ running: footballRunning(settings), waiting: waitingCount(entries), enabled: settings.enabled, here, busy: "Drběna právě píše. Jeden článek jí trvá asi půl minuty, stránka se sama obnoví." })}
     ${keyWarn}
   </section>`;
 }

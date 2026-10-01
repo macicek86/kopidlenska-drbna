@@ -1,4 +1,5 @@
 // Fotbal v D1: nastavení, zapamatované aktuality z webu klubu a zámek, ať neběží dva průchody naráz.
+import { lockHeld, lockRow, unlockRow } from "../background.js";
 import { asBool, clip, requireChief } from "../db-core.js";
 import { DEFAULT_CLUB_URL, readClubUrl } from "./club.js";
 
@@ -218,26 +219,11 @@ export async function countWaiting(env, maxAttempts) {
   return Number(row?.n ?? 0);
 }
 
-// Zámek nese čas, kdy sám vyprší. Když Worker uprostřed práce skončí, nezůstane fotbal zamčený dlouho.
-export async function lockFootball(env, seconds) {
-  const now = new Date();
-  const until = new Date(now.getTime() + seconds * 1000).toISOString();
-  const token = `${until}-${crypto.randomUUID()}`;
-  const result = await env.DB.prepare(
-    "update football_settings set running_at = ? where id = 1 and (running_at is null or running_at = '' or running_at < ?)",
-  )
-    .bind(token, now.toISOString())
-    .run();
-  return Number(result?.meta?.changes ?? 0) > 0 ? token : "";
-}
-
-export async function unlockFootball(env, token) {
-  if (!token) return;
-  await env.DB.prepare("update football_settings set running_at = null where id = 1 and running_at = ?").bind(token).run();
-}
+export const lockFootball = (env, seconds) => lockRow(env, "football_settings", seconds);
+export const unlockFootball = (env, token) => unlockRow(env, "football_settings", token);
 
 export function footballRunning(settings, now = new Date()) {
-  return Boolean(settings.runningAt) && settings.runningAt > now.toISOString();
+  return lockHeld(settings.runningAt, now);
 }
 
 // Cron běží každé čtyři hodiny. Fotbal se podívá, až od minulé kontroly uběhne nastavená doba (s hodinkou rezervy).

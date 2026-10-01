@@ -1,4 +1,5 @@
 // Jeden průchod fotbalu: stáhnout aktuality FK Kopidlno, doplnit je z rozpisu a tabulky a nechat Drběnu napsat článek.
+import { CLICK_BUDGET_MS, CLICK_LOCK_SECONDS, CRON_BUDGET_MS, CRON_LOCK_SECONDS, drain, inBackground } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
 import { requireChief } from "../db-core.js";
 import { fetchImage, storeImageBytes } from "../images.js";
@@ -24,10 +25,6 @@ import {
 
 export const BATCH_CRON = 8;
 export const BATCH_CLICK = 2;
-const CLICK_BUDGET_MS = 8_000;
-const CRON_BUDGET_MS = 8 * 60_000;
-const CLICK_LOCK_SECONDS = 90;
-const CRON_LOCK_SECONDS = 14 * 60;
 const LOOKBACK_DAYS = 60;
 
 export function clubSource(link) {
@@ -189,29 +186,13 @@ function summary(results, added, waiting) {
   return { status: failed.length ? (done ? "partial" : "error") : "ok", note: parts.join(" ") };
 }
 
-// Píše jednu aktualitu za druhou, dokud nevyprší čas. Další začne jen tehdy, když zbývá dost času na odpověď Claude.
-export async function processWaiting(env, settings, { budgetMs, max, fetchImpl = fetch, ask = askFootball, clock = Date.now } = {}) {
-  const started = clock();
-  const results = [];
-  while (results.length < max && (!results.length || clock() - started < budgetMs)) {
-    const [item] = await waitingFootballItems(env, 1, MAX_ATTEMPTS);
-    if (!item) break;
-    results.push(await processFootball(env, item, settings, { fetchImpl, ask }));
-  }
-  return results;
-}
-
-// Psaní na pozadí po kliknutí v redakci. Cloudflare nechá Worker po odpovědi doběhnout asi 30 s, proto jen krátká dávka.
-function inBackground(ctx, work) {
-  if (ctx?.waitUntil) {
-    ctx.waitUntil(work().catch(() => {}));
-    return true;
-  }
-  return false;
-}
-
 async function writeBatch(env, settings, { added, checked, fetchImpl, ask, budgetMs, max }) {
-  const results = await processWaiting(env, settings, { budgetMs, max, fetchImpl, ask });
+  const results = await drain({
+    next: async () => (await waitingFootballItems(env, 1, MAX_ATTEMPTS))[0],
+    handle: (item) => processFootball(env, item, settings, { fetchImpl, ask }),
+    budgetMs,
+    max,
+  });
   const result = summary(results, added, await countWaiting(env, MAX_ATTEMPTS));
   if (checked || results.length) await writeFootballStatus(env, { ...result, checked });
   return result;

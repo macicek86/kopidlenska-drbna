@@ -2,7 +2,7 @@
 import { formatShort } from "../format.js";
 import { DEFAULT_VOICE, MODEL } from "../munipolis/ai.js";
 import { DEFAULT_FEED_URL } from "../munipolis/feed.js";
-import { STATUS } from "../munipolis/store.js";
+import { importRunning, MAX_ATTEMPTS, STATUS } from "../munipolis/store.js";
 import { esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { adminShell } from "./shell.js";
@@ -96,7 +96,21 @@ function settingsForm(settings) {
   </form>`;
 }
 
-function statusPanel(data, settings) {
+export function waitingCount(entries) {
+  return entries.filter((entry) => entry.status === "nove" || (entry.status === "chyba" && entry.attempts < MAX_ATTEMPTS)).length;
+}
+
+// Co importu zbývá. Když Drběna zrovna pracuje, stránka se po chvíli sama obnoví (public/admin.js, data-refresh).
+export function workingNote({ running, waiting, enabled, here, busy }) {
+  if (running) return `<div class="callout callout-info" data-refresh="8" data-refresh-url="${esc(here)}">${esc(busy)}</div>`;
+  if (!waiting) return "";
+  const later = enabled
+    ? "Dopíše je cron (běží každé čtyři hodiny), nebo hned kliknutí na Zkontrolovat teď."
+    : "Kontrola je vypnutá, takže je dopíše jen kliknutí na Zkontrolovat teď.";
+  return callout(`Na zpracování čeká ${waiting}. ${later}`, "info");
+}
+
+function statusPanel(data, settings, entries, here) {
   const checked = settings.checkedAt ? `Naposledy zkontrolováno ${stamp(settings.checkedAt)}.` : "Ještě se nekontrolovalo.";
   const mode = settings.enabled ? (settings.autoPublish ? "Zapnuto, rovnou zveřejňuje." : "Zapnuto, všechno čeká na schválení.") : "Vypnuto. Kontrolovat jde jen ručně.";
   const keyWarn = data.hasApiKey
@@ -110,9 +124,10 @@ function statusPanel(data, settings) {
         <p class="status-main">${esc(checked)}</p>
         <p class="status-sub">${esc(mode)} Model ${esc(MODEL)}.</p>
       </div>
-      <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Kontroluji…">Zkontrolovat teď</button></form>
+      <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji zprávy…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
+    ${workingNote({ running: importRunning(settings), waiting: waitingCount(entries), enabled: settings.enabled, here, busy: "Drběna právě čte zprávy města. Jedna jí trvá asi půl minuty, stránka se sama obnoví." })}
     ${keyWarn}
   </section>`;
 }
@@ -130,7 +145,7 @@ export function adminMunipolis(ctx, data, message, query = {}) {
     "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek a přepisuje je po svém. Když už stejná věc na drbně je, nechá ji být.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
-    ${statusPanel(data, settings)}
+    ${statusPanel(data, settings, entries, open ? `${BASE}?zprava=${open.id}` : BASE)}
     ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map(entryItem), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "munipolis", message, body, { title: "Munipolis" });

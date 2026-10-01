@@ -288,3 +288,20 @@ test("titulka ukáže odstávku vody mezi odstávkami", () => {
   assert.doesNotMatch(homePage(bare, { ...CTX, path: "/" }), /Nepoteče voda/);
   assert.ok(DEFAULT_VOICE.length > 50);
 });
+
+test("redakce Munipolisu ukáže, že Drběna čte, a obnoví se", () => {
+  const data = {
+    signedIn: true,
+    user: { id: 1, role: "hlavni", name: "Redakce", permissions: [] },
+    hasApiKey: true,
+    importSettings: { enabled: false, autoPublish: false, feedUrl: "https://kopidlno.munipolis.cz/rss", voice: "", checkedAt: "", status: "", note: "", runningAt: "2999-01-01T00:00:00.000Z-x" },
+    importItems: [
+      { id: 7, guid: "g", link: "", title: "Bazárek", text: "", images: [], publishedAt: "2026-09-29T10:00:00Z", status: "nove", reason: "", duplicateOf: "", attempts: 0, articleId: null, proposalId: null, eventId: null, noticeId: null },
+    ],
+  };
+  const busy = adminMunipolis(CTX, data, { text: "", kind: "ok" }, {});
+  assert.match(busy, /data-refresh="8" data-refresh-url="\/redakce\/munipolis"/);
+  const idle = adminMunipolis(CTX, { ...data, importSettings: { ...data.importSettings, runningAt: "" } }, { text: "", kind: "ok" }, {});
+  assert.doesNotMatch(idle, /data-refresh=/);
+  assert.match(idle, /Na zpracování čeká 1\. Kontrola je vypnutá/);
+});

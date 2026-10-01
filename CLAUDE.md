@@ -11,6 +11,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 - `src/munipolis/`: import zpráv města (`feed.js` RSS, `ai.js` pokyny pro Claude, `store.js` D1, `run.js` průchod). Spouští ho cron a tlačítko v redakci. Klíč je tajemství `ANTHROPIC_API_KEY`
 - `src/fotbal/`: články z webu FK Kopidlno (`club.js` rozbor stránek Sklub.cz, `ai.js` pokyny, `store.js` D1, `run.js` průchod). Cron běží každé 4 h, fotbal se ale podívá jen tak často, jak je nastavené v redakci (výchozí jednou denně)
 - `src/claude.js`: společné volání Claude (model, JSON podle schématu, chyby česky); `src/bot-article.js`: uložení článku od kozy Drběny (rovnou na web, nebo jako návrh)
+- `src/background.js`: importy po kliknutí v redakci jen stáhnou zdroj a Clauda volají na pozadí (`ctx.waitUntil`, Cloudflare dá asi 30 s, takže krátká dávka). Zámek `running_at` nese čas, kdy vyprší. Stránka se mezitím obnovuje přes `data-refresh` v `public/admin.js`. Zbytek fronty dopíše cron
 - `src/photo.js`: fotka u zprávy (bod výřezu jako třídy `fx-*`/`fy-*`, popisek, detail bez ořezu); `src/images.js`: ukládání fotek do R2
 - `src/admin/`: redakce, jeden modul na sekci (`articles.js`, `ads.js`, `doctors.js`…)
   - `shell.js`: rozvržení s postranním menu a přihlášení

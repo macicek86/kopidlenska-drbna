@@ -1,4 +1,5 @@
 // Jeden průchod importu: stáhnout RSS, nové zprávy dát Claudovi a výsledek uložit jako návrh, akci nebo odstávku.
+import { CLICK_BUDGET_MS, CLICK_LOCK_SECONDS, CRON_BUDGET_MS, CRON_LOCK_SECONDS, drain, inBackground } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
 import { requireChief } from "../db-core.js";
 import { fetchImage, storeImageBytes } from "../images.js";
@@ -7,6 +8,7 @@ import { addDays, pragueNow } from "../waste.js";
 import { askClaude } from "./ai.js";
 import { fetchFeed } from "./feed.js";
 import {
+  countWaitingItems,
   finishItem,
   loadImportItem,
   loadImportSettings,
@@ -17,9 +19,10 @@ import {
   writeImportStatus,
 } from "./store.js";
 
-// Kolik zpráv se zpracuje najednou. Cron má času dost, kliknutí v redakci čeká na odpověď.
+// Kolik zpráv se zpracuje najednou. Cron má času dost, po kliknutí v redakci se píše na pozadí jen chvilku.
 export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
+const BUSY = "Drběna už zprávy města čte. Počkejte, stránka se sama obnoví.";
 const LOOKBACK_DAYS = 60;
 
 export function sourceParagraph(link) {
@@ -162,59 +165,102 @@ export async function processItem(env, item, settings, { force = false, fetchImp
   return { ok: true, status: "hotovo" };
 }
 
-function summary(results, added) {
+function summary(results, added, waiting) {
   const done = results.filter((result) => result.ok).length;
   const failed = results.filter((result) => !result.ok);
   const parts = [];
   if (added) parts.push(`Nových zpráv: ${added}.`);
   if (done) parts.push(`Zpracováno: ${done}.`);
   if (failed.length) parts.push(`Nepovedlo se: ${failed.length} (${failed[0].error})`);
+  if (waiting) parts.push(`Na zpracování čeká ještě ${waiting}.`);
   if (!parts.length) parts.push("Nic nového.");
   return { status: failed.length ? (done ? "partial" : "error") : "ok", note: parts.join(" ") };
 }
 
-// Cron i tlačítko „Zkontrolovat teď“. Bez zapnutého importu ho cron přeskočí.
-export async function runImport(env, { request = null, fetchImpl = fetch, ask = askClaude } = {}) {
-  if (request) {
-    const gate = await requireChief(env, request);
-    if (!gate.ok) return gate;
+// Stáhne RSS a nové zprávy si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
+async function collect(env, settings, fetchImpl) {
+  const feed = await fetchFeed(settings.feedUrl, { fetchImpl });
+  if (!feed.ok) {
+    await writeImportStatus(env, { status: "error", note: feed.error });
+    return feed;
   }
+  return { ok: true, added: await rememberItems(env, feed.items, settings.since) };
+}
+
+async function writeBatch(env, settings, { added, fetchImpl, ask, budgetMs, max }) {
+  const results = await drain({
+    next: async () => (await waitingItems(env, 1))[0],
+    handle: (item) => processItem(env, item, settings, { fetchImpl, ask }),
+    budgetMs,
+    max,
+  });
+  const result = summary(results, added, await countWaitingItems(env));
+  await writeImportStatus(env, result);
+  return result;
+}
+
+// Cron každé čtyři hodiny. Bez zapnutého importu nedělá nic.
+export async function runImport(env, { fetchImpl = fetch, ask = askClaude } = {}) {
   const settings = await loadImportSettings(env);
-  if (!request && !settings.enabled) return { ok: true, skipped: true };
-  const lock = await lockImport(env);
-  if (!lock) return { ok: false, error: "Import už běží. Zkuste to za chvíli." };
+  if (!settings.enabled) return { ok: true, skipped: true };
+  const lock = await lockImport(env, CRON_LOCK_SECONDS);
+  if (!lock) return { ok: true, skipped: true };
   try {
-    const feed = await fetchFeed(settings.feedUrl, { fetchImpl });
-    if (!feed.ok) {
-      await writeImportStatus(env, { status: "error", note: feed.error });
-      return { ok: false, error: feed.error };
-    }
-    const added = await rememberItems(env, feed.items, settings.since);
-    const batch = await waitingItems(env, request ? BATCH_CLICK : BATCH_CRON);
-    const results = [];
-    for (const item of batch) results.push(await processItem(env, item, settings, { fetchImpl, ask }));
-    const result = summary(results, added);
-    await writeImportStatus(env, result);
-    return { ok: result.status !== "error", error: result.note, note: result.note };
+    const collected = await collect(env, settings, fetchImpl);
+    if (!collected.ok) return collected;
+    const result = await writeBatch(env, settings, { added: collected.added, fetchImpl, ask, budgetMs: CRON_BUDGET_MS, max: BATCH_CRON });
+    return { ok: result.status !== "error", note: result.note };
   } finally {
     await unlockImport(env, lock);
   }
 }
 
-// Ruční zpracování jedné zprávy z redakce. Přeskočenou nebo duplicitní zpracuje i proti Claudovu názoru.
-export async function runOne(env, request, id, { fetchImpl = fetch, ask = askClaude } = {}) {
+// Tlačítko „Zkontrolovat teď“: RSS stáhne hned, zprávy zpracuje na pozadí a stránka se mezitím obnovuje.
+export async function checkImportNow(env, request, { ctx = null, fetchImpl = fetch, ask = askClaude } = {}) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  const settings = await loadImportSettings(env);
+  const lock = await lockImport(env, CLICK_LOCK_SECONDS);
+  if (!lock) return { ok: false, error: BUSY };
+  let handedOff = false;
+  try {
+    const collected = await collect(env, settings, fetchImpl);
+    if (!collected.ok) return collected;
+    const work = async () => {
+      try {
+        await writeBatch(env, settings, { added: collected.added, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
+      } finally {
+        await unlockImport(env, lock);
+      }
+    };
+    handedOff = inBackground(ctx, work);
+    if (!handedOff) await work();
+    return { ok: true, background: handedOff };
+  } finally {
+    if (!handedOff) await unlockImport(env, lock);
+  }
+}
+
+// Ruční zpracování jedné zprávy z redakce. Přeskočenou nebo duplicitní zpracuje i proti Claudovu názoru. Píše se na pozadí.
+export async function runOne(env, request, id, { ctx = null, fetchImpl = fetch, ask = askClaude } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const item = id ? await loadImportItem(env, id) : null;
   if (!item) return { ok: false, error: "Tahle zpráva v importu není." };
   if (item.status === "hotovo") return { ok: false, error: "Tahle zpráva už je zpracovaná." };
-  const lock = await lockImport(env);
-  if (!lock) return { ok: false, error: "Import už běží. Zkuste to za chvíli." };
-  try {
-    const settings = await loadImportSettings(env);
-    const force = item.status === "preskoceno" || item.status === "duplicita";
-    return await processItem(env, item, settings, { force, fetchImpl, ask });
-  } finally {
-    await unlockImport(env, lock);
-  }
+  const lock = await lockImport(env, CLICK_LOCK_SECONDS);
+  if (!lock) return { ok: false, error: BUSY };
+  const settings = await loadImportSettings(env);
+  const force = item.status === "preskoceno" || item.status === "duplicita";
+  let outcome = null;
+  const work = async () => {
+    try {
+      outcome = await processItem(env, item, settings, { force, fetchImpl, ask });
+    } finally {
+      await unlockImport(env, lock);
+    }
+  };
+  if (inBackground(ctx, work)) return { ok: true, background: true };
+  await work();
+  return outcome;
 }

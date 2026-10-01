@@ -1,4 +1,5 @@
 // Import z Munipolisu v D1: nastavení, zapamatované zprávy a autorka Koza Drběna.
+import { lockHeld, lockRow, unlockRow } from "../background.js";
 import { asBool, clip, requireChief } from "../db-core.js";
 import { hashPassword } from "../password.js";
 import { DEFAULT_FEED_URL, readFeedUrl } from "./feed.js";
@@ -64,12 +65,13 @@ function mapSettings(row) {
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
     note: String(row?.note ?? ""),
+    runningAt: String(row?.running_at ?? ""),
   };
 }
 
 export async function loadImportSettings(env) {
   const row = await env.DB.prepare(
-    "select enabled, feed_url, auto_publish, voice, since, checked_at, status, note from import_settings where id = 1",
+    "select enabled, feed_url, auto_publish, voice, since, checked_at, status, note, running_at from import_settings where id = 1",
   ).first();
   return mapSettings(row);
 }
@@ -170,21 +172,18 @@ export async function writeImportStatus(env, { status, note }) {
     .run();
 }
 
-export async function lockImport(env) {
-  const now = new Date();
-  const token = `${now.toISOString()}-${crypto.randomUUID()}`;
-  const stale = new Date(now.getTime() - 15 * 60 * 1000).toISOString();
-  const result = await env.DB.prepare(
-    "update import_settings set running_at = ? where id = 1 and (running_at is null or running_at = '' or running_at < ?)",
-  )
-    .bind(token, stale)
-    .run();
-  return Number(result?.meta?.changes ?? 0) > 0 ? token : "";
+export const lockImport = (env, seconds) => lockRow(env, "import_settings", seconds);
+export const unlockImport = (env, token) => unlockRow(env, "import_settings", token);
+
+export function importRunning(settings, now = new Date()) {
+  return lockHeld(settings.runningAt, now);
 }
 
-export async function unlockImport(env, token) {
-  if (!token) return;
-  await env.DB.prepare("update import_settings set running_at = null where id = 1 and running_at = ?").bind(token).run();
+export async function countWaitingItems(env) {
+  const row = await env.DB.prepare("select count(*) as n from import_items where status = 'nove' or (status = 'chyba' and attempts < ?)")
+    .bind(MAX_ATTEMPTS)
+    .first();
+  return Number(row?.n ?? 0);
 }
 
 // Při prvním zapnutí si drbna poznamená, odkdy zprávy brát, ať nezahltí redakci celým archivem.

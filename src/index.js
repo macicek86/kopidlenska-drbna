@@ -620,7 +620,9 @@ async function renderPost(request, env, url, execution) {
     if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
   }
-  const section = (await outagePost(path, request, env, fields)) ?? (await munipolisPost(path, request, env, fields)) ??
+  const section =
+    (await outagePost(path, request, env, fields)) ??
+    (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution));
   if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
