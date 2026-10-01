@@ -232,12 +232,15 @@ test("stránka odstávek a titulka ukážou vodu", () => {
     new Date("2026-10-01T08:00:00Z"),
   );
   const page = outagesPage({ outages: { items: [], areas: [{ code: "573060", name: "Kopidlno" }], fetchedAt: "2026-10-01T08:00:00Z", checked: "" }, water }, CTX);
-  assert.match(page, /<h2>Nepoteče voda<\/h2>/);
+  assert.match(page, /<h2>Voda<\/h2>/);
+  assert.match(page, /<h2>Elektřina<\/h2>/);
+  assert.match(page, /<p class="kicker">Nepoteče voda<\/p>/);
   assert.match(page, /Právě neteče/);
   assert.match(page, /Cisterna projíždí\./);
   assert.match(page, /href="https:\/\/kopidlno\.munipolis\.cz\/nastenka\/1"/);
   const empty = outagesPage({ outages: { items: [], areas: [], fetchedAt: null }, water: [] }, CTX);
   assert.doesNotMatch(empty, /Nepoteče voda/);
+  assert.match(empty, /Teď o žádné odstávce vody nevíme\./);
 });
 
 test("redakce Munipolisu ukáže stav, zprávy a detail", () => {

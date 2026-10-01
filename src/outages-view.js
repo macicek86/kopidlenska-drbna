@@ -78,26 +78,40 @@ export function outageEmpty(board, copy) {
   return tx(copy, "outages_empty");
 }
 
-export function outagesPage(data, ctx) {
-  const board = data.outages ?? { items: [], areas: [], fetchedAt: null, status: "", note: "", checked: "" };
-  const water = data.water ?? [];
+function waterSection(water, copy) {
+  const body = water.length
+    ? `<div class="stack">${water.map((item) => noticeCard(item, { copy })).join("")}</div>`
+    : `<p class="card dashed muted">${esc(tx(copy, "water_empty"))}</p>`;
+  return `<section class="block">
+    <h2>${esc(tx(copy, "water_heading"))}</h2>
+    ${body}
+    <p class="fine">${esc(tx(copy, "water_note"))}</p>
+  </section>`;
+}
+
+function powerSection(board, copy) {
   const showArea = board.areas.length > 1;
+  const group = (heading, items) =>
+    items.length
+      ? `<h3>${esc(heading)}</h3><div class="stack">${items
+          .map((item) => outageCard(item, { showArea, copy }))
+          .join("")}</div>`
+      : "";
   const current = board.items.filter((item) => item.phase === "now");
   const planned = board.items.filter((item) => item.phase !== "now");
-  const section = (heading, items) =>
-    items.length
-      ? `<section class="block"><h2>${esc(heading)}</h2><div class="stack">${items
-          .map((item) => outageCard(item, { showArea, copy: ctx.copy }))
-          .join("")}</div></section>`
-      : "";
-  const waterBlock = water.length
-    ? `<section class="block"><h2>${esc(tx(ctx.copy, "water_heading"))}</h2><div class="stack">${water
-        .map((item) => noticeCard(item, { copy: ctx.copy }))
-        .join("")}</div></section>`
-    : "";
   const list = board.items.length
-    ? `${section(tx(ctx.copy, "outages_current"), current)}${section(tx(ctx.copy, "outages_planned"), planned)}`
-    : `<p class="card dashed muted">${esc(outageEmpty(board, ctx.copy))}</p>`;
+    ? `${group(tx(copy, "outages_current"), current)}${group(tx(copy, "outages_planned"), planned)}`
+    : `<p class="card dashed muted">${esc(outageEmpty(board, copy))}</p>`;
+  return `<section class="block">
+    <h2>${esc(tx(copy, "power_heading"))}</h2>
+    ${board.note ? `<p class="banner">${esc(board.note)}</p>` : ""}
+    ${list}
+    <p class="fine">${board.checked ? `${esc(board.checked)} ` : ""}${esc(tx(copy, "outages_disclaimer"))} <a href="https://www.bezstavy.cz/" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "outages_source"))}</a>.</p>
+  </section>`;
+}
+
+export function outagesPage(data, ctx) {
+  const board = data.outages ?? { items: [], areas: [], fetchedAt: null, status: "", note: "", checked: "" };
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "outages_heading")} | ${tx(ctx.copy, "site_name")}`,
@@ -106,10 +120,7 @@ export function outagesPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "outages_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "outages_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "outages_lede"))}</p>
-      ${waterBlock}
-      ${board.note ? `<p class="banner">${esc(board.note)}</p>` : ""}
-      ${board.checked ? `<p class="meta">${esc(board.checked)}</p>` : ""}
-      ${list}
-      <p class="fine">${esc(tx(ctx.copy, "outages_disclaimer"))} <a href="https://www.bezstavy.cz/" target="_blank" rel="noopener noreferrer">${esc(tx(ctx.copy, "outages_source"))}</a></p>`,
+      ${waterSection(data.water ?? [], ctx.copy)}
+      ${powerSection(board, ctx.copy)}`,
   });
 }
