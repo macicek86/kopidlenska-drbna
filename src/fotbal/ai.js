@@ -70,7 +70,13 @@ export function footballContext(known) {
   return parts.join("\n\n");
 }
 
-export function footballText(item, known, { today, force = false }) {
+// Claude o rozporu ví, ať ho nezakryje sebejistým textem. Opraví ho redakce, článek jde jako návrh.
+function doubtNote(doubts) {
+  if (!doubts?.length) return "";
+  return `Pozor, datum ve zdroji nesedí: ${doubts.join(" ")}\nNeopravuj ho podle sebe a nevymýšlej. Den a datum zápasu napiš jen jednou, přesně jako ve zdroji, redakce je před zveřejněním zkontroluje.`;
+}
+
+export function footballText(item, known, { today, force = false, doubts = [] }) {
   return [
     `Dnes je ${today}.`,
     footballContext(known),
@@ -78,6 +84,7 @@ export function footballText(item, known, { today, force = false }) {
     `Nadpis: ${item.title}`,
     `Text:\n${item.text || "(bez textu)"}`,
     item.extra ? `Doplněno z rozpisu a tabulky na webu klubu:\n${item.extra}` : "",
+    doubtNote(doubts),
     force ? FORCE : "",
   ]
     .filter(Boolean)
@@ -107,10 +114,10 @@ export function readFootballDecision(raw, { force = false } = {}) {
   return { ok: true, decision, reason, duplicateOf: "", article: { title, excerpt, body: prepared.html } };
 }
 
-export async function askFootball(env, { item, known, voice, today, force = false }) {
+export async function askFootball(env, { item, known, voice, today, force = false, doubts = [] }) {
   const answer = await callClaude(env, {
     system: footballPrompt(voice),
-    content: [{ type: "text", text: footballText(item, known, { today, force }) }],
+    content: [{ type: "text", text: footballText(item, known, { today, force, doubts }) }],
     schema: footballSchema(),
     effort: "low",
   });

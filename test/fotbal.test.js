@@ -3,6 +3,7 @@ import test from "node:test";
 import { adminFootball } from "../src/admin/index.js";
 import { footballSchema, footballText, readFootballDecision } from "../src/fotbal/ai.js";
 import { clubPages, czechDate, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList, readClubUrl } from "../src/fotbal/club.js";
+import { dateDoubts, datedWeekdays } from "../src/fotbal/dates.js";
 import { clubSource, footballSourceDate, matchExtra } from "../src/fotbal/run.js";
 import { footballDue, footballRunning } from "../src/fotbal/store.js";
 
@@ -247,4 +248,22 @@ test("ručně vybraný zápas dostane datum, kdy se hrál, nikdy ne budoucí", (
   assert.equal(footballSourceDate({ ...report, extra: "", text: "" }, "2026-10-01"), "2026-09-23");
   assert.equal(footballSourceDate({ kind: "pozvanka", publishedOn: "2026-09-30", text: "sobota 3. 10. 2026", extra: "" }, "2026-10-01"), "2026-09-30");
   assert.equal(footballSourceDate({ kind: "clanek", publishedOn: "2026-12-30", text: "", extra: "" }, "2026-10-01"), "");
+});
+
+test("den v týdnu, který nesedí na datum, se pozná a Drběna se o tom dozví", () => {
+  const sunday = { kind: "pozvanka", title: "TJ Sokol Libuň - FK Kopidlno C", publishedOn: "2026-09-30", text: "9.liga - III. třída mužů, neděle 3. 10. 2026 od 16:00", extra: "" };
+  assert.deepEqual(dateDoubts(sunday), ["„neděle 3. 10. 2026“: 3. 10. 2026 je sobota, ne neděle."]);
+  assert.deepEqual(dateDoubts({ ...sunday, text: "sobota 3. 10. 2026 od 16:00" }), []);
+  assert.deepEqual(dateDoubts({ ...sunday, text: "Hrajeme v neděli 4.10. od 16:00" }), []);
+  assert.equal(dateDoubts({ ...sunday, text: "v neděli 3. října" }).length, 1);
+  assert.equal(dateDoubts({ ...sunday, text: "v pátek 31. 9." })[0], "„pátek 31. 9.“ není skutečné datum.");
+  assert.deepEqual(datedWeekdays("v sobotu 9. 1.", "2026-12-20").map((entry) => entry.date), ["2027-01-09"]);
+
+  const planned = { ...sunday, text: "sobota 3. 10. 2026 od 16:00", extra: "Zápas: TJ Sokol Libuň – FK Kopidlno C, 2026-10-04 16:00, ještě se nehrálo" };
+  assert.match(dateDoubts(planned)[0], /V rozpisu klubu je zápas 4\. 10\. 2026 \(neděle\)/);
+  assert.deepEqual(dateDoubts({ ...planned, text: "neděle 4. 10. 2026" }), []);
+
+  const text = footballText(sunday, { articles: [], proposals: [] }, { today: "2026-10-01", doubts: dateDoubts(sunday) });
+  assert.match(text, /Pozor, datum ve zdroji nesedí/);
+  assert.doesNotMatch(footballText(sunday, { articles: [], proposals: [] }, { today: "2026-10-01" }), /Pozor/);
 });

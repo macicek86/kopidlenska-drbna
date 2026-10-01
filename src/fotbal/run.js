@@ -18,6 +18,7 @@ import { MAX_ATTEMPTS } from "../munipolis/store.js";
 import { USER_AGENT } from "../munipolis/feed.js";
 import { addDays, pragueNow } from "../waste.js";
 import { askFootball } from "./ai.js";
+import { dateDoubts, scheduleDate } from "./dates.js";
 import { clubPages, czechDate, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList } from "./club.js";
 import {
   countWaiting,
@@ -170,17 +171,20 @@ async function articleImage(env, item, settings, fetchImpl) {
 export function footballSourceDate(item, today) {
   const dates = [item.publishedOn];
   if (item.kind === "zapas") {
-    dates.push(item.extra.match(/^Zápas: [^\n]*?, (\d{4}-\d{2}-\d{2})/m)?.[1] ?? czechDate(item.text));
+    dates.push(scheduleDate(item.extra) || czechDate(item.text));
   }
   const best = dates.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date ?? "")).sort().at(-1) ?? "";
   return best && best <= today ? best : "";
 }
 
 // Ručně vybranou aktualitu Drběna napíše vždy (redakce rozhodla) a s datem ze zdroje. Cron píše s dnešním datem.
+// Když datum ve zdroji nesedí (den v týdnu, rozpis), článek jde jako návrh, i když se má rovnou zveřejňovat.
 export async function processFootball(env, item, settings, { fetchImpl = fetch, ask = askFootball } = {}) {
   const today = pragueNow().date;
   const force = item.manual;
-  const answer = await ask(env, { item, known: await knownContent(env, today), voice: voiceFor(await loadDrbena(env), "fotbal"), today, force });
+  const doubts = dateDoubts(item);
+  const known = await knownContent(env, today);
+  const answer = await ask(env, { item, known, voice: voiceFor(await loadDrbena(env), "fotbal"), today, force, doubts });
   if (!answer.ok) {
     await finishFootballItem(env, item.id, { status: "chyba", reason: answer.error });
     return { ok: false, error: answer.error };
@@ -194,11 +198,12 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
     article: answer.article,
     imageKey: await articleImage(env, item, settings, fetchImpl),
     sourceHtml: clubSource(item.link),
-    autoPublish: settings.autoPublish,
+    autoPublish: settings.autoPublish && !doubts.length,
     rubric: await targetRubric(env, settings),
     publishOn: item.manual ? footballSourceDate(item, today) : "",
   });
-  await finishFootballItem(env, item.id, { status: "hotovo", reason: answer.reason, ...made });
+  const reason = doubts.length ? `Zkontrolujte datum, ve zdroji nesedí: ${doubts.join(" ")} ${answer.reason}` : answer.reason;
+  await finishFootballItem(env, item.id, { status: "hotovo", reason, ...made });
   return { ok: true, status: "hotovo" };
 }
 
