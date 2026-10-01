@@ -25,6 +25,7 @@ const ICONS = {
   inbox: '<path d="M3.5 13.5 6 5.5h12l2.5 8"/><path d="M3.5 13.5v5h17v-5h-5a3.5 3.5 0 0 1-7 0z"/>',
   clock: '<circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/>',
   ball: '<circle cx="12" cy="12" r="8.5"/><path d="m12 8 3.3 2.4-1.3 3.9h-4l-1.3-3.9z"/><path d="M12 8V3.5M15.3 10.4l4.2-1.5M14 14.3l2.6 3.6M10 14.3l-2.6 3.6M8.7 10.4 4.5 8.9"/>',
+  paper: '<path d="M4.5 5.5h12v13a1.5 1.5 0 0 0 1.5 1.5H6a1.5 1.5 0 0 1-1.5-1.5z"/><path d="M16.5 9h3v9.5a1.5 1.5 0 0 1-3 0"/><path d="M7.5 9h6M7.5 12.5h6M7.5 16h4"/>',
 };
 
 export function icon(name) {

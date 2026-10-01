@@ -420,3 +420,37 @@ create table if not exists football_items (
   created_at text not null default (datetime('now')),
   processed_at text
 );
+
+create table if not exists denik_settings (
+  id integer primary key,
+  enabled integer not null default 0,
+  feed_url text not null default '',
+  auto_publish integer not null default 0,
+  fresh_days integer not null default 3,
+  football integer not null default 0,
+  source_link integer not null default 0,
+  checked_at text,
+  status text not null default '',
+  note text not null default '',
+  running_at text
+);
+
+create table if not exists denik_items (
+  id integer primary key autoincrement,
+  guid text not null unique,
+  link text not null default '',
+  title text not null,
+  text text not null default '',
+  published_at text not null default '',
+  status text not null default 'nove',
+  reason text not null default '',
+  duplicate_of text not null default '',
+  article_id integer,
+  proposal_id integer,
+  event_id integer,
+  notice_id integer,
+  manual integer not null default 0,
+  attempts integer not null default 0,
+  created_at text not null default (datetime('now')),
+  processed_at text
+);

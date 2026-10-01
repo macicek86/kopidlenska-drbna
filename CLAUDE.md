@@ -10,6 +10,8 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 - `src/notices.js` + `src/notices-db.js`: odstávky vody a uzavírky (uzavírky zatím jen v redakci, viz `PUBLIC_NOTICE_KINDS`); `src/outages-view.js` stránka a karta odstávek
 - `src/munipolis/`: import zpráv města (`feed.js` RSS, `ai.js` pokyny pro Claude, `store.js` D1, `run.js` průchod). Spouští ho cron a tlačítko v redakci. Klíč je tajemství `ANTHROPIC_API_KEY`
 - `src/fotbal/`: články z webu FK Kopidlno (`club.js` rozbor stránek Sklub.cz, `dates.js` kontrola dne v týdnu a data proti rozpisu (při rozporu jde článek jako návrh), `ai.js` pokyny, `store.js` D1, `run.js` průchod). Cron běží každé 4 h, fotbal se ale podívá jen tak často, jak je nastavené v redakci (výchozí jednou denně)
+- `src/denik/`: články z Jičínského deníku (`feed.js` RSS, výběr jen Kopidlna a částí, volná část článku před paywallem; `ai.js` pokyny a kontrola podmínek Deníku; `store.js` D1; `run.js` průchod). Deník to dovolil jen takto: žádné citace ani opsané věty, žádné „jak píše Deník“, jen podstatné věci. `denikProblem` výsledek, který to poruší, vrátí Claudovi k přepsání. Fotky z Deníku se neberou, odkaz na zdroj jen se zapnutým nastavením
+- `src/import-context.js`: společné pro Munipolis a Deník (co už na drbně je, rubriky, datum ze zdroje, souhrn)
 - `src/drbena.js`: povaha kozy Drběny (výchozí text a `voiceFor`: povaha, u fotbalu k ní fotbalové zvyky); `src/drbena-db.js` ji ukládá (`drbena_settings`), redakce ji upravuje na stránce Koza Drběna (`src/admin/drbena.js`). Výchozí text se neukládá, ať změna v kódu platí všude
 - `src/claude.js`: společné volání Claude (model, JSON podle schématu, chyby česky); `src/bot-article.js`: uložení článku od kozy Drběny (rovnou na web, nebo jako návrh)
 - `src/background.js`: fronta importů. Cron (se zapnutým importem) bere sám jen čerstvé položky (`fresh_days` podle data ve zdroji, u zápasu den zápasu) a píše je s dnešním datem; starší odloží jako `stare`, i když už čekají ve frontě, ať se drbna po prvním spuštění nebo dlouhé pauze nenaplní starými věcmi. Tlačítko „Zkontrolovat teď“ jen načte položky jako `nacteno` a redakce zaškrtne, co zpracovat (`manual = 1`): to Drběna napíše vždy a s datem ze zdroje (`proposals.publish_on` se při schválení stane datem zprávy). Vybrané se píšou na pozadí (`ctx.waitUntil`, asi 30 s, krátká dávka) při výběru a při každém otevření stránky, ta se sama obnovuje (`data-refresh` v `public/admin.js`); zbytek dopíše cron. Zámek `running_at` nese čas, kdy vyprší
@@ -42,7 +44,7 @@ npm run screens -- lekari  # jen vybrané sekce
 LOGIN=jana PASSWORD=… OUT=.screens/prispevatel npm run screens   # pohled přispěvatele
 ```
 
-Import z Munipolisu i fotbal jde v náhledu vyzkoušet bez skutečného Claude: `npx wrangler dev --port 8788 --persist-to .wrangler/nahled --var ANTHROPIC_API_KEY:x --var ANTHROPIC_BASE_URL:http://127.0.0.1:<port>` a na tom portu malý server, který na `POST /v1/messages` vrátí JSON podle schématu z `outputSchema()` (fotbal: `footballSchema()`).
+Import z Munipolisu, Deníku i fotbal jde v náhledu vyzkoušet bez skutečného Claude: `npx wrangler dev --port 8788 --persist-to .wrangler/nahled --var ANTHROPIC_API_KEY:x --var ANTHROPIC_BASE_URL:http://127.0.0.1:<port>` a na tom portu malý server, který na `POST /v1/messages` vrátí JSON podle schématu z `outputSchema()` (fotbal: `footballSchema()`).
 
 ## Kontroly
 

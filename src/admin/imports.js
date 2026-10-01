@@ -3,7 +3,7 @@ import { formatShort } from "../format.js";
 import { MAX_ATTEMPTS, STATUS } from "../munipolis/store.js";
 import { esc } from "../view.js";
 import { pragueNow } from "../waste.js";
-import { badge, callout } from "./ui.js";
+import { badge, callout, item, modalLink } from "./ui.js";
 
 export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad" };
 
@@ -16,6 +16,7 @@ export function refLink(ref) {
     akce: ["/redakce/akce?id=", "Akce"],
     odstavka: ["/redakce/odstavky?oznameni=", "Odstávka"],
     munipolis: ["/redakce/munipolis?zprava=", "Zpráva z Munipolisu"],
+    denik: ["/redakce/denik?zprava=", "Zpráva z Deníku"],
   };
   if (!links[kind] || !/^\d+$/.test(id ?? "")) return "";
   return `<a href="${links[kind][0]}${id}">${esc(links[kind][1])} #${id}</a>`;
@@ -94,3 +95,26 @@ export function workingNote({ running, entries, enabled, busy }) {
 
 // V nastavení importů místo pole s povahou: ta je společná na stránce Koza Drběna.
 export const VOICE_NOTE = `<p class="hint">Jak Drběna píše, se nastavuje na stránce <a href="/redakce/drbena">Koza Drběna</a>.</p>`;
+
+// Co z položky vzniklo (návrh, zpráva, akce, odstávka) jako odkazy do redakce.
+export function madeLinks(entry) {
+  return [
+    entry.proposalId && refLink(`navrh:${entry.proposalId}`),
+    entry.articleId && refLink(`zprava:${entry.articleId}`),
+    entry.eventId && refLink(`akce:${entry.eventId}`),
+    entry.noticeId && refLink(`odstavka:${entry.noticeId}`),
+  ].filter(Boolean);
+}
+
+// Řádek převzaté zprávy v seznamu (Munipolis, Deník).
+export function importEntryItem(entry, base, formId) {
+  const made = madeLinks(entry);
+  const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
+  return item({
+    title: entry.title,
+    meta: [stamp(entry.publishedAt), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
+    badges: `${statusBadge(entry)}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
+    actions: `${pickBox(entry, formId)}${modalLink(`${base}?zprava=${entry.id}`, "Detail")}`,
+    search: `${entry.title} ${entry.reason}`,
+  });
+}

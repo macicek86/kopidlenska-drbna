@@ -3,36 +3,15 @@ import { MODEL } from "../munipolis/ai.js";
 import { DEFAULT_FEED_URL } from "../munipolis/feed.js";
 import { DEFAULT_FRESH_DAYS, importRunning } from "../munipolis/store.js";
 import { esc } from "../view.js";
-import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
-import { callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
+import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/munipolis";
 const PICK = "vyber-zprav";
 
-function results(entry) {
-  return [
-    entry.proposalId && refLink(`navrh:${entry.proposalId}`),
-    entry.articleId && refLink(`zprava:${entry.articleId}`),
-    entry.eventId && refLink(`akce:${entry.eventId}`),
-    entry.noticeId && refLink(`odstavka:${entry.noticeId}`),
-  ].filter(Boolean);
-}
-
-function entryItem(entry) {
-  const made = results(entry);
-  const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
-  return item({
-    title: entry.title,
-    meta: [stamp(entry.publishedAt), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
-    badges: `${statusBadge(entry)}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
-    actions: `${pickBox(entry, PICK)}${modalLink(`${BASE}?zprava=${entry.id}`, "Detail")}`,
-    search: `${entry.title} ${entry.reason}`,
-  });
-}
-
 function entryDetail(entry) {
-  const made = results(entry);
+  const made = madeLinks(entry);
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
   const images = entry.images.map((url, index) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Obrázek ${index + 1}</a>`).join(" · ");
   const source = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Původní zpráva</a>` : "";
@@ -94,7 +73,7 @@ export function adminMunipolis(ctx, data, message, query = {}) {
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries)}
-    ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map(entryItem), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
+    ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE, PICK)), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "munipolis", message, body, { title: "Munipolis" });
 }

@@ -61,7 +61,7 @@ function isoStamp(value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
 }
 
-export function parseFeed(xml) {
+export function parseFeed(xml, { maxItems = MAX_ITEMS } = {}) {
   const text = String(xml ?? "");
   if (!/<rss[\s>]/i.test(text) && !/<channel[\s>]/i.test(text)) return { ok: false, items: [] };
   const items = [];
@@ -80,12 +80,12 @@ export function parseFeed(xml) {
       images: imagesIn(html).slice(0, 3),
       publishedAt: isoStamp(tag(block, "pubDate")),
     });
-    if (items.length >= MAX_ITEMS) break;
+    if (items.length >= maxItems) break;
   }
   return { ok: true, items };
 }
 
-export async function fetchFeed(url, { fetchImpl = fetch } = {}) {
+export async function fetchFeed(url, { fetchImpl = fetch, source = "Munipolis", maxItems = MAX_ITEMS } = {}) {
   let response;
   try {
     response = await fetchImpl(url, {
@@ -94,17 +94,17 @@ export async function fetchFeed(url, { fetchImpl = fetch } = {}) {
       redirect: "follow",
     });
   } catch {
-    return { ok: false, error: "Munipolis neodpověděl.", items: [] };
+    return { ok: false, error: `${source} neodpověděl.`, items: [] };
   }
-  if (!response.ok) return { ok: false, error: `Munipolis odpověděl ${response.status}.`, items: [] };
-  const parsed = parseFeed(await response.text());
+  if (!response.ok) return { ok: false, error: `${source} odpověděl ${response.status}.`, items: [] };
+  const parsed = parseFeed(await response.text(), { maxItems });
   if (!parsed.ok) return { ok: false, error: "Na adrese není RSS.", items: [] };
   return { ok: true, error: "", items: parsed.items };
 }
 
-export function readFeedUrl(value) {
+export function readFeedUrl(value, fallback = DEFAULT_FEED_URL) {
   const url = String(value ?? "").trim();
-  if (!url) return DEFAULT_FEED_URL;
+  if (!url) return fallback;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") return "";

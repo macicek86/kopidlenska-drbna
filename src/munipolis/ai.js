@@ -127,8 +127,8 @@ export function contextText(known) {
     ),
   );
   add(
-    "Dřívější zprávy z Munipolisu",
-    (known.imports ?? []).map((row) => `[munipolis:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
+    "Dřívější převzaté zprávy (Munipolis, Deník)",
+    (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
   );
   return parts.join("\n\n");
 }
@@ -150,7 +150,7 @@ function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|munipolis):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|munipolis|denik):\d+$/;
 
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
 export function readDecision(raw, { rubricSlugs, force = false }) {

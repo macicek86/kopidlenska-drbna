@@ -14,8 +14,9 @@ import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { fetchImage, storeImageBytes } from "../images.js";
-import { insertNotice, loadNotices } from "../notices-db.js";
-import { addDays, pragueNow } from "../waste.js";
+import { importSourceDate, importSummary, knownContent, outcomeOf, rubricMap } from "../import-context.js";
+import { insertNotice } from "../notices-db.js";
+import { pragueNow } from "../waste.js";
 import { askClaude } from "./ai.js";
 import { fetchFeed } from "./feed.js";
 import {
@@ -34,7 +35,6 @@ import {
 export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
 const BUSY = "Drběna už zprávy města čte. Počkejte, stránka se sama obnoví.";
-const LOOKBACK_DAYS = 60;
 
 export function sourceParagraph(link) {
   if (!link) return `<p><em>Zdroj: Munipolis města Kopidlna</em></p>`;
@@ -42,77 +42,7 @@ export function sourceParagraph(link) {
   return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">Munipolis města Kopidlna</a></em></p>`;
 }
 
-export function outcomeOf(item) {
-  if (item.status === "hotovo") {
-    const made = [
-      item.articleId && `zprava:${item.articleId}`,
-      item.proposalId && `navrh:${item.proposalId}`,
-      item.eventId && `akce:${item.eventId}`,
-      item.noticeId && `odstavka:${item.noticeId}`,
-    ].filter(Boolean);
-    return `zpracováno (${made.join(", ") || "nic"})`;
-  }
-  if (item.status === "duplicita") return `duplicita s ${item.duplicateOf || "něčím na webu"}`;
-  if (item.status === "preskoceno") return "přeskočeno";
-  return "";
-}
-
-async function rows(env, sql, ...binds) {
-  const statement = env.DB.prepare(sql);
-  const result = await (binds.length ? statement.bind(...binds) : statement).all();
-  return result.results ?? [];
-}
-
-// Co už na drbně je, aby Claude poznal stejnou věc od někoho jiného.
-async function knownContent(env, itemId, today) {
-  const since = addDays(today, -LOOKBACK_DAYS);
-  const articles = await rows(
-    env,
-    "select id, title, excerpt, created_at from articles where created_at >= ? order by created_at desc, id desc limit 60",
-    since,
-  );
-  const proposals = await rows(
-    env,
-    "select id, title, excerpt, created_at from proposals where status = 'pending' order by id desc limit 30",
-  );
-  const events = await rows(
-    env,
-    "select id, title, place, starts_on, starts_time from events where starts_on >= ? order by starts_on asc limit 60",
-    addDays(today, -30),
-  );
-  const notices = (await loadNotices(env)).filter((row) => (row.endsOn || row.startsOn) >= addDays(today, -30));
-  const imports = await rows(
-    env,
-    `select id, title, published_at, status, duplicate_of, article_id, proposal_id, event_id, notice_id from import_items
-     where id != ? and status in ('hotovo', 'duplicita', 'preskoceno') and published_at >= ? order by published_at desc limit 40`,
-    itemId,
-    since,
-  );
-  return {
-    articles: articles.map((row) => ({ id: row.id, title: row.title, excerpt: row.excerpt, createdOn: String(row.created_at).slice(0, 10) })),
-    proposals: proposals.map((row) => ({ id: row.id, title: row.title, excerpt: row.excerpt, createdOn: String(row.created_at).slice(0, 10) })),
-    events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time })),
-    notices,
-    imports: imports.map((row) => ({
-      id: row.id,
-      title: row.title,
-      publishedOn: String(row.published_at).slice(0, 10),
-      outcome: outcomeOf({
-        status: row.status,
-        duplicateOf: row.duplicate_of,
-        articleId: row.article_id,
-        proposalId: row.proposal_id,
-        eventId: row.event_id,
-        noticeId: row.notice_id,
-      }),
-    })),
-  };
-}
-
-async function rubricMap(env) {
-  const list = await rows(env, "select id, name, slug from rubrics order by sort_order asc, id asc");
-  return new Map(list.map((row) => [String(row.slug), { id: Number(row.id), name: String(row.name) }]));
-}
+export { importSourceDate, outcomeOf };
 
 async function downloadImages(urls, fetchImpl) {
   const images = [];
@@ -123,14 +53,6 @@ async function downloadImages(urls, fetchImpl) {
   return images;
 }
 
-// Datum zveřejnění zprávy v Munipolisu jako pražský den, nebo prázdné (pak dnešek).
-export function importSourceDate(item, today) {
-  const parsed = Date.parse(item.publishedAt);
-  if (!Number.isFinite(parsed)) return "";
-  const day = pragueNow(new Date(parsed)).date;
-  return day <= today ? day : "";
-}
-
 // Ručně vybranou zprávu Drběna zpracuje vždy (redakce rozhodla) a článek dostane datum ze zdroje. Cron píše s dnešním datem.
 export async function processItem(env, item, settings, { fetchImpl = fetch, ask = askClaude } = {}) {
   const today = pragueNow().date;
@@ -139,7 +61,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   const images = await downloadImages(item.images, fetchImpl);
   const answer = await ask(env, {
     item,
-    known: await knownContent(env, item.id, today),
+    known: await knownContent(env, { itemId: item.id, today }),
     images,
     rubricSlugs: [...rubrics.keys()],
     voice: voiceFor(await loadDrbena(env)),
@@ -187,18 +109,6 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   return { ok: true, status: "hotovo" };
 }
 
-function summary(results, added, waiting) {
-  const done = results.filter((result) => result.ok).length;
-  const failed = results.filter((result) => !result.ok);
-  const parts = [];
-  if (added) parts.push(`Nových zpráv: ${added}.`);
-  if (done) parts.push(`Zpracováno: ${done}.`);
-  if (failed.length) parts.push(`Nepovedlo se: ${failed.length} (${failed[0].error})`);
-  if (waiting) parts.push(`Na zpracování čeká ještě ${waiting}.`);
-  if (!parts.length) parts.push("Nic nového.");
-  return { status: failed.length ? (done ? "partial" : "error") : "ok", note: parts.join(" ") };
-}
-
 // Stáhne RSS a nové zprávy si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
 async function collect(env, settings, fetchImpl, { manual = false } = {}) {
   const feed = await fetchFeed(settings.feedUrl, { fetchImpl });
@@ -228,7 +138,7 @@ async function writeBatch(env, settings, { added, fetchImpl, ask, budgetMs, max,
     budgetMs,
     max,
   });
-  const result = summary(results, added, await countWaitingItems(env));
+  const result = importSummary(results, added, await countWaitingItems(env));
   await writeImportStatus(env, result);
   return result;
 }
