@@ -28,12 +28,18 @@ export function adminQuery(url) {
     noticeFresh: url.searchParams.has("nove-oznameni"),
     importId: positiveParam(url, "zprava"),
     importSettings: url.searchParams.has("nastaveni"),
+    topicId: positiveParam(url, "tema"),
+    removeTopicId: positiveParam(url, "smazat-tema"),
+    upload: url.searchParams.has("nahrat"),
+    uploadTopicId: positiveParam(url, "nahrat"),
+    freshTopic: url.searchParams.has("nove-tema"),
   };
 }
 
 export async function formFields(request) {
   const form = await request.formData();
   const text = (name) => String(form.get(name) ?? "");
+  const positive = (name) => (Number.isInteger(Number(text(name))) && Number(text(name)) > 0 ? Number(text(name)) : undefined);
   const id = Number(text("id"));
   return {
     id: Number.isInteger(id) && id > 0 ? id : undefined,
@@ -130,5 +136,10 @@ export async function formFields(request) {
     withFootball: form.get("withFootball") === "1",
     sourceLink: form.get("sourceLink") === "1",
     freshDays: text("freshDays"),
+    images: form.getAll("images"),
+    stockId: positive("stock_id"),
+    topicId: positive("topicId"),
+    hint: text("hint"),
+    fallbackTopicId: text("fallbackTopicId"),
   };
 }

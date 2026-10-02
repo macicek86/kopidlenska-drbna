@@ -71,6 +71,14 @@ function bootPick(field) {
     show(objectUrl);
   });
 
+  // Fotka z knihovny: náhled ukáže ji (výřez si nese z knihovny), „Nechat, jak je“ vrátí současnou.
+  for (const radio of field.querySelectorAll('input[name="stock_id"]')) {
+    radio.addEventListener("change", () => {
+      const src = radio.closest(".stock-option")?.querySelector("img")?.src || current;
+      if (src) show(src);
+    });
+  }
+
   full.addEventListener("click", (event) => {
     const box = full.querySelector("img")?.getBoundingClientRect();
     if (!box || !box.width || !box.height) return;

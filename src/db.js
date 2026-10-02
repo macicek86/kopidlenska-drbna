@@ -1,19 +1,19 @@
 import { loadAdProposals, loadAds } from "./ads-db.js";
 import { COPY } from "./copy.js";
-import { releaseImage, storeImage } from "./images.js";
+import { releaseImage } from "./images.js";
+import { formImage, loadStock } from "./stock-db.js";
 import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
 import { loadPlaces } from "./places-db.js";
-import { changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
-import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
+import { loadDoctors } from "./doctors-db.js";
+import { loadYards } from "./yards-db.js";
 import { emptyOutageBoard, loadOutageAreas, loadOutageBoard } from "./outages-db.js";
 import {
   asBool,
   clip,
   identify,
   requireChief,
-  requireUser,
   slugify,
   uniqueSlug,
   userCan,
@@ -49,6 +49,8 @@ export {
   saveOutageAreas,
 } from "./outages-db.js";
 export { ensureSchema } from "./schema.js";
+export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
+export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
 export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
 const ARTICLE_FIELDS =
   "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
@@ -110,58 +112,6 @@ function mapEvent(row) {
     startsTime: String(row.starts_time ?? ""),
     description: String(row.description ?? ""),
     published: asBool(row.published),
-  };
-}
-
-function mapYard(row) {
-  const hours = parseHours(row.hours);
-  return {
-    id: Number(row.id),
-    name: String(row.name),
-    place: String(row.place ?? ""),
-    accepts: String(row.accepts ?? ""),
-    week: hours.week,
-    legacy: hours.legacy,
-    sortOrder: Number(row.sort_order ?? 0),
-    published: asBool(row.published),
-    closures: [],
-  };
-}
-
-function mapClosure(row) {
-  return {
-    id: Number(row.id),
-    yardId: Number(row.yard_id),
-    startsOn: String(row.starts_on ?? "").slice(0, 10),
-    endsOn: String(row.ends_on ?? "").slice(0, 10),
-    reason: String(row.reason ?? ""),
-    createdBy: row.created_by == null || row.created_by === "" ? null : Number(row.created_by),
-  };
-}
-
-function mapDoctor(row) {
-  return {
-    id: Number(row.id),
-    name: String(row.name),
-    specialty: String(row.specialty ?? ""),
-    place: String(row.place ?? ""),
-    phone: String(row.phone ?? ""),
-    week: parseDoctorHours(row.hours),
-    sortOrder: Number(row.sort_order ?? 0),
-    published: asBool(row.published),
-    changes: [],
-  };
-}
-
-function mapDoctorChange(row) {
-  return {
-    id: Number(row.id),
-    doctorId: Number(row.doctor_id),
-    startsOn: String(row.starts_on ?? "").slice(0, 10),
-    endsOn: String(row.ends_on ?? "").slice(0, 10),
-    note: String(row.note ?? ""),
-    week: parseDoctorHours(row.hours),
-    createdBy: row.created_by == null || row.created_by === "" ? null : Number(row.created_by),
   };
 }
 
@@ -267,58 +217,6 @@ async function loadProposals(env, whereSql, ...binds) {
   );
   const rows = binds.length ? await query.bind(...binds).all() : await query.all();
   return (rows.results ?? []).map(mapProposal);
-}
-
-export async function loadYards(env, { publicOnly = false, today = null } = {}) {
-  const yardSql = publicOnly
-    ? `select id, name, place, accepts, hours, sort_order, published
-       from yards where published = 1 order by sort_order asc, id asc`
-    : `select id, name, place, accepts, hours, sort_order, published
-       from yards order by sort_order asc, id asc`;
-  const yards = ((await env.DB.prepare(yardSql).all()).results ?? []).map(mapYard);
-  if (!yards.length) return [];
-  let closureSql = "select id, yard_id, starts_on, ends_on, reason, created_by from yard_closures";
-  const binds = [];
-  if (today) {
-    closureSql += " where ends_on >= ?";
-    binds.push(today);
-  }
-  closureSql += " order by starts_on asc, id asc";
-  const query = env.DB.prepare(closureSql);
-  const rows = binds.length ? await query.bind(...binds).all() : await query.all();
-  const byYard = new Map(yards.map((yard) => [yard.id, yard]));
-  for (const row of rows.results ?? []) {
-    const closure = mapClosure(row);
-    const yard = byYard.get(closure.yardId);
-    if (yard) yard.closures.push(closure);
-  }
-  return yards;
-}
-
-export async function loadDoctors(env, { publicOnly = false, today = null } = {}) {
-  const doctorSql = publicOnly
-    ? `select id, name, specialty, place, phone, hours, sort_order, published
-       from doctors where published = 1 order by sort_order asc, id asc`
-    : `select id, name, specialty, place, phone, hours, sort_order, published
-       from doctors order by sort_order asc, id asc`;
-  const doctors = ((await env.DB.prepare(doctorSql).all()).results ?? []).map(mapDoctor);
-  if (!doctors.length) return [];
-  let changeSql = "select id, doctor_id, starts_on, ends_on, note, hours, created_by from doctor_changes";
-  const binds = [];
-  if (today) {
-    changeSql += " where ends_on >= ?";
-    binds.push(today);
-  }
-  changeSql += " order by starts_on asc, id asc";
-  const query = env.DB.prepare(changeSql);
-  const rows = binds.length ? await query.bind(...binds).all() : await query.all();
-  const byDoctor = new Map(doctors.map((doctor) => [doctor.id, doctor]));
-  for (const row of rows.results ?? []) {
-    const change = mapDoctorChange(row);
-    const doctor = byDoctor.get(change.doctorId);
-    if (doctor) doctor.changes.push(change);
-  }
-  return doctors;
 }
 
 function mapRubric(row, articleCount = 0) {
@@ -457,6 +355,7 @@ export async function loadAdmin(env, request) {
     denikItems: [],
     drbena: null,
     rubrics: [],
+    stock: { topics: [], fallbackTopicId: null },
   };
   if (!user) return base;
   // Všechno najednou; co uživatel nesmí vidět, se nenačítá.
@@ -466,7 +365,7 @@ export async function loadAdmin(env, request) {
   const articleSql = chief
     ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
     : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
-  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, desk] = await Promise.all([
+  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, desk, stock] = await Promise.all([
     loadRubrics(env),
     loadAds(env),
     chief ? loadAdProposals(env, "where p.status = 'pending' order by p.id asc") : loadAdProposals(env, ...mine),
@@ -480,8 +379,9 @@ export async function loadAdmin(env, request) {
     when(chief || userCan(user, "oteviraci_doba"), () => loadPlaces(env, { publicOnly: !chief }), base.places),
     chief ? loadProposals(env, "where p.status = 'pending' order by p.id asc") : loadProposals(env, ...mine),
     when(chief, () => loadChiefDesk(env), null),
+    loadStock(env),
   ]);
-  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals });
+  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, stock });
   if (desk) Object.assign(base, desk, { hasApiKey: Boolean(env.ANTHROPIC_API_KEY) });
   return base;
 }
@@ -491,8 +391,9 @@ export async function saveArticle(env, request, input) {
   if (!gate.ok) return { ok: false, error: gate.error };
   const parsed = await readArticle(env, input);
   if (parsed.error) return { ok: false, error: parsed.error };
-  const stored = await storeImage(env, input.image);
+  const stored = await formImage(env, input);
   if (stored.error) return { ok: false, error: stored.error };
+  Object.assign(parsed, stored.photo);
   const { title, excerpt, body, category, rubricId, imageFocus, imageCaption } = parsed;
 
   if (input.id) {
@@ -586,189 +487,6 @@ export async function removeEvent(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from events where id = ?").bind(id).run();
-  return { ok: true };
-}
-
-function readYard(input) {
-  const name = clip(input.name, 120);
-  const place = clip(input.place, 160);
-  const accepts = clip(input.accepts, 1200);
-  const normalized = normalizeWeek(input.week);
-  if (normalized.error) return normalized;
-  const hours = JSON.stringify(normalized.week);
-  const sortOrder = Number(input.sortOrder);
-  if (name.length < 2) return { error: "Doplňte název sběrného dvora." };
-  if (place.length < 2) return { error: "Doplňte místo." };
-  if (accepts.length < 3) return { error: "Napište, co se tam vozí." };
-  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 999) {
-    return { error: "Pořadí musí být číslo od 0 do 999." };
-  }
-  return { name, place, accepts, hours, sortOrder, published: input.published ? 1 : 0 };
-}
-
-export async function saveYard(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const parsed = readYard(input);
-  if (parsed.error) return { ok: false, error: parsed.error };
-  if (input.id) {
-    const current = await env.DB.prepare("select id from yards where id = ?").bind(input.id).first();
-    if (!current) return { ok: false, error: "Tenhle sběrný dvůr už tu není." };
-    await env.DB.prepare(
-      "update yards set name = ?, place = ?, accepts = ?, hours = ?, sort_order = ?, published = ? where id = ?",
-    )
-      .bind(parsed.name, parsed.place, parsed.accepts, parsed.hours, parsed.sortOrder, parsed.published, input.id)
-      .run();
-    return { ok: true, updated: true };
-  }
-  await env.DB.prepare(
-    "insert into yards (name, place, accepts, hours, sort_order, published) values (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(parsed.name, parsed.place, parsed.accepts, parsed.hours, parsed.sortOrder, parsed.published)
-    .run();
-  return { ok: true, updated: false };
-}
-
-export async function removeYard(env, request, id) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from yard_closures where yard_id = ?").bind(id).run();
-  await env.DB.prepare("delete from yards where id = ?").bind(id).run();
-  return { ok: true };
-}
-
-async function requireClosure(env, request) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return gate;
-  if (!userCan(gate.user, "sberny_dvur")) {
-    return { ok: false, error: "Mimořádné uzavření zapíše hlavní redaktor, nebo člověk s oprávněním na sběrný dvůr." };
-  }
-  return gate;
-}
-
-export async function saveClosure(env, request, input) {
-  const gate = await requireClosure(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const yard = await env.DB.prepare("select id from yards where id = ?").bind(input.yardId).first();
-  if (!yard) return { ok: false, error: "Tenhle sběrný dvůr už tu není." };
-  const span = closureSpan(input.startsOn, input.endsOn);
-  if (span.error) return { ok: false, error: span.error };
-  const reason = clip(input.reason, 400);
-  if (reason.length < 3) return { ok: false, error: "Napište důvod uzavření." };
-  await env.DB.prepare(
-    "insert into yard_closures (yard_id, starts_on, ends_on, reason, created_by) values (?, ?, ?, ?, ?)",
-  )
-    .bind(yard.id, span.startsOn, span.endsOn, reason, gate.user.id)
-    .run();
-  return { ok: true };
-}
-
-export async function removeClosure(env, request, id) {
-  const gate = await requireClosure(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from yard_closures where id = ?").bind(id).run();
-  return { ok: true };
-}
-
-function readDoctor(input) {
-  const name = clip(input.name, 120);
-  const specialty = clip(input.specialty, 120);
-  const place = clip(input.place, 160);
-  const phone = clip(input.phone, 40);
-  const normalized = normalizeDoctorWeek(input.doctorWeek);
-  if (normalized.error) return normalized;
-  const sortOrder = Number(input.sortOrder);
-  if (name.length < 2) return { error: "Doplňte jméno lékaře nebo ordinace." };
-  if (specialty.length < 2) return { error: "Doplňte obor." };
-  if (place.length < 2) return { error: "Doplňte místo." };
-  if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 999) {
-    return { error: "Pořadí musí být číslo od 0 do 999." };
-  }
-  return {
-    name,
-    specialty,
-    place,
-    phone,
-    hours: JSON.stringify(normalized.week),
-    sortOrder,
-    published: input.published ? 1 : 0,
-  };
-}
-
-export async function saveDoctor(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const parsed = readDoctor(input);
-  if (parsed.error) return { ok: false, error: parsed.error };
-  if (input.id) {
-    const current = await env.DB.prepare("select id from doctors where id = ?").bind(input.id).first();
-    if (!current) return { ok: false, error: "Tahle ordinace už tu není." };
-    await env.DB.prepare(
-      "update doctors set name = ?, specialty = ?, place = ?, phone = ?, hours = ?, sort_order = ?, published = ? where id = ?",
-    )
-      .bind(parsed.name, parsed.specialty, parsed.place, parsed.phone, parsed.hours, parsed.sortOrder, parsed.published, input.id)
-      .run();
-    return { ok: true, updated: true };
-  }
-  await env.DB.prepare(
-    "insert into doctors (name, specialty, place, phone, hours, sort_order, published) values (?, ?, ?, ?, ?, ?, ?)",
-  )
-    .bind(parsed.name, parsed.specialty, parsed.place, parsed.phone, parsed.hours, parsed.sortOrder, parsed.published)
-    .run();
-  return { ok: true, updated: false };
-}
-
-export async function removeDoctor(env, request, id) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from doctor_changes where doctor_id = ?").bind(id).run();
-  await env.DB.prepare("delete from doctors where id = ?").bind(id).run();
-  return { ok: true };
-}
-
-async function requireDoctorHours(env, request) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return gate;
-  if (!userCan(gate.user, "doktori")) {
-    return { ok: false, error: "Ordinační hodiny mění hlavní redaktor, nebo člověk s oprávněním Lékaři." };
-  }
-  return gate;
-}
-
-export async function saveDoctorHours(env, request, input) {
-  const gate = await requireDoctorHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const doctor = await env.DB.prepare("select id from doctors where id = ?").bind(input.doctorId).first();
-  if (!doctor) return { ok: false, error: "Tahle ordinace už tu není." };
-  const normalized = normalizeDoctorWeek(input.doctorWeek);
-  if (normalized.error) return { ok: false, error: normalized.error };
-  await env.DB.prepare("update doctors set hours = ? where id = ?").bind(JSON.stringify(normalized.week), doctor.id).run();
-  return { ok: true };
-}
-
-export async function saveDoctorChange(env, request, input) {
-  const gate = await requireDoctorHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const doctor = await env.DB.prepare("select id from doctors where id = ?").bind(input.doctorId).first();
-  if (!doctor) return { ok: false, error: "Tahle ordinace už tu není." };
-  const span = changeSpan(input.startsOn, input.endsOn);
-  if (span.error) return { ok: false, error: span.error };
-  const note = clip(input.changeNote, 400);
-  if (note.length < 3) return { ok: false, error: "Napište poznámku k dočasné změně." };
-  const normalized = normalizeDoctorWeek(input.doctorWeek);
-  if (normalized.error) return { ok: false, error: normalized.error };
-  await env.DB.prepare(
-    "insert into doctor_changes (doctor_id, starts_on, ends_on, note, hours, created_by) values (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(doctor.id, span.startsOn, span.endsOn, note, JSON.stringify(normalized.week), gate.user.id)
-    .run();
-  return { ok: true };
-}
-
-export async function removeDoctorChange(env, request, id) {
-  const gate = await requireDoctorHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from doctor_changes where id = ?").bind(id).run();
   return { ok: true };
 }
 

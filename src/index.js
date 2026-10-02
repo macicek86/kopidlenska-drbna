@@ -82,6 +82,7 @@ import {
   adminRubrics,
   adminSite,
   adminStats,
+  adminStock,
   adminTexts,
   adminYards,
 } from "./admin/index.js";
@@ -95,6 +96,7 @@ import { robotsTxt, sitemapXml } from "./seo.js";
 import { loadSitemap } from "./seo-db.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
 import { PLACES_OK, placesPost } from "./post-places.js";
+import { STOCK_OK, stockPost } from "./post-stock.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
 import { DRBENA_OK, drbenaPost } from "./post-drbena.js";
 import { continueImport, runImport } from "./munipolis/run.js";
@@ -156,6 +158,7 @@ const OK = {
   "clovek-udaje": "Údaje přispěvatele jsou uložené.",
   ...OUTAGE_OK,
   ...PLACES_OK,
+  ...STOCK_OK,
   ...IMPORT_OK,
   ...DRBENA_OK,
   ...FOOTBALL_OK,
@@ -348,6 +351,12 @@ async function renderGet(request, env, url, execution) {
         return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na otevírací dobu potřebuješ oprávnění.")}`);
       }
       return html(adminPlaces(ctx, data, message, query));
+    }
+    if (tab === "obrazky") {
+      if (data.signedIn && !userCan(data.user, "obrazky")) {
+        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na knihovnu obrázků potřebuješ oprávnění.")}`);
+      }
+      return html(adminStock(ctx, data, message, query));
     }
     if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
     if (tab === "munipolis") {
@@ -583,6 +592,7 @@ async function renderPost(request, env, url, execution) {
   const section =
     (await outagePost(path, request, env, fields)) ??
     (await placesPost(path, request, env, fields)) ??
+    (await stockPost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??

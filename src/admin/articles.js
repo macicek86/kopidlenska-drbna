@@ -5,6 +5,7 @@ import { prepareArticleBody } from "../rich.js";
 import { rubricLabel, rubricsFrom } from "../rubrics.js";
 import { credit, esc, mediaUrl } from "../view.js";
 import { adminShell } from "./shell.js";
+import { stockPicker } from "./stock-pick.js";
 import {
   badge,
   callout,
@@ -52,7 +53,7 @@ export function rubricOptions(rubrics, source) {
   return parts.join("");
 }
 
-export function photoControl(source) {
+export function photoControl(source, stock = null) {
   const current = source?.imageKey ? mediaUrl(source.imageKey) : "";
   const now = current
     ? `<figure class="photo-now" data-photo-now><img src="${current}" alt=""><figcaption>Současná fotka. Nová ji nahradí.</figcaption></figure>`
@@ -75,6 +76,7 @@ export function photoControl(source) {
       </div>
       <p class="hint">Ve zprávě samotné bude fotka vidět celá.</p>
     </div>
+    ${stockPicker(stock)}
   </div>
   ${field(
     "Popisek fotky",
@@ -93,7 +95,7 @@ function richTextField(body) {
   </div>`;
 }
 
-function articleFields(source, rubrics, { publish } = {}) {
+function articleFields(source, data, { publish } = {}) {
   return `<div class="form-cols">
     <div class="form-col-main">
       ${field("Nadpis", `<input class="${input} control-lg" name="title" required maxlength="160" value="${esc(source?.title ?? "")}">`)}
@@ -101,8 +103,8 @@ function articleFields(source, rubrics, { publish } = {}) {
       ${richTextField(source?.body ?? "")}
     </div>
     <div class="form-col-side">
-      ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(rubrics, source)}</select>`, "Podrubrika je pod svou rubrikou, třeba Fotbal pod Sportem.")}
-      ${photoControl(source)}
+      ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(data.rubrics, source)}</select>`, "Podrubrika je pod svou rubrikou, třeba Fotbal pod Sportem.")}
+      ${photoControl(source, data.stock)}
       ${publish ? `<div class="field"><span>Viditelnost</span>${check("published", "1", publish.checked, "Zveřejnit na webu")}</div>` : ""}
     </div>
   </div>`;
@@ -121,7 +123,7 @@ function articleForm(data, editing, close) {
   return `<form class="form" method="post" action="${BASE}/ulozit" enctype="multipart/form-data">
     ${callout(help)}
     ${editing ? hidden("id", editing.id) : ""}
-    ${articleFields(editing, data.rubrics, { publish: { checked: editing ? editing.published : true } })}
+    ${articleFields(editing, data, { publish: { checked: editing ? editing.published : true } })}
     ${formFoot("Uložit", cancelLink(close))}
   </form>`;
 }
@@ -134,7 +136,7 @@ function reviewForm(data, proposal) {
         proposal.publishOn && !proposal.articleId ? `<br>Vyjde s datem ze zdroje: <b>${esc(formatShort(proposal.publishOn))}</b>` : ""
       }`)}
       ${hidden("id", proposal.id)}
-      ${articleFields(proposal, data.rubrics)}
+      ${articleFields(proposal, data)}
       ${formFoot(
         "Schválit a zveřejnit",
         `<button class="btn btn-line" type="button" data-toggle="vratit-${proposal.id}">Vrátit autorovi…</button>
@@ -269,7 +271,7 @@ function contributorForm(data, { proposal, target, linked }) {
     ${proposal ? hidden("id", proposal.id) : ""}
     ${target && !proposal ? hidden("clanek", target.id) : ""}
     ${proposal?.articleId ? hidden("clanek", proposal.articleId) : ""}
-    ${articleFields(formSource, data.rubrics)}
+    ${articleFields(formSource, data)}
     ${formFoot(submit, cancelLink(BASE))}
   </form>`;
 }

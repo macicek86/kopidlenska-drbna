@@ -519,3 +519,27 @@
 .pick { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.55rem; border: 1px solid var(--line); border-radius: var(--r-sm); font-size: 0.85rem; font-weight: 700; cursor: pointer; }
 .pick input { width: 1rem; height: 1rem; margin: 0; accent-color: var(--brand); }
 .pick:has(input:checked) { border-color: var(--brand); background: var(--surface-2); }
+
+/* Knihovna obrázků */
+.stock-hint { margin: 0 0 0.8rem; color: var(--muted); font-size: 0.92rem; }
+.stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.8rem; margin: 0; padding: 0; list-style: none; }
+.stock-tile { display: grid; gap: 0.45rem; margin: 0; }
+.stock-tile img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2); }
+.stock-tile-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.stock-settings { max-width: 34rem; }
+.stock-confirm { display: block; width: 9rem; aspect-ratio: 4 / 3; object-fit: cover; margin-bottom: 0.7rem; border-radius: var(--r-sm); }
+
+/* Výběr z knihovny u zprávy */
+.stock-pick { margin-top: 0.6rem; }
+.stock-pick summary { cursor: pointer; font-weight: 600; color: var(--brand); }
+.stock-pick[open] summary { margin-bottom: 0.5rem; }
+.stock-pick .hint { display: block; margin-bottom: 0.4rem; }
+.stock-keep { display: flex; gap: 0.45rem; align-items: center; font-weight: 400; }
+.stock-keep input { width: auto; flex: none; margin: 0; }
+.stock-pick-topic { margin: 0.7rem 0 0.35rem; font-size: 0.84rem; font-weight: 700; color: var(--muted); }
+.stock-pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(4.8rem, 1fr)); gap: 0.4rem; }
+.stock-option { position: relative; display: block; cursor: pointer; }
+.stock-option input { position: absolute; opacity: 0; inset: 0; }
+.stock-option img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-sm); border: 2px solid transparent; }
+.stock-option input:checked + img { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); }
+.stock-option input:focus-visible + img { outline: 2px solid var(--brand); outline-offset: 2px; }

@@ -27,6 +27,7 @@ function nav(data) {
         chief && ["munipolis", "Munipolis", "inbox", importFailed],
         chief && ["fotbal", "Fotbal", "ball", footballFailed],
         chief && ["denik", "Deník", "paper", denikFailed],
+        (chief || userCan(data.user, "obrazky")) && ["obrazky", "Knihovna obrázků", "image"],
         ["reklamy", "Reklamy", "megaphone", chief ? adWaiting : adReturned],
       ],
     },
@@ -66,7 +67,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

@@ -4,9 +4,15 @@ import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { HOURS_RULES, hoursContext, hoursSchema, readHours } from "./hours.js";
+import { topicsText } from "../stock.js";
 
 export { MODEL, DEFAULT_VOICE };
 const MAX_IMAGE_BYTES = 3_700_000;
+
+// Obrázek u článku: vlastní fotka jen když stojí za to, jinak ilustrační z knihovny obrázků.
+const IMAGE_RULES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu. Plakát, leták, pozvánka, vyhláška, tabulka, mapa nebo logo jsou "knihovna", i když jsou barevné. Když nic přiložené není, taky "knihovna".
+- image_topic: téma z knihovny obrázků, které ke zprávě nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.
+- image_caption: krátký popisek vlastní fotky, nebo prázdný text. U "knihovna" vždy prázdný.`;
 
 const RULES = `Dostaneš jednu zprávu z městského Munipolisu Kopidlna a přehled toho, co už na webu Kopidlenská drbna je.
 
@@ -26,7 +32,8 @@ ${HOURS_RULES}
 
 Pravidla:
 - Data, časy, místa, jména, ceny a telefony opiš přesně podle zdroje. Nic nevymýšlej. Když údaj chybí, nech pole prázdné. Rok doplň podle data zveřejnění zprávy.
-- Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí. image_caption je krátký popisek obrázku, nebo prázdný text.
+- Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
+${IMAGE_RULES}
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až pět krátkých odstavců. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
@@ -41,8 +48,9 @@ function stringField() {
   return { type: "string" };
 }
 
-// `hours` přidá pole s otevírací dobou (jen Munipolis, Deník ho nemá).
-export function outputSchema(rubricSlugs, { hours = false } = {}) {
+// `hours` přidá pole s otevírací dobou (jen Munipolis, Deník ho nemá). `topics` jsou značky témat knihovny obrázků,
+// `ownImage` dovolí vybrat vlastní fotku (Deník fotky nedává, tam je obrázek vždy z knihovny).
+export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true } = {}) {
   const slugs = rubricSlugs.length ? rubricSlugs : ["zpravy"];
   const schema = {
     type: "object",
@@ -55,7 +63,7 @@ export function outputSchema(rubricSlugs, { hours = false } = {}) {
       article: {
         type: "object",
         additionalProperties: false,
-        required: ["include", "title", "excerpt", "body_html", "rubric", "image_caption"],
+        required: ["include", "title", "excerpt", "body_html", "rubric", "image_caption", "image_topic"],
         properties: {
           include: { type: "boolean" },
           title: stringField(),
@@ -63,6 +71,7 @@ export function outputSchema(rubricSlugs, { hours = false } = {}) {
           body_html: stringField(),
           rubric: { type: "string", enum: slugs },
           image_caption: stringField(),
+          image_topic: { type: "string", enum: [...new Set([...topics, ""])] },
         },
       },
       event: {
@@ -96,6 +105,10 @@ export function outputSchema(rubricSlugs, { hours = false } = {}) {
       },
     },
   };
+  if (ownImage) {
+    schema.properties.article.required.push("image_use");
+    schema.properties.article.properties.image_use = { type: "string", enum: ["vlastni", "knihovna"] };
+  }
   if (hours) {
     schema.required.push("hours");
     schema.properties.hours = hoursSchema();
@@ -144,13 +157,15 @@ export function contextText(known) {
   return parts.join("\n\n");
 }
 
-export function userText(item, known, { today, force = false }) {
+export function userText(item, known, { today, force = false, topics = [], images = 0 }) {
   return [
     `Dnes je ${today}.`,
     contextText(known),
+    topicsText(topics),
     `Nová zpráva z Munipolisu (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
     `Nadpis: ${item.title}`,
     `Text:\n${item.text || "(bez textu, údaje jsou možná jen na obrázku)"}`,
+    images ? `Přiložené obrázky: ${images}.` : "Bez přiloženého obrázku.",
     force ? FORCE : "",
   ]
     .filter(Boolean)
@@ -180,7 +195,16 @@ export function readDecision(raw, { rubricSlugs, force = false }) {
     const excerpt = clean(raw.article.excerpt, 320);
     const rubric = rubricSlugs.includes(raw.article.rubric) ? raw.article.rubric : "";
     if (title.length >= 3 && excerpt.length >= 3 && prepared.text.length >= 3 && rubric) {
-      article = { title, excerpt, body: prepared.html, rubric, imageCaption: clean(raw.article.image_caption, 200) };
+      const imageUse = raw.article.image_use === "vlastni" ? "vlastni" : "knihovna";
+      article = {
+        title,
+        excerpt,
+        body: prepared.html,
+        rubric,
+        imageUse,
+        imageTopic: clean(raw.article.image_topic, 60),
+        imageCaption: imageUse === "vlastni" ? clean(raw.article.image_caption, 200) : "",
+      };
     }
   }
 
@@ -226,14 +250,20 @@ function base64(bytes) {
   return btoa(binary);
 }
 
-// Jedno volání Claude. `images` jsou už stažené obrázky ({ bytes, type }).
-export async function askClaude(env, { item, known, images = [], rubricSlugs, voice, today, force = false }) {
-  // API bere obrázek do 5 MB v base64. Větší plakát Claude neuvidí, ale k návrhu se uloží.
+// API bere obrázek do 5 MB v base64. Větší obrázek Claude neuvidí, a tak ho ani nemůže vybrat jako vlastní fotku.
+export function visibleImages(images) {
+  return images.filter((image) => image.bytes.byteLength <= MAX_IMAGE_BYTES);
+}
+
+// Jedno volání Claude. `images` jsou už stažené obrázky ({ bytes, type }), `topics` témata knihovny obrázků.
+export async function askClaude(env, { item, known, images = [], topics = [], rubricSlugs, voice, today, force = false }) {
+  const shown = visibleImages(images);
   const content = [
-    ...images.filter((image) => image.bytes.byteLength <= MAX_IMAGE_BYTES).map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
-    { type: "text", text: userText(item, known, { today, force }) },
+    ...shown.map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
+    { type: "text", text: userText(item, known, { today, force, topics, images: shown.length }) },
   ];
-  const answer = await callClaude(env, { system: systemPrompt(voice), content, schema: outputSchema(rubricSlugs, { hours: true }) });
+  const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug) });
+  const answer = await callClaude(env, { system: systemPrompt(voice), content, schema });
   if (!answer.ok) return answer;
   return readDecision(answer.raw, { rubricSlugs, force });
 }

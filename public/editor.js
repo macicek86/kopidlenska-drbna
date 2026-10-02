@@ -12,7 +12,49 @@ function photoLimits(input) {
 }
 
 function bootPhotos(root) {
-  for (const form of root.querySelectorAll("form")) bindPhoto(form);
+  for (const form of root.querySelectorAll("form")) {
+    bindPhoto(form);
+    bindPhotos(form);
+  }
+}
+
+// Knihovna obrázků: víc fotek najednou (pole images). Každou zmenší stejně jako jednu fotku u zprávy.
+function bindPhotos(form) {
+  const fileInput = form.querySelector('input[type="file"][name="images"]');
+  if (!fileInput || form.dataset.photosBound) return;
+  form.dataset.photosBound = "1";
+  let ready = false;
+  form.addEventListener("submit", async (event) => {
+    if (ready) return;
+    const files = [...(fileInput.files ?? [])].filter((file) => file.size > 0);
+    if (!files.length) return;
+    event.preventDefault();
+    const button = form.querySelector('button[type="submit"]');
+    const previous = button?.textContent ?? "";
+    if (button) button.disabled = true;
+    try {
+      const limits = photoLimits(fileInput);
+      const transfer = new DataTransfer();
+      for (const [index, file] of files.entries()) {
+        if (button) button.textContent = `Zmenšuji fotky… ${index + 1}/${files.length}`;
+        const small = file.type === "image/webp" && file.size <= limits.bytes ? await edgeOf(file) : null;
+        transfer.items.add(small !== null && small <= limits.edge ? file : await toWebp(file, limits));
+      }
+      fileInput.files = transfer.files;
+      ready = true;
+      if (button) {
+        button.disabled = false;
+        button.textContent = "Nahrávám…";
+      }
+      form.requestSubmit();
+    } catch (error) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = previous;
+      }
+      window.alert(error instanceof Error ? error.message : "Fotky se nepodařilo zmenšit.");
+    }
+  });
 }
 
 function bindPhoto(form) {

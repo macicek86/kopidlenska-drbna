@@ -102,7 +102,7 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
   }
   const made = await saveBotArticle(env, {
     article: answer.article,
-    imageKey: await articleImage(env, item, settings, fetchImpl),
+    image: { key: await articleImage(env, item, settings, fetchImpl) },
     sourceHtml: clubSource(item.link),
     autoPublish: settings.autoPublish && !doubts.length,
     rubric: await targetRubric(env, settings),

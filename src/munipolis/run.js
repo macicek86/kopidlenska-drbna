@@ -17,7 +17,8 @@ import { fetchImage, storeImageBytes } from "../images.js";
 import { importSourceDate, importSummary, knownContent, outcomeOf, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
-import { askClaude } from "./ai.js";
+import { loadStockTopics, pickStockImage } from "../stock-db.js";
+import { askClaude, visibleImages } from "./ai.js";
 import { saveHoursChanges } from "./hours.js";
 import { ensureBot } from "./store.js";
 import { fetchFeed } from "./feed.js";
@@ -55,6 +56,13 @@ async function downloadImages(urls, fetchImpl) {
   return images;
 }
 
+// Vlastní fotku ze zprávy jen tehdy, když ji Drběna vybrala (plakát ne), jinak ilustrační z knihovny.
+export async function articleImage(env, article, images) {
+  const [own] = visibleImages(images);
+  if (article.imageUse === "vlastni" && own) return { key: await storeImageBytes(env, own), focus: "", caption: article.imageCaption };
+  return pickStockImage(env, article.imageTopic);
+}
+
 // Ručně vybranou zprávu Drběna zpracuje vždy (redakce rozhodla) a článek dostane datum ze zdroje. Cron píše s dnešním datem.
 export async function processItem(env, item, settings, { fetchImpl = fetch, ask = askClaude } = {}) {
   const today = pragueNow().date;
@@ -65,6 +73,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
     item,
     known: await knownContent(env, { itemId: item.id, today }),
     images,
+    topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
     voice: voiceFor(await loadDrbena(env)),
     today,
@@ -82,12 +91,11 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
 
   const made = {};
   if (answer.article) {
-    const imageKey = images[0] ? await storeImageBytes(env, images[0]) : null;
     Object.assign(
       made,
       await saveBotArticle(env, {
         article: answer.article,
-        imageKey,
+        image: await articleImage(env, answer.article, images),
         sourceHtml: sourceParagraph(item.link),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),

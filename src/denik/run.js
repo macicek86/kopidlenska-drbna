@@ -16,6 +16,7 @@ import { voiceFor } from "../drbena.js";
 import { importSourceDate, importSummary, knownContent, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
+import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { askDenik } from "./ai.js";
 import { fetchArticle, fetchDenikFeed } from "./feed.js";
 import {
@@ -57,6 +58,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
   const answer = await ask(env, {
     item,
     known: await knownContent(env, { itemId: item.id, today, table: "denik_items" }),
+    topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
     voice: voiceFor(await loadDrbena(env)),
     today,
@@ -78,7 +80,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
       made,
       await saveBotArticle(env, {
         article: answer.article,
-        imageKey: null,
+        image: await pickStockImage(env, answer.article.imageTopic),
         sourceHtml: denikSource(item.link, settings.sourceLink),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),

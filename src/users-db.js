@@ -21,6 +21,11 @@ export const PERMISSIONS = [
     detail: "Může měnit otevírací dobu míst, dočasné změny a novou otevírací dobu. Místa samotná zakládá hlavní redaktor.",
   },
   {
+    code: "obrazky",
+    label: "Knihovna obrázků",
+    detail: "Může nahrávat a mazat ilustrační fotky a měnit jejich témata.",
+  },
+  {
     code: "statistiky",
     label: "Statistiky",
     detail: "Vidí návštěvnost webu: kolik lidí přišlo, co čtou a odkud přišli.",

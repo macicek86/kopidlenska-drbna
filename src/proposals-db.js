@@ -1,7 +1,8 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
 import { asBool, clip, requireChief, requireUser, slugify, uniqueSlug } from "./db-core.js";
 import { readArticle, redactedFlag, textWasEdited } from "./db.js";
-import { releaseImage, storeImage } from "./images.js";
+import { releaseImage } from "./images.js";
+import { formImage } from "./stock-db.js";
 
 export async function saveProposal(env, request, input) {
   const gate = await requireUser(env, request);
@@ -37,8 +38,9 @@ export async function saveProposal(env, request, input) {
       .first();
   }
 
-  const stored = await storeImage(env, input.image);
+  const stored = await formImage(env, input);
   if (stored.error) return { ok: false, error: stored.error };
+  Object.assign(parsed, stored.photo);
 
   if (existing) {
     let imageKey = existing.image_key ? String(existing.image_key) : null;
@@ -135,8 +137,9 @@ export async function approveProposal(env, request, input) {
     if (!article) return { ok: false, error: "Tahle zpráva už tu není." };
   }
 
-  const stored = await storeImage(env, input.image);
+  const stored = await formImage(env, input);
   if (stored.error) return { ok: false, error: stored.error };
+  Object.assign(parsed, stored.photo);
 
   const submitted = {
     title: String(proposal.submitted_title),

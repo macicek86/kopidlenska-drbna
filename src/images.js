@@ -12,7 +12,7 @@ export async function storeImage(env, file, folder = "clanky") {
   if (file.size > 4 * 1024 * 1024) return { error: "Fotka může mít nejvýš 4 MB." };
   const ext = IMAGE_TYPES[file.type];
   if (!ext) return { error: "Fotka musí být JPG, PNG, WEBP nebo GIF." };
-  const prefix = folder === "reklamy" ? "reklamy" : "clanky";
+  const prefix = ["reklamy", "knihovna"].includes(folder) ? folder : "clanky";
   const key = `${prefix}/${crypto.randomUUID()}.${ext}`;
   await env.BUCKET.put(key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type },
@@ -43,8 +43,11 @@ export async function storeImageBytes(env, image) {
   return key;
 }
 
+// Smaže fotku z R2, když ji už nic nepoužívá. Fotky z knihovny sdílí víc zpráv, ty drží knihovna.
 export async function releaseImage(env, key) {
   if (!key) return;
+  const stock = await env.DB.prepare("select 1 as ok from stock_images where image_key = ?").bind(key).first();
+  if (stock) return;
   const article = await env.DB.prepare("select 1 as ok from articles where image_key = ?").bind(key).first();
   if (article) return;
   const proposal = await env.DB.prepare("select 1 as ok from proposals where image_key = ?").bind(key).first();

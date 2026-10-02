@@ -3,6 +3,7 @@
 import { callClaude } from "../claude.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { contextText, outputSchema, readDecision } from "../munipolis/ai.js";
+import { topicsText } from "../stock.js";
 
 const RULES = `Dostaneš jeden článek z Jičínského deníku, který zmiňuje Kopidlno nebo jeho části (Drahoraz, Mlýnec, Pševes, Ledkov), a přehled toho, co už na webu Kopidlenská drbna je.
 
@@ -29,6 +30,7 @@ Pravidla:
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: jeden až tři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul> a <li>. Odkaz na zdroj nepiš.
 - event.description: prostý text, jedna až tři věty.
+- image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné. image_caption nech prázdné, fotky z Deníku se neberou.
 - Datum piš jako RRRR-MM-DD a čas jako HH:MM.
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
@@ -40,10 +42,11 @@ export function denikPrompt(voice) {
   return `${RULES}\n\nHlas a styl textů:\n${style}`;
 }
 
-export function denikText(item, known, { today, force = false, retry = "" }) {
+export function denikText(item, known, { today, force = false, retry = "", topics = [] }) {
   return [
     `Dnes je ${today}.`,
     contextText(known),
+    topicsText(topics),
     `Článek z Jičínského deníku (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
     `Nadpis: ${item.title}`,
     `Text:\n${item.text || "(jen nadpis)"}`,
@@ -101,12 +104,13 @@ export function denikProblem(decision, item) {
 }
 
 // Jedno volání Claude, a když výsledek poruší podmínky Deníku, ještě jedno s upozorněním.
-export async function askDenik(env, { item, known, rubricSlugs, voice, today, force = false }) {
+export async function askDenik(env, { item, known, topics = [], rubricSlugs, voice, today, force = false }) {
+  const schema = outputSchema(rubricSlugs, { topics: topics.map((topic) => topic.slug), ownImage: false });
   let retry = "";
   let problem = "";
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const content = [{ type: "text", text: denikText(item, known, { today, force, retry }) }];
-    const answer = await callClaude(env, { system: denikPrompt(voice), content, schema: outputSchema(rubricSlugs) });
+    const content = [{ type: "text", text: denikText(item, known, { today, force, retry, topics }) }];
+    const answer = await callClaude(env, { system: denikPrompt(voice), content, schema });
     if (!answer.ok) return answer;
     const decision = readDecision(answer.raw, { rubricSlugs, force });
     if (!decision.ok || decision.decision !== "vytvorit") return decision;

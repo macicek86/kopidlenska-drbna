@@ -14,8 +14,9 @@ import { ensureDenikTables } from "./denik/store.js";
 import { ensureDrbenaTable } from "./drbena-db.js";
 import { ensureUserColumns } from "./users-db.js";
 import { ensureVisitTables } from "./visits-db.js";
+import { ensureStockTables } from "./stock-db.js";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 let schemaReady = false;
 
@@ -332,6 +333,7 @@ async function migrateSchema(env) {
   await ensureDrbenaTable(env);
   await ensurePlaceTables(env);
   await ensureVisitTables(env);
+  await ensureStockTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
