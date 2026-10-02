@@ -3,6 +3,32 @@ import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
 import { layout } from "./view.js";
 
+const TEASER_PLACES_CHARS = 45;
+
+function placesWord(count) {
+  if (count === 1) return "místo";
+  if (count >= 2 && count <= 4) return "místa";
+  return "míst";
+}
+
+// Na titulku jen pár míst bez upřesnění v závorkách, kolik se vejde na řádek, a kolik dalších.
+// Jinak by první ulice vypadala jako jediná, kde se odstávka chystá.
+export function teaserPlaces(item) {
+  const labels = item.placeLabels ?? [];
+  const total = labels.length + (item.morePlaces ?? 0);
+  const shown = [];
+  let length = 0;
+  for (const label of labels) {
+    const short = label.replace(/\s*\([^)]*\)/g, "").trim() || label;
+    if (shown.length && length + short.length + 2 > TEASER_PLACES_CHARS) break;
+    shown.push(short);
+    length += short.length + 2;
+  }
+  const rest = total - shown.length;
+  if (!rest) return shown.join(", ");
+  return `${shown.join(", ")} a ${rest === 1 ? "ještě 1" : `${rest >= 5 ? "dalších" : "další"} ${rest}`} ${placesWord(rest)}`;
+}
+
 function teaserLine({ kind, name, state, when, where }) {
   return `<li class="${kind}">
     <p class="yard-home-name">${esc(name)}</p>
@@ -19,14 +45,14 @@ export function outagesTeaser(data, ctx) {
     name: item.title,
     state: item.state,
     when: item.when,
-    where: item.placeLabels?.[0] ?? "",
+    where: teaserPlaces(item),
   }));
   const power = (data.outages?.items ?? []).filter(soon).map((item) => ({
     kind: item.phase === "now" ? "is-closure" : "is-later",
     name: item.areaName,
     state: item.state,
     when: item.when,
-    where: item.placeLabels?.[0] ?? "",
+    where: teaserPlaces(item),
   }));
   const items = [...water, ...power].slice(0, 3);
   if (!items.length) return "";

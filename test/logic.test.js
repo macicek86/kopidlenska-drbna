@@ -1026,3 +1026,13 @@ test("popisek fotky prolinkuje licenci Creative Commons", () => {
   assert.match(captionHtml("Foto: CC0"), /publicdomain\/zero\/1\.0/);
   assert.equal(captionHtml("Foto: <b>Jana</b>"), "Foto: &lt;b&gt;Jana&lt;/b&gt;");
 });
+
+test("titulka u odstávky ukáže pár míst a kolik jich je ještě", async () => {
+  const { teaserPlaces } = await import("../src/outages-view.js");
+  const placeLabels = ["Tomáše Svobody (od náměstí k Policii ČR)", "Bédy Křídla", "Vackova", "Hilmarova", "Husova", "Na Sklípku", "Crhova", "Na Vinici", "náměstí (polovina)"];
+  assert.equal(teaserPlaces({ placeLabels }), "Tomáše Svobody, Bédy Křídla, Vackova a dalších 6 míst");
+  assert.equal(teaserPlaces({ placeLabels: ["Husova"] }), "Husova");
+  assert.equal(teaserPlaces({ placeLabels: ["Husova"], morePlaces: 1 }), "Husova a ještě 1 místo");
+  assert.equal(teaserPlaces({ placeLabels: ["Husova"], morePlaces: 7 }), "Husova a dalších 7 míst");
+  assert.equal(teaserPlaces({}), "");
+});
