@@ -2,6 +2,10 @@ name = "kopidlenska-drbna"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
+# Cloudflare Access: ACCESS_TEAM (název týmu, třeba „drbna“ z drbna.cloudflareaccess.com) a ACCESS_AUD
+# (Application Audience tag) se nastavují jako tajemství: npx wrangler secret put ACCESS_TEAM
+# Místně nejsou, takže náhled a vývoj se dál přihlašují heslem.
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
@@ -19,6 +23,8 @@ bucket_name = "kopidlenska-drbna"
 [triggers]
 crons = ["15 */4 * * *"]
 
+# Až drbna pojede na vlastní doméně: odkomentovat routes a přidat workers_dev = false a preview_urls = false
+# nahoru k name, ať redakce nejde obejít kolem Cloudflare Access.
 # routes = [
 #   { pattern = "kopidlenskadrbna.org", custom_domain = true },
 #   { pattern = "www.kopidlenskadrbna.org", custom_domain = true },

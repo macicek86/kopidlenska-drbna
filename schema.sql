@@ -159,6 +159,7 @@ create table if not exists users (
   login text not null unique,
   name text not null,
   alias text not null default '',
+  email text,
   password_hash text not null,
   role text not null,
   session_token text,

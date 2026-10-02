@@ -1,7 +1,6 @@
 import { AD_SEEDS } from "./ads.js";
 import { loadAdProposals, loadAds } from "./ads-db.js";
 import { COPY } from "./copy.js";
-import { hashPassword, verifyPassword } from "./password.js";
 import { releaseImage, storeImage } from "./images.js";
 import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
@@ -14,10 +13,7 @@ import {
   addColumn,
   asBool,
   clip,
-  currentUser,
-  mapAccount,
-  normalizeLogin,
-  readCookie,
+  identify,
   requireChief,
   requireUser,
   slugify,
@@ -29,22 +25,24 @@ import { ensureImportTables, loadImportItems, loadImportSettings } from "./munip
 import { ensureFootballTables, loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { ensureDenikTables, loadDenikItems, loadDenikSettings } from "./denik/store.js";
 import { ensureDrbenaTable, loadDrbena } from "./drbena-db.js";
+import { ensureUserColumns, loadUsers } from "./users-db.js";
+import { accessConfig } from "./access.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
 export const CATEGORIES = SEED_RUBRICS.map((item) => item.name);
-export const PERMISSIONS = [
-  {
-    code: "sberny_dvur",
-    label: "Sběrný dvůr",
-    detail: "Může zapsat mimořádné uzavření a důvod. Dvůr samotný pořád mění hlavní redaktor.",
-  },
-  {
-    code: "doktori",
-    label: "Lékaři",
-    detail: "Může měnit ordinační hodiny a dočasnou změnu. Ordinaci samotnou pořád zakládá hlavní redaktor.",
-  },
-];
 export { clearCookie, readCookie, sessionCookie, userCan } from "./db-core.js";
+export {
+  PERMISSIONS,
+  changePassword,
+  createContributor,
+  knownPermissions,
+  login,
+  logout,
+  saveContributorAccess,
+  saveProfile,
+  setContributorActive,
+  setContributorPassword,
+} from "./users-db.js";
 export {
   addOutageArea,
   loadOutageBoard,
@@ -78,12 +76,6 @@ export function byline(person) {
   const alias = String(person.alias ?? person.authorAlias ?? "").trim();
   if (alias) return alias;
   return String(person.name ?? person.authorName ?? "").trim();
-}
-
-export function knownPermissions(values) {
-  const allowed = new Set(PERMISSIONS.map((item) => item.code));
-  const list = Array.isArray(values) ? values : [];
-  return [...new Set(list.map((item) => String(item)))].filter((code) => allowed.has(code));
 }
 
 function mapArticle(row) {
@@ -372,12 +364,6 @@ async function createDeskTables(env) {
   ).run();
 }
 
-async function ensureUserColumns(env) {
-  const info = await env.DB.prepare("pragma table_info(users)").all();
-  const names = new Set((info.results ?? []).map((row) => row.name));
-  await addColumn(env, names, "alias", "alter table users add column alias text not null default ''");
-}
-
 async function ensureArticleColumns(env) {
   const info = await env.DB.prepare("pragma table_info(articles)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
@@ -583,19 +569,6 @@ export async function ensureSchema(env) {
   if (await migrateSchema(env)) schemaReady = true;
 }
 
-async function attachPermissions(env, accounts) {
-  if (!accounts.length) return accounts;
-  const rows = (await env.DB.prepare("select user_id, code from user_permissions").all()).results ?? [];
-  const byUser = new Map();
-  for (const row of rows) {
-    const id = Number(row.user_id);
-    const list = byUser.get(id) ?? [];
-    list.push(String(row.code));
-    byUser.set(id, list);
-  }
-  return accounts.map((account) => ({ ...account, permissions: byUser.get(account.id) ?? [] }));
-}
-
 function readArticleFields(input) {
   const title = clip(input.title, 160);
   const excerpt = clip(input.excerpt, 320);
@@ -773,11 +746,14 @@ export async function loadArticle(env, slug) {
 
 export async function loadAdmin(env, request) {
   const row = await settings(env);
-  const user = await currentUser(env, request);
+  const { user, email } = await identify(env, request);
+  const access = Boolean(accessConfig(env));
   const base = {
     signedIn: Boolean(user),
     user,
-    showDefaultPassword: asBool(row.password_is_default),
+    access,
+    accessEmail: email,
+    showDefaultPassword: !access && asBool(row.password_is_default),
     waste: buildWasteView(wasteFrom(row)),
     contactNote: String(row.contact_note),
     articles: [],
@@ -841,14 +817,7 @@ export async function loadAdmin(env, request) {
          from events order by starts_on asc, starts_time asc, id asc`,
       ).all()
     ).results.map(mapEvent);
-    base.users = await attachPermissions(
-      env,
-      (
-        await env.DB.prepare(
-          "select id, login, name, alias, role, active from users order by case role when 'hlavni' then 0 else 1 end, name",
-        ).all()
-      ).results.map((row) => mapAccount(row)),
-    );
+    base.users = await loadUsers(env);
     base.proposals = await loadProposals(env, "where p.status = 'pending' order by p.id asc");
   } else {
     base.proposals = await loadProposals(
@@ -858,80 +827,6 @@ export async function loadAdmin(env, request) {
     );
   }
   return base;
-}
-
-function token() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export async function login(env, loginName, password) {
-  const name = normalizeLogin(loginName);
-  if (!name || !String(password ?? "")) return { ok: false, error: "Doplňte jméno a heslo." };
-  const row = await env.DB.prepare("select id, password_hash, active from users where login = ?").bind(name).first();
-  if (!row || !asBool(row.active) || !(await verifyPassword(password, row.password_hash))) {
-    return { ok: false, error: "Jméno nebo heslo nesedí." };
-  }
-  const next = token();
-  await env.DB.prepare("update users set session_token = ? where id = ?").bind(next, row.id).run();
-  return { ok: true, token: next };
-}
-
-export async function logout(env, request) {
-  const session = readCookie(request);
-  if (!session) return;
-  await env.DB.prepare("update users set session_token = null where session_token = ?").bind(session).run();
-}
-
-export async function changePassword(env, request, current, next) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  if (next.trim().length < 8) return { ok: false, error: "Nové heslo musí mít aspoň 8 znaků." };
-  const row = await env.DB.prepare("select password_hash, role from users where id = ?").bind(gate.user.id).first();
-  if (!row || !(await verifyPassword(current, row.password_hash))) {
-    return { ok: false, error: "Současné heslo nesedí." };
-  }
-  const hash = await hashPassword(next.trim());
-  const session = token();
-  await env.DB.prepare("update users set password_hash = ?, session_token = ? where id = ?")
-    .bind(hash, session, gate.user.id)
-    .run();
-  if (row.role === "hlavni") {
-    await env.DB.prepare(
-      "update settings set password_hash = ?, password_is_default = 0, session_token = null where id = 1",
-    )
-      .bind(hash)
-      .run();
-  }
-  return { ok: true, token: session };
-}
-
-function readAlias(value) {
-  const alias = clip(value, 60);
-  if (alias && alias.length < 2) {
-    return { error: "Alias musí mít aspoň 2 znaky. Když ho nechcete, nechte pole prázdné." };
-  }
-  return { alias };
-}
-
-export async function saveProfile(env, request, input) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const next = clip(input.name, 60);
-  if (next.length < 2) return { ok: false, error: "Doplňte jméno, jak má být pod článkem." };
-  const alias = readAlias(input.alias);
-  if (alias.error) return { ok: false, error: alias.error };
-  await env.DB.prepare("update users set name = ?, alias = ? where id = ?")
-    .bind(next, alias.alias, gate.user.id)
-    .run();
-  return { ok: true };
-}
-
-async function writePermissions(env, userId, codes) {
-  await env.DB.prepare("delete from user_permissions where user_id = ?").bind(userId).run();
-  for (const code of codes) {
-    await env.DB.prepare("insert into user_permissions (user_id, code) values (?, ?)").bind(userId, code).run();
-  }
 }
 
 export async function saveArticle(env, request, input) {
@@ -1000,73 +895,6 @@ export async function removeArticle(env, request, id) {
   await env.DB.prepare("delete from proposals where article_id = ?").bind(id).run();
   await env.DB.prepare("delete from articles where id = ?").bind(id).run();
   for (const key of keys) await releaseImage(env, key);
-  return { ok: true };
-}
-
-export async function createContributor(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const name = clip(input.name, 60);
-  const loginName = normalizeLogin(input.login);
-  const password = String(input.password ?? "").trim();
-  const alias = readAlias(input.alias);
-  if (name.length < 2) return { ok: false, error: "Doplňte jméno, jak má být pod článkem." };
-  if (alias.error) return { ok: false, error: alias.error };
-  if (!/^[a-z0-9]{3,32}$/.test(loginName)) {
-    return { ok: false, error: "Přihlašovací jméno může mít 3 až 32 znaků: malá písmena a číslice." };
-  }
-  if (password.length < 8) return { ok: false, error: "Heslo musí mít aspoň 8 znaků." };
-  const existing = await env.DB.prepare("select id from users where login = ?").bind(loginName).first();
-  if (existing) return { ok: false, error: "Tohle přihlašovací jméno už někdo má." };
-  await env.DB.prepare(
-    "insert into users (login, name, alias, password_hash, role) values (?, ?, ?, ?, 'prispevovatel')",
-  )
-    .bind(loginName, name, alias.alias, await hashPassword(password))
-    .run();
-  const created = await env.DB.prepare("select id from users where login = ?").bind(loginName).first();
-  if (created) await writePermissions(env, created.id, knownPermissions(input.permissions));
-  return { ok: true };
-}
-
-export async function saveContributorAccess(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const row = await env.DB.prepare("select id, role from users where id = ?").bind(input.id).first();
-  if (!row) return { ok: false, error: "Ten účet už tu není." };
-  if (row.role === "hlavni") return { ok: false, error: "Hlavní redaktor má všechna oprávnění." };
-  const alias = readAlias(input.alias);
-  if (alias.error) return { ok: false, error: alias.error };
-  await env.DB.prepare("update users set alias = ? where id = ?").bind(alias.alias, row.id).run();
-  await writePermissions(env, row.id, knownPermissions(input.permissions));
-  return { ok: true };
-}
-
-export async function setContributorActive(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const row = await env.DB.prepare("select id, role from users where id = ?").bind(input.id).first();
-  if (!row) return { ok: false, error: "Ten účet už tu není." };
-  if (row.role === "hlavni") return { ok: false, error: "Účet hlavního redaktora takhle nejde vypnout." };
-  const active = input.active === "1" || input.active === 1 || input.active === true;
-  await env.DB.prepare(
-    "update users set active = ?, session_token = case when ? = 0 then null else session_token end where id = ?",
-  )
-    .bind(active ? 1 : 0, active ? 1 : 0, row.id)
-    .run();
-  return { ok: true, active };
-}
-
-export async function setContributorPassword(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const password = String(input.next ?? "").trim();
-  if (password.length < 8) return { ok: false, error: "Heslo musí mít aspoň 8 znaků." };
-  const row = await env.DB.prepare("select id, role from users where id = ?").bind(input.id).first();
-  if (!row) return { ok: false, error: "Ten účet už tu není." };
-  if (row.role !== "prispevovatel") return { ok: false, error: "Heslo hlavního redaktora se mění v sekci Můj účet." };
-  await env.DB.prepare("update users set password_hash = ?, session_token = null where id = ?")
-    .bind(await hashPassword(password), row.id)
-    .run();
   return { ok: true };
 }
 

@@ -1,5 +1,7 @@
 // Společné kousky pro práci s D1: ořez textu, slug, přihlášený člověk a oprávnění.
 
+import { accessConfig, accessEmail } from "./access.js";
+
 const COOKIE = "drbna_editor";
 
 export function clip(value, max) {
@@ -58,6 +60,7 @@ export function mapAccount(row, permissions = []) {
     login: String(row.login),
     name: String(row.name),
     alias: String(row.alias ?? "").trim(),
+    email: String(row.email ?? ""),
     role: String(row.role),
     active: asBool(row.active),
     permissions,
@@ -100,16 +103,30 @@ export async function permissionCodes(env, userId) {
   return (rows.results ?? []).map((row) => String(row.code));
 }
 
-export async function currentUser(env, request) {
+const ACCOUNT_FIELDS = "id, login, name, alias, email, role, active";
+
+// Kdo je přihlášený. S Cloudflare Access podle ověřeného e-mailu (ten vrací i bez účtu, ať redakce
+// může říct, že pro něj účet nemá), jinak podle cookie z přihlášení heslem.
+export async function identify(env, request) {
+  const access = accessConfig(env);
+  if (access) {
+    const email = await accessEmail(request, access);
+    if (!email) return { user: null, email: null };
+    const row = await env.DB.prepare(`select ${ACCOUNT_FIELDS} from users where email = ? and active = 1`)
+      .bind(email)
+      .first();
+    return { user: row ? mapAccount(row, await permissionCodes(env, row.id)) : null, email };
+  }
   const token = readCookie(request);
-  if (!token || token.length < 20) return null;
-  const row = await env.DB.prepare(
-    "select id, login, name, alias, role, active from users where session_token = ? and active = 1",
-  )
+  if (!token || token.length < 20) return { user: null, email: null };
+  const row = await env.DB.prepare(`select ${ACCOUNT_FIELDS} from users where session_token = ? and active = 1`)
     .bind(token)
     .first();
-  if (!row) return null;
-  return mapAccount(row, await permissionCodes(env, row.id));
+  return { user: row ? mapAccount(row, await permissionCodes(env, row.id)) : null, email: null };
+}
+
+export async function currentUser(env, request) {
+  return (await identify(env, request)).user;
 }
 
 export async function requireUser(env, request) {

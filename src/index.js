@@ -46,6 +46,7 @@ import {
   setAdEnabled,
   withdrawAdProposal,
 } from "./ads-db.js";
+import { ACCESS_LOGOUT, accessConfig } from "./access.js";
 import { approveProposal, discardProposal, rejectProposal, saveProposal, withdrawProposal } from "./proposals-db.js";
 import {
   adPage,
@@ -109,7 +110,7 @@ const OK = {
   web: "Svoz a kontakt jsou uložené.",
   texty: "Texty jsou uložené.",
   heslo: "Heslo je změněné.",
-  jmeno: "Jméno a alias jsou uložené.",
+  jmeno: "Údaje jsou uložené.",
   dvur: "Sběrný dvůr je uložený.",
   "dvur-upraven": "Sběrný dvůr je upravený.",
   "dvur-smazan": "Sběrný dvůr je smazaný.",
@@ -144,7 +145,7 @@ const OK = {
   "clovek-vypnut": "Účet je vypnutý.",
   "clovek-zapnut": "Účet je zase aktivní.",
   "clovek-heslo": "Heslo přispěvatele je nastavené.",
-  "clovek-udaje": "Alias a oprávnění jsou uložené.",
+  "clovek-udaje": "Údaje přispěvatele jsou uložené.",
   ...OUTAGE_OK,
   ...IMPORT_OK,
   ...DRBENA_OK,
@@ -225,6 +226,7 @@ async function formFields(request) {
     description: text("description"),
     password: text("password"),
     login: text("login"),
+    email: text("email"),
     name: text("name"),
     note: text("note"),
     active: text("active"),
@@ -464,7 +466,7 @@ async function renderPost(request, env, url, execution) {
   }
   if (path === "/redakce/odhlasit") {
     await logout(env, request);
-    return redirect("/redakce/prehled", clearCookie(https));
+    return redirect(accessConfig(env) ? ACCESS_LOGOUT : "/redakce/prehled", clearCookie(https));
   }
   if (path === "/redakce/zpravy/navrh") {
     const result = await saveProposal(env, request, fields);

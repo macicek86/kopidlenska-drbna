@@ -1,3 +1,4 @@
+import { ACCESS_LOGOUT } from "../access.js";
 import { byline, userCan } from "../db.js";
 import { esc, flashOf } from "../view.js";
 import { field, icon, input } from "./ui.js";
@@ -101,7 +102,29 @@ ${rich ? `<script src="/vendor/trix/trix.umd.min.js" defer></script>` : ""}
 </html>`;
 }
 
+// S Cloudflare Access sem člověk dojde, jen když ho Access pustil, ale v redakci pro jeho e-mail
+// účet není (nebo je vypnutý). Bez tokenu sem nedojde vůbec, leda obejitím Accessu.
+function accessPage(data) {
+  const text = data.accessEmail
+    ? `Pro <b>${esc(data.accessEmail)}</b> tu účet není, nebo je vypnutý. Napište hlavnímu redaktorovi, ať vám ho založí nebo zapne.`
+    : "Do redakce se přihlašuje e-mailem přes Cloudflare Access. Otevřete ji na hlavní adrese webu, Access se vás zeptá na e-mail.";
+  return document({
+    title: "Redakce | Kopidlenská drbna",
+    bodyClass: "adm adm-login",
+    body: `<main class="login-box" id="obsah">
+      <a class="login-brand" href="/"><img src="/kozel-maskot.webp" alt=""><span>Kopidlenská <b>drbna</b></span></a>
+      <div class="login-card form">
+        <h1>Redakce</h1>
+        <div class="callout callout-warn">${text}</div>
+        ${data.accessEmail ? `<a class="btn btn-block" href="${ACCESS_LOGOUT}">Přihlásit jiným e-mailem</a>` : ""}
+      </div>
+      <a class="login-back" href="/">← Zpět na web</a>
+    </main>`,
+  });
+}
+
 function loginPage(data, flash) {
+  if (data.access) return accessPage(data);
   return document({
     title: "Redakce | Kopidlenská drbna",
     bodyClass: "adm adm-login",

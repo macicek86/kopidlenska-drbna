@@ -32,7 +32,7 @@ Domény musí být na stejném účtu. Stejné řádky jsou připravené zakomen
 
 ## Redakce
 
-Adresa `/redakce`. Po přihlášení se otevře Přehled: co čeká na schválení a co se chystá. Vlevo je menu sekcí (na mobilu nahoře). Úpravy, nové položky i mazání se otevírají v okně, seznamy jde prohledávat a před zavřením okna s neuloženými změnami se redakce zeptá. Ctrl+S uloží otevřený formulář. Účty jsou dvou druhů.
+Adresa `/redakce`. Na produkci se do ní přihlašuje e-mailem přes Cloudflare Access, nastavení je v [NAVOD-ACCESS.md](NAVOD-ACCESS.md). Po přihlášení se otevře Přehled: co čeká na schválení a co se chystá. Vlevo je menu sekcí (na mobilu nahoře). Úpravy, nové položky i mazání se otevírají v okně, seznamy jde prohledávat a před zavřením okna s neuloženými změnami se redakce zeptá. Ctrl+S uloží otevřený formulář. Účty jsou dvou druhů.
 
 Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v sekci Můj účet. Může zprávy, akce, texty, svoz, sběrné dvory, odstávky elektřiny i účty. Jeho vlastní zpráva jde na web hned. Výchozí jméno pod článkem je Redakce. V sekci Můj účet si každý nastaví jméno a volitelný alias. Když alias používá, na webu se u jeho zpráv ukáže alias.
 

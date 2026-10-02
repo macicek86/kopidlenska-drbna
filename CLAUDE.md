@@ -6,7 +6,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 - `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`)
 - `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…); `src/home.js` titulka (upozornění vedle maskota, na počítači ve dvou sloupcích, styly v `public/home.css`)
-- `src/db.js`: data webu; `src/proposals-db.js` návrhy zpráv (uložení, schválení, vrácení, stažení, smazání); `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/ads-db.js` reklamy; `src/outages-db.js` odstávky elektřiny
+- `src/db.js`: data webu; `src/users-db.js` účty redakce (heslo, e-mail, přispěvatelé, oprávnění); `src/proposals-db.js` návrhy zpráv (uložení, schválení, vrácení, stažení, smazání); `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/ads-db.js` reklamy; `src/outages-db.js` odstávky elektřiny
 - `src/notices.js` + `src/notices-db.js`: odstávky vody a uzavírky (uzavírky zatím jen v redakci, viz `PUBLIC_NOTICE_KINDS`); `src/outages-view.js` stránka a karta odstávek
 - `src/munipolis/`: import zpráv města (`feed.js` RSS, `ai.js` pokyny pro Claude, `store.js` D1, `run.js` průchod). Spouští ho cron a tlačítko v redakci. Klíč je tajemství `ANTHROPIC_API_KEY`
 - `src/fotbal/`: články z webu FK Kopidlno (`club.js` rozbor stránek Sklub.cz, `fotbalunas.js` oficiální rozpis, výsledky, střelci a tabulka soutěže z fotbalunas.cz (zdroj pravdy; fotbal.cz pustí jen prohlížeč), `collect.js` stažení aktualit a doplnění z obou webů, `dates.js` kontrola dne v týdnu, data, týmu a skóre: co opraví fotbalunas, smí jít ven, ostatní rozpory jdou jako návrh, `ai.js` pokyny, `store.js` D1, `run.js` průchod). Cron běží každé 4 h, fotbal se ale podívá jen tak často, jak je nastavené v redakci (výchozí jednou denně)
@@ -24,6 +24,12 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 - `public/admin.css`, `public/admin.js`: vzhled a chování redakce
 - `public/editor.js`: editor textu (Trix), zmenšení fotky, náhled reklamy. Nový obsah oživí událost `drbna:mount`.
 - `public/photo-pick.js`: v redakci náhled výřezu fotky a ťuknutí na místo, které má zůstat vidět
+
+## Přihlášení do redakce: Cloudflare Access
+
+Na produkci hlídá redakci Cloudflare Access (Zero Trust), zatím na adrese `*.workers.dev`. Worker ověří token z hlavičky `Cf-Access-Jwt-Assertion` (podpis, AUD, vydavatel, platnost; `src/access.js`) a podle e-mailu najde účet v `users.email`. Hesla jsou pak vypnutá, odhlášení vede na `/cdn-cgi/access/logout`.
+Zapíná se to tajemstvími `ACCESS_TEAM` a `ACCESS_AUD` (`npx wrangler secret put …`). Bez nich (místně, náhled, smoke test) se redakce přihlašuje heslem jako dřív.
+Až drbna přejde na kopidlenskadrbna.org, vypnout `workers_dev` a `preview_urls` (návod je ve `wrangler.toml`) a Access nastavit na všechny tři domény.
 
 ## Redakce: jak fungují okna
 
