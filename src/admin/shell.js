@@ -36,6 +36,7 @@ function nav(data) {
         chief && ["svoz", "Popelnice", "bin"],
         (chief || userCan(data.user, "sberny_dvur")) && ["dvory", "Sběrné dvory", "recycle"],
         (chief || userCan(data.user, "doktori")) && ["lekari", "Lékaři", "cross"],
+        (chief || userCan(data.user, "oteviraci_doba")) && ["oteviraci-doba", "Otevírací doba", "clock"],
         chief && ["odstavky", "Odstávky", "bolt", noticesWaiting],
       ],
     },
@@ -65,7 +66,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "reklamy", "svoz", "dvory", "lekari", "odstavky", "drbena", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

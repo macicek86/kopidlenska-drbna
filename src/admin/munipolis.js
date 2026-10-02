@@ -69,7 +69,7 @@ export function adminMunipolis(ctx, data, message, query = {}) {
   if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
   const body = `${pageHead(
     "Munipolis",
-    "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek a přepisuje je po svém. Když už stejná věc na drbně je, nechá ji být. Po ručním načtení zpracuje jen to, co zaškrtnete.",
+    "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek, zavření a změny otevírací doby propíše rovnou a ostatní přepíše po svém. Když už stejná věc na drbně je, nechá ji být. Po ručním načtení zpracuje jen to, co zaškrtnete.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries)}

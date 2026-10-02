@@ -178,7 +178,7 @@ export function visibleHomeChange(doctor, today) {
   return list.reduce(earlierChange, null);
 }
 
-function numeric(iso, today) {
+export function numeric(iso, today) {
   const [year, month, day] = iso.split("-").map(Number);
   return iso.slice(0, 4) === today.slice(0, 4) ? `${day}. ${month}.` : `${day}. ${month}. ${year}`;
 }
@@ -209,7 +209,8 @@ export function spanSummary(change) {
     .join("; ");
 }
 
-export function homeNotice(doctor, today) {
+// `other` je konec věty u jiných hodin. Otevírací doba míst ho mění na „jinou otevírací dobu“.
+export function homeNotice(doctor, today, { other = "jiné ordinační hodiny" } = {}) {
   const change = visibleHomeChange(doctor, today);
   if (!change) return null;
   const closed = periodClosed(change);
@@ -217,15 +218,15 @@ export function homeNotice(doctor, today) {
   return {
     name: doctor.name,
     specialty: doctor.specialty,
-    state: closed ? `Má ${when} zavřeno.` : `Má ${when} jiné ordinační hodiny.`,
+    state: closed ? `Má ${when} zavřeno.` : `Má ${when} ${other}.`,
     detail: closed ? "" : spanSummary(change),
     note: change.note,
     kind: closed ? "closed" : "change",
   };
 }
 
-export function hoursSummary(doctor) {
-  if (!hasOpenSlot(doctor.week)) return "Ordinační hodiny zatím nejsou doplněné";
+export function hoursSummary(doctor, missing = "Ordinační hodiny zatím nejsou doplněné") {
+  if (!hasOpenSlot(doctor.week)) return missing;
   return (doctor.week ?? [])
     .map((slot) => {
       const text = [partText("dopoledne", slot.morning), partText("odpoledne", slot.afternoon)].filter(Boolean).join(", ");

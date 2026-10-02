@@ -3,6 +3,7 @@ import { callClaude, MODEL } from "../claude.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
 import { DEFAULT_VOICE } from "../drbena.js";
+import { HOURS_RULES, hoursContext, hoursSchema, readHours } from "./hours.js";
 
 export { MODEL, DEFAULT_VOICE };
 const MAX_IMAGE_BYTES = 3_700_000;
@@ -18,7 +19,10 @@ Co vytvořit:
 - Odstávka vody: notice s kind "voda". Každou ulici nebo část obce dej do places zvlášť. Článek jen tehdy, když zpráva říká víc než samotnou odstávku.
 - Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice. Uzavírky zatím nemají na webu vlastní přehled.
 - Pozvánka na akci s datem: event a k tomu krátký článek s pozvánkou.
+- Zavření nebo jiná otevírací doba: hours, viz níže.
 - Cokoli jiného: článek.
+
+${HOURS_RULES}
 
 Pravidla:
 - Data, časy, místa, jména, ceny a telefony opiš přesně podle zdroje. Nic nevymýšlej. Když údaj chybí, nech pole prázdné. Rok doplň podle data zveřejnění zprávy.
@@ -37,9 +41,10 @@ function stringField() {
   return { type: "string" };
 }
 
-export function outputSchema(rubricSlugs) {
+// `hours` přidá pole s otevírací dobou (jen Munipolis, Deník ho nemá).
+export function outputSchema(rubricSlugs, { hours = false } = {}) {
   const slugs = rubricSlugs.length ? rubricSlugs : ["zpravy"];
-  return {
+  const schema = {
     type: "object",
     additionalProperties: false,
     required: ["decision", "reason", "duplicate_of", "article", "event", "notice"],
@@ -91,6 +96,11 @@ export function outputSchema(rubricSlugs) {
       },
     },
   };
+  if (hours) {
+    schema.required.push("hours");
+    schema.properties.hours = hoursSchema();
+  }
+  return schema;
 }
 
 export function systemPrompt(voice) {
@@ -130,6 +140,7 @@ export function contextText(known) {
     "Dřívější převzaté zprávy (Munipolis, Deník)",
     (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
   );
+  parts.push(hoursContext(known));
   return parts.join("\n\n");
 }
 
@@ -150,7 +161,7 @@ function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|munipolis|denik):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|munipolis|denik|misto|lekar):\d+$/;
 
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
 export function readDecision(raw, { rubricSlugs, force = false }) {
@@ -160,7 +171,7 @@ export function readDecision(raw, { rubricSlugs, force = false }) {
   if (force) decision = "vytvorit";
   const reason = clean(raw.reason, 400);
   const duplicateOf = REF.test(String(raw.duplicate_of ?? "").trim()) ? String(raw.duplicate_of).trim() : "";
-  if (decision !== "vytvorit") return { ok: true, decision, reason, duplicateOf, article: null, event: null, notice: null };
+  if (decision !== "vytvorit") return { ok: true, decision, reason, duplicateOf, article: null, event: null, notice: null, hours: [] };
 
   let article = null;
   if (raw.article?.include) {
@@ -198,10 +209,14 @@ export function readDecision(raw, { rubricSlugs, force = false }) {
     if (parsed.ok) notice = parsed.notice;
   }
 
-  if (!article && !event && !notice) {
+  const hours = readHours(raw.hours);
+  // Zavření a dočasná změna se jen propíšou, článek o nich redakce nechce. Článek zůstane u trvalé změny nebo u další novinky.
+  if (hours.length && !hours.some((change) => change.kind === "trvala") && !event && !notice) article = null;
+
+  if (!article && !event && !notice && !hours.length) {
     return { ok: false, error: "Claude chtěl zprávu zpracovat, ale nevrátil nic, co by šlo uložit." };
   }
-  return { ok: true, decision, reason, duplicateOf: "", article, event, notice };
+  return { ok: true, decision, reason, duplicateOf: "", article, event, notice, hours };
 }
 
 function base64(bytes) {
@@ -218,7 +233,7 @@ export async function askClaude(env, { item, known, images = [], rubricSlugs, vo
     ...images.filter((image) => image.bytes.byteLength <= MAX_IMAGE_BYTES).map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
     { type: "text", text: userText(item, known, { today, force }) },
   ];
-  const answer = await callClaude(env, { system: systemPrompt(voice), content, schema: outputSchema(rubricSlugs) });
+  const answer = await callClaude(env, { system: systemPrompt(voice), content, schema: outputSchema(rubricSlugs, { hours: true }) });
   if (!answer.ok) return answer;
   return readDecision(answer.raw, { rubricSlugs, force });
 }

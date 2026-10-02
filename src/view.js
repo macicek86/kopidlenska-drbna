@@ -4,18 +4,11 @@ import { esc, mediaUrl } from "./html.js";
 import { text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
 import { civilWeekday } from "./waste.js";
-import {
-  HOME_LEAD_DAYS,
-  activeChange,
-  hasOpenSlot,
-  homeNotice,
-  periodClosed,
-  spanSummary,
-} from "./doctors.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 
 export { outageCard, outageEmpty, outagesPage } from "./outages-view.js";
 export { homePage } from "./home.js";
+export { doctorsPage, placesPage } from "./hours-view.js";
 
 export function externalHref(copy) {
   const value = tx(copy, "popelnice_url").trim();
@@ -29,6 +22,7 @@ const NAV = [
   ["/popelnice", "nav_bins"],
   ["/sberne-dvory", "nav_yards"],
   ["/lekari", "nav_doctors"],
+  ["/oteviraci-doba", "nav_places"],
   ["/odstavky", "nav_outages"],
   ["/o-nas", "nav_about"],
 ];
@@ -398,101 +392,6 @@ export function yardsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "yards_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "yards_lede"))}</p>
-      <div class="stack">${cards}</div>`,
-  });
-}
-
-function phoneLink(phone) {
-  const text = String(phone ?? "").trim();
-  if (!text) return "";
-  const digits = text.replace(/[^\d+]/g, "");
-  if (digits.length < 9) return esc(text);
-  const href = digits.startsWith("+") ? digits : digits.startsWith("420") ? `+${digits}` : `+420${digits}`;
-  return `<a href="tel:${esc(href)}">${esc(text)}</a>`;
-}
-
-function glueDates(text) {
-  return esc(text)
-    .replace(/(\d+)\. (\d+)\.(?: (\d{4}))?/g, (_, day, month, year) =>
-      year ? `${day}.&nbsp;${month}.&nbsp;${year}` : `${day}.&nbsp;${month}.`,
-    )
-    .replace(/ (od|do) (?=\d)/g, " $1&nbsp;");
-}
-
-function partLine(label, part) {
-  if (!part?.open) return "";
-  const note = part.note ? `<span class="hint">${esc(part.note)}</span>` : "";
-  return `<p class="part"><span class="slot"><strong>${esc(`${part.from}–${part.to}`)}</strong><span class="when">${esc(label)}</span></span>${note}</p>`;
-}
-
-function doctorWeekList(week, today, { superseded = false } = {}) {
-  const todayDay = civilWeekday(today);
-  return `<ul class="week-list doctor-week">${week
-    .map((slot) => {
-      const morning = partLine("dopoledne", slot.morning);
-      const afternoon = partLine("odpoledne", slot.afternoon);
-      const open = Boolean(morning || afternoon);
-      const todayRow = slot.day === todayDay;
-      const loud = todayRow && !superseded;
-      const classes = [loud ? "is-today" : "", todayRow && superseded ? "is-quiet" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
-      const mark = loud
-        ? `<span class="today-mark">dnes</span>`
-        : todayRow
-          ? `<span class="today-quiet">dnes neplatí</span>`
-          : "";
-      const body = open ? `<div class="parts">${morning}${afternoon}</div>` : `<strong>zavřeno</strong>`;
-      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${esc(dayLabel(slot.day))}${mark}</span>${body}</li>`;
-    })
-    .join("")}</ul>`;
-}
-
-function doctorChangeTiles(changes) {
-  return changes
-    .map((change) => {
-      const hours = periodClosed(change) ? "Zavřeno" : spanSummary(change);
-      return `<article class="date-tile"><strong>${esc(closureLabel(change))}</strong><span>${esc(change.note)}</span><span>${esc(hours)}</span></article>`;
-    })
-    .join("");
-}
-
-export function doctorsPage(data, ctx) {
-  const today = data.waste.today;
-  const cards = (data.doctors ?? []).length
-    ? (data.doctors ?? [])
-        .map((doctor) => {
-          const current = activeChange(doctor, today);
-          const notice = current ? homeNotice(doctor, today) : null;
-          const banner = notice
-            ? `<div class="banner doctor-notice"><p>${glueDates(`${notice.name} ${notice.state.charAt(0).toLowerCase()}${notice.state.slice(1)}`)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}${notice.detail ? `<p class="banner-note">${glueDates(notice.detail)}</p>` : ""}</div>`
-            : "";
-          const rest = doctor.changes.filter((change) => change.id !== current?.id);
-          const planned = rest.length
-            ? `<p class="kicker">${esc(tx(ctx.copy, "doctors_changes"))}</p><div class="dates compact">${doctorChangeTiles(rest)}</div>`
-            : "";
-          const phone = phoneLink(doctor.phone);
-          const hours = hasOpenSlot(doctor.week)
-            ? doctorWeekList(doctor.week, today, { superseded: Boolean(notice) })
-            : `<p class="muted">${esc(tx(ctx.copy, "doctors_missing_hours"))}</p>`;
-          return `<article class="card yard">
-            <p class="kicker">${esc(doctor.specialty)}</p>
-            <h2>${esc(doctor.name)}</h2>
-            <p class="meta">${esc(doctor.place)}${phone ? ` · ${phone}` : ""}</p>
-            ${banner}
-            <p class="kicker">${esc(tx(ctx.copy, banner ? "doctors_regular" : "doctors_hours"))}</p>
-            ${hours}
-            ${planned}
-          </article>`;
-        })
-        .join("")
-    : `<p class="card dashed muted">${esc(tx(ctx.copy, "doctors_empty"))}</p>`;
-  return layout({
-    ...ctx,
-    title: `${tx(ctx.copy, "doctors_heading")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "doctors_description"),
-    body: `
-      <p class="eyebrow">${esc(tx(ctx.copy, "doctors_eyebrow"))}</p>
-      <h1>${esc(tx(ctx.copy, "doctors_heading"))}</h1>
-      <p class="lede">${esc(tx(ctx.copy, "doctors_lede"))}</p>
       <div class="stack">${cards}</div>`,
   });
 }

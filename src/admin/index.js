@@ -9,6 +9,7 @@ export { adminMunipolis } from "./munipolis.js";
 export { adminOutages } from "./outages.js";
 export { adminOverview } from "./overview.js";
 export { adminPeople } from "./people.js";
+export { adminPlaces } from "./places.js";
 export { adminRubrics } from "./rubrics.js";
 export { adminPassword, adminSite, adminTexts } from "./settings.js";
 export { adminYards } from "./yards.js";

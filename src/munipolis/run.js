@@ -18,6 +18,8 @@ import { importSourceDate, importSummary, knownContent, outcomeOf, rubricMap } f
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
 import { askClaude } from "./ai.js";
+import { saveHoursChanges } from "./hours.js";
+import { ensureBot } from "./store.js";
 import { fetchFeed } from "./feed.js";
 import {
   countWaitingItems,
@@ -104,6 +106,10 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   }
   if (answer.notice) {
     made.noticeId = await insertNotice(env, { ...answer.notice, sourceUrl: item.link, published: settings.autoPublish });
+  }
+  if (answer.hours?.length) {
+    const bot = await ensureBot(env);
+    made.hoursIds = await saveHoursChanges(env, answer.hours, { sourceUrl: item.link, createdBy: bot.id });
   }
   await finishItem(env, item.id, { status: "hotovo", reason: answer.reason, ...made });
   return { ok: true, status: "hotovo" };

@@ -5,6 +5,7 @@ import { releaseImage, storeImage } from "./images.js";
 import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
+import { ensurePlaceTables, loadPlaces } from "./places-db.js";
 import { DOCTOR_SEEDS, changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
 import { KOPIDLNO } from "./outages.js";
@@ -525,6 +526,7 @@ async function migrateSchema(env) {
   await ensureFootballTables(env);
   await ensureDenikTables(env);
   await ensureDrbenaTable(env);
+  await ensurePlaceTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
@@ -723,6 +725,7 @@ export async function loadPublic(env) {
     events,
     yards: await loadYards(env, { publicOnly: true, today }),
     doctors: await loadDoctors(env, { publicOnly: true, today }),
+    places: await loadPlaces(env, { publicOnly: true, today }),
     ads: await loadAds(env, { enabledOnly: true }),
     outages: await loadOutageBoard(env),
     water: await loadNoticeBoard(env),
@@ -762,6 +765,7 @@ export async function loadAdmin(env, request) {
     users: [],
     yards: [],
     doctors: [],
+    places: [],
     ads: [],
     adProposals: [],
     outageAreas: [],
@@ -798,6 +802,9 @@ export async function loadAdmin(env, request) {
   if (user.role === "hlavni" || userCan(user, "doktori")) {
     const now = pragueNow();
     base.doctors = await loadDoctors(env, { publicOnly: user.role !== "hlavni", today: now.date });
+  }
+  if (user.role === "hlavni" || userCan(user, "oteviraci_doba")) {
+    base.places = await loadPlaces(env, { publicOnly: user.role !== "hlavni" });
   }
   if (user.role === "hlavni") {
     base.outageAreas = await loadOutageAreas(env);

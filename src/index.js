@@ -55,6 +55,7 @@ import {
   brokenPage,
   doctorsPage,
   eventsPage,
+  placesPage,
   homePage,
   outagesPage,
   missingAdPage,
@@ -74,6 +75,7 @@ import {
   adminFootball,
   adminDenik,
   adminOutages,
+  adminPlaces,
   adminOverview,
   adminPassword,
   adminPeople,
@@ -87,6 +89,7 @@ import { boardJson, feedIsStale } from "./outages.js";
 import { WEEK_DAYS } from "./yards.js";
 import { html, json, redirect, sameOrigin, secure, withError } from "./http.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
+import { PLACES_OK, placesPost } from "./post-places.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
 import { DRBENA_OK, drbenaPost } from "./post-drbena.js";
 import { continueImport, runImport } from "./munipolis/run.js";
@@ -147,6 +150,7 @@ const OK = {
   "clovek-heslo": "Heslo přispěvatele je nastavené.",
   "clovek-udaje": "Údaje přispěvatele jsou uložené.",
   ...OUTAGE_OK,
+  ...PLACES_OK,
   ...IMPORT_OK,
   ...DRBENA_OK,
   ...FOOTBALL_OK,
@@ -196,6 +200,7 @@ function adminQuery(url) {
     closureYardId: positiveParam(url, "uzavreni"),
     hoursId: positiveParam(url, "hodiny"),
     changeId: positiveParam(url, "zmena"),
+    newHoursId: positiveParam(url, "nova-doba"),
     accessId: positiveParam(url, "upravit"),
     passwordId: positiveParam(url, "heslo"),
     disableId: positiveParam(url, "vypnout"),
@@ -256,6 +261,8 @@ async function formFields(request) {
     enabled: form.get("enabled") === "1",
     adId: Number.isInteger(Number(text("nabidka"))) && Number(text("nabidka")) > 0 ? Number(text("nabidka")) : undefined,
     changeNote: text("changeNote"),
+    placeId: Number.isInteger(Number(text("placeId"))) && Number(text("placeId")) > 0 ? Number(text("placeId")) : undefined,
+    label: text("label"),
     doctorId: Number.isInteger(Number(text("doctorId"))) && Number(text("doctorId")) > 0 ? Number(text("doctorId")) : undefined,
     code: text("code"),
     parentId: Number.isInteger(Number(text("parentId"))) && Number(text("parentId")) > 0 ? Number(text("parentId")) : undefined,
@@ -396,6 +403,10 @@ async function renderGet(request, env, url, execution) {
     const data = await loadPublic(env);
     return html(doctorsPage(data, ctx));
   }
+  if (path === "/oteviraci-doba") {
+    const data = await loadPublic(env);
+    return html(placesPage(data, ctx));
+  }
   if (path === "/redakce") return redirect("/redakce/prehled");
   if (path.startsWith("/redakce/")) {
     const data = await loadAdmin(env, request);
@@ -424,6 +435,12 @@ async function renderGet(request, env, url, execution) {
         return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
       }
       return html(adminDoctors(ctx, data, message, query));
+    }
+    if (tab === "oteviraci-doba") {
+      if (data.signedIn && !userCan(data.user, "oteviraci_doba")) {
+        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na otevírací dobu potřebuješ oprávnění.")}`);
+      }
+      return html(adminPlaces(ctx, data, message, query));
     }
     if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
     if (tab === "munipolis") {
@@ -658,6 +675,7 @@ async function renderPost(request, env, url, execution) {
   }
   const section =
     (await outagePost(path, request, env, fields)) ??
+    (await placesPost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??

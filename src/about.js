@@ -36,6 +36,7 @@ export function aboutPage(data, ctx) {
             <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
             <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
             <a href="/lekari">${esc(tx(ctx.copy, "about_doctors_link"))}</a>
+            <a href="/oteviraci-doba">${esc(tx(ctx.copy, "about_places_link"))}</a>
             <a href="/odstavky">${esc(tx(ctx.copy, "about_outages_link"))}</a>
             <a href="/reklamy">${esc(tx(ctx.copy, "about_ads_link"))}</a>
             <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>

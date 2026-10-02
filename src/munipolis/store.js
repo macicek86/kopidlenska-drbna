@@ -1,6 +1,7 @@
 // Import z Munipolisu v D1: nastavení, zapamatované zprávy a autorka Koza Drběna.
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
 import { addColumn, asBool, clip, requireChief } from "../db-core.js";
+import { splitRefs } from "../import-context.js";
 import { hashPassword } from "../password.js";
 import { DEFAULT_FEED_URL, readFeedUrl } from "./feed.js";
 
@@ -46,6 +47,7 @@ export const IMPORT_TABLES = [
     proposal_id integer,
     event_id integer,
     notice_id integer,
+    hours_ids text not null default '',
     manual integer not null default 0,
     attempts integer not null default 0,
     created_at text not null default (datetime('now')),
@@ -56,7 +58,9 @@ export const IMPORT_TABLES = [
 export async function ensureImportTables(env) {
   for (const sql of IMPORT_TABLES) await env.DB.prepare(sql).run();
   const info = await env.DB.prepare("pragma table_info(import_items)").all();
-  await addColumn(env, new Set((info.results ?? []).map((row) => row.name)), "manual", "alter table import_items add column manual integer not null default 0");
+  const columns = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, columns, "manual", "alter table import_items add column manual integer not null default 0");
+  await addColumn(env, columns, "hours_ids", "alter table import_items add column hours_ids text not null default ''");
   const settingsInfo = await env.DB.prepare("pragma table_info(import_settings)").all();
   await addColumn(
     env,
@@ -112,6 +116,7 @@ export function mapImportItem(row) {
     proposalId: row.proposal_id == null ? null : Number(row.proposal_id),
     eventId: row.event_id == null ? null : Number(row.event_id),
     noticeId: row.notice_id == null ? null : Number(row.notice_id),
+    hoursIds: splitRefs(row.hours_ids),
     manual: asBool(row.manual),
     attempts: Number(row.attempts ?? 0),
     processedAt: row.processed_at ? String(row.processed_at) : "",
@@ -119,7 +124,7 @@ export function mapImportItem(row) {
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at";
+  "id, guid, link, title, text, images, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, hours_ids, manual, attempts, processed_at";
 
 export async function loadImportItems(env, limit = 40) {
   const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from import_items order by published_at desc, id desc limit ?`)
@@ -166,7 +171,7 @@ export async function rememberItems(env, items, { manual = false, isOld = () => 
 export async function finishItem(env, id, fields) {
   await env.DB.prepare(
     `update import_items set status = ?, reason = ?, duplicate_of = ?, article_id = ?, proposal_id = ?, event_id = ?, notice_id = ?,
-       attempts = attempts + 1, processed_at = datetime('now') where id = ?`,
+       hours_ids = ?, attempts = attempts + 1, processed_at = datetime('now') where id = ?`,
   )
     .bind(
       fields.status,
@@ -176,6 +181,7 @@ export async function finishItem(env, id, fields) {
       fields.proposalId ?? null,
       fields.eventId ?? null,
       fields.noticeId ?? null,
+      (fields.hoursIds ?? []).join(","),
       id,
     )
     .run();

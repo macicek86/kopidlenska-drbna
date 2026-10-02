@@ -1,5 +1,7 @@
 // Společné kousky importů zpráv (Munipolis, Deník): co už na drbně je, rubriky, datum ze zdroje a souhrn průchodu.
+import { loadDoctors } from "./db.js";
 import { loadNotices } from "./notices-db.js";
+import { loadPlaces } from "./places-db.js";
 import { addDays, pragueNow } from "./waste.js";
 
 const LOOKBACK_DAYS = 60;
@@ -11,12 +13,20 @@ export function outcomeOf(item) {
       item.proposalId && `navrh:${item.proposalId}`,
       item.eventId && `akce:${item.eventId}`,
       item.noticeId && `odstavka:${item.noticeId}`,
+      ...(item.hoursIds ?? []),
     ].filter(Boolean);
     return `zpracováno (${made.join(", ") || "nic"})`;
   }
   if (item.status === "duplicita") return `duplicita s ${item.duplicateOf || "něčím na webu"}`;
   if (item.status === "preskoceno") return "přeskočeno";
   return "";
+}
+
+export function splitRefs(text) {
+  return String(text ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 async function rows(env, sql, ...binds) {
@@ -36,7 +46,8 @@ async function pastImports(env, { table, tag }, itemTable, itemId, since) {
   if (!exists) return [];
   const list = await rows(
     env,
-    `select id, title, published_at, status, duplicate_of, article_id, proposal_id, event_id, notice_id from ${table}
+    `select id, title, published_at, status, duplicate_of, article_id, proposal_id, event_id, notice_id,
+       ${table === "import_items" ? "hours_ids" : "'' as hours_ids"} from ${table}
      where id != ? and status in ('hotovo', 'duplicita', 'preskoceno') and published_at >= ? order by published_at desc limit 40`,
     table === itemTable ? itemId : 0,
     since,
@@ -53,6 +64,7 @@ async function pastImports(env, { table, tag }, itemTable, itemId, since) {
       proposalId: row.proposal_id,
       eventId: row.event_id,
       noticeId: row.notice_id,
+      hoursIds: splitRefs(row.hours_ids),
     }),
   }));
 }
@@ -83,6 +95,8 @@ export async function knownContent(env, { itemId, today, table = "import_items" 
     events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time })),
     notices,
     imports,
+    places: await loadPlaces(env, { today }),
+    doctors: await loadDoctors(env, { today }),
   };
 }
 

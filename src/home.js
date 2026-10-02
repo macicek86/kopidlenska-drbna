@@ -5,6 +5,7 @@ import { rubricKicker } from "./rubric-nav.js";
 import { text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong } from "./format.js";
 import { homeNotice } from "./doctors.js";
+import { groupedNotices } from "./places.js";
 import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
 import { clockOf, contentAd, externalHref, layout, signedWhen } from "./view.js";
@@ -69,6 +70,27 @@ function doctorsTeaser(data, ctx) {
   </div>`;
 }
 
+// Zavřeno, jiná nebo nová otevírací doba. Stejné upozornění u víc míst je jeden řádek se všemi názvy.
+function placesTeaser(data, ctx) {
+  const notices = groupedNotices(data.places, clockOf(data).date);
+  if (!notices.length) return "";
+  const lines = notices
+    .map(
+      (item) => `<li class="is-change">
+        <p class="yard-home-name">${esc(item.names.join(", "))}</p>
+        <p class="yard-home-state">${esc(item.state)}</p>
+        ${item.note ? `<p class="yard-home-detail">${esc(item.note)}</p>` : ""}
+        ${item.detail ? `<p class="yard-home-detail">${esc(item.detail)}</p>` : ""}
+      </li>`,
+    )
+    .join("");
+  return `<div class="card waste-teaser">
+    <p class="eyebrow">${esc(tx(ctx.copy, "home_places_eyebrow"))}</p>
+    <ul class="yard-home">${lines}</ul>
+    <div class="row"><a class="btn btn-primary" href="/oteviraci-doba">${esc(tx(ctx.copy, "home_places_button"))}</a></div>
+  </div>`;
+}
+
 function newsHtml(data, ctx) {
   const lead = data.articles[0];
   const rest = data.articles.slice(1, 4);
@@ -126,6 +148,7 @@ export function homePage(data, ctx) {
           <div class="home-today">
             ${wasteTeaser(data, ctx)}
             ${yardsTeaser(data, ctx)}
+            ${placesTeaser(data, ctx)}
             ${doctorsTeaser(data, ctx)}
             ${outagesTeaser(data, ctx)}
           </div>

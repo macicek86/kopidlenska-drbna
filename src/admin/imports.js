@@ -17,8 +17,14 @@ export function refLink(ref) {
     odstavka: ["/redakce/odstavky?oznameni=", "Odstávka"],
     munipolis: ["/redakce/munipolis?zprava=", "Zpráva z Munipolisu"],
     denik: ["/redakce/denik?zprava=", "Zpráva z Deníku"],
+    misto: ["/redakce/oteviraci-doba?id=", "Místo"],
+    lekar: ["/redakce/lekari?id=", "Ordinace"],
   };
-  if (!links[kind] || !/^\d+$/.test(id ?? "")) return "";
+  // Změny otevírací doby nemají vlastní okno, vedou na stránku sekce.
+  const pages = { doba: ["/redakce/oteviraci-doba", "Otevírací doba"], ordinace: ["/redakce/lekari", "Ordinační hodiny"] };
+  if (!/^\d+$/.test(id ?? "")) return "";
+  if (pages[kind]) return `<a href="${pages[kind][0]}">${esc(pages[kind][1])} #${id}</a>`;
+  if (!links[kind]) return "";
   return `<a href="${links[kind][0]}${id}">${esc(links[kind][1])} #${id}</a>`;
 }
 
@@ -103,6 +109,7 @@ export function madeLinks(entry) {
     entry.articleId && refLink(`zprava:${entry.articleId}`),
     entry.eventId && refLink(`akce:${entry.eventId}`),
     entry.noticeId && refLink(`odstavka:${entry.noticeId}`),
+    ...(entry.hoursIds ?? []).map(refLink),
   ].filter(Boolean);
 }
 

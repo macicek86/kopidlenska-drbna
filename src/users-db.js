@@ -15,6 +15,11 @@ export const PERMISSIONS = [
     label: "Lékaři",
     detail: "Může měnit ordinační hodiny a dočasnou změnu. Ordinaci samotnou pořád zakládá hlavní redaktor.",
   },
+  {
+    code: "oteviraci_doba",
+    label: "Otevírací doba",
+    detail: "Může měnit otevírací dobu míst, dočasné změny a novou otevírací dobu. Místa samotná zakládá hlavní redaktor.",
+  },
 ];
 
 const ACCESS_ON = "Přihlášení heslem je vypnuté, redakce se přihlašuje e-mailem přes Cloudflare Access.";
