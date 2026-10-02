@@ -2,6 +2,7 @@
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, unlockRow } from "../background.js";
 import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { DEFAULT_CLUB_URL, readClubUrl } from "./club.js";
+import { DEFAULT_TRUTH_URL, readTruthUrl } from "./fotbalunas.js";
 
 export const DEFAULT_FRESH_DAYS = 7;
 export const INTERVALS = [
@@ -70,12 +71,10 @@ export async function ensureFootballTables(env) {
   const info = await env.DB.prepare("pragma table_info(football_items)").all();
   await addColumn(env, new Set((info.results ?? []).map((row) => row.name)), "manual", "alter table football_items add column manual integer not null default 0");
   const settingsInfo = await env.DB.prepare("pragma table_info(football_settings)").all();
-  await addColumn(
-    env,
-    new Set((settingsInfo.results ?? []).map((row) => row.name)),
-    "fresh_days",
-    "alter table football_settings add column fresh_days integer not null default 7",
-  );
+  const settingsColumns = new Set((settingsInfo.results ?? []).map((row) => row.name));
+  await addColumn(env, settingsColumns, "fresh_days", "alter table football_settings add column fresh_days integer not null default 7");
+  // Bez hodnoty (null) platí výchozí klub na fotbalunas.cz, prázdný text znamená neověřovat.
+  await addColumn(env, settingsColumns, "truth_url", "alter table football_settings add column truth_url text");
   const created = await env.DB.prepare(
     "insert into football_settings (id) select 1 where not exists (select 1 from football_settings where id = 1)",
   ).run();
@@ -88,6 +87,7 @@ function mapSettings(row) {
   return {
     enabled: asBool(row?.enabled),
     clubUrl: String(row?.club_url ?? "") || DEFAULT_CLUB_URL,
+    truthUrl: row?.truth_url == null ? DEFAULT_TRUTH_URL : String(row.truth_url),
     autoPublish: asBool(row?.auto_publish),
     rubricId: row?.rubric_id == null ? null : Number(row.rubric_id),
     previews: row ? asBool(row.previews) : true,
@@ -106,7 +106,7 @@ function mapSettings(row) {
 
 export async function loadFootballSettings(env) {
   const row = await env.DB.prepare(
-    `select enabled, club_url, auto_publish, rubric_id, previews, club_news, use_crest, interval_hours, fresh_days, crest_url, crest_key,
+    `select enabled, club_url, auto_publish, rubric_id, previews, club_news, use_crest, interval_hours, fresh_days, truth_url, crest_url, crest_key,
        checked_at, status, note, running_at from football_settings where id = 1`,
   ).first();
   return mapSettings(row);
@@ -245,13 +245,15 @@ export async function saveFootballSettings(env, request, input) {
   if (!gate.ok) return gate;
   const clubUrl = readClubUrl(input.clubUrl);
   if (!clubUrl) return { ok: false, error: "Adresa webu klubu musí začínat https://." };
+  const truth = readTruthUrl(input.truthUrl);
+  if (!truth.ok) return truth;
   const rubricId = Number(input.rubricId);
   const rubric = Number.isInteger(rubricId) ? await env.DB.prepare("select id from rubrics where id = ?").bind(rubricId).first() : null;
   if (!rubric) return { ok: false, error: "Vyberte rubriku." };
   const interval = Number(input.intervalHours);
   await env.DB.prepare(
     `update football_settings set enabled = ?, club_url = ?, auto_publish = ?, rubric_id = ?, previews = ?, club_news = ?, use_crest = ?,
-       interval_hours = ?, fresh_days = ? where id = 1`,
+       interval_hours = ?, fresh_days = ?, truth_url = ? where id = 1`,
   )
     .bind(
       input.enabled ? 1 : 0,
@@ -263,6 +265,7 @@ export async function saveFootballSettings(env, request, input) {
       input.useCrest ? 1 : 0,
       INTERVALS.some(([hours]) => hours === interval) ? interval : 24,
       readFreshDays(input.freshDays, DEFAULT_FRESH_DAYS),
+      truth.url,
     )
     .run();
   return { ok: true };

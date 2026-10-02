@@ -2,6 +2,7 @@
 import { MODEL } from "../claude.js";
 import { KIND_LABEL } from "../fotbal/ai.js";
 import { DEFAULT_CLUB_URL } from "../fotbal/club.js";
+import { DEFAULT_TRUTH_URL } from "../fotbal/fotbalunas.js";
 import { DEFAULT_FRESH_DAYS, footballRunning, INTERVALS } from "../fotbal/store.js";
 import { esc } from "../view.js";
 import { rubricOptions } from "./articles.js";
@@ -66,6 +67,7 @@ function settingsForm(settings, rubrics) {
     ${check("clubNews", "1", settings.clubNews, "Psát i o ostatních zprávách klubu", "Dotace, brigády, kroniky… Drběna sama vynechá, co čtenáře nezajímá.")}
     ${check("useCrest", "1", settings.useCrest, "Bez fotky dát ke článku znak klubu", "Když aktualita nemá vlastní fotku.")}
     ${field("Web klubu", `<input class="${input}" type="url" name="clubUrl" required maxlength="300" value="${esc(settings.clubUrl || DEFAULT_CLUB_URL)}">`)}
+    ${field("Ověřovat na fotbalunas.cz", `<input class="${input}" type="url" name="truthUrl" maxlength="300" value="${esc(settings.truthUrl ?? DEFAULT_TRUTH_URL)}">`, "Stránka klubu na fotbalunas.cz. Odtud se bere datum, čas, výsledek a střelci. Když se klub v aktualitě splete, platí fotbalunas a článek smí jít rovnou na web. Prázdné pole ověřování vypne.")}
     ${VOICE_NOTE}
     ${formFoot("Uložit", cancelLink(BASE))}
   </form>`;
@@ -97,7 +99,7 @@ function statusPanel(data, settings, entries) {
 }
 
 export function adminFootball(ctx, data, message, query = {}) {
-  const settings = data.footballSettings ?? { clubUrl: DEFAULT_CLUB_URL, enabled: false, autoPublish: false, previews: true, clubNews: false, useCrest: true, intervalHours: 24, rubricId: null };
+  const settings = data.footballSettings ?? { clubUrl: DEFAULT_CLUB_URL, truthUrl: DEFAULT_TRUTH_URL, enabled: false, autoPublish: false, previews: true, clubNews: false, useCrest: true, intervalHours: 24, rubricId: null };
   const entries = data.footballItems ?? [];
   const open = entries.find((entry) => entry.id === query.importId) ?? null;
   const dialogs = [
@@ -106,7 +108,7 @@ export function adminFootball(ctx, data, message, query = {}) {
   if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
   const body = `${pageHead(
     "Fotbal",
-    "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu. Po ručním načtení zpracuje jen to, co zaškrtnete.",
+    "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu, datum a výsledek ověří na fotbalunas.cz. Po ručním načtení zpracuje jen to, co zaškrtnete.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries)}

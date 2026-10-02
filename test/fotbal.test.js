@@ -4,7 +4,8 @@ import { adminFootball } from "../src/admin/index.js";
 import { footballSchema, footballText, readFootballDecision } from "../src/fotbal/ai.js";
 import { clubPages, czechDate, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList, readClubUrl } from "../src/fotbal/club.js";
 import { dateDoubts, datedWeekdays } from "../src/fotbal/dates.js";
-import { clubSource, footballSourceDate, matchExtra } from "../src/fotbal/run.js";
+import { footballSourceDate, matchExtra } from "../src/fotbal/collect.js";
+import { clubSource } from "../src/fotbal/run.js";
 import { footballDue, footballRunning } from "../src/fotbal/store.js";
 
 const BASE = "https://www.fkkopidlno.cz/";

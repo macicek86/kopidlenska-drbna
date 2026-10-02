@@ -19,6 +19,7 @@ Rozhodni (pole decision):
 
 Pravidla:
 - Výsledek, góly, minuty, jména, data, časy a místa opiš přesně podle zdroje. Nic nevymýšlej, ani průběh zápasu, který ve zdroji není. Když údaj chybí, nepiš ho.
+- Řádek „Oficiálně (fotbalunas.cz)“ jsou údaje svazu. Týmy (i jestli hrálo A, B, nebo C), datum, čas, výsledek a střelci podle něj platí, i když klub v aktualitě píše něco jiného. Rozpor v článku nezmiňuj, prostě piš správně. Celé jméno střelce smíš vzít z webu klubu, když sedí příjmení.
 - Skóre piš jako 7:6, poločas v závorce (3:3). Jména hráčů piš tak, jak jsou ve zdroji.
 - Kopidlno může hrát doma i venku. Kdo je domácí, poznáš podle pořadí v nadpisu (první je domácí).
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny. U zápasu ať je v nadpisu výsledek nebo soupeř.
@@ -76,14 +77,21 @@ function doubtNote(doubts) {
   return `Pozor, datum ve zdroji nesedí: ${doubts.join(" ")}\nNeopravuj ho podle sebe a nevymýšlej. Den a datum zápasu napiš jen jednou, přesně jako ve zdroji, redakce je před zveřejněním zkontroluje.`;
 }
 
-export function footballText(item, known, { today, force = false, doubts = [] }) {
+// Co klub spletl a co platí podle fotbalunas.cz. Drběna píše opravené údaje.
+function fixNote(fixes) {
+  if (!fixes?.length) return "";
+  return `Klub se v aktualitě spletl, platí oficiální údaje z fotbalunas.cz: ${fixes.join(" ")}\nPiš podle oficiálních údajů.`;
+}
+
+export function footballText(item, known, { today, force = false, doubts = [], fixes = [] }) {
   return [
     `Dnes je ${today}.`,
     footballContext(known),
     `Aktualita z webu FK Kopidlno (druh: ${KIND_LABEL[item.kind] ?? item.kind}, zveřejněno ${item.publishedOn || "neznámo kdy"}):`,
     `Nadpis: ${item.title}`,
     `Text:\n${item.text || "(bez textu)"}`,
-    item.extra ? `Doplněno z rozpisu a tabulky na webu klubu:\n${item.extra}` : "",
+    item.extra ? `Doplněno z rozpisu a tabulky (web klubu a fotbalunas.cz):\n${item.extra}` : "",
+    fixNote(fixes),
     doubtNote(doubts),
     force ? FORCE : "",
   ]
@@ -114,10 +122,10 @@ export function readFootballDecision(raw, { force = false } = {}) {
   return { ok: true, decision, reason, duplicateOf: "", article: { title, excerpt, body: prepared.html } };
 }
 
-export async function askFootball(env, { item, known, voice, today, force = false, doubts = [] }) {
+export async function askFootball(env, { item, known, voice, today, force = false, doubts = [], fixes = [] }) {
   const answer = await callClaude(env, {
     system: footballPrompt(voice),
-    content: [{ type: "text", text: footballText(item, known, { today, force, doubts }) }],
+    content: [{ type: "text", text: footballText(item, known, { today, force, doubts, fixes }) }],
     schema: footballSchema(),
     effort: "low",
   });

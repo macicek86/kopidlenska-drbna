@@ -1,4 +1,4 @@
-// Jeden průchod fotbalu: stáhnout aktuality FK Kopidlno, doplnit je z rozpisu a tabulky a nechat Drběnu napsat článek.
+// Jeden průchod fotbalu: stáhnout aktuality FK Kopidlno (`collect.js`) a nechat Drběnu napsat článek.
 import {
   CLICK_BUDGET_MS,
   CLICK_LOCK_SECONDS,
@@ -15,20 +15,17 @@ import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { fetchImage, storeImageBytes } from "../images.js";
 import { MAX_ATTEMPTS } from "../munipolis/store.js";
-import { USER_AGENT } from "../munipolis/feed.js";
 import { addDays, pragueNow } from "../waste.js";
 import { askFootball } from "./ai.js";
-import { dateDoubts, scheduleDate } from "./dates.js";
-import { clubPages, czechDate, findMatch, newsKind, parseMatchDetail, parseMatchList, parseNewsDetail, parseNewsList } from "./club.js";
+import { collectNews, footballSourceDate } from "./collect.js";
+import { checkDates } from "./dates.js";
 import {
   countWaiting,
   finishFootballItem,
   selectFootballItems,
   footballDue,
-  knownGuids,
   loadFootballSettings,
   lockFootball,
-  rememberFootballItem,
   saveCrest,
   unlockFootball,
   waitingFootballItems,
@@ -43,88 +40,6 @@ export function clubSource(link) {
   if (!link) return `<p><em>Zdroj: web FK Kopidlno</em></p>`;
   const href = link.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">web FK Kopidlno</a></em></p>`;
-}
-
-async function fetchPage(url, fetchImpl) {
-  try {
-    const response = await fetchImpl(url, {
-      headers: { Accept: "text/html", "User-Agent": USER_AGENT },
-      signal: AbortSignal.timeout(20_000),
-      redirect: "follow",
-    });
-    if (!response.ok) return { ok: false, error: `Web klubu odpověděl ${response.status}.` };
-    return { ok: true, html: await response.text() };
-  } catch {
-    return { ok: false, error: "Web klubu neodpověděl." };
-  }
-}
-
-// Doplňky k zápasu, které v aktualitě nejsou: soutěž, kolo, góly s minutou, tabulka a střelci.
-export function matchExtra(match, detail, matchDetail) {
-  if (!match) return "";
-  return [
-    `Soutěž: ${match.competition || "neuvedeno"}, ${match.round || "kolo neuvedeno"}`,
-    `Zápas: ${match.home} – ${match.away}, ${match.date}${match.time ? ` ${match.time}` : ""}${match.score ? `, výsledek ${match.score}` : ", ještě se nehrálo"}`,
-    matchDetail,
-    detail.table ? `Tabulka soutěže teď:\n${detail.table}` : "",
-    detail.scorers ? `Nejlepší střelci týmu:\n${detail.scorers}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-// Projde úvodní stránku a aktuality klubu. Nové aktuality uloží do fronty, starší (podle data ve zdroji) a vypnuté rovnou odloží.
-// Při ručním načtení (`manual`) počkají všechny, až redakce vybere, které zpracovat.
-export async function collectNews(env, settings, { fetchImpl = fetch, manual = false } = {}) {
-  const home = await fetchPage(settings.clubUrl, fetchImpl);
-  if (!home.ok) return home;
-  const pages = clubPages(home.html, settings.clubUrl);
-  const list = await fetchPage(pages.news, fetchImpl);
-  if (!list.ok) return list;
-  const today = pragueNow().date;
-  const news = parseNewsList(list.html, settings.clubUrl).map((entry) => ({ ...entry, kind: newsKind(entry.title) }));
-  if (!news.length) return { ok: false, error: "Na webu klubu nejsou žádné aktuality. Nezměnil se web?" };
-  const known = await knownGuids(env, news.map((entry) => `${entry.id}:${entry.kind}`));
-  const fresh = news.filter((entry) => !known.has(`${entry.id}:${entry.kind}`));
-  let matches = null;
-  let added = 0;
-  for (const entry of fresh.reverse()) {
-    const page = await fetchPage(entry.url, fetchImpl);
-    if (!page.ok) continue;
-    const detail = parseNewsDetail(page.html, settings.clubUrl);
-    let extra = "";
-    if (entry.kind !== "clanek") {
-      if (!matches) {
-        matches = [];
-        for (const url of pages.results) {
-          const schedule = await fetchPage(url, fetchImpl);
-          if (schedule.ok) matches.push(...parseMatchList(schedule.html, settings.clubUrl));
-        }
-      }
-      const match = findMatch(matches, detail.title || entry.title);
-      const played = match?.score ? await fetchPage(match.url, fetchImpl) : null;
-      extra = matchExtra(match, detail, played?.ok ? parseMatchDetail(played.html) : "");
-    }
-    const item = {
-      guid: `${entry.id}:${entry.kind}`,
-      kind: entry.kind,
-      link: entry.url,
-      title: detail.title || entry.title,
-      publishedOn: entry.date || detail.date,
-      text: detail.text,
-      extra,
-      images: detail.images.slice(0, 1),
-      cover: detail.cover,
-    };
-    const old = !isFresh(footballSourceDate(item, today), today, settings.freshDays);
-    const off = (entry.kind === "pozvanka" && !settings.previews) || (entry.kind === "clanek" && !settings.clubNews);
-    if (manual) {
-      if (await rememberFootballItem(env, item, { status: "nacteno" })) added += 1;
-    } else if (old) await rememberFootballItem(env, item, { status: "stare", reason: STALE_REASON });
-    else if (off) await rememberFootballItem(env, item, { status: "preskoceno", reason: "Tenhle druh aktualit je v nastavení vypnutý." });
-    else if (await rememberFootballItem(env, item)) added += 1;
-  }
-  return { ok: true, added };
 }
 
 async function rows(env, sql, ...binds) {
@@ -167,24 +82,15 @@ async function articleImage(env, item, settings, fetchImpl) {
   return key;
 }
 
-// Datum ze zdroje pro ručně vybranou aktualitu. U zápasu den, kdy se hrál (klub aktualitu zakládá už před zápasem).
-export function footballSourceDate(item, today) {
-  const dates = [item.publishedOn];
-  if (item.kind === "zapas") {
-    dates.push(scheduleDate(item.extra) || czechDate(item.text));
-  }
-  const best = dates.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date ?? "")).sort().at(-1) ?? "";
-  return best && best <= today ? best : "";
-}
-
 // Ručně vybranou aktualitu Drběna napíše vždy (redakce rozhodla) a s datem ze zdroje. Cron píše s dnešním datem.
 // Když datum ve zdroji nesedí (den v týdnu, rozpis), článek jde jako návrh, i když se má rovnou zveřejňovat.
+// Co opravily oficiální údaje z fotbalunas.cz, návrh nevynutí: Drběna píše správně a redakce se to dozví v poznámce.
 export async function processFootball(env, item, settings, { fetchImpl = fetch, ask = askFootball } = {}) {
   const today = pragueNow().date;
   const force = item.manual;
-  const doubts = dateDoubts(item);
+  const { doubts, fixes } = checkDates(item);
   const known = await knownContent(env, today);
-  const answer = await ask(env, { item, known, voice: voiceFor(await loadDrbena(env), "fotbal"), today, force, doubts });
+  const answer = await ask(env, { item, known, voice: voiceFor(await loadDrbena(env), "fotbal"), today, force, doubts, fixes });
   if (!answer.ok) {
     await finishFootballItem(env, item.id, { status: "chyba", reason: answer.error });
     return { ok: false, error: answer.error };
@@ -202,7 +108,13 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
     rubric: await targetRubric(env, settings),
     publishOn: item.manual ? footballSourceDate(item, today) : "",
   });
-  const reason = doubts.length ? `Zkontrolujte datum, ve zdroji nesedí: ${doubts.join(" ")} ${answer.reason}` : answer.reason;
+  const reason = [
+    fixes.length ? `Opraveno podle fotbalunas.cz: ${fixes.join(" ")}` : "",
+    doubts.length ? `Zkontrolujte datum, ve zdroji nesedí: ${doubts.join(" ")}` : "",
+    answer.reason,
+  ]
+    .filter(Boolean)
+    .join(" ");
   await finishFootballItem(env, item.id, { status: "hotovo", reason, ...made });
   return { ok: true, status: "hotovo" };
 }

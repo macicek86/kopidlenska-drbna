@@ -150,7 +150,7 @@ export function newsKind(title) {
   return "clanek";
 }
 
-function folded(value) {
+export function folded(value) {
   return String(value ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -159,12 +159,18 @@ function folded(value) {
     .trim();
 }
 
-// K aktualitě „Domácí - Hosté 7:6 (3:3)“ najde zápas v rozpisu.
-export function findMatch(matches, title) {
+// Domácí a hosté z nadpisu „Domácí - Hosté 7:6 (3:3)“.
+export function titleTeams(title) {
   const [home, rest] = String(title ?? "").split(/\s[-–]\s/);
   if (!rest) return null;
-  const away = rest.replace(/\s*\d+\s*:\s*\d+[\s\S]*$/, "");
-  return matches.find((row) => folded(row.home) === folded(home) && folded(row.away) === folded(away)) ?? null;
+  return { home: home.trim(), away: rest.replace(/\s*\d+\s*:\s*\d+[\s\S]*$/, "").trim() };
+}
+
+// K aktualitě najde zápas v rozpisu.
+export function findMatch(matches, title) {
+  const teams = titleTeams(title);
+  if (!teams) return null;
+  return matches.find((row) => folded(row.home) === folded(teams.home) && folded(row.away) === folded(teams.away)) ?? null;
 }
 
 export function readClubUrl(value) {

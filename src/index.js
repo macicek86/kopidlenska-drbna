@@ -292,6 +292,7 @@ async function formFields(request) {
     articleText: text("text"),
     autoPublish: form.get("autoPublish") === "1",
     clubUrl: text("clubUrl"),
+    truthUrl: text("truthUrl"),
     previews: form.get("previews") === "1",
     clubNews: form.get("clubNews") === "1",
     useCrest: form.get("useCrest") === "1",

@@ -1,5 +1,8 @@
 // Kontrola dat v aktualitě klubu: den v týdnu musí sedět na datum a datum pozvánky na rozpis.
-// Klub se občas přepíše („neděle 3. 10.“, ale 3. 10. je sobota). Takový článek nesmí jít rovnou na web.
+// Klub se občas přepíše („neděle 3. 10.“, ale 3. 10. je sobota). Takový článek nesmí jít rovnou na web,
+// ledaže zápas známe z fotbalunas.cz: ten platí, chyba se opraví podle něj a článek smí jít ven.
+import { titleTeams } from "./club.js";
+import { nearOfficial, officialFromExtra, sameTeam } from "./fotbalunas.js";
 
 const WEEKDAYS = [
   ["neděle", "neděli"],
@@ -70,17 +73,49 @@ export function scheduleDate(extra) {
   return String(extra ?? "").match(/^Zápas: [^\n]*?, (\d{4}-\d{2}-\d{2})/m)?.[1] ?? "";
 }
 
-// Seznam pochybností o datu pro redakci. Prázdný znamená, že je všechno v pořádku.
-export function dateDoubts(item) {
+function weekdayName(date) {
+  return WEEKDAY_NAMES[new Date(`${date}T12:00:00Z`).getUTCDay()];
+}
+
+function titleScore(title) {
+  return String(title ?? "").match(/(\d+)\s*:\s*(\d+)/)?.slice(1, 3).join(":") ?? "";
+}
+
+// Co v datech nesedí. `doubts` musí zkontrolovat redakce (článek jde jako návrh), `fixes` opravila oficiální data z fotbalunas.cz.
+export function checkDates(item) {
   const doubts = [];
+  const fixes = [];
+  const official = item.kind === "clanek" ? null : officialFromExtra(item.extra);
   const found = datedWeekdays(`${item.title ?? ""}\n${item.text ?? ""}`, item.publishedOn);
   for (const entry of found) {
-    if (!entry.date) doubts.push(`„${entry.text}“ není skutečné datum.`);
-    else if (entry.real !== entry.weekday) doubts.push(`„${entry.text}“: ${czech(entry.date)} je ${WEEKDAY_NAMES[entry.real]}, ne ${WEEKDAY_NAMES[entry.weekday]}.`);
+    const wrong = !entry.date
+      ? `„${entry.text}“ není skutečné datum.`
+      : entry.real !== entry.weekday
+        ? `„${entry.text}“: ${czech(entry.date)} je ${WEEKDAY_NAMES[entry.real]}, ne ${WEEKDAY_NAMES[entry.weekday]}.`
+        : "";
+    // Datum pár dní od zápasu (nebo nesmyslné) patří k zápasu: když nesedí na oficiální, platí oficiální.
+    const aboutMatch = official && (!entry.date || nearOfficial(entry.date, official));
+    if (aboutMatch && (wrong || entry.date !== official.date)) {
+      fixes.push(`„${entry.text}“ → ${weekdayName(official.date)} ${czech(official.date)}.`);
+    } else if (wrong) doubts.push(wrong);
   }
   const planned = item.kind === "pozvanka" ? scheduleDate(item.extra) : "";
-  if (planned && found.length && !found.some((entry) => entry.date === planned)) {
-    doubts.push(`V rozpisu klubu je zápas ${czech(planned)} (${WEEKDAY_NAMES[new Date(`${planned}T12:00:00Z`).getUTCDay()]}), v textu jiné datum.`);
+  if (official) {
+    if (planned && planned !== official.date) fixes.push(`Rozpis klubu uvádí ${czech(planned)}, hraje se ${weekdayName(official.date)} ${czech(official.date)}.`);
+    const teams = titleTeams(item.title);
+    if (teams && !(sameTeam(official.home, teams.home) && sameTeam(official.away, teams.away))) {
+      fixes.push(`Zápas „${teams.home} – ${teams.away}“ je podle svazu ${official.home} – ${official.away}.`);
+    }
+    const score = item.kind === "zapas" ? titleScore(item.title) : "";
+    if (score && official.score && score !== official.score) fixes.push(`Výsledek ${score} → ${official.score}.`);
+    if (official.cancelled) doubts.push("Podle fotbalunas.cz je zápas zrušený.");
+  } else if (planned && found.length && !found.some((entry) => entry.date === planned)) {
+    doubts.push(`V rozpisu klubu je zápas ${czech(planned)} (${weekdayName(planned)}), v textu jiné datum.`);
   }
-  return [...new Set(doubts)];
+  return { doubts: [...new Set(doubts)], fixes: [...new Set(fixes)] };
+}
+
+// Seznam pochybností o datu pro redakci. Prázdný znamená, že je všechno v pořádku.
+export function dateDoubts(item) {
+  return checkDates(item).doubts;
 }
