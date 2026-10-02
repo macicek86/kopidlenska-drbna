@@ -1,5 +1,4 @@
 import {
-  approveProposal,
   changePassword,
   clearCookie,
   createContributor,
@@ -10,7 +9,6 @@ import {
   loadPublic,
   login,
   logout,
-  rejectProposal,
   removeArticle,
   removeClosure,
   removeDoctor,
@@ -25,7 +23,6 @@ import {
   saveDoctorHours,
   saveEvent,
   saveProfile,
-  saveProposal,
   saveSite,
   saveYard,
   loadOutageBoard,
@@ -37,7 +34,6 @@ import {
   setContributorActive,
   setContributorPassword,
   userCan,
-  withdrawProposal,
 } from "./db.js";
 import {
   approveAdProposal,
@@ -50,6 +46,7 @@ import {
   setAdEnabled,
   withdrawAdProposal,
 } from "./ads-db.js";
+import { approveProposal, discardProposal, rejectProposal, saveProposal, withdrawProposal } from "./proposals-db.js";
 import {
   adPage,
   adsPage,
@@ -140,6 +137,7 @@ const OK = {
   navrh: "Návrh čeká na schválení.",
   "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
   "navrh-stazen": "Návrh je stažený.",
+  "navrh-smazan": "Návrh je smazaný.",
   schvaleno: "Příspěvek je schválený a na webu.",
   vraceno: "Návrh je vrácený autorovi.",
   clovek: "Přispěvatel má účet.",
@@ -192,6 +190,7 @@ function adminQuery(url) {
     proposalId: positiveParam(url, "navrh"),
     targetId: positiveParam(url, "clanek"),
     withdrawId: positiveParam(url, "stahnout"),
+    discardId: positiveParam(url, "smazat-navrh"),
     cancelId: positiveParam(url, "zrusit"),
     closureYardId: positiveParam(url, "uzavreni"),
     hoursId: positiveParam(url, "hodiny"),
@@ -476,6 +475,12 @@ async function renderPost(request, env, url, execution) {
     const result = await withdrawProposal(env, request, fields.id);
     if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/zpravy?ok=navrh-stazen");
+  }
+  if (path === "/redakce/zpravy/smazat-navrh") {
+    if (!fields.confirm || !fields.id) return redirect("/redakce/zpravy");
+    const result = await discardProposal(env, request, fields.id);
+    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/zpravy?ok=navrh-smazan");
   }
   if (path === "/redakce/zpravy/schvalit") {
     const result = await approveProposal(env, request, fields);

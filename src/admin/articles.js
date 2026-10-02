@@ -135,7 +135,11 @@ function reviewForm(data, proposal) {
       }`)}
       ${hidden("id", proposal.id)}
       ${articleFields(proposal, data.rubrics)}
-      ${formFoot("Schválit a zveřejnit", `<button class="btn btn-line" type="button" data-toggle="vratit-${proposal.id}">Vrátit autorovi…</button>`)}
+      ${formFoot(
+        "Schválit a zveřejnit",
+        `<button class="btn btn-line" type="button" data-toggle="vratit-${proposal.id}">Vrátit autorovi…</button>
+        ${modalLink(`${BASE}?smazat-navrh=${proposal.id}`, "Smazat", "btn-ghost btn-danger-text")}`,
+      )}
     </form>
     <form class="form return-form" id="vratit-${proposal.id}" method="post" action="${BASE}/vratit" data-toggled>
       ${hidden("id", proposal.id)}
@@ -148,6 +152,7 @@ function chiefArticles(ctx, data, message, query) {
   const proposal = data.proposals.find((row) => row.id === query.proposalId) ?? null;
   const editing = proposal ? null : (data.articles.find((row) => row.id === query.editingId) ?? null);
   const removing = data.articles.find((row) => row.id === query.confirmId) ?? null;
+  const discarding = data.proposals.find((row) => row.id === query.discardId) ?? null;
   const pending = data.proposals.filter((row) => row.status === "pending");
 
   const queue = pending.map((row) =>
@@ -155,7 +160,8 @@ function chiefArticles(ctx, data, message, query) {
       title: row.title,
       meta: `${proposalKind(row)} · ${esc(credit(row))}${row.articleTitle ? ` · ke zprávě ${esc(row.articleTitle)}` : ""}`,
       badges: badge("Čeká", "warn"),
-      actions: modalLink(`${BASE}?navrh=${row.id}`, "Posoudit", "btn-primary"),
+      actions: `${modalLink(`${BASE}?navrh=${row.id}`, "Posoudit", "btn-primary")}
+        ${modalLink(`${BASE}?smazat-navrh=${row.id}`, "Smazat", "btn-ghost btn-danger-text")}`,
       tone: "warn",
     }),
   );
@@ -176,7 +182,7 @@ function chiefArticles(ctx, data, message, query) {
       title: "Nová zpráva",
       size: "wide",
       close: BASE,
-      open: Boolean(query.fresh) && !proposal && !editing && !removing,
+      open: Boolean(query.fresh) && !proposal && !editing && !removing && !discarding,
       body: articleForm(data, null, BASE),
     }),
   ];
@@ -193,7 +199,24 @@ function chiefArticles(ctx, data, message, query) {
       }),
     );
   }
-  if (removing && !editing && !proposal) {
+  if (discarding && !editing && !proposal) {
+    dialogs.push(
+      modal({
+        id: "okno",
+        title: "Smazat návrh",
+        close: BASE,
+        open: true,
+        body: confirmForm({
+          action: `${BASE}/smazat-navrh`,
+          id: discarding.id,
+          text: `Návrh <b>${esc(discarding.title)}</b> zmizí. Na web nepůjde a autor ho už neuvidí ani jako vrácený. Vrátit to nejde.`,
+          submit: "Opravdu smazat",
+          close: BASE,
+        }),
+      }),
+    );
+  }
+  if (removing && !editing && !proposal && !discarding) {
     dialogs.push(
       modal({
         id: "okno",

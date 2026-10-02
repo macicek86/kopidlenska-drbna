@@ -6,7 +6,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 - `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`)
 - `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…)
-- `src/db.js`: data webu; `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/ads-db.js` reklamy; `src/outages-db.js` odstávky elektřiny
+- `src/db.js`: data webu; `src/proposals-db.js` návrhy zpráv (uložení, schválení, vrácení, stažení, smazání); `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/ads-db.js` reklamy; `src/outages-db.js` odstávky elektřiny
 - `src/notices.js` + `src/notices-db.js`: odstávky vody a uzavírky (uzavírky zatím jen v redakci, viz `PUBLIC_NOTICE_KINDS`); `src/outages-view.js` stránka a karta odstávek
 - `src/munipolis/`: import zpráv města (`feed.js` RSS, `ai.js` pokyny pro Claude, `store.js` D1, `run.js` průchod). Spouští ho cron a tlačítko v redakci. Klíč je tajemství `ANTHROPIC_API_KEY`
 - `src/fotbal/`: články z webu FK Kopidlno (`club.js` rozbor stránek Sklub.cz, `dates.js` kontrola dne v týdnu a data proti rozpisu (při rozporu jde článek jako návrh), `ai.js` pokyny, `store.js` D1, `run.js` průchod). Cron běží každé 4 h, fotbal se ale podívá jen tak často, jak je nastavené v redakci (výchozí jednou denně)
