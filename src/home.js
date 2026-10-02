@@ -8,7 +8,8 @@ import { homeNotice } from "./doctors.js";
 import { groupedNotices } from "./places.js";
 import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
-import { clockOf, contentAd, externalHref, layout, signedWhen } from "./view.js";
+import { siteLd } from "./seo.js";
+import { clockOf, contentAd, externalHref, layout, signedWhen, siteOrigin } from "./view.js";
 
 function wasteTeaser(data, ctx) {
   return `<div class="card waste-teaser">
@@ -134,6 +135,7 @@ export function homePage(data, ctx) {
     ...ctx,
     title: tx(ctx.copy, "site_name"),
     description: tx(ctx.copy, "home_description"),
+    jsonLd: siteLd(siteOrigin(ctx.origin, ctx.mainOrigin), ctx.copy),
     body: `
       <section class="hero home-hero">
         <div class="mascot">

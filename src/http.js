@@ -40,6 +40,17 @@ export function json(body, status = 200) {
   });
 }
 
+// robots.txt a sitemap.xml: veřejné, hodinu v mezipaměti.
+export function plain(body, contentType) {
+  return new Response(body, {
+    headers: {
+      "content-type": `${contentType}; charset=utf-8`,
+      "cache-control": "public, max-age=3600",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
 export function withError(path, error) {
   const join = path.includes("?") ? "&" : "?";
   return `${path}${join}chyba=${encodeURIComponent(error)}`;

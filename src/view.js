@@ -5,6 +5,7 @@ import { text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
 import { civilWeekday } from "./waste.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
+import { eventLd, jsonLdTag } from "./seo.js";
 
 export { outageCard, outageEmpty, outagesPage } from "./outages-view.js";
 export { homePage } from "./home.js";
@@ -31,7 +32,7 @@ const OG_IMAGE = "/og.webp";
 const OG_WIDTH = 1200;
 const OG_HEIGHT = 630;
 
-function siteOrigin(origin, mainOrigin) {
+export function siteOrigin(origin, mainOrigin) {
   const value = String(origin || mainOrigin || "").trim().replace(/\/$/, "");
   return /^https?:\/\//i.test(value) ? value : "";
 }
@@ -42,12 +43,33 @@ function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
 
-export function layout({ title, description, path, minimal, mainOrigin, origin, body, script = "", head = "", copy = {} }) {
+// canonical: cesta i s dotazem, když se liší od path (rubrika). image: absolutní adresa fotky místo výchozí.
+export function layout({
+  title,
+  description,
+  path,
+  minimal,
+  mainOrigin,
+  origin,
+  body,
+  script = "",
+  head = "",
+  copy = {},
+  canonical,
+  noindex = false,
+  ogType = "website",
+  image = "",
+  published = "",
+  jsonLd = [],
+}) {
   const brandHref = minimal ? "/popelnice" : "/";
   const base = siteOrigin(origin, mainOrigin);
-  const pagePath = typeof path === "string" && path.startsWith("/") ? path : "/";
+  const pagePath = typeof canonical === "string" && canonical.startsWith("/")
+    ? canonical
+    : typeof path === "string" && path.startsWith("/") ? path : "/";
   const pageUrl = base ? `${base}${pagePath}` : "";
-  const ogImage = base ? `${base}${OG_IMAGE}` : OG_IMAGE;
+  const ogImage = image || (base ? `${base}${OG_IMAGE}` : OG_IMAGE);
+  const defaultImage = !image;
   const siteName = tx(copy, "site_name");
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const links = NAV.map(
@@ -68,19 +90,29 @@ export function layout({ title, description, path, minimal, mainOrigin, origin, 
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
-  <meta property="og:type" content="website">
+  ${noindex ? `<meta name="robots" content="noindex">` : ""}
+  ${pageUrl && !noindex ? `<link rel="canonical" href="${esc(pageUrl)}">` : ""}
+  <meta property="og:type" content="${esc(ogType)}">
   <meta property="og:locale" content="cs_CZ">
   <meta property="og:site_name" content="${esc(siteName)}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
   ${pageUrl ? `<meta property="og:url" content="${esc(pageUrl)}">` : ""}
   <meta property="og:image" content="${esc(ogImage)}">
-  <meta property="og:image:type" content="image/webp">
+  ${
+    defaultImage
+      ? `<meta property="og:image:type" content="image/webp">
   <meta property="og:image:width" content="${OG_WIDTH}">
   <meta property="og:image:height" content="${OG_HEIGHT}">
-  <meta property="og:image:alt" content="${esc(siteName)}">
+  <meta property="og:image:alt" content="${esc(siteName)}">`
+      : ""
+  }
+  ${published ? `<meta property="article:published_time" content="${esc(published)}">` : ""}
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(title)}">
+  <meta name="twitter:description" content="${esc(description)}">
   <meta name="twitter:image" content="${esc(ogImage)}">
+  ${jsonLdTag(jsonLd)}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -143,6 +175,11 @@ export function closureLabel(closure) {
 export function contentAd(data, ctx) {
   const ad = Object.hasOwn(data, "ad") ? data.ad : pickAd(data.ads);
   return ad ? adPanel(ad, ctx.copy) : "";
+}
+
+function adSlot(data, ctx) {
+  const html = contentAd(data, ctx);
+  return html ? `<div class="ad-slot">${html}</div>` : "";
 }
 
 function adLinkHtml(link, label, preview) {
@@ -237,6 +274,7 @@ export function adPage(ad, ctx) {
 export function missingAdPage(ctx) {
   return layout({
     ...ctx,
+    noindex: true,
     title: `${tx(ctx.copy, "ads_missing")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "ads_missing"),
     body: `<h1>${esc(tx(ctx.copy, "ads_missing"))}</h1><a class="back" href="/reklamy">${esc(tx(ctx.copy, "ads_back"))}</a>`,
@@ -246,6 +284,7 @@ export function missingAdPage(ctx) {
 export function missingPage(ctx) {
   return layout({
     ...ctx,
+    noindex: true,
     title: `${tx(ctx.copy, "missing_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "missing_description"),
     body: `<h1>${esc(tx(ctx.copy, "missing_heading"))}</h1><a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>`,
@@ -275,6 +314,7 @@ export function eventsPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "events_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "events_description"),
+    jsonLd: upcoming.map((event) => eventLd(siteOrigin(ctx.origin, ctx.mainOrigin), event)),
     body: `
       <p class="eyebrow">${esc(tx(ctx.copy, "events_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>

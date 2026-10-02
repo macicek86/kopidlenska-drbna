@@ -87,7 +87,9 @@ import {
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
 import { WEEK_DAYS } from "./yards.js";
-import { html, json, redirect, sameOrigin, secure, withError } from "./http.js";
+import { html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
+import { robotsTxt, sitemapXml } from "./seo.js";
+import { loadSitemap } from "./seo-db.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
 import { PLACES_OK, placesPost } from "./post-places.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
@@ -334,6 +336,11 @@ async function renderGet(request, env, url, execution) {
         "x-content-type-options": "nosniff",
       },
     });
+  }
+
+  if (path === "/robots.txt") return plain(robotsTxt(url.origin), "text/plain");
+  if (path === "/sitemap.xml") {
+    return plain(sitemapXml(url.origin, await loadSitemap(env), { minimal: base.minimal }), "application/xml");
   }
 
   const ctx = { ...base, copy: await loadCopy(env) };

@@ -5,9 +5,10 @@ import { formatDayMonth, formatLong } from "./format.js";
 import { esc } from "./html.js";
 import { articleFigure, storyPhoto } from "./photo.js";
 import { renderArticleHtml } from "./rich.js";
-import { articleCrumbs, newsCount, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
+import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
 import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
-import { adPanel, contentAd, layout, signedWhen } from "./view.js";
+import { articleCrumbsLd, articleImage, articleLd } from "./seo.js";
+import { adPanel, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
 
 const SCRIPT = `<script src="/site.js" defer></script>`;
 
@@ -41,6 +42,7 @@ export function newsPage(data, ctx, rubrika) {
     ...ctx,
     title: `${title} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "news_description"),
+    canonical: selected ? rubricHref(selected.slug) : "/zpravy",
     script: SCRIPT,
     body: `<header class="news-head">
         ${newsCrumbs(rubrics, selected, ctx.copy)}
@@ -60,10 +62,15 @@ function articleMeta(article) {
 
 export function articlePage(article, ctx, extras = {}) {
   const ad = Object.hasOwn(extras, "ad") ? extras.ad : pickAd(extras.ads);
+  const base = siteOrigin(ctx.origin, ctx.mainOrigin);
   return layout({
     ...ctx,
     title: `${article.title} | ${tx(ctx.copy, "site_name")}`,
     description: article.excerpt,
+    ogType: "article",
+    image: articleImage(base, article),
+    published: article.createdOn,
+    jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
     body: `
       <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
       ${articleCrumbs(article)}
