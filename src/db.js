@@ -6,6 +6,7 @@ import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
 import { ensurePlaceTables, loadPlaces } from "./places-db.js";
+import { ensureVisitTables } from "./visits-db.js";
 import { DOCTOR_SEEDS, changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
 import { KOPIDLNO } from "./outages.js";
@@ -527,6 +528,7 @@ async function migrateSchema(env) {
   await ensureDenikTables(env);
   await ensureDrbenaTable(env);
   await ensurePlaceTables(env);
+  await ensureVisitTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();

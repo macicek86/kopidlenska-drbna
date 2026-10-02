@@ -9,6 +9,7 @@ import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricK
 import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
 import { articleCrumbsLd, articleImage, articleLd } from "./seo.js";
 import { adPanel, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
+import { readCount } from "./visits.js";
 
 const SCRIPT = `<script src="/site.js" defer></script>`;
 
@@ -54,10 +55,11 @@ export function newsPage(data, ctx, rubrika) {
   });
 }
 
-function articleMeta(article) {
+function articleMeta(article, views) {
   const base = signedWhen(article, formatLong(article.createdOn));
   const mark = article.redacted ? ` · <span class="redigovano">Redigováno</span>` : "";
-  return `<p class="meta">${esc(base)}${mark}</p>`;
+  const read = readCount(views);
+  return `<p class="meta">${esc(base)}${mark}${read ? ` · <span class="precteno">${esc(read)}</span>` : ""}</p>`;
 }
 
 export function articlePage(article, ctx, extras = {}) {
@@ -75,7 +77,7 @@ export function articlePage(article, ctx, extras = {}) {
       <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
       ${articleCrumbs(article)}
       <h1 class="article-title">${esc(article.title)}</h1>
-      ${articleMeta(article)}
+      ${articleMeta(article, extras.views)}
       <div class="article-body${article.imageKey ? " has-photo" : ""}">
         ${articleFigure(article)}
         <div class="prose">${renderArticleHtml(article.body)}</div>

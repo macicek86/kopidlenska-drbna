@@ -20,6 +20,11 @@ export const PERMISSIONS = [
     label: "Otevírací doba",
     detail: "Může měnit otevírací dobu míst, dočasné změny a novou otevírací dobu. Místa samotná zakládá hlavní redaktor.",
   },
+  {
+    code: "statistiky",
+    label: "Statistiky",
+    detail: "Vidí návštěvnost webu: kolik lidí přišlo, co čtou a odkud přišli.",
+  },
 ];
 
 const ACCESS_ON = "Přihlášení heslem je vypnuté, redakce se přihlašuje e-mailem přes Cloudflare Access.";

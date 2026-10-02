@@ -16,7 +16,7 @@ function nav(data) {
   const groups = [
     {
       name: "",
-      links: [["prehled", "Přehled", "home"]],
+      links: [["prehled", "Přehled", "home"], (chief || userCan(data.user, "statistiky")) && ["statistiky", "Statistiky", "chart"]],
     },
     {
       name: "Obsah",
@@ -66,7 +66,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

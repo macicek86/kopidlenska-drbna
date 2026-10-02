@@ -12,5 +12,6 @@ export { adminPeople } from "./people.js";
 export { adminPlaces } from "./places.js";
 export { adminRubrics } from "./rubrics.js";
 export { adminPassword, adminSite, adminTexts } from "./settings.js";
+export { adminStats } from "./stats.js";
 export { adminYards } from "./yards.js";
 export { ADMIN_TABS } from "./shell.js";
