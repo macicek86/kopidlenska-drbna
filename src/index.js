@@ -162,6 +162,29 @@ const OK = {
   ...DENIK_OK,
 };
 
+// Stránky, které berou data z loadPublic.
+const PUBLIC_PAGES = new Set([
+  "/",
+  "/popelnice",
+  "/odstavky",
+  "/zpravy",
+  "/reklamy",
+  "/akce",
+  "/o-nas",
+  "/sberne-dvory",
+  "/lekari",
+  "/oteviraci-doba",
+]);
+
+async function loadStory(env, slug, path) {
+  const [article, ads, views] = await Promise.all([
+    loadArticle(env, slug),
+    loadAds(env, { enabledOnly: true }),
+    pathViews(env, path),
+  ]);
+  return { article, ads, views };
+}
+
 function chooseAd(request, ads) {
   return pickAd(ads, { avoidId: readSeenAd(request.headers.get("cookie")) });
 }
@@ -214,10 +237,17 @@ async function renderGet(request, env, url, execution) {
     return plain(sitemapXml(url.origin, await loadSitemap(env), { minimal: base.minimal }), "application/xml");
   }
 
-  const ctx = { ...base, copy: await loadCopy(env) };
+  // Texty a data stránky najednou: na sobě nezávisí.
+  const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
+  const [copy, data, admin, story] = await Promise.all([
+    loadCopy(env),
+    minimalHome || PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
+    path.startsWith("/redakce/") ? loadAdmin(env, request) : null,
+    slug == null ? null : loadStory(env, slug, path),
+  ]);
+  const ctx = { ...base, copy };
 
   if (minimalHome || path === "/popelnice") {
-    const data = await loadPublic(env);
     return html(
       binsPage(data.waste, { ...ctx, path: "/popelnice", minimal: minimalHome || ctx.minimal }, {
         showExternal: !minimalHome,
@@ -226,7 +256,6 @@ async function renderGet(request, env, url, execution) {
     );
   }
   if (path === "/") {
-    const data = await loadPublic(env);
     kickOutageRefresh(env, execution, data.outages);
     const ad = chooseAd(request, data.ads);
     return htmlAd(request, homePage({ ...data, ad }, ctx), ad);
@@ -237,27 +266,22 @@ async function renderGet(request, env, url, execution) {
     return json(boardJson(board));
   }
   if (path === "/odstavky") {
-    const data = await loadPublic(env);
     kickOutageRefresh(env, execution, data.outages);
     return html(outagesPage(data, ctx));
   }
   if (path === "/zpravy") {
-    const data = await loadPublic(env);
     const ad = chooseAd(request, data.ads);
     return htmlAd(request, newsPage({ ...data, ad }, ctx, url.searchParams.get("rubrika") ?? ""), ad);
   }
   if (path.startsWith("/zpravy/")) {
-    const slug = decodeURIComponent(path.slice("/zpravy/".length));
-    const article = await loadArticle(env, slug);
+    const { article, ads, views: counted } = story;
     if (!article) return html(missingPage(ctx), 404);
-    const ads = await loadAds(env, { enabledOnly: true });
     const ad = chooseAd(request, ads);
     // Počet i s tímhle přečtením, když se započítá.
-    const views = (await pathViews(env, path)) + (visitTarget(request) ? 1 : 0);
+    const views = counted + (visitTarget(request) ? 1 : 0);
     return htmlAd(request, articlePage(article, ctx, { ad, views }), ad);
   }
   if (path === "/reklamy") {
-    const data = await loadPublic(env);
     return html(adsPage(data, ctx));
   }
   if (path.startsWith("/reklamy/")) {
@@ -267,29 +291,24 @@ async function renderGet(request, env, url, execution) {
     return html(adPage(ad, ctx));
   }
   if (path === "/akce") {
-    const data = await loadPublic(env);
     const ad = chooseAd(request, data.ads);
     return htmlAd(request, eventsPage({ ...data, ad }, ctx), ad);
   }
   if (path === "/o-nas") {
-    const data = await loadPublic(env);
     return html(aboutPage(data, ctx));
   }
   if (path === "/sberne-dvory") {
-    const data = await loadPublic(env);
     return html(yardsPage(data, ctx));
   }
   if (path === "/lekari") {
-    const data = await loadPublic(env);
     return html(doctorsPage(data, ctx));
   }
   if (path === "/oteviraci-doba") {
-    const data = await loadPublic(env);
     return html(placesPage(data, ctx));
   }
   if (path === "/redakce") return redirect("/redakce/prehled");
   if (path.startsWith("/redakce/")) {
-    const data = await loadAdmin(env, request);
+    const data = admin;
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
     const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", "drbena"]);
@@ -593,10 +612,11 @@ export default {
   async fetch(request, env, execution) {
     const url = new URL(request.url);
     try {
-      await ensureSchema(env);
+      // Statické soubory databázi nepotřebují.
       if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
         return env.ASSETS.fetch(request);
       }
+      await ensureSchema(env);
       if (request.method === "GET" || request.method === "HEAD") {
         const response = await renderGet(request, env, url, execution);
         const visit = visitPath(request, response);

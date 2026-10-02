@@ -1,18 +1,14 @@
-import { AD_SEEDS } from "./ads.js";
 import { loadAdProposals, loadAds } from "./ads-db.js";
 import { COPY } from "./copy.js";
 import { releaseImage, storeImage } from "./images.js";
 import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
-import { ensurePlaceTables, loadPlaces } from "./places-db.js";
-import { ensureVisitTables } from "./visits-db.js";
-import { DOCTOR_SEEDS, changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
+import { loadPlaces } from "./places-db.js";
+import { changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
-import { KOPIDLNO } from "./outages.js";
 import { emptyOutageBoard, loadOutageAreas, loadOutageBoard } from "./outages-db.js";
 import {
-  addColumn,
   asBool,
   clip,
   identify,
@@ -22,12 +18,12 @@ import {
   uniqueSlug,
   userCan,
 } from "./db-core.js";
-import { ensureNoticeTables, loadNoticeBoard, loadNotices } from "./notices-db.js";
-import { ensureImportTables, loadImportItems, loadImportSettings } from "./munipolis/store.js";
-import { ensureFootballTables, loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
-import { ensureDenikTables, loadDenikItems, loadDenikSettings } from "./denik/store.js";
-import { ensureDrbenaTable, loadDrbena } from "./drbena-db.js";
-import { ensureUserColumns, loadUsers } from "./users-db.js";
+import { loadNoticeBoard, loadNotices } from "./notices-db.js";
+import { loadImportItems, loadImportSettings } from "./munipolis/store.js";
+import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
+import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
+import { loadDrbena } from "./drbena-db.js";
+import { loadUsers } from "./users-db.js";
 import { accessConfig } from "./access.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
@@ -52,13 +48,14 @@ export {
   removeOutageArea,
   saveOutageAreas,
 } from "./outages-db.js";
+export { ensureSchema } from "./schema.js";
 export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
 const ARTICLE_FIELDS =
   "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+// Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
+const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "");
 const ARTICLE_FROM =
   "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
-
-let schemaReady = false;
 
 export function textWasEdited(before, after) {
   return (
@@ -86,7 +83,7 @@ function mapArticle(row) {
     slug: String(row.slug),
     title: String(row.title),
     excerpt: String(row.excerpt),
-    body: String(row.body),
+    body: String(row.body ?? ""),
     category: row.rubric_name ? String(row.rubric_name) : String(row.category),
     rubricId: row.rubric_id == null || row.rubric_id === "" ? null : Number(row.rubric_id),
     parentName: row.parent_name ? String(row.parent_name) : "",
@@ -216,363 +213,6 @@ function wasteFrom(row) {
   };
 }
 
-async function createDeskTables(env) {
-  await env.DB.prepare(
-    `create table if not exists users (
-      id integer primary key autoincrement,
-      login text not null unique,
-      name text not null,
-      alias text not null default '',
-      password_hash text not null,
-      role text not null,
-      session_token text,
-      active integer not null default 1,
-      created_at text not null default (date('now'))
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists proposals (
-      id integer primary key autoincrement,
-      article_id integer,
-      author_id integer not null,
-      author_name text not null,
-      title text not null,
-      excerpt text not null,
-      body text not null,
-      category text not null,
-      image_key text,
-      submitted_title text not null,
-      submitted_excerpt text not null,
-      submitted_body text not null,
-      submitted_category text not null,
-      status text not null default 'pending',
-      note text not null default '',
-      created_at text not null default (date('now'))
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists user_permissions (
-      user_id integer not null,
-      code text not null,
-      primary key (user_id, code)
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists yards (
-      id integer primary key autoincrement,
-      name text not null,
-      place text not null,
-      accepts text not null,
-      hours text not null,
-      sort_order integer not null default 0,
-      published integer not null default 1
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists yard_closures (
-      id integer primary key autoincrement,
-      yard_id integer not null,
-      starts_on text not null,
-      ends_on text not null,
-      reason text not null,
-      created_by integer,
-      created_at text not null default (date('now'))
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists doctors (
-      id integer primary key autoincrement,
-      name text not null,
-      specialty text not null,
-      place text not null,
-      phone text not null default '',
-      hours text not null,
-      sort_order integer not null default 0,
-      published integer not null default 1
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists doctor_changes (
-      id integer primary key autoincrement,
-      doctor_id integer not null,
-      starts_on text not null,
-      ends_on text not null,
-      note text not null,
-      hours text not null,
-      created_by integer,
-      created_at text not null default (date('now'))
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists ads (
-      id integer primary key autoincrement,
-      slug text not null unique,
-      title text not null,
-      body text not null,
-      place text not null default '',
-      link text not null default '',
-      image_key text,
-      enabled integer not null default 1,
-      sample integer not null default 0,
-      author_id integer,
-      author_name text not null default '',
-      created_at text not null default (date('now'))
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists ad_proposals (
-      id integer primary key autoincrement,
-      ad_id integer,
-      author_id integer not null,
-      author_name text not null,
-      title text not null,
-      body text not null,
-      place text not null default '',
-      link text not null default '',
-      image_key text,
-      enabled integer not null default 1,
-      status text not null default 'pending',
-      note text not null default '',
-      created_at text not null default (date('now'))
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists outage_areas (
-      id integer primary key autoincrement,
-      code text not null unique,
-      name text not null,
-      enabled integer not null default 1,
-      sort_order integer not null default 100
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists outage_feed (
-      id integer primary key,
-      fetched_at text,
-      status text not null default '',
-      note text not null default '',
-      payload text not null default '[]',
-      fetching_at text
-    )`,
-  ).run();
-  await env.DB.prepare(
-    `create table if not exists rubrics (
-      id integer primary key autoincrement,
-      parent_id integer,
-      name text not null,
-      slug text not null unique,
-      sort_order integer not null default 0
-    )`,
-  ).run();
-}
-
-async function ensureArticleColumns(env) {
-  const info = await env.DB.prepare("pragma table_info(articles)").all();
-  const names = new Set((info.results ?? []).map((row) => row.name));
-  await addColumn(env, names, "author_id", "alter table articles add column author_id integer");
-  await addColumn(env, names, "author_name", "alter table articles add column author_name text not null default ''");
-  await addColumn(env, names, "redacted", "alter table articles add column redacted integer not null default 0");
-  await addColumn(env, names, "rubric_id", "alter table articles add column rubric_id integer");
-  await addColumn(env, names, "image_focus", "alter table articles add column image_focus text not null default ''");
-  await addColumn(env, names, "image_caption", "alter table articles add column image_caption text not null default ''");
-}
-
-async function ensureProposalColumns(env) {
-  const info = await env.DB.prepare("pragma table_info(proposals)").all();
-  const names = new Set((info.results ?? []).map((row) => row.name));
-  await addColumn(env, names, "rubric_id", "alter table proposals add column rubric_id integer");
-  await addColumn(env, names, "image_focus", "alter table proposals add column image_focus text not null default ''");
-  await addColumn(env, names, "image_caption", "alter table proposals add column image_caption text not null default ''");
-  // Datum, se kterým má zpráva po schválení vyjít (import podle data ve zdroji). Prázdné = den schválení.
-  await addColumn(env, names, "publish_on", "alter table proposals add column publish_on text not null default ''");
-}
-
-async function seedRubrics(env) {
-  for (const item of SEED_RUBRICS) {
-    await env.DB.prepare(
-      `insert into rubrics (parent_id, name, slug, sort_order)
-       select null, ?, ?, ?
-       where not exists (select 1 from rubrics where slug = ?)`,
-    )
-      .bind(item.name, item.slug, item.sortOrder, item.slug)
-      .run();
-  }
-  for (const item of SEED_RUBRICS) {
-    await env.DB.prepare(
-      "update articles set rubric_id = (select id from rubrics where slug = ?) where rubric_id is null and category = ?",
-    )
-      .bind(item.slug, item.name)
-      .run();
-    await env.DB.prepare(
-      "update proposals set rubric_id = (select id from rubrics where slug = ?) where rubric_id is null and category = ?",
-    )
-      .bind(item.slug, item.name)
-      .run();
-  }
-  await env.DB.prepare(
-    `update articles set rubric_id = (select id from rubrics where rubrics.name = articles.category)
-     where rubric_id is null and exists (select 1 from rubrics where rubrics.name = articles.category)`,
-  ).run();
-  await env.DB.prepare(
-    `update proposals set rubric_id = (select id from rubrics where rubrics.name = proposals.category)
-     where rubric_id is null and exists (select 1 from rubrics where rubrics.name = proposals.category)`,
-  ).run();
-}
-
-async function migrateSession(env) {
-  const row = await env.DB.prepare("select session_token from settings where id = 1").first();
-  if (!row?.session_token) return;
-  const chief = await env.DB.prepare(
-    "select id, session_token from users where role = 'hlavni' order by id asc limit 1",
-  ).first();
-  if (chief && !chief.session_token) {
-    await env.DB.prepare("update users set session_token = ? where id = ?").bind(row.session_token, chief.id).run();
-  }
-  await env.DB.prepare("update settings set session_token = null where id = 1").run();
-}
-
-async function seedDoctors(env) {
-  const info = await env.DB.prepare("pragma table_info(settings)").all();
-  const names = new Set((info.results ?? []).map((row) => row.name));
-  await addColumn(env, names, "doctors_seeded", "alter table settings add column doctors_seeded integer not null default 0");
-  const flag = await env.DB.prepare("select doctors_seeded as done from settings where id = 1").first();
-  if (Number(flag?.done) === 1) return;
-  const count = await env.DB.prepare("select count(*) as n from doctors").first();
-  if (Number(count?.n) === 0) {
-    for (const doctor of DOCTOR_SEEDS) {
-      await env.DB.prepare(
-        "insert into doctors (name, specialty, place, phone, hours, sort_order, published) values (?, ?, ?, ?, ?, ?, ?)",
-      )
-        .bind(
-          doctor.name,
-          doctor.specialty,
-          doctor.place,
-          doctor.phone,
-          JSON.stringify(doctor.week),
-          doctor.sortOrder,
-          doctor.published,
-        )
-        .run();
-    }
-  }
-  await env.DB.prepare("update settings set doctors_seeded = 1 where id = 1").run();
-}
-
-async function seedOutages(env) {
-  const info = await env.DB.prepare("pragma table_info(settings)").all();
-  const names = new Set((info.results ?? []).map((row) => row.name));
-  await addColumn(env, names, "outages_seeded", "alter table settings add column outages_seeded integer not null default 0");
-  await env.DB.prepare(
-    "insert into outage_feed (id, payload) select 1, '[]' where not exists (select 1 from outage_feed where id = 1)",
-  ).run();
-  const flag = await env.DB.prepare("select outages_seeded as done from settings where id = 1").first();
-  if (Number(flag?.done) === 1) return;
-  const count = await env.DB.prepare("select count(*) as n from outage_areas").first();
-  if (Number(count?.n) === 0) {
-    await env.DB.prepare("insert into outage_areas (code, name, enabled, sort_order) values (?, ?, 1, 0)")
-      .bind(KOPIDLNO.code, KOPIDLNO.name)
-      .run();
-  }
-  await env.DB.prepare("update settings set outages_seeded = 1 where id = 1").run();
-}
-
-async function demoImage(env, file) {
-  if (!env.ASSETS?.fetch) return null;
-  try {
-    const response = await env.ASSETS.fetch(new Request(`https://local.invalid/demo-reklamy/${file}`));
-    if (!response.ok) return null;
-    const type = response.headers.get("content-type") ?? "";
-    if (!type.includes("image/")) return null;
-    return await response.arrayBuffer();
-  } catch {
-    return null;
-  }
-}
-
-async function seedAds(env) {
-  const info = await env.DB.prepare("pragma table_info(settings)").all();
-  const names = new Set((info.results ?? []).map((row) => row.name));
-  await addColumn(env, names, "ads_seeded", "alter table settings add column ads_seeded integer not null default 0");
-  const flag = await env.DB.prepare("select ads_seeded as done from settings where id = 1").first();
-  if (Number(flag?.done) === 1) return;
-  const count = await env.DB.prepare("select count(*) as n from ads").first();
-  if (Number(count?.n) === 0) {
-    const chief = await env.DB.prepare(
-      "select id, name from users where role = 'hlavni' order by id asc limit 1",
-    ).first();
-    const authorId = chief?.id ?? null;
-    const authorName = chief?.name ? String(chief.name) : "Redakce";
-    for (const ad of AD_SEEDS) {
-      const bytes = await demoImage(env, ad.image);
-      let imageKey = null;
-      if (bytes) {
-        imageKey = `reklamy/demo-${ad.slug}.webp`;
-        await env.BUCKET.put(imageKey, bytes, { httpMetadata: { contentType: "image/webp" } });
-      }
-      await env.DB.prepare(
-        `insert into ads (slug, title, body, place, link, image_key, enabled, sample, author_id, author_name)
-         values (?, ?, ?, ?, '', ?, 1, 1, ?, ?)`,
-      )
-        .bind(ad.slug, ad.title, ad.body, ad.place, imageKey, authorId, authorName)
-        .run();
-    }
-  }
-  await env.DB.prepare("update settings set ads_seeded = 1 where id = 1").run();
-}
-
-async function migrateSchema(env) {
-  await createDeskTables(env);
-  await ensureNoticeTables(env);
-  await ensureImportTables(env);
-  await ensureFootballTables(env);
-  await ensureDenikTables(env);
-  await ensureDrbenaTable(env);
-  await ensurePlaceTables(env);
-  await ensureVisitTables(env);
-  const settingsReady = await env.DB.prepare(
-    "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
-  ).first();
-  if (settingsReady) {
-    await seedDoctors(env);
-    await seedOutages(env);
-  }
-  const usersTable = await env.DB.prepare(
-    "select 1 as ok from sqlite_master where type = 'table' and name = 'users'",
-  ).first();
-  if (usersTable) await ensureUserColumns(env);
-  const settingsTable = await env.DB.prepare(
-    "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
-  ).first();
-  if (!settingsTable) return false;
-  const articlesTable = await env.DB.prepare(
-    "select 1 as ok from sqlite_master where type = 'table' and name = 'articles'",
-  ).first();
-  if (articlesTable) {
-    await ensureArticleColumns(env);
-    const proposalsTable = await env.DB.prepare(
-      "select 1 as ok from sqlite_master where type = 'table' and name = 'proposals'",
-    ).first();
-    if (proposalsTable) await ensureProposalColumns(env);
-    await seedRubrics(env);
-  }
-  await env.DB.prepare(
-    `insert into users (login, name, password_hash, role)
-     select 'redakce', 'Redakce', password_hash, 'hlavni' from settings
-     where id = 1 and not exists (select 1 from users)`,
-  ).run();
-  await migrateSession(env);
-  await seedAds(env);
-  return true;
-}
-
-// Kontrola schématu jednou za instanci Workeru. Každý požadavek ji dělá sám, dokud jednou celá neproběhne.
-// Nesdílet rozběhnutý slib mezi požadavky: když se požadavek, který ho spustil, zruší (zavřená stránka,
-// obnovení), Cloudflare zruší i jeho dotazy, slib se nikdy nedokončí a všechny další požadavky by visely.
-export async function ensureSchema(env) {
-  if (schemaReady) return;
-  if (await migrateSchema(env)) schemaReady = true;
-}
-
 function readArticleFields(input) {
   const title = clip(input.title, 160);
   const excerpt = clip(input.excerpt, 320);
@@ -693,49 +333,50 @@ function mapRubric(row, articleCount = 0) {
 }
 
 export async function loadRubrics(env) {
-  const rows =
-    (await env.DB.prepare("select id, parent_id, name, slug, sort_order from rubrics order by sort_order asc, id asc").all())
-      .results ?? [];
-  const counts =
-    (
-      await env.DB.prepare(
-        "select rubric_id as id, count(*) as n from articles where rubric_id is not null group by rubric_id",
-      ).all()
-    ).results ?? [];
-  const byId = new Map(counts.map((row) => [Number(row.id), Number(row.n)]));
-  return rows.map((row) => mapRubric(row, byId.get(Number(row.id)) ?? 0));
+  const [rows, counts] = await Promise.all([
+    env.DB.prepare("select id, parent_id, name, slug, sort_order from rubrics order by sort_order asc, id asc").all(),
+    env.DB.prepare("select rubric_id as id, count(*) as n from articles where rubric_id is not null group by rubric_id").all(),
+  ]);
+  const byId = new Map((counts.results ?? []).map((row) => [Number(row.id), Number(row.n)]));
+  return (rows.results ?? []).map((row) => mapRubric(row, byId.get(Number(row.id)) ?? 0));
 }
 
+// Veřejné stránky: všechno najednou, dotazy na sobě nezávisí.
 export async function loadPublic(env) {
-  const row = await settings(env);
   const now = pragueNow();
   const today = now.date;
-  const articles = (
-    await env.DB.prepare(
-      `select ${ARTICLE_FIELDS}
+  const [row, articles, events, yards, doctors, places, ads, outages, water, rubrics] = await Promise.all([
+    settings(env),
+    env.DB.prepare(
+      `select ${ARTICLE_LIST_FIELDS}
        from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`,
-    ).all()
-  ).results.map(mapArticle);
-  const events = (
-    await env.DB.prepare(
+    ).all(),
+    env.DB.prepare(
       `select id, title, place, starts_on, starts_time, description, published
        from events where published = 1 order by starts_on asc, starts_time asc, id asc`,
-    ).all()
-  ).results.map(mapEvent);
+    ).all(),
+    loadYards(env, { publicOnly: true, today }),
+    loadDoctors(env, { publicOnly: true, today }),
+    loadPlaces(env, { publicOnly: true, today }),
+    loadAds(env, { enabledOnly: true }),
+    loadOutageBoard(env),
+    loadNoticeBoard(env),
+    loadRubrics(env),
+  ]);
   return {
-    articles,
-    events,
-    yards: await loadYards(env, { publicOnly: true, today }),
-    doctors: await loadDoctors(env, { publicOnly: true, today }),
-    places: await loadPlaces(env, { publicOnly: true, today }),
-    ads: await loadAds(env, { enabledOnly: true }),
-    outages: await loadOutageBoard(env),
-    water: await loadNoticeBoard(env),
+    articles: articles.results.map(mapArticle),
+    events: events.results.map(mapEvent),
+    yards,
+    doctors,
+    places,
+    ads,
+    outages,
+    water,
     waste: buildWasteView(wasteFrom(row), today),
     now,
     contactNote: String(row.contact_note),
     showDefaultPassword: asBool(row.password_is_default),
-    rubrics: await loadRubrics(env),
+    rubrics,
   };
 }
 
@@ -749,9 +390,44 @@ export async function loadArticle(env, slug) {
   return row ? mapArticle(row) : null;
 }
 
+// Části redakce jen pro hlavního redaktora.
+async function loadChiefDesk(env) {
+  const [outageAreas, outages, notices, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, drbena, events, users] =
+    await Promise.all([
+      loadOutageAreas(env),
+      loadOutageBoard(env),
+      loadNotices(env),
+      loadImportSettings(env),
+      loadImportItems(env),
+      loadFootballSettings(env),
+      loadFootballItems(env),
+      loadDenikSettings(env),
+      loadDenikItems(env),
+      loadDrbena(env),
+      env.DB.prepare(
+        `select id, title, place, starts_on, starts_time, description, published
+         from events order by starts_on asc, starts_time asc, id asc`,
+      ).all(),
+      loadUsers(env),
+    ]);
+  return {
+    outageAreas,
+    outages,
+    notices,
+    importSettings,
+    importItems,
+    footballSettings,
+    footballItems,
+    denikSettings,
+    denikItems,
+    drbena,
+    events: events.results.map(mapEvent),
+    users,
+  };
+}
+
 export async function loadAdmin(env, request) {
-  const row = await settings(env);
-  const { user, email } = await identify(env, request);
+  const [row, { user, email }] = await Promise.all([settings(env), identify(env, request)]);
   const access = Boolean(accessConfig(env));
   const base = {
     signedIn: Boolean(user),
@@ -783,58 +459,30 @@ export async function loadAdmin(env, request) {
     rubrics: [],
   };
   if (!user) return base;
-  base.rubrics = await loadRubrics(env);
-  base.ads = await loadAds(env);
-  base.adProposals =
-    user.role === "hlavni"
-      ? await loadAdProposals(env, "where p.status = 'pending' order by p.id asc")
-      : await loadAdProposals(
-          env,
-          "where p.author_id = ? and p.status in ('pending', 'rejected') order by p.id desc",
-          user.id,
-        );
-  const articleSql =
-    user.role === "hlavni"
-      ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
-      : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
-  base.articles = (await env.DB.prepare(articleSql).all()).results.map(mapArticle);
-  if (user.role === "hlavni" || userCan(user, "sberny_dvur")) {
-    base.yards = await loadYards(env, { publicOnly: user.role !== "hlavni" });
-  }
-  if (user.role === "hlavni" || userCan(user, "doktori")) {
-    const now = pragueNow();
-    base.doctors = await loadDoctors(env, { publicOnly: user.role !== "hlavni", today: now.date });
-  }
-  if (user.role === "hlavni" || userCan(user, "oteviraci_doba")) {
-    base.places = await loadPlaces(env, { publicOnly: user.role !== "hlavni" });
-  }
-  if (user.role === "hlavni") {
-    base.outageAreas = await loadOutageAreas(env);
-    base.outages = await loadOutageBoard(env);
-    base.notices = await loadNotices(env);
-    base.importSettings = await loadImportSettings(env);
-    base.importItems = await loadImportItems(env);
-    base.footballSettings = await loadFootballSettings(env);
-    base.footballItems = await loadFootballItems(env);
-    base.denikSettings = await loadDenikSettings(env);
-    base.denikItems = await loadDenikItems(env);
-    base.drbena = await loadDrbena(env);
-    base.hasApiKey = Boolean(env.ANTHROPIC_API_KEY);
-    base.events = (
-      await env.DB.prepare(
-        `select id, title, place, starts_on, starts_time, description, published
-         from events order by starts_on asc, starts_time asc, id asc`,
-      ).all()
-    ).results.map(mapEvent);
-    base.users = await loadUsers(env);
-    base.proposals = await loadProposals(env, "where p.status = 'pending' order by p.id asc");
-  } else {
-    base.proposals = await loadProposals(
-      env,
-      "where p.author_id = ? and p.status in ('pending', 'rejected') order by p.id desc",
-      user.id,
-    );
-  }
+  // Všechno najednou; co uživatel nesmí vidět, se nenačítá.
+  const chief = user.role === "hlavni";
+  const when = (allowed, load, fallback) => (allowed ? load() : fallback);
+  const mine = ["where p.author_id = ? and p.status in ('pending', 'rejected') order by p.id desc", user.id];
+  const articleSql = chief
+    ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
+    : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
+  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, desk] = await Promise.all([
+    loadRubrics(env),
+    loadAds(env),
+    chief ? loadAdProposals(env, "where p.status = 'pending' order by p.id asc") : loadAdProposals(env, ...mine),
+    env.DB.prepare(articleSql).all(),
+    when(chief || userCan(user, "sberny_dvur"), () => loadYards(env, { publicOnly: !chief }), base.yards),
+    when(
+      chief || userCan(user, "doktori"),
+      () => loadDoctors(env, { publicOnly: !chief, today: pragueNow().date }),
+      base.doctors,
+    ),
+    when(chief || userCan(user, "oteviraci_doba"), () => loadPlaces(env, { publicOnly: !chief }), base.places),
+    chief ? loadProposals(env, "where p.status = 'pending' order by p.id asc") : loadProposals(env, ...mine),
+    when(chief, () => loadChiefDesk(env), null),
+  ]);
+  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals });
+  if (desk) Object.assign(base, desk, { hasApiKey: Boolean(env.ANTHROPIC_API_KEY) });
   return base;
 }
 

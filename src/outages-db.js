@@ -33,8 +33,11 @@ export async function loadOutageAreas(env) {
 }
 
 export async function loadOutageBoard(env) {
-  const areas = (await loadOutageAreas(env)).filter((area) => area.enabled);
-  const row = await env.DB.prepare("select fetched_at, status, note, payload from outage_feed where id = 1").first();
+  const [allAreas, row] = await Promise.all([
+    loadOutageAreas(env),
+    env.DB.prepare("select fetched_at, status, note, payload from outage_feed where id = 1").first(),
+  ]);
+  const areas = allAreas.filter((area) => area.enabled);
   return buildBoard({
     fetchedAt: row?.fetched_at ? String(row.fetched_at) : null,
     status: String(row?.status ?? ""),
