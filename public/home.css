@@ -1,0 +1,13 @@
+/* Titulka: na počítači upozornění ve dvou sloupcích vedle maskota, na mobilu pod sebou. */
+.home-hero > * { min-width: 0; }
+
+.home-today { display: grid; gap: 0.8rem; margin-top: 1.1rem; }
+
+.home-today > .waste-teaser { margin-top: 0; }
+
+@media (min-width: 900px) {
+  .home-hero { grid-template-columns: 24rem minmax(0, 1fr); gap: 2rem; }
+  .home-hero > .mascot > img { width: 22rem; }
+  .home-today { display: block; columns: 2; column-gap: 0.8rem; }
+  .home-today > .waste-teaser { break-inside: avoid; margin-bottom: 0.8rem; }
+}

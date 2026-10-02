@@ -5,7 +5,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 ## Kde co je
 
 - `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`)
-- `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…)
+- `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…); `src/home.js` titulka (upozornění vedle maskota, na počítači ve dvou sloupcích, styly v `public/home.css`)
 - `src/db.js`: data webu; `src/proposals-db.js` návrhy zpráv (uložení, schválení, vrácení, stažení, smazání); `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/ads-db.js` reklamy; `src/outages-db.js` odstávky elektřiny
 - `src/notices.js` + `src/notices-db.js`: odstávky vody a uzavírky (uzavírky zatím jen v redakci, viz `PUBLIC_NOTICE_KINDS`); `src/outages-view.js` stránka a karta odstávek
 - `src/munipolis/`: import zpráv města (`feed.js` RSS, `ai.js` pokyny pro Claude, `store.js` D1, `run.js` průchod). Spouští ho cron a tlačítko v redakci. Klíč je tajemství `ANTHROPIC_API_KEY`
