@@ -16,14 +16,29 @@ function slotOf(week, iso) {
   return (week ?? []).find((slot) => slot.day === day) ?? { day, morning: { open: false }, afternoon: { open: false } };
 }
 
+function samePart(a, b) {
+  if (!a?.open || !b?.open) return !a?.open && !b?.open;
+  return a.from === b.from && a.to === b.to && (a.note ?? "") === (b.note ?? "");
+}
+
+function sameSlot(a, b) {
+  return samePart(a.morning, b.morning) && samePart(a.afternoon, b.afternoon);
+}
+
 // Jeden den: hodiny, které ten den opravdu platí, a změna, ze které jsou (nebo null).
+// Den, který změna nechává stejný jako běžně (třeba zavřená neděle), se nezvýrazní.
 export function hoursOn(entity, iso, today) {
   const changes = entity.changes ?? [];
+  const regular = slotOf(entity.week, iso);
   const temporary = changes.filter((change) => change.kind !== "trvala" && change.startsOn <= iso && iso <= change.endsOn).reduce(laterChange, null);
-  if (temporary) return { iso, slot: slotOf(temporary.week, iso), change: temporary, kind: "zmena" };
-  const fresh = changes.filter((change) => change.kind === "trvala" && change.startsOn > today && change.startsOn <= iso).reduce(laterChange, null);
-  if (fresh) return { iso, slot: slotOf(fresh.week, iso), change: fresh, kind: "nova" };
-  return { iso, slot: slotOf(entity.week, iso), change: null, kind: "" };
+  const fresh = temporary
+    ? null
+    : changes.filter((change) => change.kind === "trvala" && change.startsOn > today && change.startsOn <= iso).reduce(laterChange, null);
+  const change = temporary ?? fresh;
+  if (!change) return { iso, slot: regular, change: null, kind: "" };
+  const slot = slotOf(change.week, iso);
+  if (sameSlot(slot, regular)) return { iso, slot, change: null, kind: "" };
+  return { iso, slot, change, kind: temporary ? "zmena" : "nova" };
 }
 
 export function nextDays(entity, today, count = NEXT_DAYS) {

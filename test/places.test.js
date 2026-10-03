@@ -101,12 +101,14 @@ test("Claude vidí místa i lékaře se změnami", () => {
 });
 
 test("stránka, titulka a redakce otevírací doby", () => {
-  const places = [place(1, knihovna, [closure(4, 1, "2026-10-02")])];
+  const places = [place(1, knihovna, [closure(4, 1, "2026-10-02", "2026-10-05")])];
   const data = { places, waste: { today: "2026-10-02" }, now: { date: "2026-10-02", time: "10:00" } };
   const page = placesPage(data, { path: "/oteviraci-doba", copy: {} });
   // Zavření je přímo v příštích 7 dnech, zvýrazněné a s důvodem. Běžná doba je v okně pod nimi.
-  assert.match(page, /<li class="is-today is-change is-off"><span class="day">Pátek 2\.&nbsp;10\.<span class="today-mark">dnes<\/span><\/span><strong>zavřeno<\/strong><p class="change-note"><span class="change-mark">změna<\/span> školení k volbám<\/p><\/li>/);
-  assert.match(page, /<li><span class="day">Pondělí 5\.&nbsp;10\.<\/span>/);
+  assert.match(page, /<li class="is-change is-off"><span class="day">Pondělí 5\.&nbsp;10\.<\/span><strong>zavřeno<\/strong><p class="change-note"><span class="change-mark">změna<\/span> školení k volbám<\/p><\/li>/);
+  // V pátek má knihovna zavřeno i běžně, změna ho nezvýrazní.
+  assert.match(page, /<li class="is-today is-off"><span class="day">Pátek 2\.&nbsp;10\.<span class="today-mark">dnes<\/span><\/span><strong>zavřeno<\/strong><\/li>/);
+  assert.match(page, /<li><span class="day">Úterý 6\.&nbsp;10\.<\/span>/);
   assert.match(page, /<button type="button" class="pop-open" popovertarget="bezne-misto-1">Běžná otevírací doba<\/button>/);
   assert.match(page, /<div class="hours-pop" id="bezne-misto-1" popover>/);
   assert.doesNotMatch(page, /Další změny/);

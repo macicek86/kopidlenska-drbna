@@ -37,6 +37,9 @@ test("příštích 7 dní: změna přepíše běžné hodiny, u překryvu platí
   assert.equal(days[4].slot.morning.to, "13:00");
   assert.match(days[5].slot.morning.note, /ordinuje MUDr\. Ulrychová$/);
   assert.equal(hoursOn(doctor, "2026-10-15", "2026-10-03").change, null);
+  // Sobota a neděle jsou zavřené i běžně, změna je nezvýrazní.
+  assert.equal(hoursOn(doctor, "2026-10-10", "2026-10-03").change, null);
+  assert.equal(hoursOn(doctor, "2026-10-11", "2026-10-03").change, null);
 });
 
 test("nová doba místa se zvýrazní, jen dokud nezačne platit", () => {
