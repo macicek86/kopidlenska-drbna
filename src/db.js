@@ -1,5 +1,6 @@
 import { loadAdProposals, loadAds } from "./ads-db.js";
 import { COPY } from "./copy.js";
+import { attachmentKeys, keptAttachments, readAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
 import { formImage, loadStock } from "./stock-db.js";
 import { readCaption, readFocus } from "./photo.js";
@@ -59,9 +60,9 @@ export { ensureSchema } from "./schema.js";
 export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
 export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 // Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
-const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "");
+const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "").replace("a.attachments, ", "");
 const ARTICLE_FROM =
   "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
 
@@ -100,6 +101,7 @@ function mapArticle(row) {
     imageKey: row.image_key ? String(row.image_key) : null,
     imageFocus: String(row.image_focus ?? ""),
     imageCaption: String(row.image_caption ?? ""),
+    attachments: readAttachments(row.attachments),
     published: asBool(row.published),
     createdOn: String(row.created_at ?? "").slice(0, 10),
     authorId: row.author_id == null || row.author_id === "" ? null : Number(row.author_id),
@@ -127,6 +129,7 @@ function mapProposal(row) {
     imageKey: row.image_key ? String(row.image_key) : null,
     imageFocus: String(row.image_focus ?? ""),
     imageCaption: String(row.image_caption ?? ""),
+    attachments: readAttachments(row.attachments),
     submittedTitle: String(row.submitted_title),
     submittedExcerpt: String(row.submitted_excerpt),
     submittedBody: String(row.submitted_body),
@@ -198,7 +201,7 @@ export async function readArticle(env, input) {
 
 async function loadProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
-    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key, p.image_focus, p.image_caption,
+    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key, p.image_focus, p.image_caption, p.attachments,
             p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at, p.publish_on,
             a.slug as article_slug, a.title as article_title, u.alias as author_alias,
             r.name as rubric_name, parent.name as parent_name
@@ -416,7 +419,7 @@ export async function saveArticle(env, request, input) {
 
   if (input.id) {
     const current = await env.DB.prepare(
-      "select image_key, author_id, title, excerpt, body, category, redacted from articles where id = ?",
+      "select image_key, attachments, author_id, title, excerpt, body, category, redacted from articles where id = ?",
     )
       .bind(input.id)
       .first();
@@ -435,14 +438,16 @@ export async function saveArticle(env, request, input) {
       { title, excerpt, body, category },
     );
     const redacted = (authorIsOther && edited) || asBool(current.redacted) ? 1 : 0;
+    const attachments = keptAttachments(current.attachments, input);
     // Po úpravě textu se klíčová slova smažou a cron je dopočítá znovu (src/keywords.js).
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, redacted = ?, keywords = case when ? then '' else keywords end where id = ?`,
+         image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = case when ? then '' else keywords end where id = ?`,
     )
-      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, redacted, edited ? 1 : 0, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, redacted, edited ? 1 : 0, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
+    for (const key of attachments.removed) await releaseImage(env, key);
     return { ok: true };
   }
 
@@ -461,11 +466,13 @@ export async function saveArticle(env, request, input) {
 export async function removeArticle(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const current = await env.DB.prepare("select image_key from articles where id = ?").bind(id).first();
-  const proposals = (await env.DB.prepare("select id, image_key from proposals where article_id = ?").bind(id).all()).results ?? [];
+  const current = await env.DB.prepare("select image_key, attachments from articles where id = ?").bind(id).first();
+  const proposals = (await env.DB.prepare("select id, image_key, attachments from proposals where article_id = ?").bind(id).all()).results ?? [];
   const keys = new Set();
-  if (current?.image_key) keys.add(String(current.image_key));
-  for (const row of proposals) if (row.image_key) keys.add(String(row.image_key));
+  for (const row of [current, ...proposals]) {
+    if (row?.image_key) keys.add(String(row.image_key));
+    for (const key of attachmentKeys(row?.attachments)) keys.add(key);
+  }
   await env.DB.prepare("delete from proposals where article_id = ?").bind(id).run();
   await env.DB.prepare("delete from articles where id = ?").bind(id).run();
   await forgetArticle(env, id);

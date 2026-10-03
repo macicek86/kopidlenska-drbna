@@ -4,6 +4,7 @@ import { pickAd } from "./ads.js";
 import { facebookUrl, text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
 import { esc } from "./html.js";
+import { attachmentsSection } from "./attachments.js";
 import { articleFigure, storyPhoto } from "./photo.js";
 import { renderArticleHtml } from "./rich.js";
 import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
@@ -122,6 +123,7 @@ export function articlePage(article, ctx, extras = {}) {
             ${articleFigure(article)}
             <div class="prose">${tieHtml(renderArticleHtml(article.body))}</div>
           </div>
+          ${attachmentsSection(article)}
           ${facebookInvite(ctx.copy)}
         </div>
         ${side ? `<aside class="article-side">${side}</aside>` : ""}

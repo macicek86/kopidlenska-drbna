@@ -3,6 +3,7 @@
 import { asBool, clip, IMPORT_ITEM_TABLES, reopenImports, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
 import { readArticle, redactedFlag, textWasEdited } from "./db.js";
 import { forgetProposal, linkEventsToArticle } from "./events-db.js";
+import { attachmentKeys, keptAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
 import { BOT_LOGIN } from "./munipolis/store.js";
 import { formImage } from "./stock-db.js";
@@ -107,7 +108,7 @@ export async function saveProposal(env, request, input) {
 export async function withdrawProposal(env, request, id) {
   const gate = await requireUser(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const row = await env.DB.prepare("select id, author_id, image_key, status from proposals where id = ?")
+  const row = await env.DB.prepare("select id, author_id, image_key, attachments, status from proposals where id = ?")
     .bind(id)
     .first();
   if (!row || Number(row.author_id) !== gate.user.id) return { ok: false, error: "Cizí návrh nejde stáhnout." };
@@ -115,6 +116,7 @@ export async function withdrawProposal(env, request, id) {
   await env.DB.prepare("delete from proposals where id = ?").bind(id).run();
   await forgetProposal(env, id);
   await releaseImage(env, row.image_key ? String(row.image_key) : null);
+  for (const key of attachmentKeys(row.attachments)) await releaseImage(env, key);
   return { ok: true };
 }
 
@@ -136,7 +138,7 @@ export async function approveProposal(env, request, input) {
   if (!gate.ok) return { ok: false, error: gate.error };
   if (!input.id) return { ok: false, error: "Ten návrh už tu není." };
   const proposal = await env.DB.prepare(
-    `select p.id, p.article_id, p.author_id, p.author_name, p.image_key, p.submitted_title, p.submitted_excerpt,
+    `select p.id, p.article_id, p.author_id, p.author_name, p.image_key, p.attachments, p.submitted_title, p.submitted_excerpt,
             p.submitted_body, p.submitted_category, p.status, p.publish_on, p.keywords, p.follows_id, u.login as author_login
      from proposals p left join users u on u.id = p.author_id where p.id = ?`,
   )
@@ -173,6 +175,8 @@ export async function approveProposal(env, request, input) {
   };
   let imageKey = proposal.image_key ? String(proposal.image_key) : null;
   const previousProposalImage = imageKey;
+  // Přílohy přejdou do nové zprávy (úprava existující zprávy je nemá) a návrh si je už nedrží.
+  const attachments = keptAttachments(proposal.attachments, input);
   if (stored.key) imageKey = stored.key;
 
   if (article) {
@@ -202,9 +206,9 @@ export async function approveProposal(env, request, input) {
     const slug = await uniqueSlug(env, slugify(parsed.title));
     const edited = textWasEdited(submitted, finalText);
     const inserted = await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted,
+      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted,
          keywords, follows_id)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?, ?, ?)`,
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -216,6 +220,7 @@ export async function approveProposal(env, request, input) {
         imageKey,
         parsed.imageFocus,
         parsed.imageCaption,
+        attachments.json,
         String(proposal.publish_on ?? ""),
         proposal.author_id,
         proposal.author_name,
@@ -231,7 +236,7 @@ export async function approveProposal(env, request, input) {
 
   await env.DB.prepare(
     `update proposals set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
-       image_focus = ?, image_caption = ?, status = 'approved', note = '' where id = ?`,
+       image_focus = ?, image_caption = ?, attachments = '', status = 'approved', note = '' where id = ?`,
   )
     .bind(
       parsed.title,
@@ -248,6 +253,7 @@ export async function approveProposal(env, request, input) {
   if (stored.key && previousProposalImage && previousProposalImage !== stored.key) {
     await releaseImage(env, previousProposalImage);
   }
+  for (const key of article ? attachmentKeys(proposal.attachments) : attachments.removed) await releaseImage(env, key);
   return { ok: true };
 }
 
@@ -266,11 +272,12 @@ export async function rejectProposal(env, request, input) {
 export async function discardProposal(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const row = await env.DB.prepare("select id, image_key, status from proposals where id = ?").bind(id).first();
+  const row = await env.DB.prepare("select id, image_key, attachments, status from proposals where id = ?").bind(id).first();
   if (!row || row.status !== "pending") return { ok: false, error: "Ten návrh už tu není." };
   await env.DB.prepare("delete from proposals where id = ?").bind(id).run();
   await forgetProposal(env, id);
   await reopenImports(env, { proposalIds: [id] });
   await releaseImage(env, row.image_key ? String(row.image_key) : null);
+  for (const key of attachmentKeys(row.attachments)) await releaseImage(env, key);
   return { ok: true };
 }

@@ -55,6 +55,9 @@ export async function formFields(request) {
     image: form.get("image"),
     imageFocus: text("image_focus"),
     imageCaption: text("image_caption"),
+    // Přílohy zprávy (src/attachments.js): formulář je ukázal a tyhle nechává.
+    attachmentsShown: text("attachments_shown") === "1",
+    keepAttachments: form.getAll("keep_attachment").map(String),
     place: text("place"),
     startsOn: text("startsOn"),
     startsTime: text("startsTime"),

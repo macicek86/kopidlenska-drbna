@@ -2,6 +2,7 @@
 import { formatShort } from "../format.js";
 import { prepareArticleBody } from "../rich.js";
 import { rubricsFrom } from "../rubrics.js";
+import { mediaUrl } from "../html.js";
 import { credit, esc } from "../view.js";
 import { photoField } from "./photo-field.js";
 import { stockPicker } from "./stock-pick.js";
@@ -52,6 +53,26 @@ export function photoControl(source, stock = null) {
   )}`;
 }
 
+// Přílohy ze zdroje (jízdní řády, mapy). Nové se tu nepřidávají, jen jde odškrtnout, co ve zprávě být nemá.
+function attachmentsControl(source) {
+  const list = source?.attachments ?? [];
+  if (!list.length) return "";
+  const items = list
+    .map(
+      (item) => `<li><label class="attachment-pick">
+          <input type="checkbox" name="keep_attachment" value="${esc(item.key)}" checked>
+          <a href="${mediaUrl(item.key)}" target="_blank" rel="noopener"><img src="${mediaUrl(item.key)}" alt="" loading="lazy"></a>
+          <span>${esc(item.caption || "Bez popisku")}</span>
+        </label></li>`,
+    )
+    .join("");
+  return `<div class="field"><span>Přílohy</span>
+      ${hidden("attachments_shown", "1")}
+      <ul class="plain attachment-picks">${items}</ul>
+      <span class="hint">Ukážou se pod zprávou. Odškrtnutá příloha se po uložení smaže.</span>
+    </div>`;
+}
+
 function richTextField(body) {
   const html = prepareArticleBody(body).html;
   return `<div class="field field-rich"><span>Text</span>
@@ -72,6 +93,7 @@ export function articleFields(source, data, { publish } = {}) {
     <div class="form-col-side">
       ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(data.rubrics, source)}</select>`, "Podrubrika je pod svou rubrikou, třeba Fotbal pod Sportem.")}
       ${photoControl(source, data.stock)}
+      ${attachmentsControl(source)}
       ${publish ? `<div class="field"><span>Viditelnost</span>${check("published", "1", publish.checked, "Zveřejnit na webu")}</div>` : ""}
     </div>
   </div>`;

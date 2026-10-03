@@ -10,17 +10,26 @@ import { topicsText } from "../stock.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
+import { MAX_ATTACHMENTS } from "../attachments.js";
 
 export { MODEL, DEFAULT_VOICE };
 export { addArticles, articleLine, contextText } from "../import-overview.js";
 const MAX_IMAGE_BYTES = 3_700_000;
+// Kolik obrázků Claude dostane a kolik dohromady smí mít (dotaz na API má strop 32 MB i s base64).
+const MAX_IMAGES = 8;
+const MAX_IMAGES_BYTES = 18_000_000;
 
 // Obrázek u článku: vlastní fotka jen když stojí za to, jinak ilustrační z knihovny obrázků.
-const IMAGE_RULES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu.
+const IMAGE_RULES = `- Obrázky jsou očíslované (Obrázek 1, 2…). Vlastní fotka nebo plakát je vždy Obrázek 1.
+- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu.
   "plakat", když je přiložený pěkně udělaný plakát nebo pozvánka na akci, kde aspoň zhruba třetinu plochy zabírají fotky nebo kresby. Delší odstavce textu nevadí, rozhodují obrázky. Oznámení, která nezvou na akci (zavřeno, změna, upozornění), jsou "knihovna", i když mají pěkné malované pozadí nebo ozdoby.
   "knihovna" u plakátu nebo letáku, na kterém fotky a kresby skoro nejsou, nebo jsou jen malé (logo, ikonka, drobný obrázek v rohu), a u vyhlášky, tabulky, mapy nebo loga, i když jsou barevné. Když nic přiložené není, taky "knihovna".
 - image_topic: téma z knihovny obrázků, které ke zprávě nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.
 - image_caption: krátký popisek vlastní fotky nebo plakátu (u plakátu třeba „Plakát bazárku“), nebo prázdný text. U "knihovna" vždy prázdný.`;
+
+// Přílohy pod článkem (src/attachments.js): zpráva z Munipolisu mívá v galerii jízdní řády, mapy nebo rozpisy.
+const ATTACHMENT_RULES = `- attachments: obrázky, které si čtenář potřebuje prohlédnout sám a jejich obsah se do textu nevejde: jízdní řády, mapa uzavírky nebo objížďky, rozpis, tabulka, leták s podrobnostmi. U každého číslo obrázku (image) a krátký popisek, co na něm je (caption), třeba „Výlukový jízdní řád linky 723 Kopidlno – Mladá Boleslav“. Obrázek 1 sem nedávej, když je image_use "vlastni" nebo "plakat". Fotky, loga, ozdoby a obrázky, jejichž údaje už celé jsou v textu, taky ne. Když nic takového není, dej prázdné pole.
+  Když přílohy jsou, napiš v textu, že jsou pod článkem („jízdní řády najdete pod článkem“).`;
 
 const RULES = `Dostaneš jednu zprávu z městského Munipolisu Kopidlna a přehled toho, co už na webu Kopidlenská drbna je.
 
@@ -32,7 +41,7 @@ ${FOLLOWUP_DECISION}
 
 Co vytvořit:
 - Odstávka vody: notice s kind "voda". Každou ulici nebo část obce dej do places zvlášť. Článek jen tehdy, když zpráva říká víc než samotnou odstávku.
-- Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice.
+- Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice. Piš přesně, co je zavřené: kterou ulici nebo silnici a odkud kam, podle textu nebo mapy na obrázku. Nadpis zdroje bývá zkratka („Uzavírka – Hilmarovo náměstí“). Když je zavřený jen kus silnice, který na náměstí nebo do obce vede, nepiš, že je zavřené celé náměstí nebo obec, ani v nadpisu. Do notice.places dej jen uzavřené úseky („Tomáše Svobody, úsek před vjezdem na náměstí“), ne celé náměstí.
 - Pozvánka na akci s datem: event a k tomu krátký článek s pozvánkou.
 - Zavření nebo jiná otevírací doba: hours, viz níže.
 - Cokoli jiného: článek.
@@ -42,11 +51,14 @@ ${HOURS_RULES}
 Pravidla:
 - Data, časy, místa, jména, ceny a telefony opiš přesně podle zdroje. Nic nevymýšlej. Když údaj chybí, nech pole prázdné. Rok doplň podle data zveřejnění zprávy.
 - Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
+- Zprávu podej jako svou novinku, ne jako převyprávěné oznámení. Nepiš, že město nebo radnice něco oznámila, informuje, zveřejnila, prosí nebo se omlouvá, ani „v příloze oznámení“. Co zpráva čtenářům říká, napiš rovnou („Řidiči i cestující, počítejte s omezením.“). Město jmenuj jen tam, kde samo něco dělá (opravuje, pořádá, rozhodlo). Odkaz na zdroj drbna přidá sama.
+- Odkazy ze zdroje, které čtenáři pomůžou (mapa uzavírky, objízdná trasa, přihláška), smíš dát do textu jako <a href="adresa">krátký popis</a>. Adresu opiš přesně ze zdroje, jiné nevymýšlej.
 ${IMAGE_RULES}
+${ATTACHMENT_RULES}
 ${KEYWORDS_RULE}
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
-- body_html: dva až pět krátkých odstavců. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
+- body_html: dva až pět krátkých odstavců. Smíš použít jen <p>, <strong>, <em>, <ul>, <li>, <h3> a <a> s odkazem ze zdroje. Odkaz na zdroj nepiš, drbna ho doplní sama.
 - event.description: prostý text, jedna až tři věty.
 - Datum piš jako RRRR-MM-DD a čas jako HH:MM.
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná.
@@ -61,7 +73,8 @@ function stringField() {
 // `hours` přidá pole s otevírací dobou (jen Munipolis, Deník ho nemá). `topics` jsou značky témat knihovny obrázků,
 // `ownImage` dovolí vybrat vlastní fotku (Deník fotky nedává, tam je obrázek vždy z knihovny),
 // `followup` přidá rozhodnutí „doplneni“ (navazující zpráva, src/followup.js).
-export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true, followup = false } = {}) {
+// `attachments` přidá k článku přílohy (obrázky ze zdroje pod článkem).
+export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true, followup = false, attachments = false } = {}) {
   const slugs = rubricSlugs.length ? rubricSlugs : ["zpravy"];
   const schema = {
     type: "object",
@@ -120,6 +133,18 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
   if (ownImage) {
     schema.properties.article.required.push("image_use");
     schema.properties.article.properties.image_use = { type: "string", enum: ["vlastni", "plakat", "knihovna"] };
+  }
+  if (attachments) {
+    schema.properties.article.required.push("attachments");
+    schema.properties.article.properties.attachments = {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["image", "caption"],
+        properties: { image: { type: "integer" }, caption: stringField() },
+      },
+    };
   }
   if (hours) {
     schema.required.push("hours");
@@ -180,7 +205,21 @@ export function readArticle(raw, rubricSlugs) {
     imageTopic: clean(raw.image_topic, 60),
     imageCaption: imageUse !== "knihovna" ? clean(raw.image_caption, 200) : "",
     keywords: readKeywords(raw.keywords),
+    attachments: readAttachmentPicks(raw.attachments, imageUse),
   };
+}
+
+// Které obrázky jdou pod článek: čísla od 1, každé jednou, bez obrázku 1, když je to fotka nebo plakát článku.
+function readAttachmentPicks(raw, imageUse) {
+  if (!Array.isArray(raw)) return [];
+  const picks = [];
+  for (const item of raw) {
+    const index = Number(item?.image);
+    if (!Number.isInteger(index) || index < 1 || picks.some((pick) => pick.index === index)) continue;
+    if (index === 1 && imageUse !== "knihovna") continue;
+    picks.push({ index, caption: clean(item.caption, 200) });
+  }
+  return picks.slice(0, MAX_ATTACHMENTS);
 }
 
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
@@ -245,18 +284,31 @@ export function base64(bytes) {
 }
 
 // API bere obrázek do 5 MB v base64. Větší obrázek Claude neuvidí, a tak ho ani nemůže vybrat jako vlastní fotku.
+// Obrázků je nejvýš MAX_IMAGES a dohromady do MAX_IMAGES_BYTES, další Claude neuvidí.
 export function visibleImages(images) {
-  return images.filter((image) => image.bytes.byteLength <= MAX_IMAGE_BYTES);
+  const shown = [];
+  let total = 0;
+  for (const image of images) {
+    const size = image.bytes.byteLength;
+    if (size > MAX_IMAGE_BYTES || total + size > MAX_IMAGES_BYTES) continue;
+    shown.push(image);
+    total += size;
+    if (shown.length >= MAX_IMAGES) break;
+  }
+  return shown;
 }
 
 // Jedno volání Claude. `images` jsou už stažené obrázky ({ bytes, type }), `topics` témata knihovny obrázků.
 export async function askClaude(env, { item, known, images = [], topics = [], rubricSlugs, voice, today, force = false }) {
   const shown = visibleImages(images);
   const content = [
-    ...shown.map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
+    ...shown.flatMap((image, index) => [
+      { type: "text", text: `Obrázek ${index + 1}:` },
+      { type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } },
+    ]),
     { type: "text", text: userText(item, known, { today, force, topics, images: shown.length }) },
   ];
-  const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug), followup: true });
+  const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug), followup: true, attachments: true });
   const system = systemPrompt(voice, { rubricSlugs });
   const answer = await callClaude(env, { system, content, schema });
   if (!answer.ok) return answer;

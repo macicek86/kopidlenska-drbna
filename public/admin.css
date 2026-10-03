@@ -551,3 +551,8 @@ html { font-size: 100%; }
 .chat-answer summary { cursor: pointer; font-weight: 600; color: var(--brand); font-size: 0.9rem; }
 .chat-answer p { margin: 0.5rem 0 0; padding: 0.7rem 0.9rem; border-radius: 0.6rem; background: var(--surface-2); font-size: 0.92rem; line-height: 1.5; }
 .message-text { margin: 0; padding: 0.7rem 0.9rem; border-radius: 0.6rem; background: var(--surface-2); font-size: 0.95rem; line-height: 1.5; }
+
+/* Přílohy zprávy: náhled s popiskem, zaškrtnuté zůstávají */
+.attachment-picks { display: grid; gap: 0.5rem; }
+.attachment-pick { display: grid; grid-template-columns: auto 4.5rem minmax(0, 1fr); gap: 0.6rem; align-items: center; font-size: 0.9rem; }
+.attachment-pick img { display: block; width: 4.5rem; height: 3.2rem; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-2); }

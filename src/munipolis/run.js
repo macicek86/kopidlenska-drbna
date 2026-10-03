@@ -24,6 +24,7 @@ import { askClaude, visibleImages } from "./ai.js";
 import { saveHoursChanges } from "./hours.js";
 import { ensureBot } from "./store.js";
 import { fetchFeed } from "./feed.js";
+import { fetchPageImages, mergeImageUrls } from "./page.js";
 import {
   countWaitingItems,
   finishItem,
@@ -49,9 +50,11 @@ export function sourceParagraph(link) {
 
 export { importSourceDate, outcomeOf };
 
-async function downloadImages(urls, fetchImpl) {
+// Obrázky z RSS a ze stránky zprávy (galerie s jízdními řády, mapami…). Claude jich uvidí nejvýš tolik, kolik pustí visibleImages.
+async function downloadImages(item, fetchImpl) {
+  const urls = mergeImageUrls(item.images, await fetchPageImages(item.link, { fetchImpl }));
   const images = [];
-  for (const url of urls.slice(0, 2)) {
+  for (const url of urls.slice(0, 8)) {
     const image = await fetchImage(url, { fetchImpl });
     if (image) images.push(image);
   }
@@ -68,12 +71,23 @@ export async function articleImage(env, article, images) {
   return pickStockImage(env, article.imageTopic);
 }
 
+// Přílohy, které Drběna vybrala, se uloží do R2 a půjdou pod článek. Čísla obrázků jsou od 1 v pořadí, jak je Claude viděl.
+export async function articleAttachments(env, article, images) {
+  const shown = visibleImages(images);
+  const list = [];
+  for (const pick of article.attachments ?? []) {
+    const image = shown[pick.index - 1];
+    if (image) list.push({ key: await storeImageBytes(env, image, "prilohy"), caption: pick.caption });
+  }
+  return list;
+}
+
 // Ručně vybranou zprávu Drběna zpracuje vždy (redakce rozhodla) a článek dostane datum ze zdroje. Cron píše s dnešním datem.
 export async function processItem(env, item, settings, { fetchImpl = fetch, ask = askClaude } = {}) {
   const today = pragueNow().date;
   const force = item.manual;
   const rubrics = await rubricMap(env);
-  const images = await downloadImages(item.images, fetchImpl);
+  const images = await downloadImages(item, fetchImpl);
   const answer = await ask(env, {
     item,
     known: await knownContent(env, { itemId: item.id, today }),
@@ -112,6 +126,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
       await saveBotArticle(env, {
         article: answer.article,
         image: await articleImage(env, answer.article, images),
+        attachments: await articleAttachments(env, answer.article, images),
         sourceHtml: sourceParagraph(item.link),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),

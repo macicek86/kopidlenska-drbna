@@ -37,8 +37,8 @@ export async function fetchImage(url, { fetchImpl = fetch } = {}) {
   return { bytes, type };
 }
 
-export async function storeImageBytes(env, image) {
-  const key = `clanky/${crypto.randomUUID()}.${IMAGE_TYPES[image.type]}`;
+export async function storeImageBytes(env, image, folder = "clanky") {
+  const key = `${folder === "prilohy" ? "prilohy" : "clanky"}/${crypto.randomUUID()}.${IMAGE_TYPES[image.type]}`;
   await env.BUCKET.put(key, image.bytes, { httpMetadata: { contentType: image.type } });
   return key;
 }
@@ -56,6 +56,13 @@ export async function releaseImage(env, key) {
   if (ad) return;
   const adProposal = await env.DB.prepare("select 1 as ok from ad_proposals where image_key = ?").bind(key).first();
   if (adProposal) return;
+  // Přílohy zprávy (src/attachments.js) drží JSON, ve kterém je klíč celý.
+  const attached = await env.DB.prepare(
+    "select 1 as ok from articles where instr(attachments, ?) > 0 union all select 1 from proposals where instr(attachments, ?) > 0 limit 1",
+  )
+    .bind(key, key)
+    .first();
+  if (attached) return;
   await env.BUCKET.delete(key);
 }
 

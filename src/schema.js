@@ -22,7 +22,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 let schemaReady = false;
 
@@ -188,6 +188,8 @@ async function ensureArticleColumns(env) {
   // Klíčová slova pro Drběnu (src/keywords.js) a zpráva, na kterou tahle navazuje (doplnění od Drběny).
   await addColumn(env, names, "keywords", "alter table articles add column keywords text not null default ''");
   await addColumn(env, names, "follows_id", "alter table articles add column follows_id integer");
+  // Přílohy ze zdroje (jízdní řády, mapy), JSON podle src/attachments.js.
+  await addColumn(env, names, "attachments", "alter table articles add column attachments text not null default ''");
 }
 
 async function ensureProposalColumns(env) {
@@ -200,6 +202,7 @@ async function ensureProposalColumns(env) {
   await addColumn(env, names, "publish_on", "alter table proposals add column publish_on text not null default ''");
   await addColumn(env, names, "keywords", "alter table proposals add column keywords text not null default ''");
   await addColumn(env, names, "follows_id", "alter table proposals add column follows_id integer");
+  await addColumn(env, names, "attachments", "alter table proposals add column attachments text not null default ''");
 }
 
 // Bod výřezu fotky u reklamy, stejně jako u zprávy.
