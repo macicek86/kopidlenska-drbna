@@ -169,3 +169,9 @@ test("bez klíče Drběna neodpoví", async () => {
   const result = await askDrbena({}, { modelKey: "haiku", system: [], history: [{ role: "user", text: "?" }] });
   assert.equal(result.ok, false);
 });
+
+test("Drběna zná skupinu na Facebooku, jen když je zapnutá", () => {
+  const url = "https://www.facebook.com/groups/kopidlenskadrbna";
+  assert.match(chatInstructions({}, "", url), /\[skupina Kopidlenská drbna\]\(https:\/\/www\.facebook\.com\/groups\/kopidlenskadrbna\)/);
+  assert.doesNotMatch(chatInstructions({}, ""), /Facebook/);
+});

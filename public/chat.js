@@ -1,4 +1,4 @@
-// Web: plovoucí okénko „Zeptej se Drběny“. Rozhovor drží v sessionStorage, ať přežije přechod na jinou stránku.
+// Web: plovoucí okénko „Zeptejte se Drběny“. Rozhovor drží v sessionStorage, ať přežije přechod na jinou stránku.
 // Turnstile se načte, až když člověk poprvé píše; ověření proběhne většinou samo, bez klikání.
 
 const root = document.querySelector("[data-chat]");
@@ -33,16 +33,26 @@ function el(tag, className, text) {
   return node;
 }
 
-// Odkazy jen na vlastní web ([text](/adresa)) a tučné písmo (**text**). Všechno ostatní je čistý text.
+// Odkazy jen na vlastní web ([text](/adresa)) a na skupinu drbny na Facebooku, tučné písmo (**text**). Všechno ostatní je čistý text.
 function inline(parent, text) {
-  const pattern = /\[([^\]]+)\]\((\/(?!\/)[^)\s]*)\)|\*\*([^*]+)\*\*/g;
+  const pattern = /\[([^\]]+)\]\(((?:\/(?!\/)|https:\/\/)[^)\s]*)\)|\*\*([^*]+)\*\*/g;
   let last = 0;
   for (const match of text.matchAll(pattern)) {
     parent.append(text.slice(last, match.index));
-    if (match[2]) {
+    if (match[2]?.startsWith("/")) {
       const link = el("a", "", match[1]);
       link.href = match[2];
       parent.append(link);
+    } else if (match[2]) {
+      if (match[2] === root.dataset.facebook) {
+        const link = el("a", "", match[1]);
+        link.href = match[2];
+        link.target = "_blank";
+        link.rel = "noopener";
+        parent.append(link);
+      } else {
+        parent.append(match[1]);
+      }
     } else {
       parent.append(el("strong", "", match[3]));
     }
@@ -140,11 +150,11 @@ function setup() {
   fab.type = "button";
   fab.setAttribute("aria-expanded", "false");
   fab.setAttribute("aria-controls", "chat-okno");
-  fab.setAttribute("aria-label", "Zeptej se Drběny");
+  fab.setAttribute("aria-label", "Zeptejte se Drběny");
   const face = el("img");
   face.src = "/kozel-maskot.webp";
   face.alt = "";
-  fab.append(face, el("span", "", "Zeptej se Drběny"));
+  fab.append(face, el("span", "", "Zeptejte se Drběny"));
 
   const panel = el("section", "chat-panel");
   panel.id = "chat-okno";

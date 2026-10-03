@@ -38,9 +38,16 @@ export function ownChatPersona(text) {
   return value === normalize(DEFAULT_CHAT_PERSONA) ? "" : value;
 }
 
+// Skupina na Facebooku: jediný odkaz mimo drbnu, který chat smí poslat (public/chat.js ho pozná podle data-facebook).
+export function facebookRule(url) {
+  return `Skupina na Facebooku:
+- Drbna má i skupinu na Facebooku, kde si sousedé povídají, sdílejí fotky a tipy: [skupina Kopidlenská drbna](${url}). Je to jediný odkaz mimo drbnu, který smíš poslat, a jen přesně v tomhle tvaru.
+- Zmiň ji, když se někdo ptá, kde to probrat s ostatními, kde sdílet fotky nebo se na něco zeptat sousedů, nebo jestli je drbna na Facebooku. Jinak ji necpi a nepřidávej ji do každé odpovědi.`;
+}
+
 // Pevná část pokynů: pravidla chatu, povaha z článků (z ní kdo Drběna je) a povaha v chatu.
-export function chatInstructions(drbena, chatPersona) {
-  return `${CHAT_RULES}
+export function chatInstructions(drbena, chatPersona, facebook = "") {
+  return `${CHAT_RULES}${facebook ? `\n\n${facebookRule(facebook)}` : ""}
 
 Tvoje povaha z článků. Vezmi si z ní, kdo jsi a jaká jsi; pravidla psaní článků (třetí osoba, úvodní věta, nadpis) v chatu neplatí:
 """

@@ -5,7 +5,7 @@ import { countdownLabel } from "../src/format.js";
 import { buildWasteView, isoWeek, pragueNow } from "../src/waste.js";
 import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../src/ads.js";
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
-import { text } from "../src/copy.js";
+import { facebookUrl, text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
 import { adPanel, homePage, layout, outagesPage } from "../src/view.js";
 import { articlePage, newsPage } from "../src/news.js";
@@ -1036,4 +1036,13 @@ test("titulka u odstávky ukáže pár míst a kolik jich je ještě", async () 
   assert.equal(teaserPlaces({ placeLabels: ["Husova"], morePlaces: 1 }), "Husova a ještě 1 místo");
   assert.equal(teaserPlaces({ placeLabels: ["Husova"], morePlaces: 7 }), "Husova a dalších 7 míst");
   assert.equal(teaserPlaces({}), "");
+});
+
+test("odkaz na Facebook jde upravit i vypnout pomlčkou", () => {
+  assert.equal(facebookUrl({}), "https://www.facebook.com/groups/kopidlenskadrbna");
+  assert.equal(facebookUrl({ facebook_url: "-" }), "");
+  assert.equal(facebookUrl({ facebook_url: "javascript:alert(1)" }), "");
+  const page = layout({ title: "T", path: "/", body: "", copy: {} });
+  assert.match(page, /<footer>[\s\S]*facebook\.com\/groups\/kopidlenskadrbna[\s\S]*<\/footer>/);
+  assert.doesNotMatch(layout({ title: "T", path: "/", body: "", copy: { facebook_url: "-" } }), /facebook\.com\/groups/);
 });

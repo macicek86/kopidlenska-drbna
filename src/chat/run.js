@@ -1,4 +1,5 @@
 // Chat s Drběnou: veřejné adresy. POST /chat/zacit (Turnstile → lístek) a POST /chat/zeptat (otázka → odpověď).
+import { facebookUrl } from "../copy.js";
 import { loadCopy, loadPublic } from "../db.js";
 import { loadDrbena } from "../drbena-db.js";
 import { formatLong } from "../format.js";
@@ -74,7 +75,7 @@ async function chatSystem(env, request) {
   const ctx = { path: "/", minimal: false, mainOrigin: origin, origin, copy };
   const now = pragueNow();
   return [
-    { type: "text", text: chatInstructions(drbena, settings.persona) },
+    { type: "text", text: chatInstructions(drbena, settings.persona, facebookUrl(copy)) },
     { type: "text", text: siteOverview(data, ctx), cache_control: { type: "ephemeral" } },
     { type: "text", text: `Teď je ${formatLong(now.date).toLowerCase()} ${now.date.slice(0, 4)}, ${now.time} (${now.date}).` },
   ];

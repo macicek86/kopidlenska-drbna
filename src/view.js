@@ -1,7 +1,7 @@
 import { pickAd, safeAdLink } from "./ads.js";
 import { byline } from "./db.js";
 import { esc, mediaUrl } from "./html.js";
-import { text as tx } from "./copy.js";
+import { facebookUrl, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
 import { civilWeekday } from "./waste.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
@@ -67,6 +67,7 @@ export function layout({
   const ogImage = image || (base ? `${base}${OG_IMAGE}` : OG_IMAGE);
   const defaultImage = !image;
   const siteName = tx(copy, "site_name");
+  const facebook = facebookUrl(copy);
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const links = NAV.map(
     ([href, key]) =>
@@ -130,12 +131,13 @@ export function layout({
     <main id="obsah">${body}</main>
     <footer>
       <p>${esc(tx(copy, "footer_copy"))}</p>
+      ${facebook ? `<p><a href="${esc(facebook)}" rel="noopener">${esc(tx(copy, "footer_facebook"))}</a></p>` : ""}
       <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
       ${minimal ? "" : `<a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>`}
     </footer>
   </div>
   ${script}
-  ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"></div><script src="/chat.js" defer></script>` : ""}
+  ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>
 </html>`;
 }

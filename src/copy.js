@@ -154,10 +154,20 @@ export const COPY = [
   { group: "Reklamy", key: "ads_sample", label: "Označení ukázky", value: "ukázka", max: 40 },
   { group: "Reklamy", key: "ads_more", label: "Text odkazu na panelu", value: "Víc", max: 40 },
   { group: "Reklamy", key: "ads_missing", label: "Chybějící reklama", value: "Tahle reklama tu není", max: 80 },
+  { group: "Facebook", key: "facebook_url", label: "Adresa skupiny na Facebooku", value: "https://www.facebook.com/groups/kopidlenskadrbna", max: 200, url: true, hint: "Začíná https://. Když sem napíšete jen pomlčku -, odkazy na Facebook z webu i z chatu zmizí." },
+  { group: "Facebook", key: "footer_facebook", label: "Odkaz v patičce", value: "Přidejte se ke skupině na Facebooku", max: 80 },
+  { group: "Facebook", key: "article_facebook", label: "Věta pod zprávou", value: "Chcete to probrat se sousedy?", max: 120 },
+  { group: "Facebook", key: "article_facebook_link", label: "Odkaz pod zprávou", value: "Pokecejte ve skupině na Facebooku", max: 80 },
   { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Koza Drběna, maskot Kopidlenské drbny", max: 160 },
 ];
 
 const BY_KEY = new Map(COPY.map((item) => [item.key, item]));
+
+// Adresa skupiny na Facebooku, nebo "", když ji redakce vypnula pomlčkou.
+export function facebookUrl(copy) {
+  const value = text(copy, "facebook_url").trim();
+  return /^https:\/\/[^\s"<>]+$/.test(value) ? value : "";
+}
 
 export function text(copy, key) {
   const value = copy?.[key];

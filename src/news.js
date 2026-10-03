@@ -1,6 +1,6 @@
 // Stránky zpráv: seznam s rubrikami a jedna zpráva.
 import { pickAd } from "./ads.js";
-import { text as tx } from "./copy.js";
+import { facebookUrl, text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
 import { esc } from "./html.js";
 import { articleFigure, storyPhoto } from "./photo.js";
@@ -62,6 +62,13 @@ function articleMeta(article, views) {
   return `<p class="meta">${esc(base)}${mark}${read ? ` · <span class="precteno">${esc(read)}</span>` : ""}</p>`;
 }
 
+// Nenápadná pozvánka do skupiny na Facebooku, drbna sama komentáře nemá.
+function facebookInvite(copy) {
+  const url = facebookUrl(copy);
+  if (!url) return "";
+  return `<p class="article-facebook">${esc(tx(copy, "article_facebook"))} <a href="${esc(url)}" rel="noopener">${esc(tx(copy, "article_facebook_link"))}</a></p>`;
+}
+
 export function articlePage(article, ctx, extras = {}) {
   const ad = Object.hasOwn(extras, "ad") ? extras.ad : pickAd(extras.ads);
   const base = siteOrigin(ctx.origin, ctx.mainOrigin);
@@ -82,6 +89,7 @@ export function articlePage(article, ctx, extras = {}) {
         ${articleFigure(article)}
         <div class="prose">${renderArticleHtml(article.body)}</div>
       </div>
+      ${facebookInvite(ctx.copy)}
       ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}`,
   });
 }

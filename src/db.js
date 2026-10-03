@@ -635,6 +635,9 @@ export async function saveCopy(env, request) {
   for (const item of COPY) {
     const value = clip(form.get(item.key), item.max);
     if (!value) return { ok: false, error: `Doplňte pole: ${item.label}.` };
+    if (item.url && value !== "-" && !/^https:\/\/[^\s"<>]+$/.test(value)) {
+      return { ok: false, error: `${item.label}: napište celou adresu začínající https://, nebo pomlčku -.` };
+    }
     statements.push(
       env.DB.prepare(
         "insert into copy (key, value) values (?, ?) on conflict(key) do update set value = excluded.value",
