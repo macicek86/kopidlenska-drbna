@@ -183,11 +183,6 @@ export function contentAd(data, ctx) {
   return ad ? adPanel(ad, ctx.copy) : "";
 }
 
-export function adSlot(data, ctx) {
-  const html = contentAd(data, ctx);
-  return html ? `<div class="ad-slot">${html}</div>` : "";
-}
-
 function adLinkHtml(link, label, preview) {
   if (!link) return "";
   if (preview) return `<span>${esc(label)}</span>`;

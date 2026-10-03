@@ -7,7 +7,7 @@ import { pickAd, readAdFields, readSeenAd, safeAdLink, seenAdCookie } from "../s
 import { byline, knownPermissions, redactedFlag, textWasEdited, userCan } from "../src/db.js";
 import { facebookUrl, text } from "../src/copy.js";
 import { prepareArticleBody, renderArticleHtml } from "../src/rich.js";
-import { adPanel, homePage, layout, outagesPage } from "../src/view.js";
+import { adPanel, eventsPage, homePage, layout, outagesPage } from "../src/view.js";
 import { articlePage, newsPage } from "../src/news.js";
 import { aboutPage, paragraphs } from "../src/about.js";
 import { articleFigure, captionHtml, figureSide, focusClass, readCaption, readFocus, storyPhoto } from "../src/photo.js";
@@ -480,6 +480,13 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.equal(long.match(/class="ad-panel/g).length, 3);
   assert.match(long, /Druhá nabídka/);
   assert.match(long, /Třetí nabídka/);
+  const day = (n) => `2026-${String(Math.floor(n / 28) + 1).padStart(2, "0")}-${String((n % 28) + 1).padStart(2, "0")}`;
+  const events = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, title: `Akce ${i + 1}`, place: "Sál", startsOn: day(i) }));
+  const eventsHtml = eventsPage({ ...bare, events, waste: { today: "2026-12-31" }, ads: others, ad }, { ...ctx, path: "/akce" });
+  assert.equal(eventsHtml.match(/class="ad-panel/g).length, 3);
+  assert.ok(eventsHtml.indexOf("ad-slot") < eventsHtml.indexOf("Akce 25"));
+  const fewEvents = eventsPage({ ...bare, events: events.slice(0, 9), waste: { today: "2026-12-31" }, ads: others, ad }, { ...ctx, path: "/akce" });
+  assert.equal(fewEvents.match(/class="ad-panel/g).length, 1);
   const lonely = newsPage({ ...bare, articles: many, ads: [ad], ad }, { ...ctx, path: "/zpravy" }, "");
   assert.equal(lonely.match(/class="ad-panel/g).length, 1);
 

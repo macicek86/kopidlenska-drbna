@@ -1,5 +1,6 @@
 // Stránky zpráv: seznam s rubrikami a jedna zpráva.
-import { adQueue, pickAd } from "./ads.js";
+import { pageAds, weaveAds } from "./ad-weave.js";
+import { pickAd } from "./ads.js";
 import { facebookUrl, text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
 import { esc } from "./html.js";
@@ -25,24 +26,14 @@ function storyCard(article) {
           </a>`;
 }
 
-// První reklama po dvou zprávách, další vždy po AD_EVERY zprávách, každá jen jednou.
-const AD_FIRST = 2;
-const AD_EVERY = 6;
+// První reklama po dvou zprávách, další vždy po šesti.
+const AD_SPACING = { first: 2, every: 6 };
 
-function weaveAds(cards, data, ctx) {
-  if (!cards.length) return cards;
-  const first = Object.hasOwn(data, "ad") ? data.ad : pickAd(data.ads);
-  if (!first) return cards;
-  const queue = adQueue(data.ads, first);
-  const out = [];
-  cards.forEach((card, index) => {
-    out.push(card);
-    const seen = index + 1;
-    const due = seen === AD_FIRST || (seen > AD_FIRST && (seen - AD_FIRST) % AD_EVERY === 0);
-    if (due && queue.length && seen < cards.length) out.push(adPanel(queue.shift(), ctx.copy));
-  });
-  // Krátký seznam: aspoň jedna reklama na konci, jako dřív.
-  if (cards.length <= AD_FIRST) out.push(adPanel(queue.shift(), ctx.copy));
+function newsCards(cards, data, ctx) {
+  const queue = pageAds(data);
+  const out = weaveAds(cards, queue, ctx.copy, AD_SPACING);
+  // Krátký seznam: aspoň jedna reklama na konci.
+  if (cards.length && cards.length <= AD_SPACING.first && queue.length) out.push(adPanel(queue.shift(), ctx.copy));
   return out;
 }
 
@@ -56,7 +47,7 @@ export function newsPage(data, ctx, rubrika) {
   const title = selected
     ? rubricLabel({ category: selected.name, parentName: selected.parentId ? scope?.name : "" })
     : heading;
-  const cards = weaveAds(visible.map(storyCard), data, ctx);
+  const cards = newsCards(visible.map(storyCard), data, ctx);
   const list = cards.length ? cards.join("") : `<p class="card dashed muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
   return layout({
     ...ctx,
