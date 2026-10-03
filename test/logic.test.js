@@ -490,6 +490,12 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   const lonely = newsPage({ ...bare, articles: many, ads: [ad], ad }, { ...ctx, path: "/zpravy" }, "");
   assert.equal(lonely.match(/class="ad-panel/g).length, 1);
 
+  const framed = adPanel({ ...ad, imageKey: "reklamy/a.webp", imageFocus: "30 70" }, ctx.copy);
+  assert.match(framed, /class="ad-photo fx-3 fy-7"/);
+  const solo = adPanel({ ...ad, imageKey: "reklamy/a.webp", imageFocus: "30 70" }, ctx.copy, { heading: "h1" });
+  assert.match(solo, /class="ad-photo"/);
+  assert.equal(readAdFields({ title: "Kolo", body: "Seřídím.", imageFocus: "33 71" }).imageFocus, "30 70");
+
   const article = articlePage(articles[0], ctx, { ad });
   assert.match(article, /ad-slot/);
   assert.match(article, /href="https:\/\/example.com\/chleb"/);

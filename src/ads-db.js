@@ -4,7 +4,7 @@ import { asBool, clip, requireChief, requireUser, slugify } from "./db-core.js";
 import { releaseImage, storeImage } from "./images.js";
 
 const AD_FIELDS =
-  "a.id, a.slug, a.title, a.body, a.place, a.link, a.image_key, a.enabled, a.sample, a.author_id, a.author_name, a.created_at, u.alias as author_alias";
+  "a.id, a.slug, a.title, a.body, a.place, a.link, a.image_key, a.image_focus, a.enabled, a.sample, a.author_id, a.author_name, a.created_at, u.alias as author_alias";
 const AD_FROM = "ads a left join users u on u.id = a.author_id";
 
 function mapAd(row) {
@@ -16,6 +16,7 @@ function mapAd(row) {
     place: String(row.place ?? ""),
     link: String(row.link ?? ""),
     imageKey: row.image_key ? String(row.image_key) : null,
+    imageFocus: String(row.image_focus ?? ""),
     enabled: asBool(row.enabled),
     sample: asBool(row.sample),
     authorId: row.author_id == null || row.author_id === "" ? null : Number(row.author_id),
@@ -62,7 +63,7 @@ export async function saveAd(env, request, input) {
   if (parsed.error) return { ok: false, error: parsed.error };
   const stored = await storeImage(env, input.image, "reklamy");
   if (stored.error) return { ok: false, error: stored.error };
-  const { title, body, place, link, enabled } = parsed;
+  const { title, body, place, link, imageFocus, enabled } = parsed;
 
   if (input.id) {
     const current = await env.DB.prepare("select id, author_id, image_key from ads where id = ?").bind(input.id).first();
@@ -74,9 +75,9 @@ export async function saveAd(env, request, input) {
     const previous = imageKey;
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
-      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, enabled = ?, sample = 0 where id = ?",
+      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, sample = 0 where id = ?",
     )
-      .bind(title, body, place, link, imageKey, enabled ? 1 : 0, input.id)
+      .bind(title, body, place, link, imageKey, imageFocus, enabled ? 1 : 0, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     return { ok: true };
@@ -84,10 +85,10 @@ export async function saveAd(env, request, input) {
 
   const slug = await uniqueAdSlug(env, slugify(title));
   await env.DB.prepare(
-    `insert into ads (slug, title, body, place, link, image_key, enabled, sample, author_id, author_name, created_at)
-     values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now'))`,
+    `insert into ads (slug, title, body, place, link, image_key, image_focus, enabled, sample, author_id, author_name, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now'))`,
   )
-    .bind(slug, title, body, place, link, stored.key, enabled ? 1 : 0, gate.user.id, gate.user.name)
+    .bind(slug, title, body, place, link, stored.key, imageFocus, enabled ? 1 : 0, gate.user.id, gate.user.name)
     .run();
   return { ok: true };
 }
@@ -134,6 +135,7 @@ function mapAdProposal(row) {
     place: String(row.place ?? ""),
     link: String(row.link ?? ""),
     imageKey: row.image_key ? String(row.image_key) : null,
+    imageFocus: String(row.image_focus ?? ""),
     enabled: asBool(row.enabled),
     status: String(row.status),
     note: String(row.note ?? ""),
@@ -146,7 +148,7 @@ function mapAdProposal(row) {
 
 export async function loadAdProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
-    `select p.id, p.ad_id, p.author_id, p.author_name, p.title, p.body, p.place, p.link, p.image_key,
+    `select p.id, p.ad_id, p.author_id, p.author_name, p.title, p.body, p.place, p.link, p.image_key, p.image_focus,
             p.enabled, p.status, p.note, p.created_at, a.title as ad_title, u.alias as author_alias
      from ad_proposals p
      left join ads a on a.id = p.ad_id
@@ -203,11 +205,11 @@ export async function saveAdProposal(env, request, input) {
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
       `update ad_proposals
-       set title = ?, body = ?, place = ?, link = ?, image_key = ?, enabled = ?,
+       set title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?,
            author_name = ?, status = 'pending', note = ''
        where id = ?`,
     )
-      .bind(parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.enabled ? 1 : 0, gate.user.name, existing.id)
+      .bind(parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.imageFocus, parsed.enabled ? 1 : 0, gate.user.name, existing.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     return { ok: true, updated: true };
@@ -220,10 +222,10 @@ export async function saveAdProposal(env, request, input) {
   }
   await env.DB.prepare(
     `insert into ad_proposals (
-       ad_id, author_id, author_name, title, body, place, link, image_key, enabled, status
-     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       ad_id, author_id, author_name, title, body, place, link, image_key, image_focus, enabled, status
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
   )
-    .bind(adId, gate.user.id, gate.user.name, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.enabled ? 1 : 0)
+    .bind(adId, gate.user.id, gate.user.name, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.imageFocus, parsed.enabled ? 1 : 0)
     .run();
   return { ok: true, updated: false };
 }
@@ -271,19 +273,19 @@ export async function approveAdProposal(env, request, input) {
     const previousAdImage = ad.image_key ? String(ad.image_key) : null;
     const nextImage = imageKey || previousAdImage;
     await env.DB.prepare(
-      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, enabled = ?, sample = 0 where id = ?",
+      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, sample = 0 where id = ?",
     )
-      .bind(parsed.title, parsed.body, parsed.place, parsed.link, nextImage, parsed.enabled ? 1 : 0, linkedId)
+      .bind(parsed.title, parsed.body, parsed.place, parsed.link, nextImage, parsed.imageFocus, parsed.enabled ? 1 : 0, linkedId)
       .run();
     imageKey = nextImage;
     if (previousAdImage && previousAdImage !== nextImage) oldKeys.add(previousAdImage);
   } else {
     const slug = await uniqueAdSlug(env, slugify(parsed.title));
     const created = await env.DB.prepare(
-      `insert into ads (slug, title, body, place, link, image_key, enabled, sample, author_id, author_name, created_at)
-       values (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now'))`,
+      `insert into ads (slug, title, body, place, link, image_key, image_focus, enabled, sample, author_id, author_name, created_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, date('now'))`,
     )
-      .bind(slug, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.enabled ? 1 : 0, proposal.author_id, proposal.author_name)
+      .bind(slug, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.imageFocus, parsed.enabled ? 1 : 0, proposal.author_id, proposal.author_name)
       .run();
     linkedId = Number(created.meta?.last_row_id ?? 0) || null;
     if (!linkedId) {
@@ -294,10 +296,10 @@ export async function approveAdProposal(env, request, input) {
 
   await env.DB.prepare(
     `update ad_proposals
-     set ad_id = ?, title = ?, body = ?, place = ?, link = ?, image_key = ?, enabled = ?, status = 'approved', note = ''
+     set ad_id = ?, title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, status = 'approved', note = ''
      where id = ?`,
   )
-    .bind(linkedId, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.enabled ? 1 : 0, proposal.id)
+    .bind(linkedId, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.imageFocus, parsed.enabled ? 1 : 0, proposal.id)
     .run();
   if (previousProposalImage && previousProposalImage !== imageKey) oldKeys.add(previousProposalImage);
   for (const key of oldKeys) await releaseImage(env, key);

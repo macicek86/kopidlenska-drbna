@@ -23,7 +23,8 @@ function bootPick(field) {
   const dot = field.querySelector("[data-photo-dot]");
   const now = field.querySelector("[data-photo-now]");
   const images = [...field.querySelectorAll("[data-photo-src]")];
-  const crops = [...field.querySelectorAll("[data-photo-crop]")];
+  // Výřez ukazují i náhledy mimo pole, třeba panel reklamy vedle formuláře.
+  const crops = [...(field.closest("form") ?? field).querySelectorAll("[data-photo-crop]")];
   if (!fileInput || !focusInput || !pick || !full || !dot) return;
 
   let focus = parseFocus(focusInput.value) ?? { x: 50, y: 50 };

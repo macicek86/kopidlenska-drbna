@@ -1,9 +1,9 @@
 // Formulář zprávy v redakci: pole zprávy, rubrika, fotka a schválení návrhu.
 import { formatShort } from "../format.js";
-import { readFocus } from "../photo.js";
 import { prepareArticleBody } from "../rich.js";
 import { rubricsFrom } from "../rubrics.js";
-import { credit, esc, mediaUrl } from "../view.js";
+import { credit, esc } from "../view.js";
+import { photoField } from "./photo-field.js";
 import { stockPicker } from "./stock-pick.js";
 import { callout, cancelLink, check, field, formFoot, hidden, input, modalLink } from "./ui.js";
 
@@ -36,30 +36,15 @@ export function rubricOptions(rubrics, source) {
 }
 
 export function photoControl(source, stock = null) {
-  const current = source?.imageKey ? mediaUrl(source.imageKey) : "";
-  const now = current
-    ? `<figure class="photo-now" data-photo-now><img src="${current}" alt=""><figcaption>Současná fotka. Nová ji nahradí.</figcaption></figure>`
-    : "";
-  return `<div class="field photo-field" data-photo${current ? ` data-current="${esc(current)}"` : ""}>
-    <span>Fotka</span>
-    ${now}
-    <input class="control" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif">
-    <span class="hint">Před odesláním se v prohlížeči zmenší. Stačí fotka z mobilu.</span>
-    <input type="hidden" name="image_focus" value="${esc(readFocus(source?.imageFocus))}" data-photo-focus>
-    <div class="photo-pick" data-photo-pick hidden>
-      <p class="photo-pick-title">Ťukněte na to, co má být vidět</p>
-      <div class="photo-pick-full" data-photo-full tabindex="0" role="button" aria-label="Místo, které má zůstat vidět. Posunete ho i šipkami.">
-        <img alt="" data-photo-src>
-        <span class="photo-dot" data-photo-dot></span>
-      </div>
-      <div class="photo-pick-previews">
-        <figure><div class="photo-crop photo-crop-list"><img alt="" data-photo-src data-photo-crop></div><figcaption>Přehled zpráv</figcaption></figure>
-        <figure><div class="photo-crop photo-crop-wide"><img alt="" data-photo-src data-photo-crop></div><figcaption>Mobil a titulka</figcaption></figure>
-      </div>
-      <p class="hint">Ve zprávě samotné bude fotka vidět celá.</p>
-    </div>
-    ${stockPicker(stock)}
-  </div>
+  return `${photoField(source, {
+    hint: "Před odesláním se v prohlížeči zmenší. Stačí fotka z mobilu.",
+    previews: [
+      { crop: "list", label: "Přehled zpráv" },
+      { crop: "wide", label: "Mobil a titulka" },
+    ],
+    note: "Ve zprávě samotné bude fotka vidět celá.",
+    extra: stockPicker(stock),
+  })}
   ${field(
     "Popisek fotky",
     `<input class="${input}" name="image_caption" maxlength="200" value="${esc(source?.imageCaption ?? "")}" placeholder="Foto: Jana Nováková">`,

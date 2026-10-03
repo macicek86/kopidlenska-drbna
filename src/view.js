@@ -3,6 +3,7 @@ import { byline } from "./db.js";
 import { esc, mediaUrl } from "./html.js";
 import { facebookUrl, text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
+import { focusClass } from "./photo.js";
 import { civilWeekday } from "./waste.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
@@ -208,10 +209,12 @@ export function adPanel(ad, copy, options = {}) {
   const who = byline(ad);
   const meta = [when, who].filter(Boolean).join(" · ");
   const more = adLinkHtml(link, tx(copy, "ads_more"), preview);
+  // Na panelu se fotka ořízne podle bodu výřezu, na stránce jedné nabídky je vidět celá.
+  const photoClass = ["ad-photo", heading === "h1" ? "" : focusClass(ad.imageFocus)].filter(Boolean).join(" ");
   const photo = ad.imageKey
-    ? `<img class="ad-photo"${preview ? ` data-ad="photo"` : ""} src="${mediaUrl(ad.imageKey)}" alt="">`
+    ? `<img class="${photoClass}"${preview ? ` data-ad="photo" data-photo-crop` : ""} src="${mediaUrl(ad.imageKey)}" alt="">`
     : preview
-      ? `<img class="ad-photo" data-ad="photo" alt="" hidden>`
+      ? `<img class="ad-photo" data-ad="photo" data-photo-crop alt="" hidden>`
       : "";
   const placeRow =
     placeText || preview

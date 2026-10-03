@@ -37,7 +37,7 @@
   pointer-events: none;
 }
 
-.photo-pick-previews { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.photo-pick-previews { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.7rem; }
 .photo-pick-previews figure { margin: 0; display: grid; gap: 0.25rem; }
 .photo-pick-previews figcaption { color: var(--muted); font-size: 0.8rem; }
 
@@ -45,3 +45,5 @@
 .photo-crop img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .photo-crop-list { aspect-ratio: 3 / 2; }
 .photo-crop-wide { aspect-ratio: 16 / 9; }
+.photo-crop-strip { aspect-ratio: 9 / 4; }
+.photo-crop-side { aspect-ratio: 4 / 3; }

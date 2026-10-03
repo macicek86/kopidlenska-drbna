@@ -20,7 +20,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 let schemaReady = false;
 
@@ -193,6 +193,15 @@ async function ensureProposalColumns(env) {
   await addColumn(env, names, "image_caption", "alter table proposals add column image_caption text not null default ''");
   // Datum, se kterým má zpráva po schválení vyjít (import podle data ve zdroji). Prázdné = den schválení.
   await addColumn(env, names, "publish_on", "alter table proposals add column publish_on text not null default ''");
+}
+
+// Bod výřezu fotky u reklamy, stejně jako u zprávy.
+async function ensureAdColumns(env) {
+  for (const table of ["ads", "ad_proposals"]) {
+    const info = await env.DB.prepare(`pragma table_info(${table})`).all();
+    const names = new Set((info.results ?? []).map((row) => row.name));
+    await addColumn(env, names, "image_focus", `alter table ${table} add column image_focus text not null default ''`);
+  }
 }
 
 async function seedRubrics(env) {
@@ -401,6 +410,7 @@ async function migrateSchema(env) {
      where id = 1 and not exists (select 1 from users)`,
   ).run();
   await migrateSession(env);
+  await ensureAdColumns(env);
   await seedAds(env);
   await renameCopy(env);
   return true;

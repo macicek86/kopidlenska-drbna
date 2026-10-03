@@ -1,6 +1,7 @@
 import { PANEL_BYTES, PANEL_EDGE } from "../ads.js";
 import { byline } from "../db.js";
 import { adPanel, credit, esc } from "../view.js";
+import { photoField } from "./photo-field.js";
 import { adminShell } from "./shell.js";
 import {
   badge,
@@ -31,6 +32,7 @@ function adDraft(source, user, sample) {
     place: source?.place ?? "",
     link: source?.link ?? "",
     imageKey: source?.imageKey ?? null,
+    imageFocus: source?.imageFocus ?? "",
     sample: Boolean(sample && source?.sample),
     slug: "",
     createdOn: source?.createdOn ?? "",
@@ -53,11 +55,15 @@ function adEditorForm(ctx, { action, help, banner = "", hiddenFields = "", draft
           ${field("Odkaz", `<input class="${input}" name="link" maxlength="240" value="${esc(draft.link)}" placeholder="https://… nebo /cesta" inputmode="url">`)}
         </div>
         <span class="hint">Odkaz je volitelný. Na panelu se ukáže jako Víc. Adresa začíná na https://, http://, mailto: nebo /.</span>
-        ${field(
-          "Fotka",
-          `<input class="${input}" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" data-edge="${PANEL_EDGE}" data-bytes="${PANEL_BYTES}">`,
-          `Volitelná. Před odesláním se v prohlížeči zmenší a uloží jako WEBP. Delší strana nejvýš ${PANEL_EDGE} px.${draft.imageKey ? " Nová fotka nahradí tu současnou." : ""}`,
-        )}
+        ${photoField(draft, {
+          inputAttrs: ` data-edge="${PANEL_EDGE}" data-bytes="${PANEL_BYTES}"`,
+          hint: "Volitelná. Před odesláním se v prohlížeči zmenší. Stačí fotka z mobilu.",
+          previews: [
+            { crop: "strip", label: "Panel na mobilu" },
+            { crop: "side", label: "Panel na počítači" },
+          ],
+          note: "Na stránce nabídky bude fotka vidět celá.",
+        })}
         ${check("enabled", "1", draft.enabled, "Zobrazovat na webu")}
       </div>
       <div class="ad-stage">
@@ -212,7 +218,10 @@ function contributorAds(ctx, data, message, query) {
 
   const editorFor = (source) => {
     const draft = adDraft(source.proposal ?? source.target, data.user, false);
-    if (!source.proposal && source.target?.imageKey) draft.imageKey = source.target.imageKey;
+    if (!source.proposal && source.target?.imageKey) {
+      draft.imageKey = source.target.imageKey;
+      draft.imageFocus = source.target.imageFocus;
+    }
     const editingAd = Boolean(source.proposal?.adId || source.target);
     const returned =
       source.proposal?.status === "rejected"

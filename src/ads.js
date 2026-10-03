@@ -1,3 +1,5 @@
+import { readFocus } from "./photo.js";
+
 export const PANEL_EDGE = 960;
 export const PANEL_BYTES = 180_000;
 
@@ -63,7 +65,7 @@ export function readAdFields(input) {
   if (body.length < 2) return { error: "Doplňte text nabídky." };
   const link = safeAdLink(input?.link);
   if (link && typeof link === "object") return link;
-  return { title, body, place, link, enabled: Boolean(input?.enabled) };
+  return { title, body, place, link, imageFocus: readFocus(input?.imageFocus), enabled: Boolean(input?.enabled) };
 }
 
 export const AD_SEEN_COOKIE = "drbna_reklama";
