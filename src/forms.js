@@ -34,6 +34,7 @@ export function adminQuery(url) {
     uploadTopicId: positiveParam(url, "nahrat"),
     freshTopic: url.searchParams.has("nove-tema"),
     clearChat: url.searchParams.has("smazat-otazky"),
+    eventId: positiveParam(url, "akce"),
   };
 }
 
@@ -56,6 +57,10 @@ export async function formFields(request) {
     startsOn: text("startsOn"),
     startsTime: text("startsTime"),
     description: text("description"),
+    // Akce: připojená zpráva, nebo zpráva psaná k akci. „Potom napsat zprávu“ u nové akce.
+    eventArticleId: positive("zprava"),
+    eventId: positive("akce"),
+    writeArticle: text("potom") === "zprava",
     password: text("password"),
     login: text("login"),
     email: text("email"),

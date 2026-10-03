@@ -58,6 +58,7 @@ export const COPY = [
   { group: "Akce", key: "events_upcoming", label: "Nadpis nadcházejících akcí", value: "Chystá se", max: 40 },
   { group: "Akce", key: "events_upcoming_empty", label: "Když se nic nechystá", value: "Žádná zveřejněná pozvánka. Až bude, objeví se tady.", max: 240, long: true },
   { group: "Akce", key: "events_past", label: "Nadpis proběhlých akcí", value: "Už proběhlo", max: 40 },
+  { group: "Akce", key: "events_article", label: "Odkaz na zprávu k akci", value: "Víc ve zprávě", max: 40 },
 
   { group: "Popelnice", key: "bins_description", label: "Popis stránky svozu", value: "Nejbližší svoz směsného odpadu v Kopidlně.", max: 240, long: true },
   { group: "Popelnice", key: "bins_title", label: "Název stránky svozu", value: "Kdy se sváží", max: 40 },

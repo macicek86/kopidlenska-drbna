@@ -23,6 +23,7 @@ import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/stor
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
 import { loadDrbena } from "./drbena-db.js";
+import { attachArticle, forgetArticle, loadEvents } from "./events-db.js";
 import { countNewMessages } from "./messages-db.js";
 import { loadUsers } from "./users-db.js";
 import { accessConfig } from "./access.js";
@@ -100,18 +101,6 @@ function mapArticle(row) {
     authorName: String(row.author_name ?? ""),
     authorAlias: String(row.author_alias ?? "").trim(),
     redacted: asBool(row.redacted),
-  };
-}
-
-function mapEvent(row) {
-  return {
-    id: Number(row.id),
-    title: String(row.title),
-    place: String(row.place),
-    startsOn: String(row.starts_on ?? "").slice(0, 10),
-    startsTime: String(row.starts_time ?? ""),
-    description: String(row.description ?? ""),
-    published: asBool(row.published),
   };
 }
 
@@ -249,10 +238,7 @@ export async function loadPublic(env) {
       `select ${ARTICLE_LIST_FIELDS}
        from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`,
     ).all(),
-    env.DB.prepare(
-      `select id, title, place, starts_on, starts_time, description, published
-       from events where published = 1 order by starts_on asc, starts_time asc, id asc`,
-    ).all(),
+    loadEvents(env, { publicOnly: true }),
     loadYards(env, { publicOnly: true, today }),
     loadDoctors(env, { publicOnly: true, today }),
     loadPlaces(env, { publicOnly: true, today }),
@@ -263,7 +249,7 @@ export async function loadPublic(env) {
   ]);
   return {
     articles: articles.results.map(mapArticle),
-    events: events.results.map(mapEvent),
+    events,
     yards,
     doctors,
     places,
@@ -302,10 +288,7 @@ async function loadChiefDesk(env) {
       loadDenikSettings(env),
       loadDenikItems(env),
       loadDrbena(env),
-      env.DB.prepare(
-        `select id, title, place, starts_on, starts_time, description, published
-         from events order by starts_on asc, starts_time asc, id asc`,
-      ).all(),
+      loadEvents(env),
       loadUsers(env),
     ]);
   return {
@@ -319,7 +302,7 @@ async function loadChiefDesk(env) {
     denikSettings,
     denikItems,
     drbena,
-    events: events.results.map(mapEvent),
+    events,
     users,
   };
 }
@@ -438,12 +421,14 @@ export async function saveArticle(env, request, input) {
   }
 
   const slug = await uniqueSlug(env, slugify(title));
-  await env.DB.prepare(
+  const inserted = await env.DB.prepare(
     `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, 0)`,
   )
     .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, input.published ? 1 : 0, gate.user.id, gate.user.name)
     .run();
+  // Zpráva psaná k akci (z redakce akcí) se k ní rovnou připojí.
+  await attachArticle(env, input.eventId, Number(inserted.meta?.last_row_id));
   return { ok: true };
 }
 
@@ -457,41 +442,8 @@ export async function removeArticle(env, request, id) {
   for (const row of proposals) if (row.image_key) keys.add(String(row.image_key));
   await env.DB.prepare("delete from proposals where article_id = ?").bind(id).run();
   await env.DB.prepare("delete from articles where id = ?").bind(id).run();
+  await forgetArticle(env, id);
   for (const key of keys) await releaseImage(env, key);
-  return { ok: true };
-}
-
-export async function saveEvent(env, request, input) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const title = clip(input.title, 160);
-  const place = clip(input.place, 160);
-  const description = clip(input.description, 4000);
-  const startsTime = clip(input.startsTime, 8);
-  const startsOn = clip(input.startsOn, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startsOn)) return { ok: false, error: "Doplňte datum." };
-  if (title.length < 3) return { ok: false, error: "Doplňte název akce." };
-  if (place.length < 2) return { ok: false, error: "Doplňte místo." };
-  if (input.id) {
-    await env.DB.prepare(
-      "update events set title = ?, place = ?, starts_on = ?, starts_time = ?, description = ?, published = ? where id = ?",
-    )
-      .bind(title, place, startsOn, startsTime, description, input.published ? 1 : 0, input.id)
-      .run();
-    return { ok: true };
-  }
-  await env.DB.prepare(
-    "insert into events (title, place, starts_on, starts_time, description, published) values (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(title, place, startsOn, startsTime, description, input.published ? 1 : 0)
-    .run();
-  return { ok: true };
-}
-
-export async function removeEvent(env, request, id) {
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from events where id = ?").bind(id).run();
   return { ok: true };
 }
 

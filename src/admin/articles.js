@@ -8,18 +8,32 @@ import { contributorArticles } from "./articles-contributor.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, confirmForm, formFoot, hidden, item, list, modal, modalLink, openButton, pageHead, panel } from "./ui.js";
 
-function articleForm(data, editing, close) {
+function articleForm(data, editing, close, event = null) {
   const help = !editing
     ? `Jde na web hned a podepíše se jako ${esc(byline(data.user) || "Redakce")}.`
     : credit(editing) && editing.authorId !== data.user?.id
       ? `Autor zůstává ${esc(credit(editing))}. Když změníte text, na webu se objeví nanejvýš slovo Redigováno.`
       : "Úprava jde na web hned.";
+  const forEvent = event ? `<br>Zpráva k akci <b>${esc(event.title)}</b>. V kalendáři u ní bude odkaz.` : "";
   return `<form class="form" method="post" action="${BASE}/ulozit" enctype="multipart/form-data">
-    ${callout(help)}
+    ${callout(`${help}${forEvent}`)}
     ${editing ? hidden("id", editing.id) : ""}
-    ${articleFields(editing, data, { publish: { checked: editing ? editing.published : true } })}
+    ${event ? hidden("akce", event.id) : ""}
+    ${articleFields(editing ?? eventDraft(event), data, { publish: { checked: editing ? editing.published : true } })}
     ${formFoot("Uložit", cancelLink(close))}
   </form>`;
+}
+
+// Nová zpráva k akci: předvyplní se z akce, redaktor ji dopíše.
+function eventDraft(event) {
+  if (!event) return null;
+  const when = `${formatLong(event.startsOn)}${event.startsTime ? ` v ${event.startsTime}` : ""}`;
+  return {
+    title: event.title,
+    excerpt: `${when}, ${event.place}.`,
+    body: event.description ? `<p>${esc(event.description)}</p>` : "",
+    category: "Kultura",
+  };
 }
 
 function chiefArticles(ctx, data, message, query) {
@@ -28,6 +42,7 @@ function chiefArticles(ctx, data, message, query) {
   const removing = data.articles.find((row) => row.id === query.confirmId) ?? null;
   const discarding = data.proposals.find((row) => row.id === query.discardId) ?? null;
   const pending = data.proposals.filter((row) => row.status === "pending");
+  const event = query.fresh ? (data.events.find((row) => row.id === query.eventId) ?? null) : null;
 
   const queue = pending.map((row) =>
     item({
@@ -53,11 +68,11 @@ function chiefArticles(ctx, data, message, query) {
   const dialogs = [
     modal({
       id: "nova-zprava",
-      title: "Nová zpráva",
+      title: event ? "Nová zpráva k akci" : "Nová zpráva",
       size: "wide",
-      close: BASE,
+      close: event ? "/redakce/akce" : BASE,
       open: Boolean(query.fresh) && !proposal && !editing && !removing && !discarding,
-      body: articleForm(data, null, BASE),
+      body: articleForm(data, null, event ? "/redakce/akce" : BASE, event),
     }),
   ];
   if (editing) dialogs.push(modal({ id: "okno", title: "Upravit zprávu", size: "wide", close: BASE, open: true, body: articleForm(data, editing, BASE) }));

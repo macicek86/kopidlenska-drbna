@@ -5,10 +5,11 @@ import { facebookUrl, text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
 import { civilWeekday } from "./waste.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
-import { eventLd, jsonLdTag } from "./seo.js";
+import { jsonLdTag } from "./seo.js";
 
 export { outageCard, outageEmpty, outagesPage } from "./outages-view.js";
 export { homePage } from "./home.js";
+export { eventsPage } from "./events-view.js";
 export { doctorsPage, placesPage } from "./hours-view.js";
 
 const NAV = [
@@ -177,7 +178,7 @@ export function contentAd(data, ctx) {
   return ad ? adPanel(ad, ctx.copy) : "";
 }
 
-function adSlot(data, ctx) {
+export function adSlot(data, ctx) {
   const html = contentAd(data, ctx);
   return html ? `<div class="ad-slot">${html}</div>` : "";
 }
@@ -288,41 +289,6 @@ export function missingPage(ctx) {
     title: `${tx(ctx.copy, "missing_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "missing_description"),
     body: `<h1>${esc(tx(ctx.copy, "missing_heading"))}</h1><a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>`,
-  });
-}
-
-function eventList(title, items, empty) {
-  const body = items.length
-    ? `<div class="stack">${items
-        .map(
-          (event) => `<article class="card">
-            <p class="kicker">${esc(formatLong(event.startsOn))}${event.startsTime ? ` · ${esc(event.startsTime)}` : ""}</p>
-            <h3>${esc(event.title)}</h3>
-            <p class="meta">${esc(event.place)}</p>
-            ${event.description ? `<p class="muted">${esc(event.description)}</p>` : ""}
-          </article>`,
-        )
-        .join("")}</div>`
-    : `<p class="muted">${esc(empty)}</p>`;
-  return `<section class="block"><h2>${esc(title)}</h2>${body}</section>`;
-}
-
-export function eventsPage(data, ctx) {
-  const upcoming = data.events.filter((event) => event.startsOn >= data.waste.today);
-  const past = data.events.filter((event) => event.startsOn < data.waste.today).reverse();
-  return layout({
-    ...ctx,
-    title: `${tx(ctx.copy, "events_heading")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "events_description"),
-    jsonLd: upcoming.map((event) => eventLd(siteOrigin(ctx.origin, ctx.mainOrigin), event)),
-    body: `
-      <p class="eyebrow">${esc(tx(ctx.copy, "events_eyebrow"))}</p>
-      <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>
-      <p class="lede">${esc(tx(ctx.copy, "events_lede"))}</p>
-      ${askLine(ctx, "events", "K akcím: ")}
-      ${eventList(tx(ctx.copy, "events_upcoming"), upcoming, tx(ctx.copy, "events_upcoming_empty"))}
-      ${adSlot(data, ctx)}
-      ${past.length ? eventList(tx(ctx.copy, "events_past"), past, "") : ""}`,
   });
 }
 

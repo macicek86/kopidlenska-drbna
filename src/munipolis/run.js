@@ -1,4 +1,5 @@
 // Jeden průchod importu: stáhnout RSS, nové zprávy dát Claudovi a výsledek uložit jako návrh, akci nebo odstávku.
+import { insertBotEvent } from "../events-db.js";
 import {
   CLICK_BUDGET_MS,
   CLICK_LOCK_SECONDS,
@@ -104,13 +105,12 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
     );
   }
   if (answer.event) {
-    const event = answer.event;
-    const result = await env.DB.prepare(
-      "insert into events (title, place, starts_on, starts_time, description, published) values (?, ?, ?, ?, ?, ?)",
-    )
-      .bind(event.title, event.place, event.startsOn, event.startsTime, event.description, settings.autoPublish ? 1 : 0)
-      .run();
-    made.eventId = Number(result.meta.last_row_id);
+    // K akci patří zpráva (nebo návrh), kterou Drběna napsala ze stejné zprávy.
+    made.eventId = await insertBotEvent(env, answer.event, {
+      published: settings.autoPublish,
+      articleId: made.articleId,
+      proposalId: made.proposalId,
+    });
   }
   if (answer.notice) {
     made.noticeId = await insertNotice(env, { ...answer.notice, sourceUrl: item.link, published: settings.autoPublish });

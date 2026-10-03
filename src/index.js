@@ -12,14 +12,12 @@ import {
   removeClosure,
   removeDoctor,
   removeDoctorChange,
-  removeEvent,
   removeYard,
   saveClosure,
   saveCopy,
   saveDoctor,
   saveDoctorChange,
   saveDoctorHours,
-  saveEvent,
   saveProfile,
   saveSite,
   saveYard,
@@ -104,15 +102,14 @@ import { MESSAGES_OK, messagesPost } from "./post-messages.js";
 import { loadMessages } from "./messages-db.js";
 import { ARTICLES_OK, articlesPost } from "./post-articles.js";
 import { ADS_OK, adsPost } from "./post-ads.js";
+import { EVENTS_OK, eventsPost } from "./post-events.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
 const OK = {
   ...ARTICLES_OK,
   ...ADS_OK,
-  akce: "Akce je uložená.",
-  "akce-upravena": "Akce je upravená.",
-  "akce-smazana": "Akce je smazaná.",
+  ...EVENTS_OK,
   web: "Svoz a kontakt jsou uložené.",
   texty: "Texty jsou uložené.",
   heslo: "Heslo je změněné.",
@@ -438,17 +435,6 @@ async function renderPost(request, env, url, execution) {
     if (!result.ok) return redirect(`/redakce/rubriky?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/rubriky?ok=rubrika-smazana");
   }
-  if (path === "/redakce/akce/ulozit") {
-    const result = await saveEvent(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/akce?chyba=${encodeURIComponent(result.error)}`);
-    return redirect(`/redakce/akce?ok=${fields.id ? "akce-upravena" : "akce"}`);
-  }
-  if (path === "/redakce/akce/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/akce");
-    const result = await removeEvent(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/akce?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/akce?ok=akce-smazana");
-  }
   if (path === "/redakce/svoz/ulozit") {
     const result = await saveSite(env, request, fields);
     if (!result.ok) return redirect(`/redakce/svoz?chyba=${encodeURIComponent(result.error)}`);
@@ -512,6 +498,7 @@ async function renderPost(request, env, url, execution) {
   const section =
     (await articlesPost(path, request, env, fields)) ??
     (await adsPost(path, request, env, fields)) ??
+    (await eventsPost(path, request, env, fields)) ??
     (await outagePost(path, request, env, fields)) ??
     (await placesPost(path, request, env, fields)) ??
     (await stockPost(path, request, env, fields)) ??

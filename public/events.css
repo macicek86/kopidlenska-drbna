@@ -1,0 +1,4 @@
+/* Odkazy pod akcí v kalendáři a na titulce: zpráva na drbně, odkaz jinam. */
+.event-links { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; margin: 0.6rem 0 0; }
+.event-links a { color: var(--brand-dark); font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+.event-links a:hover { text-decoration: underline; }

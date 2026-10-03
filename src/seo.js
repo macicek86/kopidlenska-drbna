@@ -166,6 +166,6 @@ export function eventLd(base, event) {
       name: event.place || "Kopidlno",
       address: { "@type": "PostalAddress", addressLocality: "Kopidlno", addressRegion: "Královéhradecký kraj", addressCountry: "CZ" },
     },
-    url: absolute(base, "/akce"),
+    url: absolute(base, event.articleSlug ? `/zpravy/${event.articleSlug}` : "/akce"),
   };
 }

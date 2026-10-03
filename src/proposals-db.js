@@ -2,6 +2,7 @@
 // Návrhy od Drběny smí schválit i přispěvatel s oprávněním `drbena_navrhy`.
 import { asBool, clip, IMPORT_ITEM_TABLES, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
 import { readArticle, redactedFlag, textWasEdited } from "./db.js";
+import { forgetProposal, linkEventsToArticle } from "./events-db.js";
 import { releaseImage } from "./images.js";
 import { BOT_LOGIN } from "./munipolis/store.js";
 import { formImage } from "./stock-db.js";
@@ -112,6 +113,7 @@ export async function withdrawProposal(env, request, id) {
   if (!row || Number(row.author_id) !== gate.user.id) return { ok: false, error: "Cizí návrh nejde stáhnout." };
   if (row.status === "approved") return { ok: false, error: "Schválený návrh už je zpráva." };
   await env.DB.prepare("delete from proposals where id = ?").bind(id).run();
+  await forgetProposal(env, id);
   await releaseImage(env, row.image_key ? String(row.image_key) : null);
   return { ok: true };
 }
@@ -219,6 +221,7 @@ export async function approveProposal(env, request, input) {
       )
       .run();
     await linkImports(env, proposal.id, Number(inserted.meta?.last_row_id));
+    await linkEventsToArticle(env, proposal.id, Number(inserted.meta?.last_row_id));
   }
 
   await env.DB.prepare(
@@ -261,6 +264,7 @@ export async function discardProposal(env, request, id) {
   const row = await env.DB.prepare("select id, image_key, status from proposals where id = ?").bind(id).first();
   if (!row || row.status !== "pending") return { ok: false, error: "Ten návrh už tu není." };
   await env.DB.prepare("delete from proposals where id = ?").bind(id).run();
+  await forgetProposal(env, id);
   await releaseImage(env, row.image_key ? String(row.image_key) : null);
   return { ok: true };
 }

@@ -9,6 +9,7 @@ import { groupedNotices } from "./places.js";
 import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
 import { siteLd } from "./seo.js";
+import { eventLinks } from "./events-view.js";
 import { clockOf, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
 
 function wasteTeaser(data, ctx) {
@@ -124,6 +125,7 @@ function eventsHtml(data, ctx) {
         <p class="kicker">${esc(formatLong(event.startsOn))}</p>
         <h3>${esc(event.title)}</h3>
         <p class="muted">${esc(event.place)}${event.startsTime ? ` · ${esc(event.startsTime)}` : ""}</p>
+        ${eventLinks(event, ctx)}
       </article>`,
     )
     .join("")}</div>`;

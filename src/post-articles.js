@@ -52,7 +52,10 @@ export async function articlesPost(path, request, env, fields) {
   }
   if (path === "/redakce/zpravy/ulozit") {
     const result = await saveArticle(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
+    // Zpráva k akci (z redakce akcí): při chybě znovu otevřít předvyplněnou, po uložení zpátky na akce.
+    const forEvent = !fields.id && fields.eventId;
+    if (!result.ok) return redirect(withError(forEvent ? `/redakce/zpravy?novy=1&akce=${fields.eventId}` : "/redakce/zpravy", result.error));
+    if (forEvent) return redirect("/redakce/akce?ok=zprava-k-akci");
     return redirect(`/redakce/zpravy?ok=${fields.id ? "zprava-upravena" : "zprava"}`);
   }
   if (path === "/redakce/zpravy/smazat") {

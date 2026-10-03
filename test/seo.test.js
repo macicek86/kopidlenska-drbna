@@ -80,6 +80,21 @@ test("akce mají Event s časem v pražském pásmu", () => {
   assert.equal(ld.startDate, "2026-10-10T14:00+02:00");
 });
 
+test("akce odkazuje na svou zprávu a na odkaz jinam", () => {
+  const waste = { today: "2026-10-02" };
+  const events = [
+    { title: "Posvícení", place: "Náměstí", startsOn: "2026-10-10", startsTime: "", description: "", articleSlug: "posviceni", link: "https://www.kopidlno.cz/posviceni" },
+    { title: "Drakiáda", place: "Louka", startsOn: "2026-10-11", startsTime: "", description: "", articleSlug: "", link: "javascript:alert(1)" },
+  ];
+  const html = eventsPage({ events, waste, ads: [] }, { ...ctx, path: "/akce" });
+  assert.match(html, /<a href="\/zpravy\/posviceni">Víc ve zprávě ›<\/a>/);
+  assert.match(html, /href="https:\/\/www.kopidlno.cz\/posviceni" target="_blank" rel="noopener nofollow">kopidlno.cz ↗/);
+  assert.equal(html.includes("javascript:"), false);
+  const [ld] = ldOf(html);
+  assert.equal(ld["@graph"][0].url, "https://drbna.test/zpravy/posviceni");
+  assert.equal(ld["@graph"][1].url, "https://drbna.test/akce");
+});
+
 test("chybějící stránka se nemá indexovat", () => {
   const html = missingPage(ctx);
   assert.match(html, /<meta name="robots" content="noindex">/);

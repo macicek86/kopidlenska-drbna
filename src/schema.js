@@ -12,13 +12,14 @@ import { ensureImportTables } from "./munipolis/store.js";
 import { ensureFootballTables } from "./fotbal/store.js";
 import { ensureDenikTables } from "./denik/store.js";
 import { ensureDrbenaTable } from "./drbena-db.js";
+import { ensureEventColumns } from "./events-db.js";
 import { ensureUserColumns } from "./users-db.js";
 import { ensureVisitTables } from "./visits-db.js";
 import { ensureStockTables } from "./stock-db.js";
 import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 let schemaReady = false;
 
@@ -349,6 +350,10 @@ async function migrateSchema(env) {
     "select 1 as ok from sqlite_master where type = 'table' and name = 'users'",
   ).first();
   if (usersTable) await ensureUserColumns(env);
+  const eventsTable = await env.DB.prepare(
+    "select 1 as ok from sqlite_master where type = 'table' and name = 'events'",
+  ).first();
+  if (eventsTable) await ensureEventColumns(env);
   const settingsTable = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
