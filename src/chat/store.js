@@ -6,8 +6,8 @@ import { chatModel, DEFAULT_CHAT_MODEL, USD_CZK } from "./ai.js";
 import { turnstileConfig } from "./pass.js";
 import { ownChatPersona } from "./prompt.js";
 
-export const CHAT_DEFAULTS = { perVisitor: 20, perDay: 300, budget: 500, keepDays: 30 };
-const BOUNDS = { perVisitor: [1, 200], perDay: [1, 10000], budget: [0, 100000], keepDays: [1, 365] };
+export const CHAT_DEFAULTS = { perVisitor: 20, perDay: 300, budget: 500, keepDays: 30, archive: 200 };
+export const BOUNDS = { perVisitor: [1, 200], perDay: [1, 10000], budget: [0, 100000], keepDays: [1, 365], archive: [0, 1000] };
 
 export const CHAT_TABLES = [
   `create table if not exists chat_settings (
@@ -20,7 +20,8 @@ export const CHAT_TABLES = [
     keep_days integer not null default 30,
     persona text not null default '',
     secret text not null default '',
-    ads integer not null default 1
+    ads integer not null default 1,
+    archive integer not null default 200
   )`,
   `create table if not exists chat_days (
     day text primary key,
@@ -61,6 +62,8 @@ export async function ensureChatTables(env) {
   const info = await env.DB.prepare("pragma table_info(chat_settings)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
   await addColumn(env, names, "ads", "alter table chat_settings add column ads integer not null default 1");
+  // Kolik starších zpráv vidí Drběna v rejstříku (src/chat/archive.js).
+  await addColumn(env, names, "archive", "alter table chat_settings add column archive integer not null default 200");
   await env.DB.prepare("insert into chat_settings (id, secret) select 1, ? where not exists (select 1 from chat_settings where id = 1)")
     .bind(randomSecret())
     .run();
@@ -91,6 +94,7 @@ function mapSettings(row) {
     perDay: bounded(row?.per_day, BOUNDS.perDay, CHAT_DEFAULTS.perDay),
     budget: bounded(row?.budget_czk, BOUNDS.budget, CHAT_DEFAULTS.budget),
     keepDays: bounded(row?.keep_days, BOUNDS.keepDays, CHAT_DEFAULTS.keepDays),
+    archive: bounded(row?.archive, BOUNDS.archive, CHAT_DEFAULTS.archive),
     persona: ownChatPersona(row?.persona),
     ads: row?.ads == null ? true : asBool(row.ads),
     secret: String(row?.secret ?? ""),
@@ -115,6 +119,7 @@ export function readChatSettings(fields) {
     perDay: bounded(fields.perDay, BOUNDS.perDay, CHAT_DEFAULTS.perDay),
     budget: bounded(fields.budget, BOUNDS.budget, CHAT_DEFAULTS.budget),
     keepDays: bounded(fields.keepDays, BOUNDS.keepDays, CHAT_DEFAULTS.keepDays),
+    archive: bounded(fields.archive, BOUNDS.archive, CHAT_DEFAULTS.archive),
     persona: ownChatPersona(fields.persona),
     ads: Boolean(fields.chatAds),
   };
@@ -125,10 +130,10 @@ export async function saveChatSettings(env, request, fields) {
   if (!gate.ok) return gate;
   const value = readChatSettings(fields);
   await env.DB.prepare(
-    `update chat_settings set enabled = ?, model = ?, per_visitor = ?, per_day = ?, budget_czk = ?, keep_days = ?, persona = ?, ads = ?
-     where id = 1`,
+    `update chat_settings set enabled = ?, model = ?, per_visitor = ?, per_day = ?, budget_czk = ?, keep_days = ?, persona = ?, ads = ?,
+       archive = ? where id = 1`,
   )
-    .bind(value.enabled ? 1 : 0, value.model, value.perVisitor, value.perDay, value.budget, value.keepDays, value.persona, value.ads ? 1 : 0)
+    .bind(value.enabled ? 1 : 0, value.model, value.perVisitor, value.perDay, value.budget, value.keepDays, value.persona, value.ads ? 1 : 0, value.archive)
     .run();
   return { ok: true, enabled: value.enabled };
 }

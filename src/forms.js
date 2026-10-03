@@ -143,6 +143,7 @@ export async function formFields(request) {
     perDay: text("perDay"),
     budget: text("budget"),
     keepDays: text("keepDays"),
+    archive: text("archive"),
     football: text("football"),
     articleText: text("text"),
     autoPublish: form.get("autoPublish") === "1",

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { askDrbena, usageCost } from "../src/chat/ai.js";
+import { archiveLine, archiveText } from "../src/chat/archive.js";
 import { adLines, fold, scoreArticle, searchStems, slugFrom } from "../src/chat/context.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "../src/chat/pass.js";
 import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, ownChatPersona } from "../src/chat/prompt.js";
@@ -33,6 +34,8 @@ test("hledání: bez diakritiky a podle kmene slova", () => {
   assert.equal(scoreArticle(article, searchStems("ples hasičů")), 3);
   assert.equal(scoreArticle(article, searchStems("sokolovna")), 1);
   assert.equal(scoreArticle(article, searchStems("fotbal")), 0);
+  // Klíčová slova váží jako nadpis, i když slovo v nadpisu není.
+  assert.equal(scoreArticle({ ...article, keywords: "dobrovolní hasiči" }, searchStems("dobrovolní")), 3);
 });
 
 test("adresa zprávy: z cesty, celé adresy i holého slugu", () => {
@@ -88,8 +91,10 @@ test("historie z prohlížeče: začíná otázkou, je krátká a oříznutá", 
 
 test("nastavení chatu: meze a výchozí hodnoty", () => {
   const value = readChatSettings({ enabled: true, model: "opus", perVisitor: "9999", perDay: "", budget: "-5", keepDays: "14", persona: DEFAULT_CHAT_PERSONA });
-  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, persona: "", ads: false });
+  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, archive: 200, persona: "", ads: false });
   assert.equal(readChatSettings({ model: "haiku" }).model, "haiku");
+  assert.equal(readChatSettings({ archive: "0" }).archive, 0);
+  assert.equal(readChatSettings({ archive: "5000" }).archive, 1000);
   assert.equal(readChatSettings({ chatAds: true }).ads, true);
 });
 
@@ -184,4 +189,11 @@ test("chat vidí reklamy, ukázkové ne", () => {
   ];
   assert.deepEqual(adLines(ads), ["- Seřízení kola (/reklamy/serizeni-kola): Srovnám brzdy. · Mlýnec"]);
   assert.match(chatInstructions(null, ""), /Reklamy z přehledu/);
+});
+
+test("rejstřík starších zpráv: jeden řádek s nadpisem, adresou a klíčovými slovy", () => {
+  const old = { slug: "modelari-letali", title: "Modeláři létali", keywords: "lmk kopidlno, letecké modely", createdOn: "2026-03-12", rubric: "Spolky" };
+  assert.equal(archiveLine(old), "- 12. 3. 2026 · Spolky · Modeláři létali (/zpravy/modelari-letali) · lmk kopidlno, letecké modely");
+  assert.equal(archiveLine({ ...old, keywords: "", createdOn: "" }), "- bez data · Spolky · Modeláři létali (/zpravy/modelari-letali)");
+  assert.equal(archiveText([]), "");
 });

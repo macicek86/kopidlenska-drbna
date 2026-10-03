@@ -4,10 +4,11 @@ import { formatShort } from "../format.js";
 import { addMessageContact, MESSAGE_KINDS, saveChatMessage } from "../messages-db.js";
 import { binsPage } from "../bins-view.js";
 import { doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
+import { archiveText } from "./archive.js";
 import { htmlText } from "./prompt.js";
 
 const PAGE_MAX = 6000;
-const RECENT_ARTICLES = 30;
+export const RECENT_ARTICLES = 30;
 const SEARCH_POOL = 400;
 const SEARCH_HITS = 6;
 const ARTICLE_MAX = 6000;
@@ -45,14 +46,16 @@ export function adLines(ads) {
 }
 
 // Přehled pro pokyny. Mění se jen se změnou dat, ne s časem, ať se dá uložit do cache.
-export function siteOverview(data, ctx, { ads: withAds = true } = {}) {
+// `archive` jsou starší zprávy pro rejstřík (src/chat/archive.js).
+export function siteOverview(data, ctx, { ads: withAds = true, archive = [] } = {}) {
   const articles = (data.articles ?? []).slice(0, RECENT_ARTICLES).map(articleLine);
   const ads = withAds ? adLines(data.ads) : [];
+  const older = archiveText(archive);
   return `# Co je teď na drbně
 
-## Nejnovější zprávy (/zpravy), starší najdeš nástrojem hledat_zpravy
+## Nejnovější zprávy (/zpravy), ${older ? "starší jsou v rejstříku níž a" : "starší"} najdeš nástrojem hledat_zpravy
 ${articles.length ? articles.join("\n") : "Zatím žádné zprávy."}
-
+${older ? `\n${older}\n` : ""}
 ${sitePages(data, ctx).join("\n\n")}${ads.length ? `\n\n## Reklamy: nabídky sousedů a místních (/reklamy)\n${ads.join("\n")}` : ""}`;
 }
 
@@ -71,13 +74,16 @@ export function searchStems(query) {
     .slice(0, 8);
 }
 
+// Klíčová slova (src/keywords.js) váží jako nadpis: říkají, o čem zpráva je, i když to v nadpisu není.
 export function scoreArticle(article, stems) {
   const title = fold(article.title);
+  const keywords = fold(article.keywords);
   const excerpt = fold(article.excerpt);
   const body = fold(article.body);
   let score = 0;
   for (const stem of stems) {
     if (title.includes(stem)) score += 3;
+    else if (keywords.includes(stem)) score += 3;
     if (excerpt.includes(stem)) score += 2;
     if (body.includes(stem)) score += 1;
   }
@@ -86,7 +92,7 @@ export function scoreArticle(article, stems) {
 
 async function poolArticles(env) {
   const rows = await env.DB.prepare(
-    `select a.slug, a.title, a.excerpt, a.body, a.created_at, coalesce(r.name, a.category) as rubric
+    `select a.slug, a.title, a.excerpt, a.body, a.keywords, a.created_at, coalesce(r.name, a.category) as rubric
      from articles a left join rubrics r on r.id = a.rubric_id
      where a.published = 1 order by a.created_at desc, a.id desc limit ?`,
   )
@@ -96,6 +102,7 @@ async function poolArticles(env) {
     slug: String(row.slug),
     title: String(row.title),
     excerpt: String(row.excerpt),
+    keywords: String(row.keywords ?? ""),
     body: htmlText(String(row.body ?? "")),
     createdOn: String(row.created_at ?? "").slice(0, 10),
     rubric: String(row.rubric ?? ""),
@@ -222,7 +229,7 @@ export const CHAT_TOOLS = [
   {
     name: "hledat_zpravy",
     description:
-      "Hledá ve všech zveřejněných zprávách drbny (i starších, než jsou v přehledu) podle slov v nadpisu, perexu a textu. Vrátí nanejvýš šest zpráv s datem, adresou a perexem. Projde i oznámení města, web FK Kopidlno a web ZŠ a MŠ, ze kterých drbna čerpá, i když z nich zpráva ještě není.",
+      "Hledá ve všech zveřejněných zprávách drbny (i starších, než jsou v přehledu) podle slov v nadpisu, klíčových slovech, perexu a textu. Vrátí nanejvýš šest zpráv s datem, adresou a perexem. Projde i oznámení města, web FK Kopidlno a web ZŠ a MŠ, ze kterých drbna čerpá, i když z nich zpráva ještě není.",
     input_schema: {
       type: "object",
       properties: { dotaz: { type: "string", description: "Pár klíčových slov, třeba „hasiči ples“ nebo „uzavírka Husova“." } },

@@ -78,6 +78,7 @@ function settingsForm(settings) {
       ${numberField("Měsíční rozpočet v Kč", "budget", settings.budget, 0, 100000, "Když ho chat vyčerpá, do konce měsíce se odmlčí.")}
       ${numberField("Otázky uchovávat dní", "keepDays", settings.keepDays, 1, 365, "Starší se samy smažou.")}
     </div>
+    ${numberField("Starších zpráv v rejstříku", "archive", settings.archive, 0, 1000, "Kromě 30 nejnovějších vidí Drběna i tolik starších, každou jen s nadpisem a klíčovými slovy, a o čem drbna psala, si dohledá. Každých 100 zpráv přidá k rozhovoru asi 0,20 Kč se Sonnetem a 0,10 Kč s Haiku. 0 rejstřík vypne, starší zprávy pak najde jen hledáním.")}
     ${check("chatAds", "1", settings.ads, "Drběna vidí reklamy", "Nabídku sousedů zmíní, jen když se hodí k otázce, a řekne, že jde o reklamu.")}
     ${field(
       `Jak se Drběna chová v chatu ${settings.persona ? badge("Vlastní text", "info") : badge("Výchozí text")}`,
@@ -96,6 +97,7 @@ function toggleButton(settings) {
     perDay: settings.perDay,
     budget: settings.budget,
     keepDays: settings.keepDays,
+    archive: settings.archive,
     persona: settings.persona,
   };
   if (settings.ads) fields.chatAds = "1";

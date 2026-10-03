@@ -8,7 +8,8 @@ import { isBot } from "../visits.js";
 import { dayVisitor } from "../visits-db.js";
 import { pragueNow } from "../waste.js";
 import { askDrbena, usageCost } from "./ai.js";
-import { runChatTool, siteOverview } from "./context.js";
+import { loadArchive } from "./archive.js";
+import { RECENT_ARTICLES, runChatTool, siteOverview } from "./context.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "./pass.js";
 import { chatInstructions } from "./prompt.js";
 import { chatLimit, countQuestion, countStop, loadChatSettings, recordAnswer } from "./store.js";
@@ -73,10 +74,11 @@ async function chatSystem(env, request) {
   const origin = new URL(request.url).origin;
   const [data, copy, drbena, settings] = await Promise.all([loadPublic(env), loadCopy(env), loadDrbena(env), loadChatSettings(env)]);
   const ctx = { path: "/", minimal: false, mainOrigin: origin, origin, copy };
+  const archive = await loadArchive(env, { skip: RECENT_ARTICLES, limit: settings.archive });
   const now = pragueNow();
   return [
     { type: "text", text: chatInstructions(drbena, settings.persona, facebookUrl(copy)) },
-    { type: "text", text: siteOverview(data, ctx, { ads: settings.ads }), cache_control: { type: "ephemeral" } },
+    { type: "text", text: siteOverview(data, ctx, { ads: settings.ads, archive }), cache_control: { type: "ephemeral" } },
     { type: "text", text: `Teď je ${formatLong(now.date).toLowerCase()} ${now.date.slice(0, 4)}, ${now.time} (${now.date}).` },
   ];
 }
