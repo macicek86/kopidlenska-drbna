@@ -107,7 +107,10 @@ export function outageEmpty(board, copy) {
   return tx(copy, "outages_empty");
 }
 
-// Voda i silnice: oznámení města, jen jiné texty (water_* a road_*).
+// Podmínky ŘSD pro data z NDIC: u údajů beze změny musí být tahle věta doslova.
+export const NDIC_CREDIT = "Zdrojem digitalizovaných informací o silničním provozu je NDIC.";
+
+// Voda i silnice: oznámení města, jen jiné texty (water_* a road_*). Silnice i uzavírky z NDIC.
 function noticeSection(items, prefix, copy) {
   const body = items.length
     ? `<div class="stack">${items.map((item) => noticeCard(item, { copy })).join("")}</div>`
@@ -115,7 +118,7 @@ function noticeSection(items, prefix, copy) {
   return `<section class="block">
     <h2>${esc(tx(copy, `${prefix}_heading`))}</h2>
     ${body}
-    <p class="fine">${esc(tx(copy, `${prefix}_note`))}</p>
+    <p class="fine">${esc(tx(copy, `${prefix}_note`))}${items.some((item) => item.source === "ndic") ? ` ${esc(NDIC_CREDIT)}` : ""}</p>
   </section>`;
 }
 

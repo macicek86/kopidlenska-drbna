@@ -8,6 +8,10 @@ compatibility_date = "2026-09-01"
 #
 # Chat s Drběnou: Turnstile (ověření, že píše člověk) zapnou tajemství TURNSTILE_SITE_KEY a TURNSTILE_SECRET
 # z widgetu Turnstile v Cloudflare (npx wrangler secret put …). Bez nich chat chrání jen limity z redakce.
+#
+# Uzavírky z Dopravního info (NDIC): NDIC_PUSH_USER a NDIC_PUSH_PASSWORD jsou jméno a heslo, kterým se NDIC
+# hlásí na /ndic/uzavirky (stejné se zadají u odběru v portálu mobilitydata.rsd.cz). Bez nich je příjem vypnutý.
+# Cloudflare Access na tuhle adresu nesmí (NDIC se přes Access nepřihlásí): hlídat jen /redakce.
 
 [assets]
 directory = "./public"

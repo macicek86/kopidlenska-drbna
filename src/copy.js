@@ -132,7 +132,7 @@ export const COPY = [
   { group: "Odstávky a uzavírky", key: "power_heading", label: "Nadpis části o elektřině", value: "Elektřina", max: 80 },
   { group: "Odstávky a uzavírky", key: "road_heading", label: "Nadpis části o uzavírkách", value: "Silnice", max: 80 },
   { group: "Odstávky a uzavírky", key: "road_empty", label: "Když žádná uzavírka není", value: "Teď o žádné uzavírce nevíme.", max: 240, long: true },
-  { group: "Odstávky a uzavírky", key: "road_note", label: "Odkud bereme uzavírky", value: "Uzavírky přidáváme podle oznámení města.", max: 500, long: true },
+  { group: "Odstávky a uzavírky", key: "road_note", label: "Odkud bereme uzavírky", value: "Uzavírky přidáváme podle oznámení města a Dopravního info.", max: 500, long: true },
   { group: "Odstávky a uzavírky", key: "water_source", label: "Odkaz na oznámení města", value: "Oznámení města", max: 80 },
   { group: "Odstávky a uzavírky", key: "outages_announcement", label: "Odkaz na oznámení", value: "Oznámení distributora (PDF)", max: 80 },
   { group: "Odstávky a uzavírky", key: "outages_source", label: "Odkaz na web distributora", value: "bezstavy.cz", max: 80 },

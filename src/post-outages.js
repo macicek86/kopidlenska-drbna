@@ -1,6 +1,7 @@
 // Formuláře sekce Odstávky: hlídané obce pro elektřinu a oznámení o vodě a uzavírkách.
 import { addOutageArea, refreshOutages, removeOutageArea, saveOutageAreas } from "./outages-db.js";
 import { removeNotice, saveNotice } from "./notices-db.js";
+import { clearClosures, saveNdicSettings, setClosureManual } from "./ndic/store.js";
 import { redirect, withError } from "./http.js";
 
 const BASE = "/redakce/odstavky";
@@ -14,7 +15,15 @@ export const OUTAGE_OK = {
   oznameni: "Oznámení je uložené.",
   "oznameni-upraveno": "Oznámení je upravené.",
   "oznameni-smazano": "Oznámení je smazané.",
+  "ndic-nastaveni": "Nastavení uzavírek z Dopravního info je uložené.",
+  "ndic-rucne": "Uzavírka je upravená.",
+  "ndic-smazano": "Uzavírky z Dopravního info jsou smazané. Teď můžete v portálu NDIC resetovat odběr.",
 };
+
+function simple(result, okKey) {
+  if (!result.ok) return redirect(withError(BASE, result.error));
+  return redirect(`${BASE}?ok=${okKey}`);
+}
 
 function areaResult(result, okKey) {
   if (!result.ok) return redirect(withError(BASE, result.error));
@@ -46,6 +55,12 @@ export async function outagePost(path, request, env, fields) {
     const result = await removeNotice(env, request, fields.id);
     if (!result.ok) return redirect(withError(BASE, result.error));
     return redirect(`${BASE}?ok=oznameni-smazano`);
+  }
+  if (path === `${BASE}/ndic/nastaveni`) return simple(await saveNdicSettings(env, request, fields), "ndic-nastaveni");
+  if (path === `${BASE}/ndic/rucne`) return simple(await setClosureManual(env, request, fields.closureId, fields.manual), "ndic-rucne");
+  if (path === `${BASE}/ndic/smazat`) {
+    if (!fields.confirm) return redirect(BASE);
+    return simple(await clearClosures(env, request), "ndic-smazano");
   }
   return null;
 }

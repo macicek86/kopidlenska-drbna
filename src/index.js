@@ -76,6 +76,7 @@ import {
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
 import { adminQuery, formFields } from "./forms.js";
+import { NDIC_PUSH_PATH, ndicPush } from "./ndic/push.js";
 import { visitPath, visitTarget } from "./visits.js";
 import { loadStats, pathViews, recordVisit, STAT_PERIODS } from "./visits-db.js";
 import { html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
@@ -528,6 +529,8 @@ export default {
         return env.ASSETS.fetch(request);
       }
       await ensureSchema(env);
+      // Zprávy od NDIC (uzavírky silnic): vlastní přihlášení jménem a heslem, bez kontroly původu.
+      if (url.pathname === NDIC_PUSH_PATH) return await ndicPush(request, env);
       if (request.method === "GET" || request.method === "HEAD") {
         const response = await renderGet(request, env, url, execution);
         const visit = visitPath(request, response);

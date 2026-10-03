@@ -19,6 +19,8 @@ import {
   userCan,
 } from "./db-core.js";
 import { loadNoticeBoard, loadNotices } from "./notices-db.js";
+import { loadClosures, loadNdicSettings } from "./ndic/store.js";
+import { pushConfig } from "./ndic/push.js";
 import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
@@ -276,11 +278,13 @@ export async function loadArticle(env, slug) {
 
 // Části redakce jen pro hlavního redaktora.
 async function loadChiefDesk(env) {
-  const [outageAreas, outages, notices, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, drbena, events, users] =
+  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, drbena, events, users] =
     await Promise.all([
       loadOutageAreas(env),
       loadOutageBoard(env),
       loadNotices(env),
+      loadNdicSettings(env),
+      loadClosures(env),
       loadImportSettings(env),
       loadImportItems(env),
       loadFootballSettings(env),
@@ -295,6 +299,7 @@ async function loadChiefDesk(env) {
     outageAreas,
     outages,
     notices,
+    ndic: { ...ndicSettings, ready: Boolean(pushConfig(env)), closures },
     importSettings,
     importItems,
     footballSettings,

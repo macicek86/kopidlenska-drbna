@@ -90,7 +90,8 @@ export function parseNoticeInput(input) {
 
 function bounds(notice) {
   const start = `${notice.startsOn} ${notice.startsTime || "00:00"}`;
-  const end = `${notice.endsOn || notice.startsOn} ${notice.endsTime || "23:59"}`;
+  // Uzavírka z NDIC bez konce platí do odvolání.
+  const end = notice.openEnded ? "9999-12-31 23:59" : `${notice.endsOn || notice.startsOn} ${notice.endsTime || "23:59"}`;
   return { start, end };
 }
 
@@ -111,6 +112,7 @@ function softDay(iso) {
 
 export function noticeSpan(notice) {
   const { startsOn, startsTime, endsOn, endsTime } = notice;
+  if (notice.openEnded) return `Od ${softDay(startsOn)}${startsTime ? ` ${startsTime}` : ""} do odvolání`;
   if (!endsOn) {
     if (startsTime && endsTime) return `${formatLong(startsOn)}, ${startsTime}–${endsTime}`;
     if (startsTime) return `${formatLong(startsOn)} od ${startsTime}`;
