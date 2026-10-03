@@ -793,7 +793,12 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
   .dates.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pair { grid-template-columns: 1fr 1fr; }
   /* Otevírací doba: karty vedle sebe, kolik se jich vejde, aby týden zůstal čitelný */
-  .place-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); align-items: start; }
+  .place-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); }
+  /* Karta zabírá 10 řádků mřížky (záhlaví, nadpis, 7 dnů, změny), takže dny v řádku karet leží na stejné výšce */
+  .place-card { display: grid; grid-row: span 10; grid-template-rows: subgrid; row-gap: 0; }
+  .place-card .week-list { display: grid; grid-row: span 7; grid-template-rows: subgrid; row-gap: 0; }
+  .place-card > .muted { grid-row: span 7; }
+  .place-card .doctor-week li { align-content: start; }
   .place-grid .dates.compact { grid-template-columns: 1fr; }
   .place-grid .doctor-week li { grid-template-columns: 7.6rem minmax(0, 1fr); }
   .about { grid-template-columns: 16rem 1fr; align-items: start; }

@@ -133,15 +133,17 @@ function placeCard(place, today, ctx) {
     ? doctorWeekList(place.week, today, { superseded: Boolean(current) })
     : `<p class="muted">${esc(tx(ctx.copy, "places_missing_hours"))}</p>`;
   const meta = [esc(place.place), phone].filter(Boolean).join(" · ");
-  return `<article class="card yard">
-    ${place.label ? `<p class="kicker">${esc(place.label)}</p>` : ""}
-    <h2>${esc(place.name)}</h2>
-    ${meta ? `<p class="meta">${meta}</p>` : ""}
-    ${banners}
+  // Bloky karty jsou řádky mřížky (záhlaví, nadpis týdne, 7 dnů, změny), na počítači se srovnají s kartami vedle.
+  return `<article class="card yard place-card">
+    <div class="place-head">
+      ${place.label ? `<p class="kicker">${esc(place.label)}</p>` : ""}
+      <h2>${esc(place.name)}</h2>
+      ${meta ? `<p class="meta">${meta}</p>` : ""}
+      ${banners}
+    </div>
     <p class="kicker">${esc(tx(ctx.copy, current ? "places_regular" : "places_hours"))}</p>
     ${hours}
-    ${planned}
-    ${later}
+    <div class="place-more">${planned}${later}</div>
   </article>`;
 }
 
