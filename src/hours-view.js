@@ -66,6 +66,15 @@ function noticeBanner(notice, extraClass = "") {
   return `<div class="banner doctor-notice${extraClass}"><p>${glueDates(lead)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}${notice.detail ? `<p class="banner-note">${glueDates(notice.detail)}</p>` : ""}</div>`;
 }
 
+// Řádek pod úvodem: s chatem otevře Drběnu s předvyplněnou větou, bez něj vede na kontakt.
+function askLine(ctx, prefix, prefill) {
+  return `<p class="place-ask">${esc(tx(ctx.copy, `${prefix}_ask`))} ${
+    ctx.chat
+      ? `<a href="/o-nas" data-chat-open="${esc(prefill)}">${esc(tx(ctx.copy, `${prefix}_ask_chat`))}</a>`
+      : `<a href="/o-nas">${esc(tx(ctx.copy, `${prefix}_ask_mail`))}</a>`
+  }</p>`;
+}
+
 export function doctorsPage(data, ctx) {
   const today = data.waste.today;
   const cards = (data.doctors ?? []).length
@@ -102,6 +111,7 @@ export function doctorsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "doctors_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "doctors_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "doctors_lede"))}</p>
+      ${askLine(ctx, "doctors", "U lékařů je něco špatně: ")}
       <div class="stack doctor-grid">${cards}</div>`,
   });
 }
@@ -158,12 +168,7 @@ export function placesPage(data, ctx) {
         .map((place) => `<a class="chip" href="#misto-${place.id}">${esc(place.name)}</a>`)
         .join("")}</nav>`
     : "";
-  // Chybějící místo: s chatem otevře Drběnu s předvyplněnou větou, bez něj vede na kontakt.
-  const ask = `<p class="place-ask">${esc(tx(ctx.copy, "places_ask"))} ${
-    ctx.chat
-      ? `<a href="/o-nas" data-chat-open="Chybí mi tu místo: ">${esc(tx(ctx.copy, "places_ask_chat"))}</a>`
-      : `<a href="/o-nas">${esc(tx(ctx.copy, "places_ask_mail"))}</a>`
-  }</p>`;
+  const ask = askLine(ctx, "places", "Chybí mi tu místo: ");
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "places_heading")} | ${tx(ctx.copy, "site_name")}`,
