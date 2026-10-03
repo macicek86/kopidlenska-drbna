@@ -5,6 +5,7 @@ import {
   ensureSchema,
   loadAdmin,
   loadArticle,
+  loadMoreArticles,
   loadCopy,
   loadPublic,
   login,
@@ -161,12 +162,13 @@ const PUBLIC_PAGES = new Set([
 ]);
 
 async function loadStory(env, slug, path) {
-  const [article, ads, views] = await Promise.all([
+  const [article, ads, views, more] = await Promise.all([
     loadArticle(env, slug),
     loadAds(env, { enabledOnly: true }),
     pathViews(env, path),
+    loadMoreArticles(env, slug),
   ]);
-  return { article, ads, views };
+  return { article, ads, views, more };
 }
 
 function chooseAd(request, ads) {
@@ -259,12 +261,12 @@ async function renderGet(request, env, url, execution) {
     return htmlAd(request, newsPage({ ...data, ad }, ctx, url.searchParams.get("rubrika") ?? ""), ad);
   }
   if (path.startsWith("/zpravy/")) {
-    const { article, ads, views: counted } = story;
+    const { article, ads, views: counted, more } = story;
     if (!article) return html(missingPage(ctx), 404);
     const ad = chooseAd(request, ads);
     // Počet i s tímhle přečtením, když se započítá.
     const views = counted + (visitTarget(request) ? 1 : 0);
-    return htmlAd(request, articlePage(article, ctx, { ad, views }), ad);
+    return htmlAd(request, articlePage(article, ctx, { ad, views, more }), ad);
   }
   if (path === "/reklamy") {
     return html(adsPage(data, ctx));

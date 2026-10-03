@@ -45,6 +45,7 @@ export const COPY = [
   { group: "Zprávy", key: "chip_all", label: "Filtr všech rubrik", value: "Vše", max: 40 },
   { group: "Zprávy", key: "chip_sub_all", label: "Filtr celé rubriky i s podrubrikami", value: "Všechno", max: 40 },
   { group: "Zprávy", key: "news_empty", label: "Prázdná rubrika", value: "V téhle rubrice zatím nic není.", max: 200 },
+  { group: "Zprávy", key: "article_more", label: "Nadpis dalších zpráv vedle zprávy", value: "Další zprávy", max: 40 },
   { group: "Zprávy", key: "article_back", label: "Návrat na zprávy", value: "Zpět na zprávy", max: 80 },
   { group: "Zprávy", key: "missing_heading", label: "Chybějící zpráva", value: "Tahle zpráva tu není", max: 80 },
   { group: "Zprávy", key: "missing_description", label: "Popis chybějící zprávy", value: "Tahle zpráva tu není.", max: 160 },

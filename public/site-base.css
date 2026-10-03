@@ -338,9 +338,6 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .redigovano { color: var(--muted); font-weight: 600; }
 
-/* Zpráva stojí uprostřed stránky jako jeden sloupec, text v něm zůstává zarovnaný doleva. */
-.article-page { max-width: 48rem; margin-inline: auto; }
-
 .article-title { max-width: 18ch; }
 
 .prose { max-width: 40rem; font-size: 1.12rem; line-height: 1.6; }

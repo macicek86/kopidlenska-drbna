@@ -97,3 +97,19 @@
   .ads-grid .ad-panel.has-photo .ad-layout { grid-template-columns: 1fr; align-items: start; }
   .ads-grid .ad-panel.has-photo .ad-photo { height: 11rem; min-height: 0; }
 }
+
+/* Detail zprávy na počítači: zpráva u levého okraje jako ostatní stránky, reklama a další zprávy v úzkém sloupci vedle. */
+@media (min-width: 1000px) {
+  .article-page {
+    display: grid;
+    grid-template-columns: minmax(0, 48rem) 17rem;
+    justify-content: space-between;
+    gap: 3rem;
+    align-items: start;
+  }
+
+  .article-side .ad-slot { margin-top: 0; }
+
+  .article-side .ad-panel.has-photo .ad-layout { grid-template-columns: 1fr; align-items: start; }
+  .article-side .ad-panel.has-photo .ad-photo { height: 11rem; min-height: 0; }
+}

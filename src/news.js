@@ -79,9 +79,28 @@ function facebookInvite(copy) {
   return `<p class="article-facebook">${esc(tx(copy, "article_facebook"))} <a href="${esc(url)}" rel="noopener">${esc(tx(copy, "article_facebook_link"))}</a></p>`;
 }
 
+// Další zprávy v bočním sloupci: rubrika, nadpis a den, bez fotek.
+function moreNews(articles, copy) {
+  if (!articles?.length) return "";
+  const items = articles
+    .map(
+      (item) => `<li><a href="/zpravy/${esc(item.slug)}">
+              ${rubricKicker(item)}
+              <span class="more-title">${esc(item.title)}</span>
+              <span class="more-date">${esc(formatDayMonth(item.createdOn))}</span>
+            </a></li>`,
+    )
+    .join("");
+  return `<section class="more-news">
+          <h2>${esc(tx(copy, "article_more"))}</h2>
+          <ul class="plain">${items}</ul>
+        </section>`;
+}
+
 export function articlePage(article, ctx, extras = {}) {
   const ad = Object.hasOwn(extras, "ad") ? extras.ad : pickAd(extras.ads);
   const base = siteOrigin(ctx.origin, ctx.mainOrigin);
+  const side = [ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : "", moreNews(extras.more, ctx.copy)].join("");
   return layout({
     ...ctx,
     title: `${article.title} | ${tx(ctx.copy, "site_name")}`,
@@ -92,16 +111,18 @@ export function articlePage(article, ctx, extras = {}) {
     jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
     body: `
       <div class="article-page">
-        <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
-        ${articleCrumbs(article)}
-        <h1 class="article-title">${esc(article.title)}</h1>
-        ${articleMeta(article, extras.views)}
-        <div class="article-body${article.imageKey ? " has-photo" : ""}">
-          ${articleFigure(article)}
-          <div class="prose">${renderArticleHtml(article.body)}</div>
+        <div class="article-main">
+          <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
+          ${articleCrumbs(article)}
+          <h1 class="article-title">${esc(article.title)}</h1>
+          ${articleMeta(article, extras.views)}
+          <div class="article-body${article.imageKey ? " has-photo" : ""}">
+            ${articleFigure(article)}
+            <div class="prose">${renderArticleHtml(article.body)}</div>
+          </div>
+          ${facebookInvite(ctx.copy)}
         </div>
-        ${facebookInvite(ctx.copy)}
-        ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}
+        ${side ? `<aside class="article-side">${side}</aside>` : ""}
       </div>`,
   });
 }

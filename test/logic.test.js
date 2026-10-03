@@ -496,8 +496,11 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.match(solo, /class="ad-photo"/);
   assert.equal(readAdFields({ title: "Kolo", body: "Seřídím.", imageFocus: "33 71" }).imageFocus, "30 70");
 
-  const article = articlePage(articles[0], ctx, { ad });
+  const article = articlePage(articles[0], ctx, { ad, more: [articles[1]] });
   assert.match(article, /ad-slot/);
+  assert.match(article, /class="more-news"/);
+  assert.match(article, new RegExp(`href="/zpravy/${articles[1].slug}"`));
+  assert.doesNotMatch(articlePage(articles[0], ctx, { ad: null }), /article-side/);
   assert.match(article, /href="https:\/\/example.com\/chleb"/);
   assert.match(article, /rel="noopener noreferrer"/);
 

@@ -276,6 +276,17 @@ export async function loadArticle(env, slug) {
   return row ? mapArticle(row) : null;
 }
 
+// Další zprávy do bočního sloupce u zprávy: nejnovější kromě té otevřené.
+export async function loadMoreArticles(env, slug, limit = 5) {
+  const { results } = await env.DB.prepare(
+    `select ${ARTICLE_LIST_FIELDS}
+     from ${ARTICLE_FROM} where a.published = 1 and a.slug != ? order by a.created_at desc, a.id desc limit ?`,
+  )
+    .bind(slug, limit)
+    .all();
+  return results.map(mapArticle);
+}
+
 // Části redakce jen pro hlavního redaktora.
 async function loadChiefDesk(env) {
   const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, drbena, events, users] =
