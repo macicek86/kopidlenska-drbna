@@ -2,7 +2,7 @@ import { pickAd, safeAdLink } from "./ads.js";
 import { byline } from "./db.js";
 import { esc, mediaUrl } from "./html.js";
 import { facebookUrl, text as tx } from "./copy.js";
-import { formatDayMonth, formatLong } from "./format.js";
+import { formatLong } from "./format.js";
 import { focusClass } from "./photo.js";
 import { civilWeekday } from "./waste.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
@@ -212,9 +212,6 @@ export function adPanel(ad, copy, options = {}) {
   const bodyShown = bodyText || (preview ? "Krátký text, který uvidí sousedé." : "");
   const permalink = !preview && heading !== "h1" && ad.slug;
   const titleInner = permalink ? `<a href="/reklamy/${esc(ad.slug)}">${esc(titleShown)}</a>` : esc(titleShown);
-  const when = ad.createdOn ? formatDayMonth(ad.createdOn) : "";
-  const who = byline(ad);
-  const meta = [when, who].filter(Boolean).join(" · ");
   const more = adLinkHtml(link, tx(copy, "ads_more"), preview);
   // Na panelu se fotka ořízne podle bodu výřezu, na stránce jedné nabídky je vidět celá.
   const photoClass = ["ad-photo", heading === "h1" ? "" : focusClass(ad.imageFocus)].filter(Boolean).join(" ");
@@ -248,7 +245,6 @@ export function adPanel(ad, copy, options = {}) {
         <p class="${bodyClass}"${bodyAttrs}>${esc(bodyShown)}</p>
         ${placeRow}
         ${linkRow}
-        ${meta ? `<p class="ad-meta">${esc(meta)}</p>` : ""}
       </div>
     </div>
   </aside>`;
