@@ -5,6 +5,8 @@ const root = document.querySelector("[data-chat]");
 const STORE = "drbna-chat";
 const QUESTION_MAX = 500;
 const HISTORY = 8;
+const HINT = "drbna-chat-napoveda";
+const MOBILE = "(max-width: 540px), (pointer: coarse) and (max-height: 540px)";
 const TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 const IDEAS = ["Kdy jede popelář?", "Co se chystá o víkendu?", "Kdy má otevřeno knihovna?"];
 const GREETING = "Ahoj, já jsem Drběna. Zeptejte se mě na cokoli z Kopidlna: kdy jede popelář, kdo má dnes otevřeno nebo co se chystá.";
@@ -152,9 +154,14 @@ function setup() {
   fab.setAttribute("aria-controls", "chat-okno");
   fab.setAttribute("aria-label", "Zeptejte se Drběny");
   const face = el("img");
-  face.src = "/kozel-maskot.webp";
+  face.src = "/drbena-chat.webp";
   face.alt = "";
   fab.append(face, el("span", "", "Zeptejte se Drběny"));
+
+  // Na mobilu je tlačítko bez nápisu: jednou za návštěvu vedle něj Drběna řekne, že s ní jde mluvit.
+  const hint = el("button", "chat-hint", "Zeptej se mě!");
+  hint.type = "button";
+  hint.hidden = true;
 
   const panel = el("section", "chat-panel");
   panel.id = "chat-okno";
@@ -196,7 +203,7 @@ function setup() {
   const fine = el("p", "chat-fine", "Odpovídá umělá inteligence a může se splést.");
 
   panel.append(head, log, check, form, fine);
-  root.append(fab, panel);
+  root.append(hint, fab, panel);
 
   function bubble(role, text, extra = "") {
     const item = el("div", `chat-msg chat-${role}${extra ? ` ${extra}` : ""}`);
@@ -340,7 +347,29 @@ function setup() {
   field.addEventListener("focus", () => settle(1200));
   field.addEventListener("blur", () => settle(1200));
 
+  function hideHint() {
+    hint.classList.remove("is-shown");
+    setTimeout(() => (hint.hidden = true), 300);
+  }
+
+  function offerHint() {
+    if (!matchMedia(MOBILE).matches || state.messages.length) return;
+    try {
+      if (sessionStorage.getItem(HINT)) return;
+      sessionStorage.setItem(HINT, "1");
+    } catch {
+      return;
+    }
+    setTimeout(() => {
+      if (!panel.hidden) return;
+      hint.hidden = false;
+      requestAnimationFrame(() => hint.classList.add("is-shown"));
+      setTimeout(hideHint, 6000);
+    }, 2500);
+  }
+
   function open() {
+    hideHint();
     panel.hidden = false;
     fab.setAttribute("aria-expanded", "true");
     root.classList.add("is-open");
@@ -360,6 +389,8 @@ function setup() {
   }
 
   fab.addEventListener("click", () => (panel.hidden ? open() : shut()));
+  hint.addEventListener("click", open);
+  offerHint();
   close.addEventListener("click", shut);
   panel.addEventListener("keydown", (event) => {
     if (event.key === "Escape") shut();

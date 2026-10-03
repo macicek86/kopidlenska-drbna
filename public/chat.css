@@ -31,15 +31,38 @@
 .chat-fab:hover { transform: translateY(-2px); }
 .chat-fab:focus-visible, .chat-x:focus-visible, .chat-send:focus-visible, .chat-idea:focus-visible { outline: 3px solid var(--tape); outline-offset: 2px; }
 
+/* Celá Drběna i s rohy, vykukuje z tlačítka nahoru. */
 .chat-fab img {
-  width: 2.6rem;
-  height: 2.6rem;
-  border-radius: 50%;
-  object-fit: cover;
-  background: var(--paper-deep);
+  width: 3.6rem;
+  height: 3.6rem;
+  margin: -1.2rem 0 -0.1rem;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.2));
 }
 
 .chat.is-open .chat-fab { display: none; }
+
+/* Bublina „Zeptej se mě!“ vedle tlačítka, jen na mobilu (chat.js ji jednou ukáže a schová). */
+.chat-hint {
+  position: absolute;
+  right: calc(100% + 0.6rem);
+  bottom: 0.9rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem 1rem 0.25rem 1rem;
+  background: var(--card);
+  color: var(--ink);
+  font: 700 0.95rem/1 var(--sans);
+  white-space: nowrap;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transform: translateX(0.5rem) scale(0.9);
+  transform-origin: right bottom;
+  transition: opacity 0.25s, transform 0.25s;
+}
+
+.chat-hint.is-shown { opacity: 1; transform: none; }
+.chat-hint[hidden], .chat.is-open .chat-hint { display: none; }
 
 .chat-panel {
   display: flex;
@@ -183,6 +206,14 @@
   .chat-panel { width: 100%; height: 100%; }
   .chat-fab span { display: none; }
   .chat-fab { padding: 0.3rem; }
+}
+
+@media not ((max-width: 540px) or ((pointer: coarse) and (max-height: 540px))) {
+  .chat-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-hint { transition: none; }
 }
 
 @media print {
