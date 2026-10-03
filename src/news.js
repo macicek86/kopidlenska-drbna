@@ -112,7 +112,7 @@ export function articlePage(article, ctx, extras = {}) {
     body: `
       <div class="article-page">
         <div class="article-main">
-          <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
+          <a class="back" href="/zpravy" data-back>${esc(tx(ctx.copy, "article_back"))}</a>
           ${articleCrumbs(article)}
           <h1 class="article-title">${esc(article.title)}</h1>
           ${articleMeta(article, extras.views)}
