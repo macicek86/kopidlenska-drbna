@@ -27,7 +27,7 @@ export function sitePages(data, ctx) {
     ["Sběrné dvory (/sberne-dvory)", yardsPage(bare, { ...page, path: "/sberne-dvory" })],
     ["Lékaři (/lekari)", doctorsPage(bare, { ...page, path: "/lekari" })],
     ["Otevírací doba (/oteviraci-doba)", placesPage(bare, { ...page, path: "/oteviraci-doba" })],
-    ["Odstávky vody a elektřiny (/odstavky)", outagesPage(bare, { ...page, path: "/odstavky" })],
+    ["Odstávky vody a elektřiny, uzavírky silnic a výluky vlaků (/odstavky)", outagesPage(bare, { ...page, path: "/odstavky" })],
     ["Akce (/akce)", eventsPage(bare, { ...page, path: "/akce" })],
     ["O nás a kontakt na redakci (/o-nas)", aboutPage(bare, { ...page, path: "/o-nas" })],
   ].map(([title, html]) => `## ${title}\n${clipText(htmlText(html), PAGE_MAX)}`);

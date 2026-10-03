@@ -1,6 +1,7 @@
 // Odstávky vody a uzavírky v D1.
 import { asBool, requireChief } from "./db-core.js";
 import { loadClosureNotices } from "./ndic/store.js";
+import { loadTrainNotices } from "./vlaky/store.js";
 import { noticeBoard, parseNoticeInput, placeLines } from "./notices.js";
 
 export const NOTICES_TABLE = `create table if not exists notices (
@@ -46,10 +47,14 @@ export async function loadNotices(env, { publishedOnly = false } = {}) {
   return (rows.results ?? []).map(mapNotice);
 }
 
-// Na web jdou oznámení redakce a uzavírky z NDIC (Dopravní info) dohromady.
+// Na web jdou oznámení redakce, uzavírky z NDIC (Dopravní info) a výluky vlaků z ČD dohromady.
 export async function loadNoticeBoard(env, now = new Date()) {
-  const [notices, closures] = await Promise.all([loadNotices(env, { publishedOnly: true }), loadClosureNotices(env, now)]);
-  return noticeBoard([...notices, ...closures], now);
+  const [notices, closures, trains] = await Promise.all([
+    loadNotices(env, { publishedOnly: true }),
+    loadClosureNotices(env, now),
+    loadTrainNotices(env, now),
+  ]);
+  return noticeBoard([...notices, ...closures, ...trains], now);
 }
 
 function binds(notice) {

@@ -80,6 +80,7 @@ import { boardJson, feedIsStale } from "./outages.js";
 import { adminQuery, formFields } from "./forms.js";
 import { NDIC_PUSH_PATH, ndicPush } from "./ndic/push.js";
 import { runNdic } from "./ndic/run.js";
+import { refreshTrains } from "./vlaky/run.js";
 import { visitPath, visitTarget } from "./visits.js";
 import { loadStats, pathViews, recordVisit, STAT_PERIODS } from "./visits-db.js";
 import { html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
@@ -113,6 +114,8 @@ import { ARTICLES_OK, articlesPost } from "./post-articles.js";
 import { ADS_OK, adsPost } from "./post-ads.js";
 import { EVENTS_OK, eventsPost } from "./post-events.js";
 
+// Musí sedět s druhým cronem ve wrangler.toml.
+const TRAINS_CRON = "45 */4 * * *";
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
 const OK = {
@@ -562,8 +565,13 @@ export default {
       return html(brokenPage(message), 500);
     }
   },
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
     await ensureSchema(env);
+    // Výluky vlaků mají vlastní cron: každé spuštění má svůj limit dotazů ven a jich je přes dvacet.
+    if (event.cron === TRAINS_CRON) {
+      ctx.waitUntil(refreshTrains(env).catch(() => {}));
+      return;
+    }
     ctx.waitUntil(refreshOutages(env).catch(() => {}));
     ctx.waitUntil(runImport(env).catch(() => {}));
     ctx.waitUntil(runFootball(env).catch(() => {}));

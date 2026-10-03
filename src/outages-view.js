@@ -1,4 +1,4 @@
-// Odstávky a uzavírky na webu: elektřina z widgetu ČEZ, voda a uzavírky silnic z oznámení města.
+// Odstávky a uzavírky na webu: elektřina z widgetu ČEZ, voda a uzavírky silnic z oznámení města, výluky vlaků z ČD.
 import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
 import { askLine, layout } from "./view.js";
@@ -50,6 +50,7 @@ export function outagesTeaser(data, ctx) {
   const notices = (data.notices ?? []).filter(soon);
   const water = notices.filter((item) => item.kind === "voda").map(notice);
   const roads = notices.filter((item) => item.kind === "uzavirka").map(notice);
+  const trains = notices.filter((item) => item.kind === "vlak").map(notice);
   const power = (data.outages?.items ?? []).filter(soon).map((item) => ({
     kind: item.phase === "now" ? "is-closure" : "is-later",
     name: item.areaName,
@@ -57,7 +58,7 @@ export function outagesTeaser(data, ctx) {
     when: item.when,
     where: teaserPlaces(item),
   }));
-  const items = [...water, ...power, ...roads].slice(0, 3);
+  const items = [...water, ...power, ...roads, ...trains].slice(0, 3);
   if (!items.length) return "";
   return `<div class="card waste-teaser">
     <p class="eyebrow">${esc(tx(ctx.copy, "home_outages_button"))}</p>
@@ -87,10 +88,18 @@ export function outageCard(item, { showArea, copy }) {
   </article>`;
 }
 
+function outLink(url, label) {
+  return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`;
+}
+
 export function noticeCard(item, { copy }) {
-  const source = item.sourceUrl
-    ? `<p><a href="${esc(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "water_source"))}</a></p>`
-    : "";
+  // Výluka vlaků odkazuje na detail u ČD a výlukový jízdní řád, ostatní na oznámení města.
+  const train = item.kind === "vlak";
+  const links = [
+    item.sourceUrl ? outLink(item.sourceUrl, tx(copy, train ? "train_source" : "water_source")) : "",
+    item.pdfUrl ? outLink(item.pdfUrl, tx(copy, "train_pdf")) : "",
+  ].filter(Boolean);
+  const source = links.length ? `<p>${links.join(" · ")}</p>` : "";
   return `<article class="card yard">
     <p class="kicker">${esc(item.title)}</p>
     <p class="outage-state is-${esc(item.phase)}">${esc(item.state)}</p>
@@ -110,7 +119,7 @@ export function outageEmpty(board, copy) {
 // Podmínky ŘSD pro data z NDIC: u údajů beze změny musí být tahle věta doslova.
 export const NDIC_CREDIT = "Zdrojem digitalizovaných informací o silničním provozu je NDIC.";
 
-// Voda i silnice: oznámení města, jen jiné texty (water_* a road_*). Silnice i uzavírky z NDIC.
+// Voda, silnice i vlaky: stejné karty, jen jiné texty (water_*, road_*, train_*). Silnice i uzavírky z NDIC.
 function noticeSection(items, prefix, copy) {
   const body = items.length
     ? `<div class="stack">${items.map((item) => noticeCard(item, { copy })).join("")}</div>`
@@ -157,6 +166,7 @@ export function outagesPage(data, ctx) {
       ${askLine(ctx, "outages", "Chybí tu odstávka nebo uzavírka: ")}
       ${noticeSection(notices.filter((item) => item.kind === "voda"), "water", ctx.copy)}
       ${powerSection(board, ctx.copy)}
-      ${noticeSection(notices.filter((item) => item.kind === "uzavirka"), "road", ctx.copy)}`,
+      ${noticeSection(notices.filter((item) => item.kind === "uzavirka"), "road", ctx.copy)}
+      ${noticeSection(notices.filter((item) => item.kind === "vlak"), "train", ctx.copy)}`,
   });
 }

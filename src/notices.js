@@ -7,14 +7,17 @@ export const NOTICE_KINDS = {
   voda: { label: "Odstávka vody", short: "Voda", fallbackTitle: "Nepoteče voda" },
   uzavirka: { label: "Uzavírka silnice", short: "Uzavírka", fallbackTitle: "Uzavírka silnice" },
 };
+// Výluky vlaků nezapisuje redakce (formulář je nenabízí), bere je drbna z Českých drah (src/vlaky/).
+const FEED_KINDS = { vlak: { label: "Výluka vlaků" } };
 // Druhy, které se ukazují na webu (stránka Odstávky a uzavírky a karta na titulce).
-export const PUBLIC_NOTICE_KINDS = ["voda", "uzavirka"];
+export const PUBLIC_NOTICE_KINDS = ["voda", "uzavirka", "vlak"];
 export const NOTICE_LEAD_DAYS = 7;
 const PLACE_LIMIT = 30;
 
 const PHASE_STATE = {
   voda: { now: "Právě neteče", soon: "Chystá se", later: "Naplánováno" },
   uzavirka: { now: "Právě uzavřeno", soon: "Chystá se", later: "Naplánováno" },
+  vlak: { now: "Právě platí", soon: "Chystá se", later: "Naplánováno" },
 };
 
 function clean(value, max) {
@@ -129,7 +132,7 @@ export function presentNotice(notice, now = new Date()) {
   return {
     ...notice,
     phase,
-    kindLabel: NOTICE_KINDS[notice.kind]?.label ?? "",
+    kindLabel: (NOTICE_KINDS[notice.kind] ?? FEED_KINDS[notice.kind])?.label ?? "",
     state: PHASE_STATE[notice.kind]?.[phase] ?? "",
     when: noticeSpan(notice),
     placeLabels: notice.places.slice(0, PLACE_LIMIT),

@@ -1,8 +1,10 @@
-// Formuláře sekce Odstávky: hlídané obce pro elektřinu a oznámení o vodě a uzavírkách.
+// Formuláře sekce Odstávky: hlídané obce pro elektřinu, oznámení o vodě a uzavírkách, NDIC a výluky vlaků.
 import { addOutageArea, refreshOutages, removeOutageArea, saveOutageAreas } from "./outages-db.js";
 import { removeNotice, saveNotice } from "./notices-db.js";
 import { clearClosures, retryClosure, saveNdicSettings, setClosureManual } from "./ndic/store.js";
 import { continueNdic } from "./ndic/run.js";
+import { refreshTrainsNow } from "./vlaky/run.js";
+import { saveTrainSettings, setTrainManual } from "./vlaky/store.js";
 import { redirect, withError } from "./http.js";
 
 const BASE = "/redakce/odstavky";
@@ -20,6 +22,9 @@ export const OUTAGE_OK = {
   "ndic-rucne": "Uzavírka je upravená.",
   "ndic-znovu": "Drběna se na uzavírku podívá znovu. Stránka se sama obnoví.",
   "ndic-smazano": "Uzavírky z Dopravního info jsou smazané. Teď můžete v portálu NDIC resetovat odběr.",
+  "vlaky-nastaveni": "Nastavení výluk vlaků je uložené.",
+  "vlaky-nacteno": "Výluky vlaků jsou zkontrolované.",
+  "vlaky-rucne": "Výluka je upravená.",
 };
 
 function simple(result, okKey) {
@@ -70,6 +75,9 @@ export async function outagePost(path, request, env, fields, execution = null) {
     await continueNdic(env, { ctx: execution });
     return redirect(`${BASE}?ok=ndic-znovu`);
   }
+  if (path === `${BASE}/vlaky/nastaveni`) return simple(await saveTrainSettings(env, request, fields), "vlaky-nastaveni");
+  if (path === `${BASE}/vlaky/nacist`) return areaResult(await refreshTrainsNow(env, request), "vlaky-nacteno");
+  if (path === `${BASE}/vlaky/rucne`) return simple(await setTrainManual(env, request, fields.trainId, fields.manual), "vlaky-rucne");
   if (path === `${BASE}/ndic/smazat`) {
     if (!fields.confirm) return redirect(BASE);
     return simple(await clearClosures(env, request), "ndic-smazano");

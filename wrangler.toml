@@ -27,8 +27,9 @@ database_id = "6b49d75b-58bf-433d-91be-1869f543a388"
 binding = "BUCKET"
 bucket_name = "kopidlenska-drbna"
 
+# Druhý cron jen pro výluky vlaků z ČD (src/vlaky/): má vlastní limit dotazů ven. Musí sedět s TRAINS_CRON v src/index.js.
 [triggers]
-crons = ["15 */4 * * *"]
+crons = ["15 */4 * * *", "45 */4 * * *"]
 
 # Až drbna pojede na vlastní doméně: odkomentovat routes a přidat workers_dev = false a preview_urls = false
 # nahoru k name, ať redakce nejde obejít kolem Cloudflare Access.

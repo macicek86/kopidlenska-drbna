@@ -22,6 +22,7 @@ import {
 import { loadNoticeBoard, loadNotices } from "./notices-db.js";
 import { loadClosures, loadNdicSettings } from "./ndic/store.js";
 import { pushConfig } from "./ndic/push.js";
+import { loadTrains, loadTrainSettings } from "./vlaky/store.js";
 import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
@@ -300,13 +301,15 @@ async function loadSchools(env) {
 
 // Části redakce jen pro hlavního redaktora.
 async function loadChiefDesk(env) {
-  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, schools, drbena, events, users] =
+  const [outageAreas, outages, notices, ndicSettings, closures, trainSettings, trains, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, schools, drbena, events, users] =
     await Promise.all([
       loadOutageAreas(env),
       loadOutageBoard(env),
       loadNotices(env),
       loadNdicSettings(env),
       loadClosures(env),
+      loadTrainSettings(env),
+      loadTrains(env),
       loadImportSettings(env),
       loadImportItems(env),
       loadFootballSettings(env),
@@ -323,6 +326,7 @@ async function loadChiefDesk(env) {
     outages,
     notices,
     ndic: { ...ndicSettings, ready: Boolean(pushConfig(env)), closures },
+    trains: { ...trainSettings, rows: trains },
     importSettings,
     importItems,
     footballSettings,

@@ -3,6 +3,7 @@ import { esc, outageCard, outageEmpty } from "../view.js";
 import { adminShell } from "./shell.js";
 import { ndicDialogs, ndicSection } from "./ndic.js";
 import { noticeDialogs, noticePanels } from "./notices.js";
+import { trainSection } from "./vlaky.js";
 import { callout, cancelLink, check, confirmForm, field, formFoot, icon, input, modal, modalLink, openButton, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/odstavky";
@@ -75,11 +76,12 @@ export function adminOutages(ctx, data, message, query = {}) {
 
   const body = `${pageHead(
     "Odstávky a uzavírky",
-    `Vodu a uzavírky zapisuje redakce nebo je připraví Koza Drběna ze zpráv města, uzavírky silnic posílá i Dopravní info (NDIC). Elektřinu se drbna párkrát denně ptá veřejného widgetu ČEZ Distribuce. Na titulce se odstávka nebo uzavírka ukáže, když právě probíhá nebo začíná do ${HOME_LEAD_DAYS} dní.`,
+    `Vodu a uzavírky zapisuje redakce nebo je připraví Koza Drběna ze zpráv města, uzavírky silnic posílá i Dopravní info (NDIC) a výluky vlaků bere drbna z webu Českých drah. Elektřinu se drbna párkrát denně ptá veřejného widgetu ČEZ Distribuce. Na titulce se odstávka nebo uzavírka ukáže, když právě probíhá nebo začíná do ${HOME_LEAD_DAYS} dní.`,
     `${openButton("nova-obec", `${BASE}?novy=1`, "Přidat obec", "btn-line")}${openButton("nove-oznameni", `${BASE}?nove-oznameni=1`, "Odstávka vody")}${openButton("nova-uzavirka", `${BASE}?nova-uzavirka=1`, "Uzavírka")}`,
   )}
     ${noticePanels(data.notices ?? [])}
     ${ndicSection(ctx, data.ndic ?? { closures: [] })}
+    ${trainSection(data.trains ?? { rows: [] })}
     <h2 class="adm-subhead">Elektřina</h2>
     <section class="panel status-panel">
       <div class="status-line">
