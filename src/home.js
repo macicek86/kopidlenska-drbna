@@ -99,7 +99,7 @@ function newsHtml(data, ctx) {
         ${storyPhoto(lead, "cover")}
         ${rubricKicker(lead)}
         <h3>${esc(lead.title)}</h3>
-        <p class="muted">${esc(lead.excerpt)}</p>
+        <p class="muted">${esc(lead.excerpt)} <span class="side-more">víc ›</span></p>
         <p class="meta">${esc(signedWhen(lead, formatDayMonth(lead.createdOn)))}</p>
       </a>`
     : `<p class="card muted">${esc(tx(ctx.copy, "empty_articles"))}</p>`;
