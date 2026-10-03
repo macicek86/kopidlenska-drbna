@@ -401,8 +401,12 @@ export function askLine(ctx, prefix, prefill) {
 export function yardsPage(data, ctx) {
   const today = data.waste.today;
   const now = clockOf(data);
-  const cards = (data.yards ?? []).length
-    ? (data.yards ?? [])
+  const yards = data.yards ?? [];
+  // Jeden dvůr přes celou šířku jako dřív, dva vedle sebe, víc po třech.
+  const several = yards.length > 1;
+  const grid = several ? ` place-grid ${yards.length === 2 ? "yard-grid-2" : "yard-grid-3"}` : "";
+  const cards = yards.length
+    ? yards
         .map((yard) => {
           const later = yard.closures.filter((closure) => closure.startsOn > today);
           const planned = later.length
@@ -416,8 +420,8 @@ export function yardsPage(data, ctx) {
           const hours = yard.legacy
             ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
             : weekList(yard.week, today);
-          // Stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
-          return `<article class="card yard place-card">
+          // Víc dvorů: stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
+          return `<article class="card yard${several ? " place-card" : ""}">
             <div class="place-head">
               <p class="kicker">${esc(yard.place)}</p>
               <h2>${esc(yard.name)}</h2>
@@ -441,7 +445,7 @@ export function yardsPage(data, ctx) {
       <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "yards_lede"))}</p>
       ${askLine(ctx, "yards", "U sběrných dvorů je něco špatně: ")}
-      <div class="stack place-grid">${cards}</div>`,
+      <div class="stack${grid}">${cards}</div>`,
   });
 }
 
