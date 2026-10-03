@@ -286,7 +286,7 @@ async function renderGet(request, env, url, execution) {
   }
   if (path === "/akce") {
     const ad = chooseAd(request, data.ads);
-    return htmlAd(request, eventsPage({ ...data, ad }, ctx), ad);
+    return htmlAd(request, eventsPage({ ...data, ad }, ctx, { month: url.searchParams.get("mesic") }), ad);
   }
   if (path === "/o-nas") {
     return html(aboutPage(data, ctx));

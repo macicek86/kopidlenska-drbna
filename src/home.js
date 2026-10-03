@@ -123,7 +123,7 @@ function eventsHtml(data, ctx) {
   return `<div class="cards-3">${upcoming
     .map(
       (event) => `<article class="card">
-        <p class="kicker">${esc(formatLong(event.startsOn))}</p>
+        <p class="kicker">${event.startsOn === data.waste.today ? `<span class="today-tag">${esc(tx(ctx.copy, "events_today_short"))}</span> ` : ""}${esc(formatLong(event.startsOn))}</p>
         <h3>${escTie(event.title)}</h3>
         <p class="muted">${esc(event.place)}${event.startsTime ? ` · ${esc(event.startsTime)}` : ""}</p>
         ${eventLinks(event, ctx)}

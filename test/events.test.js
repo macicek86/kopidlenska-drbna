@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mapEvent, readEventLink, saveBotEvent } from "../src/events-db.js";
+import { calendarHtml } from "../src/events-calendar.js";
+import { eventsPage } from "../src/events-view.js";
 import { DatabaseSync } from "node:sqlite";
 
 const row = { id: 1, title: "Posvícení", place: "Náměstí", starts_on: "2026-10-10", starts_time: "", description: "", published: 1 };
@@ -40,4 +42,36 @@ test("znovu zpracovaná položka importu nezaloží druhou akci, jen k ní přip
   assert.deepEqual({ ...db.prepare("select count(*) as n, article_id, proposal_id from events").get() }, { n: 1, article_id: 5, proposal_id: null });
   assert.notEqual(await saveBotEvent(env, event, { existingId: 99, published: true }), first);
   assert.equal(await saveBotEvent(env, null, { existingId: 99, published: true }), null);
+});
+
+test("dnešní akce je pod Dnes, ne mezi chystanými, a kalendář ukáže měsíc z adresy", () => {
+  const ctx = { path: "/akce", copy: {}, minimal: false, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
+  const events = [
+    { id: 1, title: "Posvícení", place: "Náměstí", startsOn: "2026-10-03", startsTime: "14:00", description: "" },
+    { id: 2, title: "Drakiáda", place: "Louka", startsOn: "2026-10-11", startsTime: "", description: "" },
+    { id: 3, title: "Ples", place: "Sál", startsOn: "2026-11-20", startsTime: "", description: "" },
+  ];
+  const html = eventsPage({ events, waste: { today: "2026-10-03" }, ads: [] }, ctx);
+  const todayAt = html.indexOf("Dnes se koná");
+  assert.ok(todayAt > 0);
+  assert.ok(html.indexOf('id="akce-1"') > todayAt && html.indexOf('id="akce-1"') < html.indexOf("Chystá se"));
+  assert.match(html, /<h2 tabindex="-1">říjen 2026<\/h2>/);
+  assert.match(html, /class="cal-day is-today has-events"/);
+  assert.match(html, /href="\/akce\?mesic=2026-11#kalendar"/);
+  assert.doesNotMatch(html, /Zpět na dnešek/);
+
+  const november = eventsPage({ events, waste: { today: "2026-10-03" }, ads: [] }, ctx, { month: "2026-11" });
+  assert.match(november, /listopad 2026/);
+  assert.match(november, /href="#akce-3"/);
+  assert.match(november, /Zpět na dnešek/);
+  assert.match(november, /href="\/akce#kalendar" data-cal-nav aria-label="říjen 2026"/);
+  assert.match(eventsPage({ events, waste: { today: "2026-10-03" }, ads: [] }, ctx, { month: "nesmysl" }), /říjen 2026/);
+});
+
+test("kalendář začíná pondělím a přeskočí přes rok", () => {
+  const html = calendarHtml([], "2026-12-15", "", { calendar: "", back: "", count: () => "" });
+  // 1. 12. 2026 je úterý, takže jedno prázdné políčko.
+  assert.equal(html.match(/is-blank/g).length, 1);
+  assert.match(html, /mesic=2027-01/);
+  assert.match(html, /mesic=2026-11/);
 });
