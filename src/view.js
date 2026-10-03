@@ -414,15 +414,18 @@ export function yardsPage(data, ctx) {
           const hours = yard.legacy
             ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
             : weekList(yard.week, today);
-          return `<article class="card yard">
-            <p class="kicker">${esc(yard.place)}</p>
-            <h2>${esc(yard.name)}</h2>
-            ${yardStatusHtml(yard, now)}
-            <p class="kicker">${esc(tx(ctx.copy, "yards_accepts"))}</p>
-            <p class="keep-lines">${esc(yard.accepts)}</p>
+          // Stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
+          return `<article class="card yard place-card">
+            <div class="place-head">
+              <p class="kicker">${esc(yard.place)}</p>
+              <h2>${esc(yard.name)}</h2>
+              ${yardStatusHtml(yard, now)}
+              <p class="kicker">${esc(tx(ctx.copy, "yards_accepts"))}</p>
+              <p class="keep-lines">${esc(yard.accepts)}</p>
+            </div>
             <p class="kicker">${esc(tx(ctx.copy, "yards_hours"))}</p>
             ${hours}
-            ${planned}
+            <div class="place-more">${planned}</div>
           </article>`;
         })
         .join("")
@@ -435,7 +438,7 @@ export function yardsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "yards_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "yards_lede"))}</p>
-      <div class="stack">${cards}</div>`,
+      <div class="stack place-grid">${cards}</div>`,
   });
 }
 

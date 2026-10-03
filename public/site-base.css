@@ -735,6 +735,12 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .place-jump { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
 .place-jump .chip { color: var(--ink); }
 .place-card { scroll-margin-top: 1rem; }
+.place-head > .count, .place-head > .soon { margin-bottom: 1rem; }
+
+/* Lékaři: den vždy nad časy, ať dlouhé poznámky mají celou šířku karty (na mobilu to platí pro všechny týdny) */
+.doctor-grid .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.28rem; }
+.doctor-grid .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.doctor-grid .doctor-week .day { padding-top: 0; }
 
 .banner p { margin: 0.15rem 0; }
 
@@ -799,14 +805,17 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
   .cards-3, .dates { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dates.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pair { grid-template-columns: 1fr 1fr; }
-  /* Otevírací doba: karty vedle sebe, kolik se jich vejde, aby týden zůstal čitelný */
+  /* Otevírací doba a sběrné dvory: karty vedle sebe, kolik se jich vejde, aby týden zůstal čitelný */
   .place-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); }
   /* Karta zabírá 10 řádků mřížky (záhlaví, nadpis, 7 dnů, změny), takže dny v řádku karet leží na stejné výšce */
   .place-card { display: grid; grid-row: span 10; grid-template-rows: subgrid; row-gap: 0; }
   .place-card .week-list { display: grid; grid-row: span 7; grid-template-rows: subgrid; row-gap: 0; }
-  .place-card > .muted { grid-row: span 7; }
+  .place-card > .muted, .place-card > .keep-lines { grid-row: span 7; }
   .place-card .doctor-week li { align-content: start; }
-  .place-grid .dates.compact { grid-template-columns: 1fr; }
+  /* Lékaři ve dvou sloupcích plněných shora, každá karta jen tak vysoká, kolik má obsahu, krátké se skládají pod sebe */
+  .doctor-grid { display: block; columns: 28rem 2; column-gap: 0.75rem; }
+  .doctor-grid > .card { break-inside: avoid; margin-bottom: 0.75rem; }
+  .place-grid .dates.compact, .doctor-grid .dates.compact { grid-template-columns: 1fr; }
   .place-grid .doctor-week li { grid-template-columns: 7.6rem minmax(0, 1fr); }
   .about { grid-template-columns: 16rem 1fr; align-items: start; }
   .about img { position: sticky; top: 1.5rem; }

@@ -102,7 +102,7 @@ export function doctorsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "doctors_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "doctors_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "doctors_lede"))}</p>
-      <div class="stack">${cards}</div>`,
+      <div class="stack doctor-grid">${cards}</div>`,
   });
 }
 
