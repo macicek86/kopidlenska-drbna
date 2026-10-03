@@ -5,6 +5,7 @@
 @import url("/home.css");
 @import url("/events.css");
 @import url("/bins.css");
+@import url("/hours.css");
 
 @media (min-width: 900px) {
   .hero {

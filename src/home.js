@@ -59,20 +59,19 @@ function doctorsTeaser(data, ctx) {
         <p class="yard-home-detail">${esc(item.specialty)}</p>
         <p class="yard-home-state">${esc(item.state)}</p>
         ${item.note ? `<p class="yard-home-detail">${esc(item.note)}</p>` : ""}
-        ${item.detail ? `<p class="yard-home-detail">${esc(item.detail)}</p>` : ""}
       </li>`;
     })
     .filter(Boolean)
     .join("");
   if (!lines) return "";
   return `<div class="card waste-teaser">
-    <p class="eyebrow">${esc(tx(ctx.copy, "home_doctors_button"))}</p>
+    <p class="eyebrow">${esc(tx(ctx.copy, "home_doctors_eyebrow"))}</p>
     <ul class="yard-home">${lines}</ul>
     <div class="row"><a class="btn btn-primary" href="/lekari">${esc(tx(ctx.copy, "home_doctors_button"))}</a></div>
   </div>`;
 }
 
-// Zavřeno, jiná nebo nová otevírací doba. Stejné upozornění u víc míst je jeden řádek se všemi názvy.
+// Zavřeno, jiná nebo nová otevírací doba, jen datum a důvod (rozpis je na stránce). Stejné upozornění u víc míst je jeden řádek se všemi názvy.
 function placesTeaser(data, ctx) {
   const notices = groupedNotices(data.places, clockOf(data).date);
   if (!notices.length) return "";
@@ -82,7 +81,6 @@ function placesTeaser(data, ctx) {
         <p class="yard-home-name">${esc(item.names.join(", "))}</p>
         <p class="yard-home-state">${esc(item.state)}</p>
         ${item.note ? `<p class="yard-home-detail">${esc(item.note)}</p>` : ""}
-        ${item.detail ? `<p class="yard-home-detail">${esc(item.detail)}</p>` : ""}
       </li>`,
     )
     .join("");

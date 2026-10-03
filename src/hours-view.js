@@ -1,11 +1,10 @@
 // Stránky s týdenními hodinami: Lékaři a Otevírací doba. Sdílí výpis týdne, upozornění a dlaždice změn.
 import { text as tx } from "./copy.js";
-import { activeChange, hasOpenSlot, homeNotice, periodClosed, spanSummary } from "./doctors.js";
+import { hasOpenSlot } from "./doctors.js";
 import { esc } from "./html.js";
-import { formatLong } from "./format.js";
-import { placeNotices, placeSummary, temporaryChanges, upcomingNewHours } from "./places.js";
-import { askLine, closureLabel, dayLabel, layout } from "./view.js";
-import { civilWeekday } from "./waste.js";
+import { laterChangeTiles, nextDaysList, popover, popoverButton, regularWeekList } from "./hours-week-view.js";
+import { placeNotices } from "./places.js";
+import { askLine, layout } from "./view.js";
 
 function phoneLink(phone) {
   const text = String(phone ?? "").trim();
@@ -24,72 +23,43 @@ function glueDates(text) {
     .replace(/ (od|do) (?=\d)/g, " $1&nbsp;");
 }
 
-// Dopoledne a odpoledne se nepíše, je to zřejmé z času.
-function partLine(part) {
-  if (!part?.open) return "";
-  const note = part.note ? `<span class="hint">${esc(part.note)}</span>` : "";
-  return `<p class="part"><span class="slot"><strong>${esc(`${part.from}–${part.to}`)}</strong></span>${note}</p>`;
-}
-
-function doctorWeekList(week, today, { superseded = false } = {}) {
-  const todayDay = civilWeekday(today);
-  return `<ul class="week-list doctor-week">${week
-    .map((slot) => {
-      const morning = partLine(slot.morning);
-      const afternoon = partLine(slot.afternoon);
-      const open = Boolean(morning || afternoon);
-      const todayRow = slot.day === todayDay;
-      const loud = todayRow && !superseded;
-      const classes = [loud ? "is-today" : "", todayRow && superseded ? "is-quiet" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
-      const mark = loud
-        ? `<span class="today-mark">dnes</span>`
-        : todayRow
-          ? `<span class="today-quiet">dnes neplatí</span>`
-          : "";
-      const body = open ? `<div class="parts">${morning}${afternoon}</div>` : `<strong>zavřeno</strong>`;
-      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${esc(dayLabel(slot.day))}${mark}</span>${body}</li>`;
-    })
-    .join("")}</ul>`;
-}
-
-function doctorChangeTiles(changes) {
-  return changes
-    .map((change) => {
-      const hours = periodClosed(change) ? "Zavřeno" : spanSummary(change);
-      return `<article class="date-tile"><strong>${esc(closureLabel(change))}</strong><span>${esc(change.note)}</span><span>${esc(hours)}</span></article>`;
-    })
-    .join("");
-}
-
 function noticeBanner(notice, extraClass = "") {
   const lead = `${notice.name} ${notice.state.charAt(0).toLowerCase()}${notice.state.slice(1)}`;
-  return `<div class="banner doctor-notice${extraClass}"><p>${glueDates(lead)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}${notice.detail ? `<p class="banner-note">${glueDates(notice.detail)}</p>` : ""}</div>`;
+  return `<div class="banner doctor-notice${extraClass}"><p>${glueDates(lead)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}</div>`;
 }
+
+// Hodiny jednoho lékaře nebo místa: příštích 7 dní, pod nimi běžný týden v okně a změny, které do 7 dní nespadají.
+function hoursBlock(entity, today, ctx, keys) {
+  if (!hasOpenSlot(entity.week) && !(entity.changes ?? []).length) {
+    return { days: `<p class="muted">${esc(tx(ctx.copy, keys.missing))}</p>`, more: "" };
+  }
+  const id = `bezne-${keys.prefix}-${entity.id}`;
+  const label = tx(ctx.copy, keys.regular);
+  const regular = hasOpenSlot(entity.week)
+    ? `<p class="regular-hours">${popoverButton(id, label)}</p>${popover(id, entity.name, label, regularWeekList(entity.week))}`
+    : "";
+  const tiles = laterChangeTiles(entity, today, keys.prefix);
+  const later = tiles ? `<p class="kicker">${esc(tx(ctx.copy, keys.changes))}</p><div class="dates compact">${tiles}</div>` : "";
+  return { days: nextDaysList(entity, today), more: `${regular}${later}` };
+}
+
+const DOCTOR_KEYS = { prefix: "lekar", missing: "doctors_missing_hours", regular: "doctors_regular", changes: "doctors_changes" };
+const PLACE_KEYS = { prefix: "misto", missing: "places_missing_hours", regular: "places_regular", changes: "places_changes" };
 
 export function doctorsPage(data, ctx) {
   const today = data.waste.today;
   const cards = (data.doctors ?? []).length
     ? (data.doctors ?? [])
         .map((doctor) => {
-          const current = activeChange(doctor, today);
-          const notice = current ? homeNotice(doctor, today) : null;
-          const banner = notice ? noticeBanner(notice) : "";
-          const rest = doctor.changes.filter((change) => change.id !== current?.id);
-          const planned = rest.length
-            ? `<p class="kicker">${esc(tx(ctx.copy, "doctors_changes"))}</p><div class="dates compact">${doctorChangeTiles(rest)}</div>`
-            : "";
           const phone = phoneLink(doctor.phone);
-          const hours = hasOpenSlot(doctor.week)
-            ? doctorWeekList(doctor.week, today, { superseded: Boolean(notice) })
-            : `<p class="muted">${esc(tx(ctx.copy, "doctors_missing_hours"))}</p>`;
+          const { days, more } = hoursBlock(doctor, today, ctx, DOCTOR_KEYS);
           return `<article class="card yard">
             <p class="kicker">${esc(doctor.specialty)}</p>
             <h2>${esc(doctor.name)}</h2>
             <p class="meta">${esc(doctor.place)}${phone ? ` · ${phone}` : ""}</p>
-            ${banner}
-            <p class="kicker">${esc(tx(ctx.copy, banner ? "doctors_regular" : "doctors_hours"))}</p>
-            ${hours}
-            ${planned}
+            <p class="kicker">${esc(tx(ctx.copy, "doctors_hours"))}</p>
+            ${days}
+            ${more}
           </article>`;
         })
         .join("")
@@ -107,34 +77,16 @@ export function doctorsPage(data, ctx) {
   });
 }
 
-function newHoursTiles(changes) {
-  return changes
-    .map(
-      (change) =>
-        `<article class="date-tile"><strong>od ${esc(formatLong(change.startsOn))}</strong>${change.note ? `<span>${esc(change.note)}</span>` : ""}<span>${esc(placeSummary(change))}</span></article>`,
-    )
-    .join("");
-}
-
 function placeCard(place, today, ctx) {
-  const temporary = temporaryChanges(place);
-  const current = activeChange({ changes: temporary }, today);
-  const notices = placeNotices(place, today).filter((notice) => (notice.kind === "new" ? notice.startsOn <= today : Boolean(current)));
-  const banners = notices.map((notice) => noticeBanner(notice, notice.kind === "new" ? " is-new" : "")).join("");
-  const rest = temporary.filter((change) => change.id !== current?.id);
-  const planned = rest.length
-    ? `<p class="kicker">${esc(tx(ctx.copy, "places_changes"))}</p><div class="dates compact">${doctorChangeTiles(rest)}</div>`
-    : "";
-  const upcoming = upcomingNewHours(place, today);
-  const later = upcoming.length
-    ? `<p class="kicker">${esc(tx(ctx.copy, "places_new_hours"))}</p><div class="dates compact">${newHoursTiles(upcoming)}</div>`
-    : "";
+  // Nová doba, která už platí, má nahoře upozornění (titulka o ní mluví ještě 14 dní).
+  const banners = placeNotices(place, today)
+    .filter((notice) => notice.kind === "new" && notice.startsOn <= today)
+    .map((notice) => noticeBanner(notice, " is-new"))
+    .join("");
   const phone = phoneLink(place.phone);
-  const hours = hasOpenSlot(place.week)
-    ? doctorWeekList(place.week, today, { superseded: Boolean(current) })
-    : `<p class="muted">${esc(tx(ctx.copy, "places_missing_hours"))}</p>`;
+  const { days, more } = hoursBlock(place, today, ctx, PLACE_KEYS);
   const meta = [esc(place.place), phone].filter(Boolean).join(" · ");
-  // Bloky karty jsou řádky mřížky (záhlaví, nadpis týdne, 7 dnů, změny), na počítači se srovnají s kartami vedle.
+  // Bloky karty jsou řádky mřížky (záhlaví, nadpis, 7 dnů, zbytek), na počítači se srovnají s kartami vedle.
   return `<article class="card yard place-card" id="misto-${place.id}">
     <div class="place-head">
       ${place.label ? `<p class="kicker">${esc(place.label)}</p>` : ""}
@@ -142,9 +94,9 @@ function placeCard(place, today, ctx) {
       ${meta ? `<p class="meta">${meta}</p>` : ""}
       ${banners}
     </div>
-    <p class="kicker">${esc(tx(ctx.copy, current ? "places_regular" : "places_hours"))}</p>
-    ${hours}
-    <div class="place-more">${planned}${later}</div>
+    <p class="kicker">${esc(tx(ctx.copy, "places_hours"))}</p>
+    ${days}
+    <div class="place-more">${more}</div>
   </article>`;
 }
 

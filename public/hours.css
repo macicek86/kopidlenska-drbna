@@ -1,0 +1,134 @@
+/* Lékaři a otevírací doba: příštích 7 dní, den se změnou a dnešek nenápadně označené,
+   běžné hodiny a rozpis změny v okně (HTML popover, bez JS). */
+
+.next-days li.is-today {
+  background: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.next-days .today-mark {
+  background: none;
+  color: var(--brand);
+  border: 1px solid currentColor;
+}
+
+.next-days li.is-change {
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--soon);
+}
+
+.next-days li.is-change.is-today { box-shadow: inset 3px 0 0 var(--brand); }
+
+.next-days li.is-change.is-off { color: var(--ink); }
+
+.next-days li > .change-note {
+  grid-column: 1 / -1;
+  margin: 0.1rem 0 0;
+  color: var(--soon);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.next-days .change-mark {
+  display: inline-block;
+  margin-right: 0.15rem;
+  padding: 0.04rem 0.38rem;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+  text-transform: uppercase;
+  vertical-align: 0.12em;
+}
+
+.regular-hours { margin: 0.8rem 0 0.4rem; }
+
+.pop-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
+}
+
+.date-tile .pop-open { margin-top: 0.3rem; font-size: 0.92rem; justify-self: start; }
+
+.date-tile .tile-state { color: var(--ink); font-weight: 700; }
+
+/* Okno: uprostřed obrazovky, na mobilu skoro přes celou šířku. Vejde se skoro na výšku obrazovky;
+   když ne, posouvá se jen obsah pod nadpisem a posuvník je tenký. */
+.hours-pop {
+  width: min(30rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 1rem 1.1rem 0.6rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 1.2rem 3rem rgb(0 0 0 / 0.25);
+  overflow: hidden;
+}
+
+.hours-pop:popover-open { display: flex; flex-direction: column; }
+
+.hours-pop-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.hours-pop-body::-webkit-scrollbar { width: 6px; }
+.hours-pop-body::-webkit-scrollbar-thumb { border-radius: 3px; background: var(--line); }
+
+.hours-pop-body > .week-list { margin-bottom: 0; }
+
+.hours-pop-body > .week-list > li:last-child { border-bottom: 0; }
+
+.hours-pop::backdrop { background: rgb(40 25 15 / 0.45); }
+
+.hours-pop-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  flex: none;
+  margin-bottom: 0.4rem;
+}
+
+.hours-pop-head h3 { margin: 0; font-family: var(--display); font-size: 1.35rem; line-height: 1.2; }
+
+.hours-pop-head .kicker { margin: 0 0 0.15rem; }
+
+.pop-close {
+  flex: none;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper-deep);
+  color: var(--ink);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hours-pop .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.25rem; }
+.hours-pop .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+
+/* Den s datem a štítkem „dnes“ je delší než samotný název dne. */
+@media (min-width: 720px) {
+  .place-grid .next-days li { grid-template-columns: 9.4rem minmax(0, 1fr); }
+}

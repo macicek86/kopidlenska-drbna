@@ -104,13 +104,18 @@ test("stránka, titulka a redakce otevírací doby", () => {
   const places = [place(1, knihovna, [closure(4, 1, "2026-10-02")])];
   const data = { places, waste: { today: "2026-10-02" }, now: { date: "2026-10-02", time: "10:00" } };
   const page = placesPage(data, { path: "/oteviraci-doba", copy: {} });
-  assert.match(page, /Knihovna má 2\.&nbsp;10\. zavřeno\./);
-  assert.match(page, /Běžná otevírací doba/);
+  // Zavření je přímo v příštích 7 dnech, zvýrazněné a s důvodem. Běžná doba je v okně pod nimi.
+  assert.match(page, /<li class="is-today is-change is-off"><span class="day">Pátek 2\.&nbsp;10\.<span class="today-mark">dnes<\/span><\/span><strong>zavřeno<\/strong><p class="change-note"><span class="change-mark">změna<\/span> školení k volbám<\/p><\/li>/);
+  assert.match(page, /<li><span class="day">Pondělí 5\.&nbsp;10\.<\/span>/);
+  assert.match(page, /<button type="button" class="pop-open" popovertarget="bezne-misto-1">Běžná otevírací doba<\/button>/);
+  assert.match(page, /<div class="hours-pop" id="bezne-misto-1" popover>/);
+  assert.doesNotMatch(page, /Další změny/);
   const home = homePage(
     { ...data, articles: [], events: [], yards: [], doctors: [], waste: { today: "2026-10-02", nextDate: "2026-10-05", daysUntil: 3 } },
     { path: "/", copy: {} },
   );
   assert.match(home, /Pozor, jiná otevírací doba/);
+  assert.match(home, /školení k volbám/);
   assert.match(home, /href="\/oteviraci-doba"/);
   const admin = adminPlaces({ path: "/redakce/oteviraci-doba", copy: {} }, { signedIn: true, user: { id: 1, role: "hlavni", name: "R" }, places }, { text: "", kind: "ok" }, { newHoursId: 1 });
   assert.match(admin, /Nová otevírací doba/);
