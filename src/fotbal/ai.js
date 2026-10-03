@@ -2,6 +2,8 @@
 import { callClaude } from "../claude.js";
 import { prepareArticleBody } from "../rich.js";
 import { DEFAULT_FOOTBALL_VOICE } from "../drbena.js";
+import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
+import { addArticles } from "../import-overview.js";
 
 export { DEFAULT_FOOTBALL_VOICE };
 
@@ -25,6 +27,7 @@ Pravidla:
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny. U zápasu ať je v nadpisu výsledek nebo soupeř.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
+${KEYWORDS_RULE} U zápasu dej do nich soupeře, soutěž a datum zápasu.
 - U "preskocit" a "duplicita" nech článek prázdný.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
 
@@ -36,7 +39,7 @@ export function footballSchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html"],
+    required: ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords"],
     properties: {
       decision: { type: "string", enum: ["vytvorit", "preskocit", "duplicita"] },
       reason: { type: "string" },
@@ -44,6 +47,7 @@ export function footballSchema() {
       title: { type: "string" },
       excerpt: { type: "string" },
       body_html: { type: "string" },
+      keywords: keywordsSchema(),
     },
   };
 }
@@ -53,21 +57,9 @@ export function footballPrompt(voice) {
   return `${RULES}\n\nHlas a styl textů:\n${style}`;
 }
 
-function line(value, max = 220) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-}
-
 export function footballContext(known) {
   const parts = [];
-  const add = (heading, rows) => parts.push(`${heading}:\n${rows.length ? rows.join("\n") : "(nic)"}`);
-  add(
-    "Zprávy na drbně za poslední týdny",
-    (known.articles ?? []).map((row) => `[zprava:${row.id}] ${row.createdOn} · ${line(row.title, 140)} · ${line(row.excerpt)}`),
-  );
-  add(
-    "Návrhy, které čekají na schválení",
-    (known.proposals ?? []).map((row) => `[navrh:${row.id}] ${row.createdOn} · ${line(row.title, 140)} · ${line(row.excerpt)}`),
-  );
+  addArticles((heading, rows) => parts.push(`${heading}:\n${rows.length ? rows.join("\n") : "(nic)"}`), known);
   return parts.join("\n\n");
 }
 
@@ -119,7 +111,7 @@ export function readFootballDecision(raw, { force = false } = {}) {
   if (title.length < 3 || excerpt.length < 3 || prepared.text.length < 3) {
     return { ok: false, error: "Claude chtěl aktualitu zpracovat, ale nevrátil článek, který by šel uložit." };
   }
-  return { ok: true, decision, reason, duplicateOf: "", article: { title, excerpt, body: prepared.html } };
+  return { ok: true, decision, reason, duplicateOf: "", article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords) } };
 }
 
 export async function askFootball(env, { item, known, voice, today, force = false, doubts = [], fixes = [] }) {

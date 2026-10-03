@@ -2,13 +2,13 @@
 import { adminDrbena } from "./admin/drbena.js";
 import { loadAdmin } from "./db.js";
 import { requireChief } from "./db-core.js";
-import { saveDrbena } from "./drbena-db.js";
+import { saveDrbena, saveFollowupSetting } from "./drbena-db.js";
 import { readTry, tryVoice } from "./drbena-try.js";
 import { html, redirect, withError } from "./http.js";
 
 const BASE = "/redakce/drbena";
 
-export const DRBENA_OK = { drbena: "Povaha Drběny je uložená." };
+export const DRBENA_OK = { drbena: "Povaha Drběny je uložená.", "drbena-navazujici": "Nastavení navazujících zpráv je uložené." };
 
 export async function drbenaPost(path, request, env, fields, ctx) {
   if (path === `${BASE}/zkusit`) {
@@ -18,6 +18,11 @@ export async function drbenaPost(path, request, env, fields, ctx) {
     const result = await tryVoice(env, input);
     const data = await loadAdmin(env, request);
     return html(adminDrbena(ctx, data, { text: "", kind: "ok" }, { input, result }));
+  }
+  if (path === `${BASE}/navazujici`) {
+    const result = await saveFollowupSetting(env, request, fields);
+    if (!result.ok) return redirect(withError(BASE, result.error));
+    return redirect(`${BASE}?ok=drbena-navazujici`);
   }
   if (path !== `${BASE}/ulozit`) return null;
   const result = await saveDrbena(env, request, fields);

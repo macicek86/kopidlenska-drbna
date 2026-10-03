@@ -53,7 +53,7 @@ export async function saveProposal(env, request, input) {
       `update proposals
        set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, image_focus = ?, image_caption = ?,
            submitted_title = ?, submitted_excerpt = ?, submitted_body = ?, submitted_category = ?,
-           author_name = ?, status = 'pending', note = ''
+           author_name = ?, status = 'pending', note = '', keywords = ''
        where id = ?`,
     )
       .bind(
@@ -137,7 +137,7 @@ export async function approveProposal(env, request, input) {
   if (!input.id) return { ok: false, error: "Ten návrh už tu není." };
   const proposal = await env.DB.prepare(
     `select p.id, p.article_id, p.author_id, p.author_name, p.image_key, p.submitted_title, p.submitted_excerpt,
-            p.submitted_body, p.submitted_category, p.status, p.publish_on, u.login as author_login
+            p.submitted_body, p.submitted_category, p.status, p.publish_on, p.keywords, p.follows_id, u.login as author_login
      from proposals p left join users u on u.id = p.author_id where p.id = ?`,
   )
     .bind(input.id)
@@ -182,7 +182,7 @@ export async function approveProposal(env, request, input) {
     const redacted = redactedFlag(article.redacted, submitted, finalText) ? 1 : 0;
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, published = 1, redacted = ? where id = ?`,
+         image_focus = ?, image_caption = ?, published = 1, redacted = ?, keywords = '' where id = ?`,
     )
       .bind(
         parsed.title,
@@ -200,9 +200,11 @@ export async function approveProposal(env, request, input) {
     if (previousArticleImage && previousArticleImage !== nextImage) await releaseImage(env, previousArticleImage);
   } else {
     const slug = await uniqueSlug(env, slugify(parsed.title));
+    const edited = textWasEdited(submitted, finalText);
     const inserted = await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?)`,
+      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted,
+         keywords, follows_id)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -217,7 +219,10 @@ export async function approveProposal(env, request, input) {
         String(proposal.publish_on ?? ""),
         proposal.author_id,
         proposal.author_name,
-        textWasEdited(submitted, finalText) ? 1 : 0,
+        edited ? 1 : 0,
+        // Upravený text dostane nová klíčová slova z cronu, neupravený si nechá ta od Drběny.
+        edited ? "" : String(proposal.keywords ?? ""),
+        proposal.follows_id ?? null,
       )
       .run();
     await linkImports(env, proposal.id, Number(inserted.meta?.last_row_id));

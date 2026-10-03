@@ -425,26 +425,22 @@ export async function saveArticle(env, request, input) {
     const previous = imageKey;
     if (stored.key) imageKey = stored.key;
     const authorIsOther = current.author_id && Number(current.author_id) !== gate.user.id;
-    const redacted =
-      authorIsOther &&
-      textWasEdited(
-        {
-          title: String(current.title),
-          excerpt: String(current.excerpt),
-          body: String(current.body),
-          category: String(current.category),
-        },
-        { title, excerpt, body, category },
-      )
-        ? 1
-        : asBool(current.redacted)
-          ? 1
-          : 0;
+    const edited = textWasEdited(
+      {
+        title: String(current.title),
+        excerpt: String(current.excerpt),
+        body: String(current.body),
+        category: String(current.category),
+      },
+      { title, excerpt, body, category },
+    );
+    const redacted = (authorIsOther && edited) || asBool(current.redacted) ? 1 : 0;
+    // Po úpravě textu se klíčová slova smažou a cron je dopočítá znovu (src/keywords.js).
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, redacted = ? where id = ?`,
+         image_focus = ?, image_caption = ?, redacted = ?, keywords = case when ? then '' else keywords end where id = ?`,
     )
-      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, redacted, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, redacted, edited ? 1 : 0, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     return { ok: true };

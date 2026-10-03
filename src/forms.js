@@ -146,6 +146,7 @@ export async function formFields(request) {
     football: text("football"),
     articleText: text("text"),
     autoPublish: form.get("autoPublish") === "1",
+    followupPublish: form.get("followupPublish") === "1",
     clubUrl: text("clubUrl"),
     truthUrl: text("truthUrl"),
     previews: form.get("previews") === "1",

@@ -2,9 +2,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 export const MODEL = "claude-opus-5-5";
+// Levný model na drobnosti (klíčová slova). Úsilí ani zástupce při odmítnutí nezná.
+export const CHEAP_MODEL = "claude-haiku-4-5";
 
 // Vrací { ok: true, raw } s rozparsovaným JSON, nebo { ok: false, error } s větou pro redakci.
-export async function callClaude(env, { system, content, schema, effort = "medium" }) {
+export async function callClaude(env, { system, content, schema, effort = "medium", cheap = false }) {
   if (!env.ANTHROPIC_API_KEY) return { ok: false, error: "Chybí klíč ANTHROPIC_API_KEY." };
   const client = new Anthropic({
     apiKey: env.ANTHROPIC_API_KEY,
@@ -14,15 +16,19 @@ export async function callClaude(env, { system, content, schema, effort = "mediu
   });
   let response;
   try {
-    response = await client.beta.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
-      output_config: { effort, format: { type: "json_schema", schema } },
-      system,
-      messages: [{ role: "user", content }],
-    });
+    const format = { type: "json_schema", schema };
+    const messages = [{ role: "user", content }];
+    response = cheap
+      ? await client.messages.create({ model: CHEAP_MODEL, max_tokens: 8000, output_config: { format }, system, messages })
+      : await client.beta.messages.create({
+          model: MODEL,
+          max_tokens: 16000,
+          betas: ["server-side-fallback-2026-07-01"],
+          fallbacks: "default",
+          output_config: { effort, format },
+          system,
+          messages,
+        });
   } catch (error) {
     if (error instanceof Anthropic.AuthenticationError) return { ok: false, error: "Claude nepřijal klíč. Zkontrolujte ANTHROPIC_API_KEY." };
     if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "Claude je teď přetížený. Zkusí se to příště." };

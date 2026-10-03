@@ -3,7 +3,10 @@
 import { callClaude } from "../claude.js";
 import { clubRules } from "../clubs.js";
 import { DEFAULT_VOICE } from "../drbena.js";
-import { contextText, outputSchema, readDecision } from "../munipolis/ai.js";
+import { writeFollowup } from "../followup.js";
+import { FOLLOWUP_DECISION } from "../followup-rules.js";
+import { KEYWORDS_RULE } from "../keywords.js";
+import { contextText, outputSchema, readArticle, readDecision } from "../munipolis/ai.js";
 import { topicsText } from "../stock.js";
 
 const RULES = `Dostaneš jeden článek z Jičínského deníku, který zmiňuje Kopidlno nebo jeho části (Drahoraz, Mlýnec, Pševes, Ledkov), a přehled toho, co už na webu Kopidlenská drbna je.
@@ -15,7 +18,8 @@ Deník drbně dovolil brát z článků informace, ale jen za těchto podmínek.
 - Přímé řeči z článku nepřebírej. Když je důležité, co někdo řekl, shrň to jednou větou vlastními slovy.
 
 Rozhodni (pole decision):
-- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "vytvorit" a novinku zmiň v reason.
+- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "doplneni" (je-li o věci zpráva), jinak "vytvorit", a novinku zmiň v reason.
+${FOLLOWUP_DECISION}
 - "preskocit": Kopidlno je v článku jen okrajově (třeba jedna obec z dlouhého výčtu), nebo článek pro sousedy z Kopidlna nemá smysl.
 - "vytvorit": článek je o Kopidlnu nebo jeho částech a sousedy bude zajímat.
 
@@ -31,6 +35,7 @@ Pravidla:
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: jeden až tři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul> a <li>. Odkaz na zdroj nepiš.
 - event.description: prostý text, jedna až tři věty.
+${KEYWORDS_RULE}
 - image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné. image_caption nech prázdné, fotky z Deníku se neberou.
 - Datum piš jako RRRR-MM-DD a čas jako HH:MM.
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná.
@@ -44,14 +49,20 @@ export function denikPrompt(voice, { rubricSlugs = null } = {}) {
   return `${RULES}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
 }
 
+export function denikItemText(item) {
+  return [
+    `Článek z Jičínského deníku (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
+    `Nadpis: ${item.title}`,
+    `Text:\n${item.text || "(jen nadpis)"}`,
+  ].join("\n\n");
+}
+
 export function denikText(item, known, { today, force = false, retry = "", topics = [] }) {
   return [
     `Dnes je ${today}.`,
     contextText(known),
     topicsText(topics),
-    `Článek z Jičínského deníku (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
-    `Nadpis: ${item.title}`,
-    `Text:\n${item.text || "(jen nadpis)"}`,
+    denikItemText(item),
     force ? FORCE : "",
     retry,
   ]
@@ -107,14 +118,28 @@ export function denikProblem(decision, item) {
 
 // Jedno volání Claude, a když výsledek poruší podmínky Deníku, ještě jedno s upozorněním.
 export async function askDenik(env, { item, known, topics = [], rubricSlugs, voice, today, force = false }) {
-  const schema = outputSchema(rubricSlugs, { topics: topics.map((topic) => topic.slug), ownImage: false });
+  const slugs = topics.map((topic) => topic.slug);
+  const schema = outputSchema(rubricSlugs, { topics: slugs, ownImage: false, followup: true });
+  const system = denikPrompt(voice, { rubricSlugs });
   let retry = "";
   let problem = "";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const content = [{ type: "text", text: denikText(item, known, { today, force, retry, topics }) }];
-    const answer = await callClaude(env, { system: denikPrompt(voice, { rubricSlugs }), content, schema });
+    const answer = await callClaude(env, { system, content, schema });
     if (!answer.ok) return answer;
     const decision = readDecision(answer.raw, { rubricSlugs, force });
+    if (decision.ok && decision.decision === "doplneni") {
+      // I navazující zpráva musí dodržet podmínky Deníku.
+      return writeFollowup(env, decision, {
+        system,
+        sourceText: denikItemText(item),
+        articleSchema: outputSchema(rubricSlugs, { topics: slugs, ownImage: false }).properties.article,
+        readArticle: (raw) => readArticle(raw, rubricSlugs),
+        topics,
+        today,
+        check: (written) => denikProblem(written, item),
+      });
+    }
     if (!decision.ok || decision.decision !== "vytvorit") return decision;
     problem = denikProblem(decision, item);
     if (!problem) return decision;

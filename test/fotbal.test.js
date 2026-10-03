@@ -142,7 +142,7 @@ test("Drběna dostane aktualitu s doplňky a její odpověď se ověří", () =>
   assert.match(text, /druh: Po zápase/);
   assert.match(text, /\[zprava:4\] 2026-09-25 · Kopidlno vyhrálo/);
   assert.match(text, /Doplněno z rozpisu a tabulky/);
-  assert.deepEqual(footballSchema().required, ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html"]);
+  assert.deepEqual(footballSchema().required, ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords"]);
 
   const made = readFootballDecision({ decision: "vytvorit", reason: "Zápas.", duplicate_of: "", title: "Gólová přestřelka", excerpt: "Kopidlno B vyhrálo 7:6.", body_html: "<p>Mééé, sedm gólů!</p><script>x</script>" });
   assert.equal(made.ok, true);

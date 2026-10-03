@@ -4,7 +4,7 @@ import { TRY_DEMO, TRY_KINDS, TRY_TEXT_MAX } from "../drbena-try.js";
 import { NOTICE_KINDS } from "../notices.js";
 import { esc } from "../view.js";
 import { adminShell } from "./shell.js";
-import { badge, callout, field, input, pageHead } from "./ui.js";
+import { badge, callout, check, field, input, pageHead } from "./ui.js";
 
 const BASE = "/redakce/drbena";
 const FORM = "drbena-povaha";
@@ -17,6 +17,16 @@ function kindOptions(selected) {
   return Object.entries(TRY_KINDS)
     .map(([value, label]) => `<option value="${value}"${value === selected ? " selected" : ""}>${esc(label)}</option>`)
     .join("");
+}
+
+// Navazující zprávy: když o věci už zpráva je a zdroj přinese víc, napíše Drběna doplnění „jak už jsem psala…“.
+function followupPanel(drbena) {
+  return `<form class="panel form" method="post" action="${BASE}/navazujici" data-dirty>
+      <header class="panel-head"><h2>Navazující zprávy</h2>${drbena.followupPublish ? badge("Rovnou na web", "info") : badge("Jako návrh")}</header>
+      <p class="panel-note">Když o věci už na drbně zpráva je a Munipolis, Deník nebo škola přinesou něco nového (výsledek, jména, jiný termín), napíše Drběna navazující zprávu s odkazem na tu původní. K jedné zprávě nejvýš dvě.</p>
+      ${check("followupPublish", "1", drbena.followupPublish, "Navazující zprávy rovnou zveřejňovat", "Jen u importů, které zveřejňují rovnou. Bez zaškrtnutí čeká každá navazující zpráva jako návrh.")}
+      <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
+    </form>`;
 }
 
 // Pole zkoušky patří k formuláři povahy (atribut form), ať Drběna píše i podle neuložené povahy.
@@ -69,7 +79,7 @@ function samplePanel(trial, unsaved) {
 
 // `trial` je zkouška povahy: { input, result }. Povaha se pak ukáže tak, jak byla v polích.
 export function adminDrbena(ctx, data, message, trial = null) {
-  const drbena = data.drbena ?? { persona: "", football: "" };
+  const drbena = data.drbena ?? { persona: "", football: "", followupPublish: false };
   const persona = trial ? trial.input.persona.trim() || DEFAULT_PERSONA : drbena.persona || DEFAULT_PERSONA;
   const football = trial ? trial.input.football.trim() || DEFAULT_FOOTBALL : drbena.football || DEFAULT_FOOTBALL;
   const ownP = trial ? ownPersona(persona) : drbena.persona;
@@ -86,6 +96,7 @@ export function adminDrbena(ctx, data, message, trial = null) {
       ${field(`U fotbalu ${state(ownF)}`, `<textarea class="${input}" name="football" rows="6" maxlength="${FOOTBALL_MAX}">${esc(football)}</textarea>`, "Fotbalové zvyky navíc. Ve fotbalových článcích se přidají k povaze.")}
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit povahu</button></div>
     </form>
+    ${followupPanel(drbena)}
     ${tryPanel(trial?.input)}
     ${trial ? samplePanel(trial, unsaved) : ""}`;
   return adminShell(ctx, data, "drbena", message, body, { title: "Koza Drběna" });

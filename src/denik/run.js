@@ -11,6 +11,7 @@ import {
   STALE_REASON,
 } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
+import { followupReason, saveFollowup } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
@@ -68,6 +69,17 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
   if (!answer.ok) {
     await finishDenikItem(env, item.id, { status: "chyba", reason: answer.error });
     return { ok: false, error: answer.error };
+  }
+  if (answer.decision === "doplneni") {
+    const made = await saveFollowup(env, answer, {
+      image: await pickStockImage(env, answer.article.imageTopic),
+      sourceHtml: denikSource(item.link, settings.sourceLink),
+      autoPublish: settings.autoPublish,
+      rubrics,
+      publishOn: item.manual ? importSourceDate(item, today) : "",
+    });
+    await finishDenikItem(env, item.id, { status: "hotovo", reason: followupReason(answer), duplicateOf: answer.duplicateOf, eventId: item.eventId, ...made });
+    return { ok: true, status: "hotovo" };
   }
   if (answer.decision !== "vytvorit") {
     const status = answer.decision === "duplicita" ? "duplicita" : "preskoceno";

@@ -22,7 +22,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 let schemaReady = false;
 
@@ -185,6 +185,9 @@ async function ensureArticleColumns(env) {
   await addColumn(env, names, "rubric_id", "alter table articles add column rubric_id integer");
   await addColumn(env, names, "image_focus", "alter table articles add column image_focus text not null default ''");
   await addColumn(env, names, "image_caption", "alter table articles add column image_caption text not null default ''");
+  // Klíčová slova pro Drběnu (src/keywords.js) a zpráva, na kterou tahle navazuje (doplnění od Drběny).
+  await addColumn(env, names, "keywords", "alter table articles add column keywords text not null default ''");
+  await addColumn(env, names, "follows_id", "alter table articles add column follows_id integer");
 }
 
 async function ensureProposalColumns(env) {
@@ -195,6 +198,8 @@ async function ensureProposalColumns(env) {
   await addColumn(env, names, "image_caption", "alter table proposals add column image_caption text not null default ''");
   // Datum, se kterým má zpráva po schválení vyjít (import podle data ve zdroji). Prázdné = den schválení.
   await addColumn(env, names, "publish_on", "alter table proposals add column publish_on text not null default ''");
+  await addColumn(env, names, "keywords", "alter table proposals add column keywords text not null default ''");
+  await addColumn(env, names, "follows_id", "alter table proposals add column follows_id integer");
 }
 
 // Bod výřezu fotky u reklamy, stejně jako u zprávy.

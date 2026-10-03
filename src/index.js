@@ -90,6 +90,7 @@ import { PLACES_OK, placesPost } from "./post-places.js";
 import { STOCK_OK, stockPost } from "./post-stock.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
 import { DRBENA_OK, drbenaPost } from "./post-drbena.js";
+import { fillKeywords } from "./keywords.js";
 import { continueImport, runImport } from "./munipolis/run.js";
 import { loadImportSettings } from "./munipolis/store.js";
 import { FOOTBALL_OK, footballPost } from "./post-fotbal.js";
@@ -569,5 +570,6 @@ export default {
     ctx.waitUntil(runDenik(env).catch(() => {}));
     for (const source of SCHOOL_LIST) ctx.waitUntil(runSkola(env, source).catch(() => {}));
     ctx.waitUntil(runNdic(env).catch(() => {}));
+    ctx.waitUntil(fillKeywords(env).catch(() => {}));
   },
 };

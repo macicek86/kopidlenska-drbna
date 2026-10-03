@@ -4,10 +4,15 @@ import { clubRules } from "../clubs.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
 import { DEFAULT_VOICE } from "../drbena.js";
-import { HOURS_RULES, hoursContext, hoursSchema, readHours } from "./hours.js";
+import { HOURS_RULES, hoursSchema, readHours } from "./hours.js";
+import { contextText } from "../import-overview.js";
 import { topicsText } from "../stock.js";
+import { writeFollowup } from "../followup.js";
+import { FOLLOWUP_DECISION } from "../followup-rules.js";
+import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
 
 export { MODEL, DEFAULT_VOICE };
+export { addArticles, articleLine, contextText } from "../import-overview.js";
 const MAX_IMAGE_BYTES = 3_700_000;
 
 // Obrázek u článku: vlastní fotka jen když stojí za to, jinak ilustrační z knihovny obrázků.
@@ -18,7 +23,8 @@ const IMAGE_RULES = `- image_use: "vlastni" jen tehdy, když je přiložená sku
 const RULES = `Dostaneš jednu zprávu z městského Munipolisu Kopidlna a přehled toho, co už na webu Kopidlenská drbna je.
 
 Rozhodni (pole decision):
-- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy. Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když nová zpráva přináší podstatnou změnu (jiný termín, zrušení, nové místo), není to duplicita: zvol "vytvorit" a změnu zmiň v reason.
+- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy. Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když nová zpráva přináší podstatnou změnu (jiný termín, zrušení, nové místo), není to duplicita: zvol "doplneni" (je-li o věci zpráva), jinak "vytvorit", a změnu zmiň v reason.
+${FOLLOWUP_DECISION}
 - "preskocit": zpráva nemá pro čtenáře drbny smysl, nebo jde o odstávku elektřiny (tu drbna bere automaticky od ČEZ).
 - "vytvorit": všechno ostatní.
 
@@ -35,6 +41,7 @@ Pravidla:
 - Data, časy, místa, jména, ceny a telefony opiš přesně podle zdroje. Nic nevymýšlej. Když údaj chybí, nech pole prázdné. Rok doplň podle data zveřejnění zprávy.
 - Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
 ${IMAGE_RULES}
+${KEYWORDS_RULE}
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až pět krátkých odstavců. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
@@ -50,21 +57,22 @@ function stringField() {
 }
 
 // `hours` přidá pole s otevírací dobou (jen Munipolis, Deník ho nemá). `topics` jsou značky témat knihovny obrázků,
-// `ownImage` dovolí vybrat vlastní fotku (Deník fotky nedává, tam je obrázek vždy z knihovny).
-export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true } = {}) {
+// `ownImage` dovolí vybrat vlastní fotku (Deník fotky nedává, tam je obrázek vždy z knihovny),
+// `followup` přidá rozhodnutí „doplneni“ (navazující zpráva, src/followup.js).
+export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true, followup = false } = {}) {
   const slugs = rubricSlugs.length ? rubricSlugs : ["zpravy"];
   const schema = {
     type: "object",
     additionalProperties: false,
     required: ["decision", "reason", "duplicate_of", "article", "event", "notice"],
     properties: {
-      decision: { type: "string", enum: ["vytvorit", "preskocit", "duplicita"] },
+      decision: { type: "string", enum: ["vytvorit", "preskocit", "duplicita", ...(followup ? ["doplneni"] : [])] },
       reason: stringField(),
       duplicate_of: stringField(),
       article: {
         type: "object",
         additionalProperties: false,
-        required: ["include", "title", "excerpt", "body_html", "rubric", "image_caption", "image_topic"],
+        required: ["include", "title", "excerpt", "body_html", "rubric", "image_caption", "image_topic", "keywords"],
         properties: {
           include: { type: "boolean" },
           title: stringField(),
@@ -73,6 +81,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
           rubric: { type: "string", enum: slugs },
           image_caption: stringField(),
           image_topic: { type: "string", enum: [...new Set([...topics, ""])] },
+          keywords: keywordsSchema(),
         },
       },
       event: {
@@ -123,47 +132,13 @@ export function systemPrompt(voice, { rubricSlugs = null } = {}) {
   return `${RULES}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
 }
 
-function line(value, max = 220) {
-  return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
-}
-
-// Přehled toho, co už na drbně je. Značky v hranatých závorkách vrací Claude v duplicate_of.
-export function contextText(known) {
-  const parts = [];
-  const add = (heading, rows) => parts.push(`${heading}:\n${rows.length ? rows.join("\n") : "(nic)"}`);
-  add(
-    "Zprávy na webu za poslední týdny",
-    (known.articles ?? []).map((row) => `[zprava:${row.id}] ${row.createdOn} · ${line(row.title, 140)} · ${line(row.excerpt)}`),
-  );
-  add(
-    "Návrhy, které čekají na schválení",
-    (known.proposals ?? []).map((row) => `[navrh:${row.id}] ${row.createdOn} · ${line(row.title, 140)} · ${line(row.excerpt)}`),
-  );
-  add(
-    "Akce v kalendáři",
-    (known.events ?? []).map(
-      (row) => `[akce:${row.id}] ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 140)} · ${line(row.place, 80)}`,
-    ),
-  );
-  add(
-    "Odstávky vody a uzavírky",
-    (known.notices ?? []).map(
-      (row) => `[odstavka:${row.id}] ${row.kind} ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 100)} · ${line(row.places.join(", "))}`,
-    ),
-  );
-  add(
-    "Uzavírky silnic z Dopravního info (NDIC), už na webu",
-    (known.closures ?? []).map(({ ref, articleId, proposalId, notice }) => {
-      const written = [articleId && `zprava:${articleId}`, proposalId && `navrh:${proposalId}`].filter(Boolean).join(", ");
-      return `[ndic:${ref}] ${notice.startsOn}${notice.endsOn ? ` až ${notice.endsOn}` : notice.openEnded ? " do odvolání" : ""} · ${line(notice.title, 100)} · ${line(notice.places.join(", "))}${written ? ` · článek ${written}` : ""}`;
-    }),
-  );
-  add(
-    "Dřívější převzaté zprávy (Munipolis, Deník, školy)",
-    (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
-  );
-  parts.push(hoursContext(known));
-  return parts.join("\n\n");
+// Samotná zpráva ze zdroje. Bez přehledu ji dostane i druhé volání, které píše navazující zprávu.
+export function itemText(item) {
+  return [
+    `Nová zpráva z Munipolisu (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
+    `Nadpis: ${item.title}`,
+    `Text:\n${item.text || "(bez textu, údaje jsou možná jen na obrázku)"}`,
+  ].join("\n\n");
 }
 
 export function userText(item, known, { today, force = false, topics = [], images = 0 }) {
@@ -171,9 +146,7 @@ export function userText(item, known, { today, force = false, topics = [], image
     `Dnes je ${today}.`,
     contextText(known),
     topicsText(topics),
-    `Nová zpráva z Munipolisu (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
-    `Nadpis: ${item.title}`,
-    `Text:\n${item.text || "(bez textu, údaje jsou možná jen na obrázku)"}`,
+    itemText(item),
     images ? `Přiložené obrázky: ${images}.` : "Bez přiloženého obrázku.",
     force ? FORCE : "",
   ]
@@ -204,17 +177,25 @@ export function readArticle(raw, rubricSlugs) {
     imageUse,
     imageTopic: clean(raw.image_topic, 60),
     imageCaption: imageUse === "vlastni" ? clean(raw.image_caption, 200) : "",
+    keywords: readKeywords(raw.keywords),
   };
 }
 
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
 export function readDecision(raw, { rubricSlugs, force = false }) {
   if (!raw || typeof raw !== "object") return { ok: false, error: "Claude nevrátil rozhodnutí." };
-  let decision = ["vytvorit", "preskocit", "duplicita"].includes(raw.decision) ? raw.decision : "";
+  let decision = ["vytvorit", "preskocit", "duplicita", "doplneni"].includes(raw.decision) ? raw.decision : "";
   if (!decision) return { ok: false, error: "Claude nevrátil rozhodnutí." };
-  if (force) decision = "vytvorit";
+  if (force && decision !== "doplneni") decision = "vytvorit";
   const reason = clean(raw.reason, 400);
   const duplicateOf = REF.test(String(raw.duplicate_of ?? "").trim()) ? String(raw.duplicate_of).trim() : "";
+  if (decision === "doplneni") {
+    // Doplnit jde jen zprávu. K návrhu nebo bez značky je to duplicita (při ručním zpracování nová zpráva).
+    const follow = /^zprava:(\d+)$/.exec(duplicateOf);
+    if (follow) return { ok: true, decision, reason, duplicateOf, followOf: Number(follow[1]), article: null, event: null, notice: null, hours: [] };
+    if (!force) return { ok: true, decision: "duplicita", reason, duplicateOf, article: null, event: null, notice: null, hours: [] };
+    decision = "vytvorit";
+  }
   if (decision !== "vytvorit") return { ok: true, decision, reason, duplicateOf, article: null, event: null, notice: null, hours: [] };
 
   let article = readArticle(raw.article, rubricSlugs);
@@ -273,8 +254,18 @@ export async function askClaude(env, { item, known, images = [], topics = [], ru
     ...shown.map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
     { type: "text", text: userText(item, known, { today, force, topics, images: shown.length }) },
   ];
-  const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug) });
-  const answer = await callClaude(env, { system: systemPrompt(voice, { rubricSlugs }), content, schema });
+  const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug), followup: true });
+  const system = systemPrompt(voice, { rubricSlugs });
+  const answer = await callClaude(env, { system, content, schema });
   if (!answer.ok) return answer;
-  return readDecision(answer.raw, { rubricSlugs, force });
+  const decision = readDecision(answer.raw, { rubricSlugs, force });
+  if (!decision.ok || decision.decision !== "doplneni") return decision;
+  return writeFollowup(env, decision, {
+    system,
+    sourceText: itemText(item),
+    articleSchema: outputSchema(rubricSlugs, { topics: topics.map((topic) => topic.slug), ownImage: false }).properties.article,
+    readArticle: (raw) => readArticle(raw, rubricSlugs),
+    topics,
+    today,
+  });
 }

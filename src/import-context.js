@@ -2,10 +2,14 @@
 import { loadDoctors } from "./db.js";
 import { loadNotices } from "./notices-db.js";
 import { knownClosures } from "./ndic/store.js";
+import { shownKeywords } from "./keywords.js";
 import { loadPlaces } from "./places-db.js";
 import { addDays, pragueNow } from "./waste.js";
 
 const LOOKBACK_DAYS = 60;
+// Starší zprávy už jen s nadpisem a klíčovými slovy, ať Drběna nepíše znovu o věci z jara.
+const OLDER_DAYS = 365;
+const OLDER_LIMIT = 80;
 
 export function outcomeOf(item) {
   if (item.status === "hotovo") {
@@ -72,19 +76,52 @@ async function pastImports(env, { table, tag }, itemTable, itemId, since) {
   }));
 }
 
+// Kolikrát už na zprávu navázala jiná zpráva nebo čekající návrh (doplnění od Drběny).
+const FOLLOWUPS = `(select count(*) from articles f where f.follows_id = a.id)
+  + (select count(*) from proposals fp where fp.follows_id = a.id and fp.status = 'pending')`;
+
+function shapeArticle(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    excerpt: row.excerpt,
+    keywords: shownKeywords(row.keywords),
+    followsId: row.follows_id == null ? null : Number(row.follows_id),
+    followups: Number(row.followups ?? 0),
+    createdOn: String(row.created_at).slice(0, 10),
+  };
+}
+
+// Zprávy a čekající návrhy pro přehled. Sdílí ho i fotbal.
+export async function knownArticles(env, today) {
+  const since = addDays(today, -LOOKBACK_DAYS);
+  const articles = await rows(
+    env,
+    `select a.id, a.title, a.excerpt, a.keywords, a.follows_id, a.created_at, ${FOLLOWUPS} as followups
+     from articles a where a.created_at >= ? order by a.created_at desc, a.id desc limit 60`,
+    since,
+  );
+  const older = await rows(
+    env,
+    `select a.id, a.title, '' as excerpt, a.keywords, a.follows_id, a.created_at, ${FOLLOWUPS} as followups
+     from articles a where a.created_at < ? and a.created_at >= ? and a.keywords not in ('', '-')
+     order by a.created_at desc, a.id desc limit ?`,
+    since,
+    addDays(today, -OLDER_DAYS),
+    OLDER_LIMIT,
+  );
+  const proposals = await rows(
+    env,
+    "select id, title, excerpt, keywords, follows_id, created_at from proposals where status = 'pending' order by id desc limit 30",
+  );
+  return { articles: articles.map(shapeArticle), older: older.map(shapeArticle), proposals: proposals.map(shapeArticle) };
+}
+
 // Co už na drbně je, aby Claude poznal stejnou věc od někoho jiného. `table` je tabulka zpracovávané položky,
 // `closureRef` uzavírka z NDIC, kterou zrovna zpracovává Drběna (sama sebe v přehledu mít nesmí).
 export async function knownContent(env, { itemId, today, table = "import_items", closureRef = 0 }) {
   const since = addDays(today, -LOOKBACK_DAYS);
-  const articles = await rows(
-    env,
-    "select id, title, excerpt, created_at from articles where created_at >= ? order by created_at desc, id desc limit 60",
-    since,
-  );
-  const proposals = await rows(
-    env,
-    "select id, title, excerpt, created_at from proposals where status = 'pending' order by id desc limit 30",
-  );
+  const { articles, older, proposals } = await knownArticles(env, today);
   const events = await rows(
     env,
     "select id, title, place, starts_on, starts_time from events where starts_on >= ? order by starts_on asc limit 60",
@@ -94,8 +131,9 @@ export async function knownContent(env, { itemId, today, table = "import_items",
   const imports = [];
   for (const source of IMPORT_SOURCES) imports.push(...(await pastImports(env, source, table, itemId, since)));
   return {
-    articles: articles.map((row) => ({ id: row.id, title: row.title, excerpt: row.excerpt, createdOn: String(row.created_at).slice(0, 10) })),
-    proposals: proposals.map((row) => ({ id: row.id, title: row.title, excerpt: row.excerpt, createdOn: String(row.created_at).slice(0, 10) })),
+    articles,
+    older,
+    proposals,
     events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time })),
     notices,
     closures: (await knownClosures(env)).filter((row) => row.ref !== closureRef),

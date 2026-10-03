@@ -1,12 +1,14 @@
 // Školy, ze kterých Drběna píše. Každá má vlastní tabulky, stránku v redakci, způsob stahování a pravidla výběru;
 // zbytek (fronta, zpracování, fotky, odkaz na zdroj) je společný v `run.js` a `store.js`.
+import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { DEFAULT_FEEDS, fetchSchoolFeeds } from "./feed.js";
 import { fetchWordpressPosts } from "./wordpress.js";
 
 const ZS_RULES = `Dostaneš jeden článek z webu Základní a mateřské školy Kopidlno a přehled toho, co už na webu Kopidlenská drbna je.
 
 Rozhodni (pole decision):
-- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "vytvorit" a novinku zmiň v reason.
+- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "doplneni" (je-li o věci zpráva), jinak "vytvorit", a novinku zmiň v reason.
+${FOLLOWUP_DECISION}
 - "preskocit": věc jen pro žáky a učitele bez zajímavosti pro sousedy (rozvrh, dokument ke stažení, přání krásných prázdnin, hospodaření spolku), nebo článek nemá dost obsahu.
 - "vytvorit": úspěchy žáků, akce školy a školky (i pro veřejnost), novinky, které zajímají rodiče i ostatní sousedy (zápis, ceny stravného, ředitelské volno, nové kroužky, projekty).
 
@@ -19,7 +21,8 @@ const ZAHRADKA_RULES = `Dostaneš jeden článek z webu Střední školy zahradn
 Od téhle školy drbna bere jen tři věci: úspěchy studentů, zahradnické trhy a semináře pro veřejnost. Všechno ostatní je vnitřní věc školy, která sousedy nezajímá.
 
 Rozhodni (pole decision):
-- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "vytvorit" a novinku zmiň v reason.
+- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "doplneni" (je-li o věci zpráva), jinak "vytvorit", a novinku zmiň v reason.
+${FOLLOWUP_DECISION}
 - "preskocit": všechno, co není úspěch studentů, trhy ani seminář pro veřejnost. Hlavně projekty a dotace (šablony, OP JAK), život školy (ples, tančení, exkurze, výlety), dražba nebo prodej majetku školy, volná místa a hledání zaměstnanců, přijímací řízení, den otevřených dveří, maturity, závěrečné zkoušky, suplování, dokumenty. Taky seminář, o kterém škola píše, že je už naplněný, a článek bez dost obsahu.
 - "vytvorit": úspěchy studentů (soutěže, mistrovství, ocenění, umístění třeba ve floristice, rybářství nebo zahradnictví), zahradnické trhy a semináře pro veřejnost.
 

@@ -14,8 +14,9 @@ import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { fetchImage, storeImageBytes } from "../images.js";
+import { knownArticles } from "../import-context.js";
 import { MAX_ATTEMPTS } from "../munipolis/store.js";
-import { addDays, pragueNow } from "../waste.js";
+import { pragueNow } from "../waste.js";
 import { askFootball } from "./ai.js";
 import { collectNews, footballSourceDate } from "./collect.js";
 import { checkDates } from "./dates.js";
@@ -34,29 +35,11 @@ import {
 
 export const BATCH_CRON = 8;
 export const BATCH_CLICK = 2;
-const LOOKBACK_DAYS = 60;
 
 export function clubSource(link) {
   if (!link) return `<p><em>Zdroj: web FK Kopidlno</em></p>`;
   const href = link.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
   return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">web FK Kopidlno</a></em></p>`;
-}
-
-async function rows(env, sql, ...binds) {
-  const statement = env.DB.prepare(sql);
-  const result = await (binds.length ? statement.bind(...binds) : statement).all();
-  return result.results ?? [];
-}
-
-async function knownContent(env, today) {
-  const articles = await rows(
-    env,
-    "select id, title, excerpt, created_at from articles where created_at >= ? order by created_at desc, id desc limit 60",
-    addDays(today, -LOOKBACK_DAYS),
-  );
-  const proposals = await rows(env, "select id, title, excerpt, created_at from proposals where status = 'pending' order by id desc limit 30");
-  const shape = (row) => ({ id: row.id, title: row.title, excerpt: row.excerpt, createdOn: String(row.created_at).slice(0, 10) });
-  return { articles: articles.map(shape), proposals: proposals.map(shape) };
 }
 
 async function targetRubric(env, settings) {
@@ -89,7 +72,7 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
   const today = pragueNow().date;
   const force = item.manual;
   const { doubts, fixes } = checkDates(item);
-  const known = await knownContent(env, today);
+  const known = await knownArticles(env, today);
   const answer = await ask(env, { item, known, voice: voiceFor(await loadDrbena(env), "fotbal"), today, force, doubts, fixes });
   if (!answer.ok) {
     await finishFootballItem(env, item.id, { status: "chyba", reason: answer.error });

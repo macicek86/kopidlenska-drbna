@@ -1,6 +1,7 @@
 // Claude přepíše uzavírku z NDIC lidsky, pozná duplicitu a k delší uzavírce napíše článek jako u Munipolisu.
 import { callClaude } from "../claude.js";
 import { DEFAULT_VOICE } from "../drbena.js";
+import { KEYWORDS_RULE } from "../keywords.js";
 import { contextText, outputSchema, readArticle } from "../munipolis/ai.js";
 import { noticeSpan, placeLines } from "../notices.js";
 import { topicsText } from "../stock.js";
@@ -25,6 +26,7 @@ Pravidla:
 - Zdroj nejmenuj a odkaz nepiš: ani NDIC, ani Dopravní info.
 - image_topic: téma z knihovny obrázků, které k uzavírce nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné. image_caption nech prázdný.
 - title článku: do 90 znaků, bez emoji. excerpt: jedna až dvě věty, do 220 znaků.
+${KEYWORDS_RULE}
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>.
 - Datum v textu piš česky (třeba 12. října), ne jako RRRR-MM-DD.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
