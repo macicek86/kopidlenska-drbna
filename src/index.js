@@ -62,6 +62,7 @@ import {
   adminMunipolis,
   adminFootball,
   adminDenik,
+  adminSkola,
   adminOutages,
   adminPlaces,
   adminOverview,
@@ -95,6 +96,9 @@ import { FOOTBALL_OK, footballPost } from "./post-fotbal.js";
 import { DENIK_OK, denikPost } from "./post-denik.js";
 import { continueDenik, runDenik } from "./denik/run.js";
 import { loadDenikSettings } from "./denik/store.js";
+import { SKOLA_OK, skolaPost } from "./post-skola.js";
+import { continueSkola, runSkola } from "./skola/run.js";
+import { loadSkolaSettings } from "./skola/store.js";
 import { continueFootball, runFootball } from "./fotbal/run.js";
 import { loadFootballSettings } from "./fotbal/store.js";
 import { chatPost } from "./chat/run.js";
@@ -143,6 +147,7 @@ const OK = {
   ...DRBENA_OK,
   ...FOOTBALL_OK,
   ...DENIK_OK,
+  ...SKOLA_OK,
   ...CHAT_OK,
   ...MESSAGES_OK,
 };
@@ -298,7 +303,7 @@ async function renderGet(request, env, url, execution) {
     const data = admin;
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", "drbena", "chat"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", "skola", "drbena", "chat"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -362,6 +367,10 @@ async function renderGet(request, env, url, execution) {
     if (tab === "denik") {
       if (data.signedIn && (await continueDenik(env, { ctx: execution })).background) data.denikSettings = await loadDenikSettings(env);
       return html(adminDenik(ctx, data, message, query));
+    }
+    if (tab === "skola") {
+      if (data.signedIn && (await continueSkola(env, { ctx: execution })).background) data.skolaSettings = await loadSkolaSettings(env);
+      return html(adminSkola(ctx, data, message, query));
     }
     if (tab === "drbena") return html(adminDrbena(ctx, data, message));
     if (tab === "chat") {
@@ -509,6 +518,7 @@ async function renderPost(request, env, url, execution) {
     (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??
+    (await skolaPost(path, request, env, fields, execution)) ??
     (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena"))) ??
     (await chatAdminPost(path, request, env, fields)) ??
     (await messagesPost(path, request, env, fields));
@@ -553,6 +563,7 @@ export default {
     ctx.waitUntil(runImport(env).catch(() => {}));
     ctx.waitUntil(runFootball(env).catch(() => {}));
     ctx.waitUntil(runDenik(env).catch(() => {}));
+    ctx.waitUntil(runSkola(env).catch(() => {}));
     ctx.waitUntil(runNdic(env).catch(() => {}));
   },
 };

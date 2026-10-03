@@ -24,7 +24,7 @@ function unwrap(value) {
   return cdata ? cdata[1] : decodeEntities(text);
 }
 
-function tag(block, name) {
+export function tag(block, name) {
   const match = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`, "i"));
   return match ? unwrap(match[1]) : "";
 }
@@ -32,6 +32,7 @@ function tag(block, name) {
 // Text zprávy pro AI i pro náhled v redakci: odstavce oddělené prázdným řádkem, bez značek.
 export function htmlToText(html) {
   const text = String(html ?? "")
+    .replace(/\r\n?/g, "\n")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<li[^>]*>/gi, "\n• ")

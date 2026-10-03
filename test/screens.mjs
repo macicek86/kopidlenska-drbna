@@ -21,6 +21,7 @@ const TABS = [
   "munipolis",
   "fotbal",
   "denik",
+  "skola",
   "texty",
   "svoz",
   "dvory",
@@ -33,6 +34,8 @@ const TABS = [
   "heslo",
   // Otevřená okna. Název souboru je adresa bez lomítek.
   "chat?nastaveni=1",
+  "skola?nastaveni=1",
+  "skola?zprava=2",
   "zpravy?novy=1",
   "zpravy?id=1",
   "reklamy?novy=1",

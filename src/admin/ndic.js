@@ -54,6 +54,7 @@ const DUPLICATE_OF = {
   akce: "stejná akce už je",
   munipolis: "stejné už přišlo z Munipolisu",
   denik: "stejné už přišlo z Deníku",
+  skola: "stejné už přišlo z webu školy",
 };
 
 function duplicateLabel(ref) {

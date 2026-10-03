@@ -3,6 +3,7 @@ export { adminArticles } from "./articles.js";
 export { adminChat } from "./chat.js";
 export { adminDoctors } from "./doctors.js";
 export { adminDenik } from "./denik.js";
+export { adminSkola } from "./skola.js";
 export { adminDrbena } from "./drbena.js";
 export { adminEvents } from "./events.js";
 export { adminFootball } from "./fotbal.js";

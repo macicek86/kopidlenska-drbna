@@ -11,6 +11,7 @@ import { ensureNoticeTables } from "./notices-db.js";
 import { ensureImportTables } from "./munipolis/store.js";
 import { ensureFootballTables } from "./fotbal/store.js";
 import { ensureDenikTables } from "./denik/store.js";
+import { ensureSkolaTables } from "./skola/store.js";
 import { ensureDrbenaTable } from "./drbena-db.js";
 import { ensureEventColumns } from "./events-db.js";
 import { ensureUserColumns } from "./users-db.js";
@@ -20,7 +21,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 let schemaReady = false;
 
@@ -236,6 +237,15 @@ async function seedRubrics(env) {
   ).run();
 }
 
+// Podrubrika pro zprávy ze ZŠ a MŠ (import z webu školy). Bez Komunity bude hlavní rubrikou.
+async function seedSchoolRubric(env) {
+  await env.DB.prepare(
+    `insert into rubrics (parent_id, name, slug, sort_order)
+     select (select id from rubrics where slug = 'komunita'), 'Škola', 'skola', 25
+     where not exists (select 1 from rubrics where slug = 'skola')`,
+  ).run();
+}
+
 async function migrateSession(env) {
   const row = await env.DB.prepare("select session_token from settings where id = 1").first();
   if (!row?.session_token) return;
@@ -364,6 +374,7 @@ async function migrateSchema(env) {
   await ensureImportTables(env);
   await ensureFootballTables(env);
   await ensureDenikTables(env);
+  await ensureSkolaTables(env);
   await ensureDrbenaTable(env);
   await ensurePlaceTables(env);
   await ensureVisitTables(env);
@@ -403,6 +414,7 @@ async function migrateSchema(env) {
       await linkApprovedImports(env);
     }
     await seedRubrics(env);
+    await seedSchoolRubric(env);
   }
   await env.DB.prepare(
     `insert into users (login, name, password_hash, role)

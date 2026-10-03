@@ -24,6 +24,7 @@ import { pushConfig } from "./ndic/push.js";
 import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
+import { loadSkolaItems, loadSkolaSettings } from "./skola/store.js";
 import { loadDrbena } from "./drbena-db.js";
 import { attachArticle, forgetArticle, loadEvents } from "./events-db.js";
 import { countNewMessages } from "./messages-db.js";
@@ -289,7 +290,7 @@ export async function loadMoreArticles(env, slug, limit = 5) {
 
 // Části redakce jen pro hlavního redaktora.
 async function loadChiefDesk(env) {
-  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, drbena, events, users] =
+  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, skolaSettings, skolaItems, drbena, events, users] =
     await Promise.all([
       loadOutageAreas(env),
       loadOutageBoard(env),
@@ -302,6 +303,8 @@ async function loadChiefDesk(env) {
       loadFootballItems(env),
       loadDenikSettings(env),
       loadDenikItems(env),
+      loadSkolaSettings(env),
+      loadSkolaItems(env),
       loadDrbena(env),
       loadEvents(env),
       loadUsers(env),
@@ -317,6 +320,8 @@ async function loadChiefDesk(env) {
     footballItems,
     denikSettings,
     denikItems,
+    skolaSettings,
+    skolaItems,
     drbena,
     events,
     users,
@@ -353,6 +358,8 @@ export async function loadAdmin(env, request) {
     footballItems: [],
     denikSettings: null,
     denikItems: [],
+    skolaSettings: null,
+    skolaItems: [],
     drbena: null,
     rubrics: [],
     stock: { topics: [], fallbackTopicId: null },

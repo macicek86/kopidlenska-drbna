@@ -5,7 +5,7 @@ import { accessConfig, accessEmail } from "./access.js";
 const COOKIE = "drbna_editor";
 
 // Tabulky importů (Munipolis, fotbal, Deník): položka zdroje a zpráva nebo návrh, který z ní vznikl.
-export const IMPORT_ITEM_TABLES = ["import_items", "football_items", "denik_items"];
+export const IMPORT_ITEM_TABLES = ["import_items", "football_items", "denik_items", "skola_items"];
 
 export function clip(value, max) {
   return String(value ?? "")

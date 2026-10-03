@@ -107,6 +107,7 @@ async function poolArticles(env) {
 const SOURCES = {
   mesto: { table: "import_items", date: "published_at", label: "oznámení města (Munipolis)" },
   fotbal: { table: "football_items", date: "published_on", label: "web FK Kopidlno" },
+  skola: { table: "skola_items", date: "published_at", label: "web ZŠ a MŠ Kopidlno" },
 };
 const SOURCE_POOL = 200;
 
@@ -171,7 +172,7 @@ export async function searchArticles(env, query) {
 }
 
 export async function readSource(env, ref) {
-  const [, tag, id] = String(ref ?? "").trim().match(/^\[?(mesto|fotbal)-(\d+)\]?$/) ?? [];
+  const [, tag, id] = String(ref ?? "").trim().match(/^\[?(mesto|fotbal|skola)-(\d+)\]?$/) ?? [];
   if (!tag) return "Takový zdroj neznám. Označení vypadá třeba jako mesto-12.";
   const source = SOURCES[tag];
   const row = await env.DB.prepare(`select title, text, ${source.date} as day from ${source.table} where id = ?`).bind(Number(id)).first();
@@ -205,7 +206,7 @@ export async function readArticle(env, address) {
   return `${row.title} (/zpravy/${row.slug})\n${formatShort(String(row.created_at).slice(0, 10))} · ${row.rubric}\n${row.excerpt}\n\n${text}${source}`;
 }
 
-// Zprávy z Munipolisu a fotbalu napsala Drběna ze zdroje; původní text bývá v údajích úplnější.
+// Zprávy z Munipolisu, fotbalu a webu školy napsala Drběna ze zdroje; původní text bývá v údajích úplnější.
 async function sourceText(env, articleId) {
   const parts = [];
   for (const source of Object.values(SOURCES)) {
@@ -220,7 +221,7 @@ export const CHAT_TOOLS = [
   {
     name: "hledat_zpravy",
     description:
-      "Hledá ve všech zveřejněných zprávách drbny (i starších, než jsou v přehledu) podle slov v nadpisu, perexu a textu. Vrátí nanejvýš šest zpráv s datem, adresou a perexem. Projde i oznámení města a web FK Kopidlno, ze kterých drbna čerpá, i když z nich zpráva ještě není.",
+      "Hledá ve všech zveřejněných zprávách drbny (i starších, než jsou v přehledu) podle slov v nadpisu, perexu a textu. Vrátí nanejvýš šest zpráv s datem, adresou a perexem. Projde i oznámení města, web FK Kopidlno a web ZŠ a MŠ, ze kterých drbna čerpá, i když z nich zpráva ještě není.",
     input_schema: {
       type: "object",
       properties: { dotaz: { type: "string", description: "Pár klíčových slov, třeba „hasiči ples“ nebo „uzavírka Husova“." } },
@@ -240,10 +241,10 @@ export const CHAT_TOOLS = [
   },
   {
     name: "precist_zdroj",
-    description: "Vrátí celý text oznámení města nebo článku z webu FK Kopidlno, který našlo hledání a na drbně zatím není. Označení je třeba mesto-12.",
+    description: "Vrátí celý text oznámení města nebo článku z webu FK Kopidlno či ZŠ a MŠ Kopidlno, který našlo hledání a na drbně zatím není. Označení je třeba mesto-12.",
     input_schema: {
       type: "object",
-      properties: { oznaceni: { type: "string", description: "Označení zdroje z hledání, třeba mesto-12 nebo fotbal-7." } },
+      properties: { oznaceni: { type: "string", description: "Označení zdroje z hledání, třeba mesto-12, fotbal-7 nebo skola-3." } },
       required: ["oznaceni"],
       additionalProperties: false,
     },

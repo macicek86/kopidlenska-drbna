@@ -17,6 +17,7 @@ export function refLink(ref) {
     odstavka: ["/redakce/odstavky?oznameni=", "Odstávka"],
     munipolis: ["/redakce/munipolis?zprava=", "Zpráva z Munipolisu"],
     denik: ["/redakce/denik?zprava=", "Zpráva z Deníku"],
+    skola: ["/redakce/skola?zprava=", "Článek školy"],
     misto: ["/redakce/oteviraci-doba?id=", "Místo"],
     lekar: ["/redakce/lekari?id=", "Ordinace"],
   };
