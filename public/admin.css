@@ -1,5 +1,8 @@
 /* Redakce. Veřejný web má site.css, tohle ho v redakci přepisuje na hustší a klidnější pracovní plochu. */
 
+/* Zmenšení písma pro menší monitory ze site-base.css se redakce netýká. */
+html { font-size: 100%; }
+
 .adm {
   --side: 15.5rem;
   --surface: #fffdfa;
