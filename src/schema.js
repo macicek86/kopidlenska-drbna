@@ -19,7 +19,7 @@ import { ensureStockTables } from "./stock-db.js";
 import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 let schemaReady = false;
 
@@ -283,6 +283,26 @@ async function seedOutages(env) {
   await env.DB.prepare("update settings set outages_seeded = 1 where id = 1").run();
 }
 
+// Texty, jejichž výchozí znění se změnilo. Uložené texty (stránka Texty ukládá všechna pole) se přepíšou,
+// jen když je redakce nezměnila, tedy mají pořád staré výchozí znění.
+const COPY_RENAMES = [
+  ["nav_outages", "Odstávky", "Odstávky a uzavírky"],
+  ["home_outages_button", "Odstávky", "Odstávky a uzavírky"],
+  ["outages_description", "Kdy v Kopidlně nepoteče voda a kdy nepůjde proud.", "Kdy v Kopidlně nepoteče voda, kdy nepůjde proud a kudy se nedá projet."],
+  ["outages_heading", "Odstávky vody a elektřiny", "Odstávky a uzavírky"],
+  ["outages_lede", "Kdy v Kopidlně a okolí nepoteče voda a kdy nepůjde proud.", "Kdy v Kopidlně a okolí nepoteče voda, kdy nepůjde proud a kde bude zavřená silnice."],
+  ["outages_ask", "Víte o odstávce, která tu chybí?", "Víte o odstávce nebo uzavírce, která tu chybí?"],
+  ["about_outages_link", "Odstávky vody a elektřiny", "Odstávky a uzavírky"],
+];
+
+async function renameCopy(env) {
+  const table = await env.DB.prepare("select name from sqlite_master where type = 'table' and name = 'copy'").first();
+  if (!table) return;
+  for (const [key, from, to] of COPY_RENAMES) {
+    await env.DB.prepare("update copy set value = ? where key = ? and value = ?").bind(to, key, from).run();
+  }
+}
+
 async function demoImage(env, file) {
   if (!env.ASSETS?.fetch) return null;
   try {
@@ -379,6 +399,7 @@ async function migrateSchema(env) {
   ).run();
   await migrateSession(env);
   await seedAds(env);
+  await renameCopy(env);
   return true;
 }
 

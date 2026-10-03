@@ -72,9 +72,9 @@ export function adminOutages(ctx, data, message, query = {}) {
   }
 
   const body = `${pageHead(
-    "Odstávky",
-    `Vodu a uzavírky zapisuje redakce nebo je připraví Koza Drběna ze zpráv města. Elektřinu se drbna párkrát denně ptá veřejného widgetu ČEZ Distribuce. Na titulce se odstávka ukáže, když právě probíhá nebo začíná do ${HOME_LEAD_DAYS} dní.`,
-    `${openButton("nova-obec", `${BASE}?novy=1`, "Přidat obec", "btn-line")}${openButton("nove-oznameni", `${BASE}?nove-oznameni=1`, "Odstávka vody")}`,
+    "Odstávky a uzavírky",
+    `Vodu a uzavírky zapisuje redakce nebo je připraví Koza Drběna ze zpráv města. Elektřinu se drbna párkrát denně ptá veřejného widgetu ČEZ Distribuce. Na titulce se odstávka nebo uzavírka ukáže, když právě probíhá nebo začíná do ${HOME_LEAD_DAYS} dní.`,
+    `${openButton("nova-obec", `${BASE}?novy=1`, "Přidat obec", "btn-line")}${openButton("nove-oznameni", `${BASE}?nove-oznameni=1`, "Odstávka vody")}${openButton("nova-uzavirka", `${BASE}?nova-uzavirka=1`, "Uzavírka")}`,
   )}
     ${noticePanels(data.notices ?? [])}
     <h2 class="adm-subhead">Elektřina</h2>
@@ -92,5 +92,5 @@ export function adminOutages(ctx, data, message, query = {}) {
     ${panel({ id: "obce", title: "Hlídané obce", count: areas.length, body: table })}
     ${panel({ id: "nahled", title: "Jak to vypadá na webu", count: board.items.length, body: preview })}
     ${dialogs.join("")}`;
-  return adminShell(ctx, data, "odstavky", message, body, { title: "Odstávky" });
+  return adminShell(ctx, data, "odstavky", message, body, { title: "Odstávky a uzavírky" });
 }

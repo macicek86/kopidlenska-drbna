@@ -12,7 +12,7 @@ const PAGE_NAMES = {
   "/zpravy": "Zprávy",
   "/akce": "Akce",
   "/popelnice": "Popelnice",
-  "/odstavky": "Odstávky",
+  "/odstavky": "Odstávky a uzavírky",
   "/lekari": "Lékaři",
   "/oteviraci-doba": "Otevírací doba",
   "/sberne-dvory": "Sběrné dvory",

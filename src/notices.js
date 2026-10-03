@@ -7,8 +7,8 @@ export const NOTICE_KINDS = {
   voda: { label: "Odstávka vody", short: "Voda", fallbackTitle: "Nepoteče voda" },
   uzavirka: { label: "Uzavírka silnice", short: "Uzavírka", fallbackTitle: "Uzavírka silnice" },
 };
-// Uzavírky se zatím sbírají jen v redakci. Až budou mít na webu místo, stačí je přidat sem.
-export const PUBLIC_NOTICE_KINDS = ["voda"];
+// Druhy, které se ukazují na webu (stránka Odstávky a uzavírky a karta na titulce).
+export const PUBLIC_NOTICE_KINDS = ["voda", "uzavirka"];
 export const NOTICE_LEAD_DAYS = 7;
 const PLACE_LIMIT = 30;
 

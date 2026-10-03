@@ -1,5 +1,5 @@
 // Odstávky vody a uzavírky v redakci: seznam, formulář a potvrzení smazání.
-import { NOTICE_KINDS, PUBLIC_NOTICE_KINDS, presentNotice } from "../notices.js";
+import { NOTICE_KINDS, presentNotice } from "../notices.js";
 import { esc } from "../view.js";
 import { badge, callout, cancelLink, check, confirmForm, field, formFoot, hidden, input, item, list, modal, modalLink, panel } from "./ui.js";
 
@@ -15,13 +15,13 @@ function kindOptions(current) {
     .join("");
 }
 
-export function noticeForm(editing) {
-  const kind = editing?.kind ?? "voda";
+export function noticeForm(editing, freshKind = "voda") {
+  const kind = editing?.kind ?? freshKind;
   return `<form class="form" method="post" action="${BASE}/oznameni">
     ${editing ? hidden("id", editing.id) : ""}
     ${editing && noticeWaiting(editing) ? callout("Tohle připravila Koza Drběna ze zprávy města. Zkontrolujte datum, čas a ulice, a pak zaškrtněte Zveřejnit.", "warn") : ""}
     <div class="pair">
-      ${field("Druh", `<select class="${input}" name="kind">${kindOptions(kind)}</select>`, "Uzavírky se zatím na webu neukazují.")}
+      ${field("Druh", `<select class="${input}" name="kind">${kindOptions(kind)}</select>`)}
       ${field("Nadpis", `<input class="${input}" name="title" maxlength="120" value="${esc(editing?.title ?? "")}" placeholder="${esc(NOTICE_KINDS[kind].fallbackTitle)}">`)}
     </div>
     <div class="pair">
@@ -66,11 +66,8 @@ function sorted(notices) {
 export function noticePanels(notices) {
   const water = sorted(notices.filter((notice) => notice.kind === "voda"));
   const closures = sorted(notices.filter((notice) => notice.kind === "uzavirka"));
-  const closureNote = PUBLIC_NOTICE_KINDS.includes("uzavirka")
-    ? ""
-    : callout("Uzavírky se zatím na webu neukazují. Drbna je sbírá, ať je bude mít připravené, až pro ně bude místo. Mezitím o nich píše běžnou zprávu.");
   return `${panel({ id: "voda", title: "Odstávky vody", count: water.length, body: list(water.map(noticeItem), "Žádná odstávka vody.") })}
-    ${panel({ id: "uzavirky", title: "Uzavírky silnic", count: closures.length, body: `${closureNote}${list(closures.map(noticeItem), "Žádná uzavírka.")}`, tone: "quiet" })}`;
+    ${panel({ id: "uzavirky", title: "Uzavírky silnic", count: closures.length, body: list(closures.map(noticeItem), "Žádná uzavírka.") })}`;
 }
 
 export function noticeDialogs(notices, query) {
@@ -84,6 +81,14 @@ export function noticeDialogs(notices, query) {
       close: BASE,
       open: Boolean(query.noticeFresh) && !editing && !removing,
       body: noticeForm(null),
+    }),
+    modal({
+      id: "nova-uzavirka",
+      title: "Nová uzavírka",
+      size: "wide",
+      close: BASE,
+      open: Boolean(query.closureFresh) && !editing && !removing,
+      body: noticeForm(null, "uzavirka"),
     }),
   ];
   if (editing) {

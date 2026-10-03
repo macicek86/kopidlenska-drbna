@@ -232,7 +232,7 @@ export async function loadRubrics(env) {
 export async function loadPublic(env) {
   const now = pragueNow();
   const today = now.date;
-  const [row, articles, events, yards, doctors, places, ads, outages, water, rubrics] = await Promise.all([
+  const [row, articles, events, yards, doctors, places, ads, outages, notices, rubrics] = await Promise.all([
     settings(env),
     env.DB.prepare(
       `select ${ARTICLE_LIST_FIELDS}
@@ -255,7 +255,7 @@ export async function loadPublic(env) {
     places,
     ads,
     outages,
-    water,
+    notices,
     waste: buildWasteView(wasteFrom(row), today),
     now,
     contactNote: String(row.contact_note),

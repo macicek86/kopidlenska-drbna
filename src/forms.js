@@ -26,6 +26,7 @@ export function adminQuery(url) {
     disableId: positiveParam(url, "vypnout"),
     noticeId: positiveParam(url, "oznameni"),
     noticeFresh: url.searchParams.has("nove-oznameni"),
+    closureFresh: url.searchParams.has("nova-uzavirka"),
     importId: positiveParam(url, "zprava"),
     importSettings: url.searchParams.has("nastaveni"),
     topicId: positiveParam(url, "tema"),

@@ -209,7 +209,7 @@ test("oznámení o vodě se ověří a dostane fázi a čas", () => {
   assert.equal(noticeSpan({ startsOn: "2026-10-01", startsTime: "", endsOn: "2026-10-03", endsTime: "12:00" }), "Čtvrtek 1. října – sobota 3. října 12:00");
 });
 
-test("na web jde jen zveřejněná voda, uzavírky zatím ne", () => {
+test("na web jde zveřejněná voda i uzavírka, skrytá a proběhlá ne", () => {
   const base = { startsOn: "2026-10-01", startsTime: "07:30", endsOn: "", endsTime: "15:00", places: ["Husova"], note: "", sourceUrl: "" };
   const board = noticeBoard(
     [
@@ -220,27 +220,36 @@ test("na web jde jen zveřejněná voda, uzavírky zatím ne", () => {
     ],
     new Date("2026-10-01T08:00:00Z"),
   );
-  assert.deepEqual(board.map((item) => item.id), [1]);
+  assert.deepEqual(board.map((item) => item.id), [1, 3]);
   assert.equal(board[0].state, "Právě neteče");
+  assert.equal(board[1].state, "Právě uzavřeno");
 });
 
 const CTX = { path: "/odstavky", copy: {}, mainOrigin: "", origin: "" };
 
-test("stránka odstávek a titulka ukážou vodu", () => {
-  const water = noticeBoard(
-    [{ id: 1, kind: "voda", title: "Nepoteče voda", startsOn: "2026-10-01", startsTime: "07:30", endsOn: "", endsTime: "15:00", places: ["Husova"], note: "Cisterna projíždí.", sourceUrl: "https://kopidlno.munipolis.cz/nastenka/1", published: true }],
+test("stránka odstávek ukáže vodu i uzavírky", () => {
+  const notices = noticeBoard(
+    [
+      { id: 1, kind: "voda", title: "Nepoteče voda", startsOn: "2026-10-01", startsTime: "07:30", endsOn: "", endsTime: "15:00", places: ["Husova"], note: "Cisterna projíždí.", sourceUrl: "https://kopidlno.munipolis.cz/nastenka/1", published: true },
+      { id: 2, kind: "uzavirka", title: "Uzavírka II/280", startsOn: "2026-10-05", startsTime: "", endsOn: "2026-10-20", endsTime: "", places: ["Hilmarovo náměstí"], note: "Objížďka přes Ledkov.", sourceUrl: "", published: true },
+    ],
     new Date("2026-10-01T08:00:00Z"),
   );
-  const page = outagesPage({ outages: { items: [], areas: [{ code: "573060", name: "Kopidlno" }], fetchedAt: "2026-10-01T08:00:00Z", checked: "" }, water }, CTX);
+  const page = outagesPage({ outages: { items: [], areas: [{ code: "573060", name: "Kopidlno" }], fetchedAt: "2026-10-01T08:00:00Z", checked: "" }, notices }, CTX);
   assert.match(page, /<h2>Voda<\/h2>/);
   assert.match(page, /<h2>Elektřina<\/h2>/);
+  assert.match(page, /<h2>Silnice<\/h2>/);
+  assert.match(page, /<h1>Odstávky a uzavírky<\/h1>/);
+  assert.match(page, /<p class="kicker">Uzavírka II\/280<\/p>\s*<p class="outage-state is-soon">Chystá se<\/p>/);
+  assert.match(page, /Objížďka přes Ledkov\./);
   assert.match(page, /<p class="kicker">Nepoteče voda<\/p>/);
   assert.match(page, /Právě neteče/);
   assert.match(page, /Cisterna projíždí\./);
   assert.match(page, /href="https:\/\/kopidlno\.munipolis\.cz\/nastenka\/1"/);
-  const empty = outagesPage({ outages: { items: [], areas: [], fetchedAt: null }, water: [] }, CTX);
+  const empty = outagesPage({ outages: { items: [], areas: [], fetchedAt: null }, notices: [] }, CTX);
   assert.doesNotMatch(empty, /Nepoteče voda/);
   assert.match(empty, /Teď o žádné odstávce vody nevíme\./);
+  assert.match(empty, /Teď o žádné uzavírce nevíme\./);
 });
 
 test("redakce Munipolisu ukáže stav, zprávy a detail", () => {
@@ -265,7 +274,7 @@ test("redakce Munipolisu ukáže stav, zprávy a detail", () => {
   assert.equal(refLink("akce:3"), '<a href="/redakce/akce?id=3">Akce #3</a>');
 });
 
-test("redakce odstávek ukáže vodu ke schválení a uzavírky bokem", () => {
+test("redakce odstávek ukáže vodu ke schválení a uzavírky", () => {
   const data = {
     signedIn: true,
     user: { id: 1, role: "hlavni", name: "Redakce", permissions: [] },
@@ -278,20 +287,25 @@ test("redakce odstávek ukáže vodu ke schválení a uzavírky bokem", () => {
   };
   const page = adminOutages(CTX, data, { text: "", kind: "ok" }, { noticeId: 1 });
   assert.match(page, /Čeká na schválení/);
-  assert.match(page, /Uzavírky se zatím na webu neukazují/);
+  assert.doesNotMatch(page, /zatím na webu neukazují/);
+  assert.match(page, /href="\/redakce\/odstavky\?nova-uzavirka=1"/);
   assert.match(page, /Zkontrolovat oznámení/);
   assert.match(page, /připravila Koza Drběna/);
 });
 
-test("titulka ukáže odstávku vody mezi odstávkami", () => {
-  const water = noticeBoard(
-    [{ id: 1, kind: "voda", title: "Nepoteče voda", startsOn: "2026-10-01", startsTime: "07:30", endsOn: "", endsTime: "15:00", places: ["Husova"], note: "", sourceUrl: "", published: true }],
+test("titulka ukáže odstávku vody i uzavírku", () => {
+  const notices = noticeBoard(
+    [
+      { id: 1, kind: "voda", title: "Nepoteče voda", startsOn: "2026-10-01", startsTime: "07:30", endsOn: "", endsTime: "15:00", places: ["Husova"], note: "", sourceUrl: "", published: true },
+      { id: 2, kind: "uzavirka", title: "Uzavírka II/280", startsOn: "2026-09-28", startsTime: "", endsOn: "2026-10-20", endsTime: "", places: ["Hilmarovo náměstí"], note: "", sourceUrl: "", published: true },
+    ],
     new Date("2026-10-01T08:00:00Z"),
   );
   const waste = { today: "2026-10-01", nextDate: "2026-10-05", daysUntil: 4, note: "", holidayNote: "", weekday: 1, weekParity: 1, stepDays: 14 };
   const bare = { articles: [], events: [], yards: [], doctors: [], waste, ads: [], contactNote: "", now: { date: "2026-10-01", time: "10:00" } };
-  const home = homePage({ ...bare, water }, { ...CTX, path: "/" });
+  const home = homePage({ ...bare, notices }, { ...CTX, path: "/" });
   assert.match(home, /<p class="yard-home-name">Nepoteče voda<\/p>\s*<p class="yard-home-state">Právě neteče<\/p>/);
+  assert.match(home, /<p class="yard-home-name">Uzavírka II\/280<\/p>\s*<p class="yard-home-state">Právě uzavřeno<\/p>/);
   assert.match(home, /href="\/odstavky"/);
   assert.doesNotMatch(homePage(bare, { ...CTX, path: "/" }), /Nepoteče voda/);
   assert.ok(DEFAULT_VOICE.length > 50);

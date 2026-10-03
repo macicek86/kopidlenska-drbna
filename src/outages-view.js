@@ -1,4 +1,4 @@
-// Odstávky na webu: elektřina z widgetu ČEZ a voda z oznámení města.
+// Odstávky a uzavírky na webu: elektřina z widgetu ČEZ, voda a uzavírky silnic z oznámení města.
 import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
 import { askLine, layout } from "./view.js";
@@ -40,13 +40,16 @@ function teaserLine({ kind, name, state, when, where }) {
 
 export function outagesTeaser(data, ctx) {
   const soon = (item) => item.phase === "now" || item.phase === "soon";
-  const water = (data.water ?? []).filter(soon).map((item) => ({
+  const notice = (item) => ({
     kind: item.phase === "now" ? "is-closure" : "is-later",
     name: item.title,
     state: item.state,
     when: item.when,
     where: teaserPlaces(item),
-  }));
+  });
+  const notices = (data.notices ?? []).filter(soon);
+  const water = notices.filter((item) => item.kind === "voda").map(notice);
+  const roads = notices.filter((item) => item.kind === "uzavirka").map(notice);
   const power = (data.outages?.items ?? []).filter(soon).map((item) => ({
     kind: item.phase === "now" ? "is-closure" : "is-later",
     name: item.areaName,
@@ -54,7 +57,7 @@ export function outagesTeaser(data, ctx) {
     when: item.when,
     where: teaserPlaces(item),
   }));
-  const items = [...water, ...power].slice(0, 3);
+  const items = [...water, ...power, ...roads].slice(0, 3);
   if (!items.length) return "";
   return `<div class="card waste-teaser">
     <p class="eyebrow">${esc(tx(ctx.copy, "home_outages_button"))}</p>
@@ -104,14 +107,15 @@ export function outageEmpty(board, copy) {
   return tx(copy, "outages_empty");
 }
 
-function waterSection(water, copy) {
-  const body = water.length
-    ? `<div class="stack">${water.map((item) => noticeCard(item, { copy })).join("")}</div>`
-    : `<p class="card dashed muted">${esc(tx(copy, "water_empty"))}</p>`;
+// Voda i silnice: oznámení města, jen jiné texty (water_* a road_*).
+function noticeSection(items, prefix, copy) {
+  const body = items.length
+    ? `<div class="stack">${items.map((item) => noticeCard(item, { copy })).join("")}</div>`
+    : `<p class="card dashed muted">${esc(tx(copy, `${prefix}_empty`))}</p>`;
   return `<section class="block">
-    <h2>${esc(tx(copy, "water_heading"))}</h2>
+    <h2>${esc(tx(copy, `${prefix}_heading`))}</h2>
     ${body}
-    <p class="fine">${esc(tx(copy, "water_note"))}</p>
+    <p class="fine">${esc(tx(copy, `${prefix}_note`))}</p>
   </section>`;
 }
 
@@ -138,6 +142,7 @@ function powerSection(board, copy) {
 
 export function outagesPage(data, ctx) {
   const board = data.outages ?? { items: [], areas: [], fetchedAt: null, status: "", note: "", checked: "" };
+  const notices = data.notices ?? [];
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "outages_heading")} | ${tx(ctx.copy, "site_name")}`,
@@ -146,8 +151,9 @@ export function outagesPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "outages_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "outages_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "outages_lede"))}</p>
-      ${askLine(ctx, "outages", "Chybí tu odstávka: ")}
-      ${waterSection(data.water ?? [], ctx.copy)}
-      ${powerSection(board, ctx.copy)}`,
+      ${askLine(ctx, "outages", "Chybí tu odstávka nebo uzavírka: ")}
+      ${noticeSection(notices.filter((item) => item.kind === "voda"), "water", ctx.copy)}
+      ${powerSection(board, ctx.copy)}
+      ${noticeSection(notices.filter((item) => item.kind === "uzavirka"), "road", ctx.copy)}`,
   });
 }

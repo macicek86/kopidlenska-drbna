@@ -23,7 +23,7 @@ Rozhodni (pole decision):
 
 Co vytvořit:
 - Odstávka vody: notice s kind "voda". Každou ulici nebo část obce dej do places zvlášť. Článek jen tehdy, když zpráva říká víc než samotnou odstávku.
-- Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice. Uzavírky zatím nemají na webu vlastní přehled.
+- Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice.
 - Pozvánka na akci s datem: event a k tomu krátký článek s pozvánkou.
 - Zavření nebo jiná otevírací doba: hours, viz níže.
 - Cokoli jiného: článek.
