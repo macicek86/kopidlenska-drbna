@@ -396,6 +396,15 @@ function yardStatusHtml(yard, now) {
   return `<p class="meta">${line}</p>`;
 }
 
+// Řádek pod úvodem: s chatem otevře Drběnu s předvyplněnou větou, bez něj vede na kontakt.
+export function askLine(ctx, prefix, prefill) {
+  return `<p class="place-ask">${esc(tx(ctx.copy, `${prefix}_ask`))} ${
+    ctx.chat
+      ? `<a href="/o-nas" data-chat-open="${esc(prefill)}">${esc(tx(ctx.copy, `${prefix}_ask_chat`))}</a>`
+      : `<a href="/o-nas">${esc(tx(ctx.copy, `${prefix}_ask_mail`))}</a>`
+  }</p>`;
+}
+
 export function yardsPage(data, ctx) {
   const today = data.waste.today;
   const now = clockOf(data);
@@ -438,6 +447,7 @@ export function yardsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "yards_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "yards_lede"))}</p>
+      ${askLine(ctx, "yards", "U sběrných dvorů je něco špatně: ")}
       <div class="stack place-grid">${cards}</div>`,
   });
 }

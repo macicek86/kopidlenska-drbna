@@ -1,7 +1,7 @@
 // Odstávky na webu: elektřina z widgetu ČEZ a voda z oznámení města.
 import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
-import { layout } from "./view.js";
+import { askLine, layout } from "./view.js";
 
 const TEASER_PLACES_CHARS = 45;
 
@@ -146,6 +146,7 @@ export function outagesPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "outages_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "outages_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "outages_lede"))}</p>
+      ${askLine(ctx, "outages", "Chybí tu odstávka: ")}
       ${waterSection(data.water ?? [], ctx.copy)}
       ${powerSection(board, ctx.copy)}`,
   });

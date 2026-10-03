@@ -4,7 +4,7 @@ import { activeChange, hasOpenSlot, homeNotice, periodClosed, spanSummary } from
 import { esc } from "./html.js";
 import { formatLong } from "./format.js";
 import { placeNotices, placeSummary, temporaryChanges, upcomingNewHours } from "./places.js";
-import { closureLabel, dayLabel, layout } from "./view.js";
+import { askLine, closureLabel, dayLabel, layout } from "./view.js";
 import { civilWeekday } from "./waste.js";
 
 function phoneLink(phone) {
@@ -64,15 +64,6 @@ function doctorChangeTiles(changes) {
 function noticeBanner(notice, extraClass = "") {
   const lead = `${notice.name} ${notice.state.charAt(0).toLowerCase()}${notice.state.slice(1)}`;
   return `<div class="banner doctor-notice${extraClass}"><p>${glueDates(lead)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}${notice.detail ? `<p class="banner-note">${glueDates(notice.detail)}</p>` : ""}</div>`;
-}
-
-// Řádek pod úvodem: s chatem otevře Drběnu s předvyplněnou větou, bez něj vede na kontakt.
-function askLine(ctx, prefix, prefill) {
-  return `<p class="place-ask">${esc(tx(ctx.copy, `${prefix}_ask`))} ${
-    ctx.chat
-      ? `<a href="/o-nas" data-chat-open="${esc(prefill)}">${esc(tx(ctx.copy, `${prefix}_ask_chat`))}</a>`
-      : `<a href="/o-nas">${esc(tx(ctx.copy, `${prefix}_ask_mail`))}</a>`
-  }</p>`;
 }
 
 export function doctorsPage(data, ctx) {
