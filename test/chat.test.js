@@ -143,7 +143,7 @@ test("Drběna si sama dohledá zprávu nástrojem a odpoví", async () => {
     assert.deepEqual(result.usage, { input: 200, output: 40, read: 0, write: 0 });
     assert.equal(claude.requests[0].model, "claude-haiku-4-5");
     assert.equal(claude.requests[0].output_config, undefined);
-    assert.deepEqual(claude.requests[0].tools.map((tool) => tool.name), ["hledat_zpravy", "precist_zpravu", "precist_zdroj"]);
+    assert.deepEqual(claude.requests[0].tools.map((tool) => tool.name), ["hledat_zpravy", "precist_zpravu", "precist_zdroj", "predat_redakci", "doplnit_kontakt"]);
   } finally {
     claude.close();
   }

@@ -1,6 +1,7 @@
-// Co Drběna v chatu ví: stránky drbny jako text (z D1 přes stejné funkce jako web) a nástroje na zprávy.
+// Co Drběna v chatu ví: stránky drbny jako text (z D1 přes stejné funkce jako web), nástroje na zprávy a vzkazy redakci.
 import { aboutPage } from "../about.js";
 import { formatShort } from "../format.js";
+import { addMessageContact, MESSAGE_KINDS, saveChatMessage } from "../messages-db.js";
 import { binsPage, doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
 import { htmlText } from "./prompt.js";
 
@@ -238,9 +239,59 @@ export const CHAT_TOOLS = [
       additionalProperties: false,
     },
   },
+  {
+    name: "predat_redakci",
+    description:
+      "Předá redakci vzkaz od návštěvníka: chybějící místo v otevírací době, oprava nebo změna na drbně, tip na článek, nápad nebo jiné přání. Vrátí, jestli se to povedlo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        druh: { type: "string", enum: Object.keys(MESSAGE_KINDS), description: "misto = chybí místo nebo služba, oprava = něco je špatně nebo se má změnit, tip = tip na článek nebo akci, napad = nápad na drbnu, jine = ostatní." },
+        shrnuti: { type: "string", description: "Jedna věta pro redakci, o co jde, třeba „Chybí otevírací doba cukrárny U Lípy“." },
+        text: { type: "string", description: "Co přesně návštěvník chce, jeho slovy a se všemi podrobnostmi, které řekl." },
+        kontakt: { type: "string", description: "E-mail nebo telefon, jen když ho návštěvník sám napsal. Jinak vynech." },
+      },
+      required: ["druh", "shrnuti", "text"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "doplnit_kontakt",
+    description: "Připíše e-mail nebo telefon k vzkazu, který jsi v tomhle rozhovoru už předala redakci.",
+    input_schema: {
+      type: "object",
+      properties: { kontakt: { type: "string", description: "E-mail nebo telefon, jak ho návštěvník napsal." } },
+      required: ["kontakt"],
+      additionalProperties: false,
+    },
+  },
 ];
 
-export async function runChatTool(env, name, input) {
+const MESSAGE_SAYS = {
+  limit: "Vzkaz se nepředal: v tomhle rozhovoru nebo dnes už jich bylo předáno hodně. Řekni, ať napíše redakci přes stránku O nás (/o-nas).",
+  empty: "Vzkaz se nepředal, chybí shrnutí.",
+  missing: "Kontakt nejde připsat, v tomhle rozhovoru zatím žádný vzkaz předaný není. Předej nejdřív vzkaz nástrojem predat_redakci i s kontaktem.",
+};
+
+// Nástroje na vzkazy potřebují vědět, kdo píše (who: day, visitor, conversation, page); bez něj nic neuloží.
+async function messageTool(env, name, input, who) {
+  if (!who) return "Vzkazy teď předat nejde.";
+  if (name === "doplnit_kontakt") {
+    const result = await addMessageContact(env, who, input?.kontakt);
+    return result.ok ? "Kontakt je připsaný ke vzkazu." : MESSAGE_SAYS[result.reason];
+  }
+  const result = await saveChatMessage(env, who, {
+    kind: input?.druh,
+    summary: input?.shrnuti,
+    text: input?.text,
+    contact: input?.kontakt,
+    page: who.page,
+  });
+  return result.ok ? "Předáno redakci. Uvidí to v redakci mezi vzkazy." : MESSAGE_SAYS[result.reason];
+}
+
+export async function runChatTool(env, name, input, who = null) {
+  if (name === "predat_redakci" || name === "doplnit_kontakt") return messageTool(env, name, input, who);
   if (name === "hledat_zpravy") return searchArticles(env, String(input?.dotaz ?? ""));
   if (name === "precist_zpravu") return readArticle(env, input?.adresa);
   if (name === "precist_zdroj") return readSource(env, input?.oznaceni);

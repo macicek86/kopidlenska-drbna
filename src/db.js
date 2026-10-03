@@ -23,6 +23,7 @@ import { loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
 import { loadDrbena } from "./drbena-db.js";
+import { countNewMessages } from "./messages-db.js";
 import { loadUsers } from "./users-db.js";
 import { accessConfig } from "./access.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
@@ -356,6 +357,7 @@ export async function loadAdmin(env, request) {
     drbena: null,
     rubrics: [],
     stock: { topics: [], fallbackTopicId: null },
+    newMessages: 0,
   };
   if (!user) return base;
   // Všechno najednou; co uživatel nesmí vidět, se nenačítá.
@@ -365,7 +367,7 @@ export async function loadAdmin(env, request) {
   const articleSql = chief
     ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
     : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
-  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, desk, stock] = await Promise.all([
+  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, desk, stock, newMessages] = await Promise.all([
     loadRubrics(env),
     loadAds(env),
     chief ? loadAdProposals(env, "where p.status = 'pending' order by p.id asc") : loadAdProposals(env, ...mine),
@@ -380,8 +382,9 @@ export async function loadAdmin(env, request) {
     chief ? loadProposals(env, "where p.status = 'pending' order by p.id asc") : loadProposals(env, ...mine),
     when(chief, () => loadChiefDesk(env), null),
     loadStock(env),
+    when(userCan(user, "vzkazy"), () => countNewMessages(env), 0),
   ]);
-  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, stock });
+  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, stock, newMessages });
   if (desk) Object.assign(base, desk, { hasApiKey: Boolean(env.ANTHROPIC_API_KEY) });
   return base;
 }

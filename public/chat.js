@@ -250,7 +250,7 @@ function setup() {
           result = { status: 403, data: { error: "Nepodařilo se ověřit, že nejste robot. Zkuste to znovu." } };
           break;
         }
-        result = await post("/chat/zeptat", { pass: state.pass, question: text, history });
+        result = await post("/chat/zeptat", { pass: state.pass, question: text, history, page: location.pathname });
         if (!result.data.restart) break;
         state.pass = "";
         save(state);
@@ -338,6 +338,20 @@ function setup() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     ask(field.value);
+  });
+
+  // Odkaz s data-chat-open otevře chat a do prázdného pole předvyplní začátek věty.
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("[data-chat-open]");
+    if (!link) return;
+    event.preventDefault();
+    if (panel.hidden) open();
+    if (link.dataset.chatOpen && !field.value.trim()) {
+      field.value = link.dataset.chatOpen;
+      fit();
+      field.setSelectionRange(field.value.length, field.value.length);
+    }
+    field.focus();
   });
 }
 

@@ -2,7 +2,7 @@ import { userCan } from "../db.js";
 import { formatLong } from "../format.js";
 import { credit, esc } from "../view.js";
 import { adminShell } from "./shell.js";
-import { badge, icon, item, list, modalLink, pageHead, panel } from "./ui.js";
+import { badge, callout, icon, item, list, modalLink, pageHead, panel } from "./ui.js";
 
 function stat(href, glyph, value, label, tone = "") {
   return `<a class="stat${tone ? ` stat-${tone}` : ""}" href="${href}">${icon(glyph)}<b>${esc(value)}</b><span>${esc(label)}</span></a>`;
@@ -95,7 +95,13 @@ export function adminOverview(ctx, data, message) {
     userCan(data.user, "sberny_dvur") || chief ? `<a class="btn btn-line" href="/redakce/dvory">${icon("recycle")}<span>Uzavření dvora</span></a>` : "",
   ].join("");
 
+  const fresh = data.newMessages ?? 0;
+  const messages = fresh
+    ? callout(`Drběna vám z chatu předala ${fresh === 1 ? "1 nový vzkaz" : fresh < 5 ? `${fresh} nové vzkazy` : `${fresh} nových vzkazů`}. <a href="/redakce/vzkazy">Přečíst</a>`, "warn")
+    : "";
+
   const body = `${pageHead(first ? `Ahoj, ${first}` : "Přehled", chief ? "Co čeká na vás a co se chystá." : "Vaše návrhy a co se chystá.")}
+    ${messages}
     <div class="stats">${stats.join("")}</div>
     <div class="quick">${actions}</div>
     <div class="cards-2">

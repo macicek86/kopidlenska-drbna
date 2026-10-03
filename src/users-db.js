@@ -26,6 +26,11 @@ export const PERMISSIONS = [
     detail: "Může nahrávat a mazat ilustrační fotky a měnit jejich témata.",
   },
   {
+    code: "vzkazy",
+    label: "Vzkazy z chatu",
+    detail: "Vidí vzkazy, které Drběna v chatu předala redakci (chybějící místo, oprava, tip na článek), a může je vyřídit.",
+  },
+  {
     code: "statistiky",
     label: "Statistiky",
     detail: "Vidí návštěvnost webu: kolik lidí přišlo, co čtou a odkud přišli.",

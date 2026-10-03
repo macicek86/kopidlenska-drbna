@@ -158,6 +158,12 @@ export function placesPage(data, ctx) {
         .map((place) => `<a class="chip" href="#misto-${place.id}">${esc(place.name)}</a>`)
         .join("")}</nav>`
     : "";
+  // Chybějící místo: s chatem otevře Drběnu s předvyplněnou větou, bez něj vede na kontakt.
+  const ask = `<p class="place-ask">${esc(tx(ctx.copy, "places_ask"))} ${
+    ctx.chat
+      ? `<a href="/o-nas" data-chat-open="Chybí mi tu místo: ">${esc(tx(ctx.copy, "places_ask_chat"))}</a>`
+      : `<a href="/o-nas">${esc(tx(ctx.copy, "places_ask_mail"))}</a>`
+  }</p>`;
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "places_heading")} | ${tx(ctx.copy, "site_name")}`,
@@ -166,6 +172,7 @@ export function placesPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "places_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "places_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "places_lede"))}</p>
+      ${ask}
       ${jump}
       <div class="stack place-grid">${cards}</div>`,
   });

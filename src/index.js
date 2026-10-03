@@ -59,6 +59,7 @@ import {
   adminDoctors,
   adminDrbena,
   adminEvents,
+  adminMessages,
   adminMunipolis,
   adminFootball,
   adminDenik,
@@ -99,6 +100,8 @@ import { chatPost } from "./chat/run.js";
 import { chatEnabled, loadChatAdmin } from "./chat/store.js";
 import { turnstileConfig } from "./chat/pass.js";
 import { CHAT_OK, chatAdminPost } from "./post-chat.js";
+import { MESSAGES_OK, messagesPost } from "./post-messages.js";
+import { loadMessages } from "./messages-db.js";
 import { ARTICLES_OK, articlesPost } from "./post-articles.js";
 import { ADS_OK, adsPost } from "./post-ads.js";
 
@@ -141,6 +144,7 @@ const OK = {
   ...FOOTBALL_OK,
   ...DENIK_OK,
   ...CHAT_OK,
+  ...MESSAGES_OK,
 };
 
 // Stránky, které berou data z loadPublic.
@@ -317,6 +321,13 @@ async function renderGet(request, env, url, execution) {
         return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
       }
       return html(adminDoctors(ctx, data, message, query));
+    }
+    if (tab === "vzkazy") {
+      if (data.signedIn && !userCan(data.user, "vzkazy")) {
+        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na vzkazy potřebuješ oprávnění.")}`);
+      }
+      if (data.signedIn) [data.messages, data.chatOff] = await Promise.all([loadMessages(env), chatEnabled(env).then((on) => !on)]);
+      return html(adminMessages(ctx, data, message, { remove: Number(url.searchParams.get("smazat")) || 0 }));
     }
     if (tab === "statistiky") {
       if (data.signedIn && !userCan(data.user, "statistiky")) {
@@ -509,7 +520,8 @@ async function renderPost(request, env, url, execution) {
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??
     (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena"))) ??
-    (await chatAdminPost(path, request, env, fields));
+    (await chatAdminPost(path, request, env, fields)) ??
+    (await messagesPost(path, request, env, fields));
   if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);

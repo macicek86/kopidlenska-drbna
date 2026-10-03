@@ -12,6 +12,7 @@ const only = process.argv.slice(2);
 
 const TABS = [
   "prehled",
+  "vzkazy",
   "statistiky",
   "zpravy",
   "rubriky",

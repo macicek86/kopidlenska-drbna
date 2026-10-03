@@ -2,11 +2,12 @@
 import { loadCopy, loadPublic } from "../db.js";
 import { loadDrbena } from "../drbena-db.js";
 import { formatLong } from "../format.js";
+import { messagePage } from "../messages-db.js";
 import { isBot } from "../visits.js";
 import { dayVisitor } from "../visits-db.js";
 import { pragueNow } from "../waste.js";
 import { askDrbena, usageCost } from "./ai.js";
-import { siteOverview } from "./context.js";
+import { runChatTool, siteOverview } from "./context.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "./pass.js";
 import { chatInstructions } from "./prompt.js";
 import { chatLimit, countQuestion, countStop, loadChatSettings, recordAnswer } from "./store.js";
@@ -109,7 +110,13 @@ export async function chatPost(path, request, env, execution) {
   }
   const left = await countQuestion(env, settings, who);
   const history = [...readHistory(body.history), { role: "user", text: question }];
-  const result = await askDrbena(env, { modelKey: settings.model, system: await chatSystem(env, request), history });
+  // Vzkazy redakci potřebují vědět, kdo píše a z jaké stránky.
+  const writer = { ...who, page: messagePage(body.page) };
+  const result = await askDrbena(
+    env,
+    { modelKey: settings.model, system: await chatSystem(env, request), history },
+    { runTool: (toolEnv, name, input) => runChatTool(toolEnv, name, input, writer) },
+  );
   const cost = usageCost(result.usage, settings.model);
   const answer = result.ok ? result.text : CHAT_SAYS[result.error] ?? CHAT_SAYS.broken;
   const saving = recordAnswer(env, settings, {
