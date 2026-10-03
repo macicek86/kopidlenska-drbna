@@ -66,7 +66,7 @@ export async function saveAd(env, request, input) {
   const { title, body, place, link, imageFocus, enabled } = parsed;
 
   if (input.id) {
-    const current = await env.DB.prepare("select id, author_id, image_key from ads where id = ?").bind(input.id).first();
+    const current = await env.DB.prepare("select id, slug, author_id, image_key from ads where id = ?").bind(input.id).first();
     if (!current) return { ok: false, error: "Tahle nabídka už tu není." };
     if (!canManageAd(gate.user, current)) {
       return { ok: false, error: "Cizí nabídku mění hlavní redaktor, nebo její autor." };
@@ -75,9 +75,9 @@ export async function saveAd(env, request, input) {
     const previous = imageKey;
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
-      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, sample = 0 where id = ?",
+      "update ads set slug = ?, title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, sample = 0 where id = ?",
     )
-      .bind(title, body, place, link, imageKey, imageFocus, enabled ? 1 : 0, input.id)
+      .bind(await slugForTitle(env, title, current.slug), title, body, place, link, imageKey, imageFocus, enabled ? 1 : 0, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     return { ok: true };
@@ -123,6 +123,15 @@ export async function removeAd(env, request, id) {
   await env.DB.prepare("delete from ads where id = ?").bind(id).run();
   for (const key of keys) await releaseImage(env, key);
   return { ok: true };
+}
+
+// Adresa jde s názvem: když se název změní, dostane nabídka novou adresu (stará pak nevede nikam).
+async function slugForTitle(env, title, current) {
+  const base = slugify(title);
+  const slug = String(current ?? "");
+  // Adresa s pořadovým číslem („kolo-2“) k názvu taky patří.
+  if (slug === base || (slug.startsWith(`${base}-`) && /^\d+$/.test(slug.slice(base.length + 1)))) return slug;
+  return uniqueAdSlug(env, base);
 }
 
 function mapAdProposal(row) {
@@ -265,7 +274,7 @@ export async function approveAdProposal(env, request, input) {
 
   let linkedId = proposal.ad_id ? Number(proposal.ad_id) : null;
   if (linkedId) {
-    const ad = await env.DB.prepare("select id, image_key from ads where id = ?").bind(linkedId).first();
+    const ad = await env.DB.prepare("select id, slug, image_key from ads where id = ?").bind(linkedId).first();
     if (!ad) {
       if (stored.key) await releaseImage(env, stored.key);
       return { ok: false, error: "Tahle nabídka už tu není." };
@@ -273,9 +282,9 @@ export async function approveAdProposal(env, request, input) {
     const previousAdImage = ad.image_key ? String(ad.image_key) : null;
     const nextImage = imageKey || previousAdImage;
     await env.DB.prepare(
-      "update ads set title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, sample = 0 where id = ?",
+      "update ads set slug = ?, title = ?, body = ?, place = ?, link = ?, image_key = ?, image_focus = ?, enabled = ?, sample = 0 where id = ?",
     )
-      .bind(parsed.title, parsed.body, parsed.place, parsed.link, nextImage, parsed.imageFocus, parsed.enabled ? 1 : 0, linkedId)
+      .bind(await slugForTitle(env, parsed.title, ad.slug), parsed.title, parsed.body, parsed.place, parsed.link, nextImage, parsed.imageFocus, parsed.enabled ? 1 : 0, linkedId)
       .run();
     imageKey = nextImage;
     if (previousAdImage && previousAdImage !== nextImage) oldKeys.add(previousAdImage);
