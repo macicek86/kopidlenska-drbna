@@ -159,7 +159,7 @@ export const COPY = [
   { group: "Reklamy", key: "ads_ask_chat", label: "Odkaz pod úvodem, když je chat zapnutý", value: "Řekněte to Drběně v chatu", max: 80 },
   { group: "Reklamy", key: "ads_ask_mail", label: "Odkaz pod úvodem, když je chat vypnutý", value: "Napište redakci", max: 80 },
   { group: "Reklamy", key: "ads_back", label: "Návrat na reklamy", value: "Všechny reklamy", max: 80 },
-  { group: "Reklamy", key: "ads_flag", label: "Označení panelu", value: "Reklama", max: 40 },
+  { group: "Reklamy", key: "ads_flag", label: "Označení panelu (nápis na pásce)", value: "Reklama od sousedů", max: 40 },
   { group: "Reklamy", key: "ads_sample", label: "Označení ukázky", value: "ukázka", max: 40 },
   { group: "Reklamy", key: "ads_more", label: "Text odkazu na panelu", value: "Víc", max: 40 },
   { group: "Reklamy", key: "ads_missing", label: "Chybějící reklama", value: "Tahle reklama tu není", max: 80 },

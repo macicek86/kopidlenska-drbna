@@ -22,7 +22,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 let schemaReady = false;
 
@@ -346,6 +346,7 @@ const COPY_RENAMES = [
   ["outages_ask", "Víte o odstávce, která tu chybí?", "Víte o odstávce nebo uzavírce, která tu chybí?"],
   ["about_outages_link", "Odstávky vody a elektřiny", "Odstávky a uzavírky"],
   ["bins_alt", "Koza Drběna v montérkách s popelnicí na kopidlenském náměstí", "Koza Drběna v reflexní pracovní soupravě s koštětem a popelnicí"],
+  ["ads_flag", "Reklama", "Reklama od sousedů"],
 ];
 
 async function renameCopy(env) {
