@@ -98,6 +98,7 @@ import { continueDenik, runDenik } from "./denik/run.js";
 import { loadDenikSettings } from "./denik/store.js";
 import { SKOLA_OK, skolaPost } from "./post-skola.js";
 import { continueSkola, runSkola } from "./skola/run.js";
+import { SCHOOL_LIST, SCHOOLS } from "./skola/sources.js";
 import { loadSkolaSettings } from "./skola/store.js";
 import { continueFootball, runFootball } from "./fotbal/run.js";
 import { loadFootballSettings } from "./fotbal/store.js";
@@ -303,7 +304,7 @@ async function renderGet(request, env, url, execution) {
     const data = admin;
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", "skola", "drbena", "chat"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "drbena", "chat"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -368,9 +369,12 @@ async function renderGet(request, env, url, execution) {
       if (data.signedIn && (await continueDenik(env, { ctx: execution })).background) data.denikSettings = await loadDenikSettings(env);
       return html(adminDenik(ctx, data, message, query));
     }
-    if (tab === "skola") {
-      if (data.signedIn && (await continueSkola(env, { ctx: execution })).background) data.skolaSettings = await loadSkolaSettings(env);
-      return html(adminSkola(ctx, data, message, query));
+    if (Object.hasOwn(SCHOOLS, tab)) {
+      const source = SCHOOLS[tab];
+      if (data.signedIn && (await continueSkola(env, source, { ctx: execution })).background) {
+        data.schools = { ...data.schools, [tab]: { ...data.schools?.[tab], settings: await loadSkolaSettings(env, source) } };
+      }
+      return html(adminSkola(ctx, data, message, query, source));
     }
     if (tab === "drbena") return html(adminDrbena(ctx, data, message));
     if (tab === "chat") {
@@ -563,7 +567,7 @@ export default {
     ctx.waitUntil(runImport(env).catch(() => {}));
     ctx.waitUntil(runFootball(env).catch(() => {}));
     ctx.waitUntil(runDenik(env).catch(() => {}));
-    ctx.waitUntil(runSkola(env).catch(() => {}));
+    for (const source of SCHOOL_LIST) ctx.waitUntil(runSkola(env, source).catch(() => {}));
     ctx.waitUntil(runNdic(env).catch(() => {}));
   },
 };

@@ -24,6 +24,7 @@ import { pushConfig } from "./ndic/push.js";
 import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
+import { SCHOOL_LIST } from "./skola/sources.js";
 import { loadSkolaItems, loadSkolaSettings } from "./skola/store.js";
 import { loadDrbena } from "./drbena-db.js";
 import { attachArticle, forgetArticle, loadEvents } from "./events-db.js";
@@ -288,9 +289,17 @@ export async function loadMoreArticles(env, slug, limit = 5) {
   return results.map(mapArticle);
 }
 
+// Nastavení a články všech škol podle značky (skola, zahradka).
+async function loadSchools(env) {
+  const entries = await Promise.all(
+    SCHOOL_LIST.map(async (source) => [source.tag, { settings: await loadSkolaSettings(env, source), items: await loadSkolaItems(env, source) }]),
+  );
+  return Object.fromEntries(entries);
+}
+
 // Části redakce jen pro hlavního redaktora.
 async function loadChiefDesk(env) {
-  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, skolaSettings, skolaItems, drbena, events, users] =
+  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, schools, drbena, events, users] =
     await Promise.all([
       loadOutageAreas(env),
       loadOutageBoard(env),
@@ -303,8 +312,7 @@ async function loadChiefDesk(env) {
       loadFootballItems(env),
       loadDenikSettings(env),
       loadDenikItems(env),
-      loadSkolaSettings(env),
-      loadSkolaItems(env),
+      loadSchools(env),
       loadDrbena(env),
       loadEvents(env),
       loadUsers(env),
@@ -320,8 +328,7 @@ async function loadChiefDesk(env) {
     footballItems,
     denikSettings,
     denikItems,
-    skolaSettings,
-    skolaItems,
+    schools,
     drbena,
     events,
     users,
@@ -358,8 +365,7 @@ export async function loadAdmin(env, request) {
     footballItems: [],
     denikSettings: null,
     denikItems: [],
-    skolaSettings: null,
-    skolaItems: [],
+    schools: {},
     drbena: null,
     rubrics: [],
     stock: { topics: [], fallbackTopicId: null },

@@ -1,19 +1,19 @@
-// Redakce: články z webu ZŠ a MŠ Kopidlno. Nastavení, stav poslední kontroly a co s nimi Koza Drběna udělala.
+// Redakce: články z webů škol (ZŠ a MŠ, zahradnická). Nastavení, stav poslední kontroly a co s nimi Koza Drběna udělala.
 import { MODEL } from "../claude.js";
-import { DEFAULT_FEEDS } from "../skola/feed.js";
-import { DEFAULT_FRESH_DAYS, skolaRunning } from "../skola/store.js";
+import { SCHOOLS } from "../skola/sources.js";
+import { skolaRunning } from "../skola/store.js";
 import { esc } from "../view.js";
 import { importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
-const BASE = "/redakce/skola";
-const PICK = "vyber-skola";
+const baseOf = (source) => `/redakce/${source.tag}`;
 
-function entryDetail(entry) {
+function entryDetail(source, entry) {
+  const BASE = baseOf(source);
   const made = madeLinks(entry);
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
-  const source = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Článek na webu školy</a>` : "";
+  const original = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Článek na webu školy</a>` : "";
   const facts = [entry.section, entry.term && `termín ${entry.term}`].filter(Boolean).join(" · ");
   return `<div class="import-detail">
     <p class="item-badges">${statusBadge(entry)}<span class="item-sub">${esc(stamp(entry.publishedAt))}</span>${facts ? `<span class="item-sub">${esc(facts)}</span>` : ""}</p>
@@ -21,25 +21,32 @@ function entryDetail(entry) {
     ${made.length ? `<p>Vzniklo: ${made.join(" · ")}</p>` : ""}
     ${duplicate ? `<p>Stejná věc už je tady: ${duplicate}</p>` : ""}
     <div class="import-source">${textBlock(entry.text)}</div>
-    ${source ? `<p class="item-sub">${source}</p>` : ""}
+    ${original ? `<p class="item-sub">${original}</p>` : ""}
     <div class="form-foot">${cancelLink(BASE, "Zavřít")}<span class="form-foot-gap"></span>${processButton(BASE, entry)}</div>
   </div>`;
 }
 
-function settingsForm(settings) {
-  const urls = (settings.feedUrls?.length ? settings.feedUrls : DEFAULT_FEEDS).join("\n");
+function feedField(source, settings) {
+  if (!source.feedField) return "";
+  const urls = (settings.feedUrls?.length ? settings.feedUrls : source.defaultFeeds).join("\n");
+  return field("Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, "Jedna na řádek. Článek, který škola dá do aktualit ZŠ i MŠ, se vezme jen jednou. Prázdné pole vrátí aktuality ZŠ a MŠ.");
+}
+
+function settingsForm(source, settings) {
+  const BASE = baseOf(source);
   return `<form class="form" method="post" action="${BASE}/ulozit">
     ${check("enabled", "1", settings.enabled, "Kontrolovat web školy automaticky", "Drbna se podívá každé čtyři hodiny a nové články rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď články jen načte a zpracuje se, co vyberete.")}
-    ${field("Automaticky jen články z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na webu školy. Starší články automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
+    ${field("Automaticky jen články z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? source.freshDays}">`, "Dní podle data na webu školy. Starší články automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce jako skryté.")}
     ${check("ownPhotos", "1", settings.ownPhotos, "Brát fotky ze školního webu", "Drběna vezme fotku od článku, když je pěkná (plakát ne), a pod ni napíše, že je od školy. Bez zaškrtnutí dává vždy ilustrační fotku z knihovny obrázků.")}
-    ${field("Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, "Jedna na řádek. Článek, který škola dá do aktualit ZŠ i MŠ, se vezme jen jednou. Prázdné pole vrátí aktuality ZŠ a MŠ.")}
+    ${feedField(source, settings)}
     ${VOICE_NOTE}
     ${formFoot("Uložit", cancelLink(BASE))}
   </form>`;
 }
 
-function statusPanel(data, settings, entries) {
+function statusPanel(source, data, settings, entries) {
+  const BASE = baseOf(source);
   const checked = settings.checkedAt ? `Naposledy zkontrolováno ${stamp(settings.checkedAt)}.` : "Ještě se nekontrolovalo.";
   const mode = settings.enabled ? (settings.autoPublish ? "Zapnuto, rovnou zveřejňuje." : "Zapnuto, všechno čeká na schválení.") : "Vypnuto. Kontrolovat jde jen ručně.";
   const photos = settings.ownPhotos ? "Fotky bere ze školy." : "Fotky jen z knihovny.";
@@ -62,21 +69,24 @@ function statusPanel(data, settings, entries) {
   </section>`;
 }
 
-export function adminSkola(ctx, data, message, query = {}) {
-  const settings = data.skolaSettings ?? { feedUrls: DEFAULT_FEEDS, enabled: false, autoPublish: false, ownPhotos: false };
-  const entries = data.skolaItems ?? [];
+export function adminSkola(ctx, data, message, query = {}, source = SCHOOLS.skola) {
+  const BASE = baseOf(source);
+  const PICK = `vyber-${source.tag}`;
+  const school = data.schools?.[source.tag] ?? {};
+  const settings = school.settings ?? { feedUrls: source.defaultFeeds, enabled: false, autoPublish: false, ownPhotos: false };
+  const entries = school.items ?? [];
   const open = entries.find((entry) => entry.id === query.importId) ?? null;
   const dialogs = [
-    modal({ id: "nastaveni", title: "Nastavení školy", size: "wide", close: BASE, open: Boolean(query.importSettings) && !open, body: settingsForm(settings) }),
+    modal({ id: "nastaveni", title: "Nastavení školy", size: "wide", close: BASE, open: Boolean(query.importSettings) && !open, body: settingsForm(source, settings) }),
   ];
-  if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
+  if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(source, open) }));
   const body = `${pageHead(
-    "Škola",
-    "Koza Drběna čte aktuality na webu ZŠ a MŠ Kopidlno. Úspěchy žáků, akce a novinky pro rodiče napíše po svém, s odkazem na článek školy. Věci jen pro žáky a to, co už na drbně je, nechá být.",
+    source.page,
+    source.intro,
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
-    ${statusPanel(data, settings, entries)}
-    ${panel({ id: "clanky-skoly", title: "Články školy", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat v článcích…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE, PICK)), "Zatím žádný článek. Klikněte na Zkontrolovat teď.") })}
+    ${statusPanel(source, data, settings, entries)}
+    ${panel({ id: `clanky-${source.tag}`, title: "Články školy", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat v článcích…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE, PICK)), "Zatím žádný článek. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
-  return adminShell(ctx, data, "skola", message, body, { title: "Škola" });
+  return adminShell(ctx, data, source.tag, message, body, { title: source.page });
 }

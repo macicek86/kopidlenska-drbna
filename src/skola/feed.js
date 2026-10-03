@@ -1,7 +1,7 @@
 // Web ZŠ a MŠ Kopidlno (Antee): RSS rubrik s celým textem, fotkou a termínem akce. Bez sítě, ať jde testovat.
+// Klíč článku (`schoolKey`) a adresy kanálů používá i web na WordPressu (`wordpress.js`).
 import { decodeEntities, htmlToText, imagesIn, readFeedUrl, tag, USER_AGENT } from "../munipolis/feed.js";
 
-export const SCHOOL_NAME = "ZŠ a MŠ Kopidlno";
 export const DEFAULT_FEEDS = ["https://www.zskopidlno.cz/aktuality-zs?action=atom", "https://www.zskopidlno.cz/aktuality-ms?action=atom"];
 const MAX_FEEDS = 6;
 const MAX_ITEMS = 30;
@@ -107,12 +107,12 @@ export async function fetchSchoolFeeds(urls, { fetchImpl = fetch } = {}) {
 }
 
 // Adresy kanálů z nastavení, jedna na řádek. Vrací null, když některá nesedí.
-export function readFeedUrls(value) {
+export function readFeedUrls(value, fallback = DEFAULT_FEEDS) {
   const lines = String(value ?? "")
     .split(/\s+/)
     .map((line) => line.trim())
     .filter(Boolean);
-  if (!lines.length) return DEFAULT_FEEDS;
+  if (!lines.length) return fallback;
   const urls = lines.map((line) => readFeedUrl(line, ""));
   if (urls.some((url) => !url)) return null;
   return [...new Set(urls)].slice(0, MAX_FEEDS);

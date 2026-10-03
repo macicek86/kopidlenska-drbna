@@ -21,7 +21,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 let schemaReady = false;
 
@@ -237,12 +237,17 @@ async function seedRubrics(env) {
   ).run();
 }
 
-// Podrubrika pro zprávy ze ZŠ a MŠ (import z webu školy). Bez Komunity bude hlavní rubrikou.
+// Podrubriky pro zprávy ze ZŠ a MŠ a ze zahradnické školy (import z webů škol). Bez Komunity budou hlavními rubrikami.
 async function seedSchoolRubric(env) {
   await env.DB.prepare(
     `insert into rubrics (parent_id, name, slug, sort_order)
      select (select id from rubrics where slug = 'komunita'), 'Škola', 'skola', 25
      where not exists (select 1 from rubrics where slug = 'skola')`,
+  ).run();
+  await env.DB.prepare(
+    `insert into rubrics (parent_id, name, slug, sort_order)
+     select (select id from rubrics where slug = 'komunita'), 'Zahradnická škola', 'zahradnicka-skola', 26
+     where not exists (select 1 from rubrics where slug = 'zahradnicka-skola')`,
   ).run();
 }
 

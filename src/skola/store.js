@@ -1,26 +1,24 @@
-// Import z webu ZŠ a MŠ Kopidlno v D1: nastavení a zapamatované články školy.
+// Import z webů škol v D1: nastavení a zapamatované články. Každá škola (`sources.js`) má vlastní dvě tabulky.
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
 import { asBool, clip, requireChief } from "../db-core.js";
 import { MAX_ATTEMPTS, mapImportItem } from "../munipolis/store.js";
-import { DEFAULT_FEEDS, readFeedUrls } from "./feed.js";
+import { readFeedUrls } from "./feed.js";
+import { SCHOOL_LIST } from "./sources.js";
 
-// Škola píše jednou za pár dní a pozvánky dává s předstihem, týden je tak akorát.
-export const DEFAULT_FRESH_DAYS = 7;
-
-export const SKOLA_TABLES = [
-  `create table if not exists skola_settings (
+export const schoolTables = (source) => [
+  `create table if not exists ${source.settingsTable} (
     id integer primary key,
     enabled integer not null default 0,
     feed_urls text not null default '',
     auto_publish integer not null default 0,
-    fresh_days integer not null default 7,
+    fresh_days integer not null default ${source.freshDays},
     own_photos integer not null default 0,
     checked_at text,
     status text not null default '',
     note text not null default '',
     running_at text
   )`,
-  `create table if not exists skola_items (
+  `create table if not exists ${source.itemsTable} (
     id integer primary key autoincrement,
     guid text not null unique,
     link text not null default '',
@@ -45,23 +43,25 @@ export const SKOLA_TABLES = [
 ];
 
 export async function ensureSkolaTables(env) {
-  for (const sql of SKOLA_TABLES) await env.DB.prepare(sql).run();
-  await env.DB.prepare("insert into skola_settings (id) select 1 where not exists (select 1 from skola_settings where id = 1)").run();
+  for (const source of SCHOOL_LIST) {
+    for (const sql of schoolTables(source)) await env.DB.prepare(sql).run();
+    await env.DB.prepare(`insert into ${source.settingsTable} (id) select 1 where not exists (select 1 from ${source.settingsTable} where id = 1)`).run();
+  }
 }
 
-function splitUrls(text) {
+function splitUrls(text, source) {
   const urls = String(text ?? "")
     .split(/\s+/)
     .filter(Boolean);
-  return urls.length ? urls : DEFAULT_FEEDS;
+  return urls.length ? urls : source.defaultFeeds;
 }
 
-function mapSettings(row) {
+function mapSettings(row, source) {
   return {
     enabled: asBool(row?.enabled),
-    feedUrls: splitUrls(row?.feed_urls),
+    feedUrls: splitUrls(row?.feed_urls, source),
     autoPublish: asBool(row?.auto_publish),
-    freshDays: readFreshDays(row?.fresh_days, DEFAULT_FRESH_DAYS),
+    freshDays: readFreshDays(row?.fresh_days, source.freshDays),
     ownPhotos: asBool(row?.own_photos),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
@@ -70,11 +70,11 @@ function mapSettings(row) {
   };
 }
 
-export async function loadSkolaSettings(env) {
+export async function loadSkolaSettings(env, source) {
   const row = await env.DB.prepare(
-    "select enabled, feed_urls, auto_publish, fresh_days, own_photos, checked_at, status, note, running_at from skola_settings where id = 1",
+    `select enabled, feed_urls, auto_publish, fresh_days, own_photos, checked_at, status, note, running_at from ${source.settingsTable} where id = 1`,
   ).first();
-  return mapSettings(row);
+  return mapSettings(row, source);
 }
 
 const ITEM_FIELDS =
@@ -84,14 +84,14 @@ function mapSkolaItem(row) {
   return { ...mapImportItem(row), section: String(row.section ?? ""), term: String(row.term ?? "") };
 }
 
-export async function loadSkolaItems(env, limit = 40) {
-  const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from skola_items order by published_at desc, id desc limit ?`).bind(limit).all();
+export async function loadSkolaItems(env, source, limit = 40) {
+  const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from ${source.itemsTable} order by published_at desc, id desc limit ?`).bind(limit).all();
   return (rows.results ?? []).map(mapSkolaItem);
 }
 
-export async function waitingSkolaItems(env, limit, { manualOnly = false } = {}) {
+export async function waitingSkolaItems(env, source, limit, { manualOnly = false } = {}) {
   const rows = await env.DB.prepare(
-    `select ${ITEM_FIELDS} from skola_items where ${queuedWhere(manualOnly)}
+    `select ${ITEM_FIELDS} from ${source.itemsTable} where ${queuedWhere(manualOnly)}
      order by manual desc, published_at asc, id asc limit ?`,
   )
     .bind(MAX_ATTEMPTS, limit)
@@ -99,17 +99,17 @@ export async function waitingSkolaItems(env, limit, { manualOnly = false } = {})
   return (rows.results ?? []).map(mapSkolaItem);
 }
 
-export const countWaitingSkola = (env, options) => countQueued(env, "skola_items", MAX_ATTEMPTS, options);
-export const selectSkolaItems = (env, ids) => markManual(env, "skola_items", ids);
+export const countWaitingSkola = (env, source, options) => countQueued(env, source.itemsTable, MAX_ATTEMPTS, options);
+export const selectSkolaItems = (env, source, ids) => markManual(env, source.itemsTable, ids);
 
 // Nové články si zapamatuje. Starší (`isOld`) jen odloží stranou.
 // Při ručním načtení počkají všechny, až redakce vybere, které zpracovat.
-export async function rememberSkolaItems(env, items, { manual = false, isOld = () => false } = {}) {
+export async function rememberSkolaItems(env, source, items, { manual = false, isOld = () => false } = {}) {
   let added = 0;
   for (const item of items) {
     const status = manual ? "nacteno" : isOld(item) ? "stare" : "nove";
     const result = await env.DB.prepare(
-      `insert or ignore into skola_items (guid, link, title, text, images, section, term, published_at, status, reason)
+      `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, section, term, published_at, status, reason)
        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
@@ -130,9 +130,9 @@ export async function rememberSkolaItems(env, items, { manual = false, isOld = (
   return added;
 }
 
-export async function finishSkolaItem(env, id, fields) {
+export async function finishSkolaItem(env, source, id, fields) {
   await env.DB.prepare(
-    `update skola_items set status = ?, reason = ?, duplicate_of = ?, article_id = ?, proposal_id = ?, event_id = ?, notice_id = ?,
+    `update ${source.itemsTable} set status = ?, reason = ?, duplicate_of = ?, article_id = ?, proposal_id = ?, event_id = ?, notice_id = ?,
        attempts = attempts + 1, processed_at = datetime('now') where id = ?`,
   )
     .bind(
@@ -148,32 +148,33 @@ export async function finishSkolaItem(env, id, fields) {
     .run();
 }
 
-export async function writeSkolaStatus(env, { status, note }) {
-  await env.DB.prepare("update skola_settings set checked_at = ?, status = ?, note = ? where id = 1")
+export async function writeSkolaStatus(env, source, { status, note }) {
+  await env.DB.prepare(`update ${source.settingsTable} set checked_at = ?, status = ?, note = ? where id = 1`)
     .bind(new Date().toISOString(), status, clip(note, 400))
     .run();
 }
 
-export const lockSkola = (env, seconds) => lockRow(env, "skola_settings", seconds);
-export const unlockSkola = (env, token) => unlockRow(env, "skola_settings", token);
+export const lockSkola = (env, source, seconds) => lockRow(env, source.settingsTable, seconds);
+export const unlockSkola = (env, source, token) => unlockRow(env, source.settingsTable, token);
 
 export function skolaRunning(settings, now = new Date()) {
   return lockHeld(settings.runningAt, now);
 }
 
-export async function saveSkolaSettings(env, request, input) {
+export async function saveSkolaSettings(env, request, source, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
-  const urls = readFeedUrls(input.feedUrls);
+  // Škola bez pole adres (WordPress) má adresu pevnou.
+  const urls = source.feedField ? readFeedUrls(input.feedUrls, source.defaultFeeds) : [];
   if (!urls) return { ok: false, error: "Každá adresa RSS musí začínat https://." };
   await env.DB.prepare(
-    "update skola_settings set enabled = ?, feed_urls = ?, auto_publish = ?, fresh_days = ?, own_photos = ? where id = 1",
+    `update ${source.settingsTable} set enabled = ?, feed_urls = ?, auto_publish = ?, fresh_days = ?, own_photos = ? where id = 1`,
   )
     .bind(
       input.enabled ? 1 : 0,
       urls.join("\n"),
       input.autoPublish ? 1 : 0,
-      readFreshDays(input.freshDays, DEFAULT_FRESH_DAYS),
+      readFreshDays(input.freshDays, source.freshDays),
       input.ownPhotos ? 1 : 0,
     )
     .run();

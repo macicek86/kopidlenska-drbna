@@ -157,7 +157,7 @@ export function contextText(known) {
     }),
   );
   add(
-    "Dřívější převzaté zprávy (Munipolis, Deník, škola)",
+    "Dřívější převzaté zprávy (Munipolis, Deník, školy)",
     (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
   );
   parts.push(hoursContext(known));
@@ -183,7 +183,7 @@ function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|misto|lekar):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|misto|lekar):\d+$/;
 
 // Článek z odpovědi Claude, nebo null, když ho nechtěl napsat nebo v něm něco chybí. Sdílí ho i Deník a NDIC.
 export function readArticle(raw, rubricSlugs) {

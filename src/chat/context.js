@@ -108,6 +108,7 @@ const SOURCES = {
   mesto: { table: "import_items", date: "published_at", label: "oznámení města (Munipolis)" },
   fotbal: { table: "football_items", date: "published_on", label: "web FK Kopidlno" },
   skola: { table: "skola_items", date: "published_at", label: "web ZŠ a MŠ Kopidlno" },
+  zahradka: { table: "zahradka_items", date: "published_at", label: "web zahradnické školy Kopidlno" },
 };
 const SOURCE_POOL = 200;
 
@@ -172,7 +173,7 @@ export async function searchArticles(env, query) {
 }
 
 export async function readSource(env, ref) {
-  const [, tag, id] = String(ref ?? "").trim().match(/^\[?(mesto|fotbal|skola)-(\d+)\]?$/) ?? [];
+  const [, tag, id] = String(ref ?? "").trim().match(/^\[?(mesto|fotbal|skola|zahradka)-(\d+)\]?$/) ?? [];
   if (!tag) return "Takový zdroj neznám. Označení vypadá třeba jako mesto-12.";
   const source = SOURCES[tag];
   const row = await env.DB.prepare(`select title, text, ${source.date} as day from ${source.table} where id = ?`).bind(Number(id)).first();
@@ -206,7 +207,7 @@ export async function readArticle(env, address) {
   return `${row.title} (/zpravy/${row.slug})\n${formatShort(String(row.created_at).slice(0, 10))} · ${row.rubric}\n${row.excerpt}\n\n${text}${source}`;
 }
 
-// Zprávy z Munipolisu, fotbalu a webu školy napsala Drběna ze zdroje; původní text bývá v údajích úplnější.
+// Zprávy z Munipolisu, fotbalu a webů škol napsala Drběna ze zdroje; původní text bývá v údajích úplnější.
 async function sourceText(env, articleId) {
   const parts = [];
   for (const source of Object.values(SOURCES)) {

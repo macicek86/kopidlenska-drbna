@@ -1,5 +1,6 @@
 import { ACCESS_LOGOUT } from "../access.js";
 import { byline, userCan } from "../db.js";
+import { SCHOOL_LIST } from "../skola/sources.js";
 import { esc, FAVICON_TAGS, flashOf } from "../view.js";
 import { field, icon, input } from "./ui.js";
 
@@ -12,7 +13,7 @@ function nav(data) {
   const importFailed = (data.importItems ?? []).filter((item) => item.status === "chyba").length;
   const footballFailed = (data.footballItems ?? []).filter((item) => item.status === "chyba").length;
   const denikFailed = (data.denikItems ?? []).filter((item) => item.status === "chyba").length;
-  const skolaFailed = (data.skolaItems ?? []).filter((item) => item.status === "chyba").length;
+  const schoolFailed = (tag) => (data.schools?.[tag]?.items ?? []).filter((item) => item.status === "chyba").length;
   const noticesWaiting = (data.notices ?? []).filter((item) => !item.published && item.sourceUrl).length;
   const groups = [
     {
@@ -32,7 +33,7 @@ function nav(data) {
         chief && ["munipolis", "Munipolis", "inbox", importFailed],
         chief && ["fotbal", "Fotbal", "ball", footballFailed],
         chief && ["denik", "Deník", "paper", denikFailed],
-        chief && ["skola", "Škola", "school", skolaFailed],
+        ...SCHOOL_LIST.map((source) => chief && [source.tag, source.page, source.icon, schoolFailed(source.tag)]),
         (chief || userCan(data.user, "obrazky")) && ["obrazky", "Knihovna obrázků", "image"],
         ["reklamy", "Reklamy", "megaphone", chief ? adWaiting : adReturned],
       ],
@@ -73,7 +74,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "skola", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

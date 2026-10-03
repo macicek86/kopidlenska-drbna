@@ -1,9 +1,8 @@
-// Formuláře sekce Škola: nastavení importu z webu ZŠ a MŠ, ruční načtení a zpracování vybraných článků.
+// Formuláře stránek škol (ZŠ a MŠ, zahradnická): nastavení importu, ruční načtení a zpracování vybraných článků.
 import { redirect, withError } from "./http.js";
 import { checkSkolaNow, selectSkola } from "./skola/run.js";
+import { SCHOOL_LIST } from "./skola/sources.js";
 import { saveSkolaSettings } from "./skola/store.js";
-
-const BASE = "/redakce/skola";
 
 export const SKOLA_OK = {
   "skola-nastaveni": "Nastavení školy je uložené.",
@@ -13,24 +12,27 @@ export const SKOLA_OK = {
 };
 
 export async function skolaPost(path, request, env, fields, ctx) {
-  if (path === `${BASE}/ulozit`) {
-    const result = await saveSkolaSettings(env, request, fields);
-    if (!result.ok) return redirect(withError(`${BASE}?nastaveni=1`, result.error));
-    return redirect(`${BASE}?ok=skola-nastaveni`);
+  const source = SCHOOL_LIST.find((school) => path.startsWith(`/redakce/${school.tag}/`));
+  if (!source) return null;
+  const base = `/redakce/${source.tag}`;
+  if (path === `${base}/ulozit`) {
+    const result = await saveSkolaSettings(env, request, source, fields);
+    if (!result.ok) return redirect(withError(`${base}?nastaveni=1`, result.error));
+    return redirect(`${base}?ok=skola-nastaveni`);
   }
-  if (path === `${BASE}/zkontrolovat`) {
-    const result = await checkSkolaNow(env, request);
-    if (!result.ok) return redirect(withError(BASE, result.error));
-    return redirect(`${BASE}?ok=${result.added ? "skola-nacteno" : "skola-nic"}`);
+  if (path === `${base}/zkontrolovat`) {
+    const result = await checkSkolaNow(env, request, source);
+    if (!result.ok) return redirect(withError(base, result.error));
+    return redirect(`${base}?ok=${result.added ? "skola-nacteno" : "skola-nic"}`);
   }
-  if (path === `${BASE}/vybrat`) {
-    const result = await selectSkola(env, request, fields.ids, { ctx });
-    if (!result.ok) return redirect(withError(BASE, result.error));
-    return redirect(`${BASE}?ok=skola-bezi`);
+  if (path === `${base}/vybrat`) {
+    const result = await selectSkola(env, request, source, fields.ids, { ctx });
+    if (!result.ok) return redirect(withError(base, result.error));
+    return redirect(`${base}?ok=skola-bezi`);
   }
-  if (path === `${BASE}/zpracovat`) {
-    const back = fields.id ? `${BASE}?zprava=${fields.id}` : BASE;
-    const result = await selectSkola(env, request, [fields.id], { ctx });
+  if (path === `${base}/zpracovat`) {
+    const back = fields.id ? `${base}?zprava=${fields.id}` : base;
+    const result = await selectSkola(env, request, source, [fields.id], { ctx });
     if (!result.ok) return redirect(withError(back, result.error));
     return redirect(`${back}${back.includes("?") ? "&" : "?"}ok=skola-bezi`);
   }

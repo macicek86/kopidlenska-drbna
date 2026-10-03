@@ -1,4 +1,4 @@
-// Společné kousky importů zpráv (Munipolis, Deník, škola): co už na drbně je, rubriky, datum ze zdroje a souhrn průchodu.
+// Společné kousky importů zpráv (Munipolis, Deník, školy): co už na drbně je, rubriky, datum ze zdroje a souhrn průchodu.
 import { loadDoctors } from "./db.js";
 import { loadNotices } from "./notices-db.js";
 import { knownClosures } from "./ndic/store.js";
@@ -41,6 +41,7 @@ export const IMPORT_SOURCES = [
   { table: "import_items", tag: "munipolis" },
   { table: "denik_items", tag: "denik" },
   { table: "skola_items", tag: "skola" },
+  { table: "zahradka_items", tag: "zahradka" },
 ];
 
 async function pastImports(env, { table, tag }, itemTable, itemId, since) {

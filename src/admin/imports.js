@@ -18,6 +18,7 @@ export function refLink(ref) {
     munipolis: ["/redakce/munipolis?zprava=", "Zpráva z Munipolisu"],
     denik: ["/redakce/denik?zprava=", "Zpráva z Deníku"],
     skola: ["/redakce/skola?zprava=", "Článek školy"],
+    zahradka: ["/redakce/zahradka?zprava=", "Článek zahradnické školy"],
     misto: ["/redakce/oteviraci-doba?id=", "Místo"],
     lekar: ["/redakce/lekari?id=", "Ordinace"],
   };
