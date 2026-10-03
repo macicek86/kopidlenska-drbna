@@ -1,5 +1,5 @@
 // Stránky zpráv: seznam s rubrikami a jedna zpráva.
-import { pickAd } from "./ads.js";
+import { adQueue, pickAd } from "./ads.js";
 import { facebookUrl, text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
 import { esc } from "./html.js";
@@ -8,7 +8,7 @@ import { renderArticleHtml } from "./rich.js";
 import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
 import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
 import { articleCrumbsLd, articleImage, articleLd } from "./seo.js";
-import { adPanel, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
+import { adPanel, layout, signedWhen, siteOrigin } from "./view.js";
 import { readCount } from "./visits.js";
 
 const SCRIPT = `<script src="/site.js" defer></script>`;
@@ -25,6 +25,27 @@ function storyCard(article) {
           </a>`;
 }
 
+// První reklama po dvou zprávách, další vždy po AD_EVERY zprávách, každá jen jednou.
+const AD_FIRST = 2;
+const AD_EVERY = 6;
+
+function weaveAds(cards, data, ctx) {
+  if (!cards.length) return cards;
+  const first = Object.hasOwn(data, "ad") ? data.ad : pickAd(data.ads);
+  if (!first) return cards;
+  const queue = adQueue(data.ads, first);
+  const out = [];
+  cards.forEach((card, index) => {
+    out.push(card);
+    const seen = index + 1;
+    const due = seen === AD_FIRST || (seen > AD_FIRST && (seen - AD_FIRST) % AD_EVERY === 0);
+    if (due && queue.length && seen < cards.length) out.push(adPanel(queue.shift(), ctx.copy));
+  });
+  // Krátký seznam: aspoň jedna reklama na konci, jako dřív.
+  if (cards.length <= AD_FIRST) out.push(adPanel(queue.shift(), ctx.copy));
+  return out;
+}
+
 export function newsPage(data, ctx, rubrika) {
   const rubrics = rubricsFrom(data);
   const selected = findRubric(rubrics, rubrika);
@@ -35,9 +56,7 @@ export function newsPage(data, ctx, rubrika) {
   const title = selected
     ? rubricLabel({ category: selected.name, parentName: selected.parentId ? scope?.name : "" })
     : heading;
-  const cards = visible.map(storyCard);
-  const woven = contentAd(data, ctx);
-  if (woven && cards.length) cards.splice(Math.min(2, cards.length), 0, woven);
+  const cards = weaveAds(visible.map(storyCard), data, ctx);
   const list = cards.length ? cards.join("") : `<p class="card dashed muted">${esc(tx(ctx.copy, "news_empty"))}</p>`;
   return layout({
     ...ctx,

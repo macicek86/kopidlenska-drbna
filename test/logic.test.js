@@ -474,6 +474,15 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   assert.ok(panelAt > news.indexOf("Zpráva 1"));
   assert.ok(panelAt < thirdAt);
 
+  const many = Array.from({ length: 20 }, (_, i) => ({ ...articles[0], id: i + 1, slug: `z-${i + 1}`, title: `Zpráva ${i + 1}` }));
+  const others = [ad, { ...ad, id: 2, slug: "druha", title: "Druhá nabídka" }, { ...ad, id: 3, slug: "treti", title: "Třetí nabídka" }];
+  const long = newsPage({ ...bare, articles: many, ads: others, ad }, { ...ctx, path: "/zpravy" }, "");
+  assert.equal(long.match(/class="ad-panel/g).length, 3);
+  assert.match(long, /Druhá nabídka/);
+  assert.match(long, /Třetí nabídka/);
+  const lonely = newsPage({ ...bare, articles: many, ads: [ad], ad }, { ...ctx, path: "/zpravy" }, "");
+  assert.equal(lonely.match(/class="ad-panel/g).length, 1);
+
   const article = articlePage(articles[0], ctx, { ad });
   assert.match(article, /ad-slot/);
   assert.match(article, /href="https:\/\/example.com\/chleb"/);

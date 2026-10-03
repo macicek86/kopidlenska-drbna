@@ -106,3 +106,14 @@ export function pickAd(ads, options = {}) {
   const unit = Number.isFinite(roll) ? Math.min(Math.max(roll, 0), 0.999999999999) : randomUnit();
   return pool[Math.floor(unit * pool.length)];
 }
+
+// Reklamy do dlouhého seznamu: první ta vybraná, za ní ostatní náhodně, každá jen jednou.
+export function adQueue(ads, first, options = {}) {
+  const random = typeof options.random === "function" ? options.random : randomUnit;
+  const rest = [...(ads ?? [])].filter((item) => item && item.id != null && Number(item.id) !== Number(first?.id));
+  for (let i = rest.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.min(Math.max(Number(random()) || 0, 0), 0.999999999999) * (i + 1));
+    [rest[i], rest[j]] = [rest[j], rest[i]];
+  }
+  return first ? [first, ...rest] : rest;
+}
