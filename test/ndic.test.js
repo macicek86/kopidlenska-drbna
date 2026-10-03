@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import { gzipSync } from "node:zlib";
 import test from "node:test";
-import { closureNotice, closureTitle, distanceKm, recordEnded } from "../src/ndic/closures.js";
+import { contextText } from "../src/munipolis/ai.js";
+import { readNdicDecision } from "../src/ndic/ai.js";
+import { closureDays, closureNotice, closureTitle, distanceKm, recordEnded } from "../src/ndic/closures.js";
+import { wantsArticle } from "../src/ndic/run.js";
+import { ensureNdicTables, finishClosure, loadClosures, loadNdicSettings, saveSituations, waitingClosures } from "../src/ndic/store.js";
 import { isDatexMessage, parseSituations } from "../src/ndic/datex.js";
 import { authorized, bodyText } from "../src/ndic/push.js";
 import { noticeBoard, noticeSpan } from "../src/notices.js";
@@ -144,4 +149,113 @@ test("příjem: tělo s gzipem i bez", async () => {
   const xml = message();
   assert.equal(await bodyText(new Uint8Array(gzipSync(xml))), xml);
   assert.equal(await bodyText(new TextEncoder().encode(xml)), xml);
+});
+
+// Malá náhrada D1 nad SQLite v paměti (jako v messages.test.js).
+function d1() {
+  const db = new DatabaseSync(":memory:");
+  const statement = (sql, values = []) => ({
+    bind: (...next) => statement(sql, next),
+    run: async () => {
+      const result = db.prepare(sql).run(...values);
+      return { results: [], meta: { changes: result.changes ?? 0 } };
+    },
+    first: async () => db.prepare(sql).get(...values) ?? null,
+    all: async () => ({ results: db.prepare(sql).all(...values) }),
+  });
+  return {
+    prepare: (sql) => statement(sql),
+    batch: async (list) => {
+      for (const item of list) await item.run();
+    },
+  };
+}
+
+async function ndicEnv() {
+  const env = { DB: d1() };
+  await ensureNdicTables(env);
+  await env.DB.prepare("update ndic_settings set drbena = 1").run();
+  return env;
+}
+
+const NOW = new Date("2026-10-03T10:00:00Z");
+
+test("uložení: blízká se uloží a čeká na Drběnu, daleká ne, skončená zmizí", async () => {
+  const env = await ndicEnv();
+  const near = parseSituations(message())[0];
+  const far = { ...parseSituations(message({ x: -742906, y: -1043052 }))[0], id: "sit-2" };
+  far.records = far.records.map((record) => ({ ...record, id: "rec-2", situationId: "sit-2" }));
+  const saved = await saveSituations(env, [near, far], NOW);
+  assert.deepEqual(saved, { situations: 2, kept: 1 });
+  const settings = await loadNdicSettings(env);
+  const waiting = await waitingClosures(env, settings, NOW);
+  assert.deepEqual(waiting.map((row) => row.id), ["rec-1"]);
+  assert.ok(waiting[0].ref > 0);
+  await saveSituations(env, parseSituations(message({ end: "2026-10-02T10:00:00+02:00" })), NOW);
+  assert.equal((await loadClosures(env, NOW)).length, 0);
+});
+
+test("přepis od Drběny zůstane i po resetu odběru a nové verzi uzavírky", async () => {
+  const env = await ndicEnv();
+  await saveSituations(env, parseSituations(message()), NOW);
+  await finishClosure(env, "rec-1", { status: "hotovo", proposalId: 7, humanTitle: "Zavřený most u Kopidlna", humanPlaces: ["Kopidlno – Ledkov"], humanNote: "Objížďka přes Pševes." });
+  await env.DB.prepare("update road_closures set cleared = 1").run();
+  assert.equal((await loadClosures(env, NOW)).length, 0);
+  await saveSituations(env, parseSituations(message()), NOW);
+  const [row] = await loadClosures(env, NOW);
+  assert.equal(row.status, "hotovo");
+  assert.equal(row.proposalId, 7);
+  assert.equal(row.humanTitle, "Zavřený most u Kopidlna");
+  assert.deepEqual(row.humanPlaces, ["Kopidlno – Ledkov"]);
+  const settings = await loadNdicSettings(env);
+  assert.equal((await waitingClosures(env, settings, NOW)).length, 0);
+  // Na web jde přepis, bez věty o NDIC jako zdroji.
+  const notice = closureNotice(row, settings);
+  assert.equal(notice.title, "Zavřený most u Kopidlna");
+  assert.equal(notice.note, "Objížďka přes Pševes.");
+  assert.equal(notice.source, "ndic-prepis");
+  assert.equal(wantsArticle(row, { articleDays: 2 }), false);
+});
+
+test("duplicita se z webu schová, ručně ukázaná se vrátí", () => {
+  assert.equal(closureNotice({ ...row, status: "duplicita" }, { radiusKm: 10 }).published, false);
+  assert.equal(closureNotice({ ...row, status: "duplicita", manual: "ukazat" }, { radiusKm: 10 }).published, true);
+});
+
+test("článek jen k delší uzavírce a jen jednou", () => {
+  const settings = { articleDays: 2 };
+  assert.equal(closureDays(row) > 15, true);
+  assert.equal(wantsArticle(row, settings), true);
+  // Začíná 5. října v 7:00: do druhého dne večer jsou to dva dny, týž den jen jeden.
+  assert.equal(closureDays({ ...row, endsAt: "2026-10-06T16:00:00.000Z" }), 2);
+  assert.equal(wantsArticle({ ...row, endsAt: "2026-10-06T16:00:00.000Z" }, settings), true);
+  assert.equal(wantsArticle({ ...row, endsAt: "2026-10-05T16:00:00.000Z" }, settings), false);
+  assert.equal(wantsArticle({ ...row, endsAt: "" }, settings), true);
+  assert.equal(wantsArticle({ ...row, articleId: 3 }, settings), false);
+});
+
+test("odpověď Drběny: duplicita potřebuje značku, oznámení nadpis, článek jen když má být", () => {
+  const slugs = ["prakticke", "zpravy"];
+  const article = { include: true, title: "Most u Ledkova je zavřený", excerpt: "Do 20. října se jezdí přes Pševes.", body_html: "<p>Most je zavřený.</p>", rubric: "prakticke", image_caption: "", image_topic: "" };
+  const notice = { title: "Zavřený most u Ledkova", places: ["Kopidlno – Ledkov", "Kopidlno – Ledkov"], note: "Objížďka přes Pševes." };
+  assert.equal(readNdicDecision({ decision: "duplicita", reason: "", duplicate_of: "nic" }, { rubricSlugs: slugs }).ok, false);
+  assert.deepEqual(readNdicDecision({ decision: "duplicita", reason: "Už od města.", duplicate_of: "odstavka:4" }, { rubricSlugs: slugs }), {
+    ok: true,
+    decision: "duplicita",
+    reason: "Už od města.",
+    duplicateOf: "odstavka:4",
+  });
+  const long = readNdicDecision({ decision: "vytvorit", reason: "", duplicate_of: "", notice, article }, { rubricSlugs: slugs, wantArticle: true });
+  assert.deepEqual(long.notice.places, ["Kopidlno – Ledkov"]);
+  assert.equal(long.article.rubric, "prakticke");
+  const short = readNdicDecision({ decision: "vytvorit", reason: "", duplicate_of: "", notice, article }, { rubricSlugs: slugs, wantArticle: false });
+  assert.equal(short.article, null);
+  assert.equal(readNdicDecision({ decision: "vytvorit", notice: { title: "", places: [], note: "" } }, { rubricSlugs: slugs }).ok, false);
+});
+
+test("Munipolis a Deník vidí uzavírky z NDIC v přehledu", () => {
+  const text = contextText({
+    closures: [{ ref: 5, articleId: 12, proposalId: null, notice: closureNotice(row, { radiusKm: 10 }) }],
+  });
+  assert.match(text, /\[ndic:5\] 2026-10-05 až 2026-10-20 · Uzavírka: silnice II\/280 · .* · článek zprava:12/);
 });

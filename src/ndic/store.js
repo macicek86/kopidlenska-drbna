@@ -1,6 +1,7 @@
-// Uzavírky z NDIC v D1: přijaté záznamy, ruční skrytí či ukázání v redakci a stav příjmu.
-import { asBool, requireChief } from "../db-core.js";
-import { closureKind, closureNotice, closureTitle, DEFAULT_RADIUS_KM, distanceKm, KEEP_RADIUS_KM, MAX_RADIUS_KM, recordEnded } from "./closures.js";
+// Uzavírky z NDIC v D1: přijaté záznamy, ruční skrytí či ukázání v redakci, zpracování Drběnou a stav příjmu.
+import { addColumn, asBool, requireChief } from "../db-core.js";
+import { lockRow, unlockRow } from "../background.js";
+import { closureKind, closureNotice, closureTitle, closureWatched, DEFAULT_RADIUS_KM, distanceKm, KEEP_RADIUS_KM, MAX_RADIUS_KM, recordEnded } from "./closures.js";
 
 export const NDIC_TABLES = [
   `create table if not exists road_closures (
@@ -16,7 +17,18 @@ export const NDIC_TABLES = [
     detour text not null default '[]',
     distance_km real,
     manual text not null default '',
-    received_at text not null default (datetime('now'))
+    received_at text not null default (datetime('now')),
+    status text not null default 'nove',
+    reason text not null default '',
+    duplicate_of text not null default '',
+    article_id integer,
+    proposal_id integer,
+    attempts integer not null default 0,
+    human_title text not null default '',
+    human_places text not null default '',
+    human_note text not null default '',
+    processed_at text,
+    cleared integer not null default 0
   )`,
   "create index if not exists road_closures_situation on road_closures (situation_id)",
   `create table if not exists ndic_settings (
@@ -26,13 +38,55 @@ export const NDIC_TABLES = [
     last_at text,
     last_situations integer not null default 0,
     last_kept integer not null default 0,
-    last_error text not null default ''
+    last_error text not null default '',
+    drbena integer not null default 0,
+    article_days integer not null default 2,
+    auto_publish integer not null default 0,
+    drbena_note text not null default '',
+    running_at text
   )`,
 ];
 
+// Sloupce, které přibyly po prvním založení tabulek (verze 7).
+const LATER_COLUMNS = {
+  road_closures: [
+    ["status", "text not null default 'nove'"],
+    ["reason", "text not null default ''"],
+    ["duplicate_of", "text not null default ''"],
+    ["article_id", "integer"],
+    ["proposal_id", "integer"],
+    ["attempts", "integer not null default 0"],
+    ["human_title", "text not null default ''"],
+    ["human_places", "text not null default ''"],
+    ["human_note", "text not null default ''"],
+    ["processed_at", "text"],
+    ["cleared", "integer not null default 0"],
+  ],
+  ndic_settings: [
+    ["drbena", "integer not null default 0"],
+    ["article_days", "integer not null default 2"],
+    ["auto_publish", "integer not null default 0"],
+    ["drbena_note", "text not null default ''"],
+    ["running_at", "text"],
+  ],
+};
+
 export async function ensureNdicTables(env) {
   for (const sql of NDIC_TABLES) await env.DB.prepare(sql).run();
+  for (const [table, columns] of Object.entries(LATER_COLUMNS)) {
+    const info = await env.DB.prepare(`pragma table_info(${table})`).all();
+    const present = new Set((info.results ?? []).map((row) => row.name));
+    for (const [name, type] of columns) await addColumn(env, present, name, `alter table ${table} add column ${name} ${type}`);
+  }
   await env.DB.prepare("insert into ndic_settings (id) select 1 where not exists (select 1 from ndic_settings where id = 1)").run();
+}
+
+export const MAX_ARTICLE_DAYS = 60;
+
+function readArticleDays(value) {
+  const days = Math.round(Number(value));
+  if (!Number.isFinite(days) || days < 0) return 2;
+  return Math.min(days, MAX_ARTICLE_DAYS);
 }
 
 function readRadius(value) {
@@ -43,7 +97,8 @@ function readRadius(value) {
 
 export async function loadNdicSettings(env) {
   const row = await env.DB.prepare(
-    "select enabled, radius_km, last_at, last_situations, last_kept, last_error from ndic_settings where id = 1",
+    `select enabled, radius_km, last_at, last_situations, last_kept, last_error, drbena, article_days, auto_publish, drbena_note, running_at
+     from ndic_settings where id = 1`,
   ).first();
   return {
     enabled: row ? asBool(row.enabled) : true,
@@ -52,6 +107,11 @@ export async function loadNdicSettings(env) {
     lastSituations: Number(row?.last_situations ?? 0),
     lastKept: Number(row?.last_kept ?? 0),
     lastError: String(row?.last_error ?? ""),
+    drbena: asBool(row?.drbena),
+    articleDays: readArticleDays(row?.article_days ?? 2),
+    autoPublish: asBool(row?.auto_publish),
+    drbenaNote: String(row?.drbena_note ?? ""),
+    runningAt: String(row?.running_at ?? ""),
   };
 }
 
@@ -64,9 +124,10 @@ function list(value) {
   }
 }
 
-function mapClosure(row) {
+export function mapClosure(row) {
   return {
     id: String(row.id),
+    ref: Number(row.rowid ?? 0),
     situationId: String(row.situation_id),
     kind: String(row.kind ?? ""),
     title: String(row.title),
@@ -78,19 +139,32 @@ function mapClosure(row) {
     distanceKm: row.distance_km == null ? null : Number(row.distance_km),
     manual: String(row.manual ?? ""),
     receivedAt: String(row.received_at ?? ""),
+    status: String(row.status ?? "nove"),
+    reason: String(row.reason ?? ""),
+    duplicateOf: String(row.duplicate_of ?? ""),
+    articleId: row.article_id == null ? null : Number(row.article_id),
+    proposalId: row.proposal_id == null ? null : Number(row.proposal_id),
+    attempts: Number(row.attempts ?? 0),
+    humanTitle: String(row.human_title ?? ""),
+    humanPlaces: String(row.human_places ?? "").split("\n").map((line) => line.trim()).filter(Boolean),
+    humanNote: String(row.human_note ?? ""),
   };
 }
 
-const FIELDS = "id, situation_id, kind, title, starts_at, ends_at, roads, comments, detour, distance_km, manual, received_at";
+export const CLOSURE_FIELDS = `rowid, id, situation_id, kind, title, starts_at, ends_at, roads, comments, detour, distance_km, manual, received_at,
+  status, reason, duplicate_of, article_id, proposal_id, attempts, human_title, human_places, human_note`;
+const FIELDS = CLOSURE_FIELDS;
 
 // Skončené záznamy pryč: NDIC konec platnosti nemusí poslat znovu, prostě přestane platit.
+// Smazané před resetem odběru, které NDIC do týdne neposlal znovu, taky.
 async function dropEnded(env, now) {
   await env.DB.prepare("delete from road_closures where ends_at != '' and ends_at < ?").bind(now.toISOString()).run();
+  await env.DB.prepare("delete from road_closures where cleared = 1 and received_at < datetime('now', '-7 days')").run();
 }
 
 export async function loadClosures(env, now = new Date()) {
   const rows = await env.DB.prepare(
-    `select ${FIELDS} from road_closures where ends_at = '' or ends_at >= ?
+    `select ${FIELDS} from road_closures where cleared = 0 and (ends_at = '' or ends_at >= ?)
      order by distance_km is null, distance_km asc, starts_at asc`,
   )
     .bind(now.toISOString())
@@ -116,7 +190,7 @@ function upsert(env, record, distance) {
      on conflict(id) do update set situation_id = excluded.situation_id, version_time = excluded.version_time,
        kind = excluded.kind, title = excluded.title, starts_at = excluded.starts_at, ends_at = excluded.ends_at,
        roads = excluded.roads, comments = excluded.comments, detour = excluded.detour,
-       distance_km = excluded.distance_km, received_at = excluded.received_at
+       distance_km = excluded.distance_km, received_at = excluded.received_at, cleared = 0
      where excluded.version_time >= road_closures.version_time`,
   ).bind(
     record.id,
@@ -172,8 +246,8 @@ export async function noteReceived(env, { situations = 0, kept = 0, error = "" }
 export async function saveNdicSettings(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
-  await env.DB.prepare("update ndic_settings set enabled = ?, radius_km = ? where id = 1")
-    .bind(input.enabled ? 1 : 0, readRadius(input.radiusKm))
+  await env.DB.prepare("update ndic_settings set enabled = ?, radius_km = ?, drbena = ?, article_days = ?, auto_publish = ? where id = 1")
+    .bind(input.enabled ? 1 : 0, readRadius(input.radiusKm), input.drbena ? 1 : 0, readArticleDays(input.articleDays), input.autoPublish ? 1 : 0)
     .run();
   return { ok: true };
 }
@@ -189,10 +263,83 @@ export async function setClosureManual(env, request, id, manual) {
   return { ok: true };
 }
 
-// Před resetem odběru v portálu NDIC: NDIC pak pošle všechny platné uzavírky znovu.
+// Před resetem odběru v portálu NDIC: NDIC pak pošle všechny platné uzavírky znovu. Záznamy se jen schovají,
+// ať u uzavírky, která přijde znovu, zůstane, co k ní Drběna napsala (jinak by svůj článek měla za duplicitu).
 export async function clearClosures(env, request) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
-  await env.DB.prepare("delete from road_closures").run();
+  await env.DB.prepare("update road_closures set cleared = 1").run();
   return { ok: true };
+}
+
+// Zpracování Drběnou: fronta, zámek a výsledek.
+export const MAX_ATTEMPTS = 3;
+
+export async function lockNdic(env, seconds) {
+  return lockRow(env, "ndic_settings", seconds);
+}
+
+export async function unlockNdic(env, token) {
+  return unlockRow(env, "ndic_settings", token);
+}
+
+// Čekající uzavírky v hlídaném okruhu, nejstarší první. Okruh se kontroluje tady, ne v SQL (ruční ukázání, skrytí).
+export async function waitingClosures(env, settings, now = new Date()) {
+  const rows = await env.DB.prepare(
+    `select ${CLOSURE_FIELDS} from road_closures
+     where cleared = 0 and (status = 'nove' or (status = 'chyba' and attempts < ?)) and (ends_at = '' or ends_at >= ?)
+     order by received_at asc, rowid asc limit 200`,
+  )
+    .bind(MAX_ATTEMPTS, now.toISOString())
+    .all();
+  return (rows.results ?? []).map(mapClosure).filter((row) => closureWatched(row, settings.radiusKm));
+}
+
+export async function finishClosure(env, id, fields) {
+  await env.DB.prepare(
+    `update road_closures set status = ?, reason = ?, duplicate_of = ?, article_id = ?, proposal_id = ?,
+       human_title = ?, human_places = ?, human_note = ?, processed_at = datetime('now'),
+       attempts = attempts + case when ? = 'chyba' then 1 else 0 end
+     where id = ?`,
+  )
+    .bind(
+      fields.status,
+      String(fields.reason ?? "").slice(0, 400),
+      fields.duplicateOf ?? "",
+      fields.articleId ?? null,
+      fields.proposalId ?? null,
+      fields.humanTitle ?? "",
+      (fields.humanPlaces ?? []).join("\n"),
+      fields.humanNote ?? "",
+      fields.status,
+      id,
+    )
+    .run();
+}
+
+export async function writeNdicNote(env, note) {
+  await env.DB.prepare("update ndic_settings set drbena_note = ? where id = 1").bind(String(note).slice(0, 300)).run();
+}
+
+// Redakce chce, aby to Drběna zkusila znovu (třeba po duplicitě, která duplicitou nebyla).
+// Článek, který už napsala, zůstane: znovu se jen přepíše oznámení a rozhodne o duplicitě.
+export async function retryClosure(env, request, id) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  const result = await env.DB.prepare(
+    "update road_closures set status = 'nove', attempts = 0, reason = '', duplicate_of = '' where id = ?",
+  )
+    .bind(String(id ?? ""))
+    .run();
+  if (!Number(result?.meta?.changes ?? 0)) return { ok: false, error: "Tahle uzavírka už tu není." };
+  return { ok: true };
+}
+
+// Uzavírky z NDIC, které jsou na webu, jako přehled pro importy (Munipolis, Deník, NDIC), ať se nezdvojí.
+export async function knownClosures(env, now = new Date()) {
+  const [settings, closures] = await Promise.all([loadNdicSettings(env), loadClosures(env, now)]);
+  return closures
+    .map((row) => ({ row, notice: closureNotice(row, settings) }))
+    .filter(({ notice }) => notice.published)
+    .map(({ row, notice }) => ({ ref: row.ref, articleId: row.articleId, proposalId: row.proposalId, notice }));
 }

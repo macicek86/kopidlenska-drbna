@@ -1,6 +1,7 @@
 // Společné kousky importů zpráv (Munipolis, Deník): co už na drbně je, rubriky, datum ze zdroje a souhrn průchodu.
 import { loadDoctors } from "./db.js";
 import { loadNotices } from "./notices-db.js";
+import { knownClosures } from "./ndic/store.js";
 import { loadPlaces } from "./places-db.js";
 import { addDays, pragueNow } from "./waste.js";
 
@@ -69,8 +70,9 @@ async function pastImports(env, { table, tag }, itemTable, itemId, since) {
   }));
 }
 
-// Co už na drbně je, aby Claude poznal stejnou věc od někoho jiného. `table` je tabulka zpracovávané položky.
-export async function knownContent(env, { itemId, today, table = "import_items" }) {
+// Co už na drbně je, aby Claude poznal stejnou věc od někoho jiného. `table` je tabulka zpracovávané položky,
+// `closureRef` uzavírka z NDIC, kterou zrovna zpracovává Drběna (sama sebe v přehledu mít nesmí).
+export async function knownContent(env, { itemId, today, table = "import_items", closureRef = 0 }) {
   const since = addDays(today, -LOOKBACK_DAYS);
   const articles = await rows(
     env,
@@ -94,6 +96,7 @@ export async function knownContent(env, { itemId, today, table = "import_items" 
     proposals: proposals.map((row) => ({ id: row.id, title: row.title, excerpt: row.excerpt, createdOn: String(row.created_at).slice(0, 10) })),
     events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time })),
     notices,
+    closures: (await knownClosures(env)).filter((row) => row.ref !== closureRef),
     imports,
     places: await loadPlaces(env, { today }),
     doctors: await loadDoctors(env, { today }),

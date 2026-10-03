@@ -96,6 +96,8 @@ export async function formFields(request) {
     closureId: text("closureId"),
     manual: text("manual"),
     radiusKm: text("radiusKm"),
+    drbena: form.get("drbena") === "1",
+    articleDays: text("articleDays"),
     adId: Number.isInteger(Number(text("nabidka"))) && Number(text("nabidka")) > 0 ? Number(text("nabidka")) : undefined,
     changeNote: text("changeNote"),
     placeId: Number.isInteger(Number(text("placeId"))) && Number(text("placeId")) > 0 ? Number(text("placeId")) : undefined,

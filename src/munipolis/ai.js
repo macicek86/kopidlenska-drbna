@@ -150,6 +150,13 @@ export function contextText(known) {
     ),
   );
   add(
+    "Uzavírky silnic z Dopravního info (NDIC), už na webu",
+    (known.closures ?? []).map(({ ref, articleId, proposalId, notice }) => {
+      const written = [articleId && `zprava:${articleId}`, proposalId && `navrh:${proposalId}`].filter(Boolean).join(", ");
+      return `[ndic:${ref}] ${notice.startsOn}${notice.endsOn ? ` až ${notice.endsOn}` : notice.openEnded ? " do odvolání" : ""} · ${line(notice.title, 100)} · ${line(notice.places.join(", "))}${written ? ` · článek ${written}` : ""}`;
+    }),
+  );
+  add(
     "Dřívější převzaté zprávy (Munipolis, Deník)",
     (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
   );
@@ -176,7 +183,27 @@ function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|munipolis|denik|misto|lekar):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|misto|lekar):\d+$/;
+
+// Článek z odpovědi Claude, nebo null, když ho nechtěl napsat nebo v něm něco chybí. Sdílí ho i Deník a NDIC.
+export function readArticle(raw, rubricSlugs) {
+  if (!raw?.include) return null;
+  const prepared = prepareArticleBody(String(raw.body_html ?? "").slice(0, 20000));
+  const title = clean(raw.title, 160);
+  const excerpt = clean(raw.excerpt, 320);
+  const rubric = rubricSlugs.includes(raw.rubric) ? raw.rubric : "";
+  if (title.length < 3 || excerpt.length < 3 || prepared.text.length < 3 || !rubric) return null;
+  const imageUse = raw.image_use === "vlastni" ? "vlastni" : "knihovna";
+  return {
+    title,
+    excerpt,
+    body: prepared.html,
+    rubric,
+    imageUse,
+    imageTopic: clean(raw.image_topic, 60),
+    imageCaption: imageUse === "vlastni" ? clean(raw.image_caption, 200) : "",
+  };
+}
 
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
 export function readDecision(raw, { rubricSlugs, force = false }) {
@@ -188,25 +215,7 @@ export function readDecision(raw, { rubricSlugs, force = false }) {
   const duplicateOf = REF.test(String(raw.duplicate_of ?? "").trim()) ? String(raw.duplicate_of).trim() : "";
   if (decision !== "vytvorit") return { ok: true, decision, reason, duplicateOf, article: null, event: null, notice: null, hours: [] };
 
-  let article = null;
-  if (raw.article?.include) {
-    const prepared = prepareArticleBody(String(raw.article.body_html ?? "").slice(0, 20000));
-    const title = clean(raw.article.title, 160);
-    const excerpt = clean(raw.article.excerpt, 320);
-    const rubric = rubricSlugs.includes(raw.article.rubric) ? raw.article.rubric : "";
-    if (title.length >= 3 && excerpt.length >= 3 && prepared.text.length >= 3 && rubric) {
-      const imageUse = raw.article.image_use === "vlastni" ? "vlastni" : "knihovna";
-      article = {
-        title,
-        excerpt,
-        body: prepared.html,
-        rubric,
-        imageUse,
-        imageTopic: clean(raw.article.image_topic, 60),
-        imageCaption: imageUse === "vlastni" ? clean(raw.article.image_caption, 200) : "",
-      };
-    }
-  }
+  let article = readArticle(raw.article, rubricSlugs);
 
   let event = null;
   if (raw.event?.include) {

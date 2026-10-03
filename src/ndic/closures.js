@@ -92,27 +92,50 @@ export function recordEnded(record, now = new Date()) {
 }
 
 // Uložená uzavírka jako oznámení (stejný tvar jako notices), ať ji web vykreslí stejně jako uzavírky od redakce.
+// Když ji Drběna přepsala, jde na web její nadpis, místa a poznámka; data a časy jsou vždy z NDIC.
 export function closureNotice(row, { radiusKm = DEFAULT_RADIUS_KM, enabled = true } = {}) {
   const start = pragueStamp(row.startsAt);
   const end = pragueStamp(row.endsAt);
   const near = row.distanceKm != null && row.distanceKm <= radiusKm;
   const roads = (row.roads ?? []).map(roadLabel).filter(Boolean);
-  const places = [roads.join(", "), distanceLine(row.distanceKm)].filter(Boolean).join(", ");
-  const note = [...(row.comments ?? []), ...(row.detour ?? []).map((text) => `Objížďka: ${text}`)].join(" ").slice(0, 600);
+  const derived = [roads.join(", "), distanceLine(row.distanceKm)].filter(Boolean).join(", ");
+  const original = [...(row.comments ?? []), ...(row.detour ?? []).map((text) => `Objížďka: ${text}`)].join(" ").slice(0, 600);
+  const rewritten = Boolean(row.humanTitle);
+  const places = rewritten && row.humanPlaces?.length ? row.humanPlaces : derived ? [derived] : [];
+  // Duplicitu s tím, co už na drbně je (od města, od redakce), Drběna z webu schová. Redakce ji může ukázat ručně.
+  const duplicate = row.status === "duplicita";
   return {
     id: `ndic-${row.id}`,
     kind: "uzavirka",
-    title: row.title,
+    title: rewritten ? row.humanTitle : row.title,
     startsOn: start.date || pragueNow().date,
     startsTime: start.time === "00:00" ? "" : start.time,
     endsOn: end.date && end.date !== start.date ? end.date : "",
     endsTime: end.time === "23:59" ? "" : end.time,
     openEnded: !end.date,
-    places: places ? [places] : [],
-    note,
+    places,
+    note: rewritten ? row.humanNote : original,
     sourceUrl: "",
     // Redakce může uzavírku skrýt, nebo ukázat i mimo okruh (třeba když zpráva nemá polohu).
-    published: Boolean(enabled && row.manual !== "skryt" && (near || row.manual === "ukazat")),
-    source: "ndic",
+    published: Boolean(enabled && row.manual !== "skryt" && (row.manual === "ukazat" || (near && !duplicate))),
+    // Přepsaný text už není „beze změny“: podle podmínek ŘSD u něj NDIC jako zdroj uvádět nesmíme.
+    source: rewritten ? "ndic-prepis" : "ndic",
   };
+}
+
+// Kolik kalendářních dní uzavírka zasahuje, počítáno včetně prvního a posledního (po–út jsou dva dny).
+// Bez konce je do odvolání, tedy dlouhá.
+export function closureDays(row) {
+  if (!row.endsAt) return Infinity;
+  const start = pragueStamp(row.startsAt || row.endsAt).date;
+  const end = pragueStamp(row.endsAt).date;
+  if (!start || !end) return 0;
+  return Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86_400_000) + 1;
+}
+
+// Patří uzavírka do okruhu, který redakce hlídá (a má ji tedy Drběna zpracovat)?
+export function closureWatched(row, radiusKm) {
+  if (row.manual === "skryt") return false;
+  if (row.manual === "ukazat") return true;
+  return row.distanceKm != null && row.distanceKm <= radiusKm;
 }

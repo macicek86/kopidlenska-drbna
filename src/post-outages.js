@@ -1,7 +1,8 @@
 // Formuláře sekce Odstávky: hlídané obce pro elektřinu a oznámení o vodě a uzavírkách.
 import { addOutageArea, refreshOutages, removeOutageArea, saveOutageAreas } from "./outages-db.js";
 import { removeNotice, saveNotice } from "./notices-db.js";
-import { clearClosures, saveNdicSettings, setClosureManual } from "./ndic/store.js";
+import { clearClosures, retryClosure, saveNdicSettings, setClosureManual } from "./ndic/store.js";
+import { continueNdic } from "./ndic/run.js";
 import { redirect, withError } from "./http.js";
 
 const BASE = "/redakce/odstavky";
@@ -17,6 +18,7 @@ export const OUTAGE_OK = {
   "oznameni-smazano": "Oznámení je smazané.",
   "ndic-nastaveni": "Nastavení uzavírek z Dopravního info je uložené.",
   "ndic-rucne": "Uzavírka je upravená.",
+  "ndic-znovu": "Drběna se na uzavírku podívá znovu. Stránka se sama obnoví.",
   "ndic-smazano": "Uzavírky z Dopravního info jsou smazané. Teď můžete v portálu NDIC resetovat odběr.",
 };
 
@@ -31,7 +33,7 @@ function areaResult(result, okKey) {
   return redirect(`${BASE}?ok=${result.partial ? "odstavky-castecne" : okKey}`);
 }
 
-export async function outagePost(path, request, env, fields) {
+export async function outagePost(path, request, env, fields, execution = null) {
   if (path === `${BASE}/pridat`) return areaResult(await addOutageArea(env, request, fields), "oblast");
   if (path === `${BASE}/ulozit`) return areaResult(await saveOutageAreas(env, request, fields), "oblast-upravena");
   if (path === `${BASE}/smazat`) {
@@ -56,8 +58,18 @@ export async function outagePost(path, request, env, fields) {
     if (!result.ok) return redirect(withError(BASE, result.error));
     return redirect(`${BASE}?ok=oznameni-smazano`);
   }
-  if (path === `${BASE}/ndic/nastaveni`) return simple(await saveNdicSettings(env, request, fields), "ndic-nastaveni");
+  if (path === `${BASE}/ndic/nastaveni`) {
+    const result = await saveNdicSettings(env, request, fields);
+    if (result.ok) await continueNdic(env, { ctx: execution });
+    return simple(result, "ndic-nastaveni");
+  }
   if (path === `${BASE}/ndic/rucne`) return simple(await setClosureManual(env, request, fields.closureId, fields.manual), "ndic-rucne");
+  if (path === `${BASE}/ndic/znovu`) {
+    const result = await retryClosure(env, request, fields.closureId);
+    if (!result.ok) return redirect(withError(BASE, result.error));
+    await continueNdic(env, { ctx: execution });
+    return redirect(`${BASE}?ok=ndic-znovu`);
+  }
   if (path === `${BASE}/ndic/smazat`) {
     if (!fields.confirm) return redirect(BASE);
     return simple(await clearClosures(env, request), "ndic-smazano");

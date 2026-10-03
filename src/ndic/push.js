@@ -2,6 +2,7 @@
 // Na každou přijatou zprávu musí přijít 200, jinak to NDIC zkouší znovu a po zhruba 24 hodinách odběr zastaví.
 // Proto i zprávu, která se nedá přečíst, potvrdíme a chybu ukážeme v redakci.
 import { isDatexMessage, parseSituations } from "./datex.js";
+import { continueNdic } from "./run.js";
 import { noteReceived, saveSituations } from "./store.js";
 
 export const NDIC_PUSH_PATH = "/ndic/uzavirky";
@@ -52,7 +53,7 @@ export async function bodyText(bytes) {
   return new TextDecoder().decode(bytes);
 }
 
-export async function ndicPush(request, env) {
+export async function ndicPush(request, env, ctx = null) {
   const config = pushConfig(env);
   if (!config) return reply("Příjem uzavírek není nastavený.", 503);
   if (!authorized(request, config)) return reply("Přihlaste se.", 401, { "www-authenticate": 'Basic realm="ndic"' });
@@ -71,6 +72,8 @@ export async function ndicPush(request, env) {
     }
     const result = await saveSituations(env, parseSituations(xml));
     await noteReceived(env, result);
+    // Nové uzavírky v okruhu Drběna přepíše hned na pozadí (když je zapnutá), zbytek dopíše cron.
+    if (ctx) await continueNdic(env, { ctx }).catch(() => {});
     return reply("OK");
   } catch (error) {
     const message = error instanceof Error ? error.message : "neznámá chyba";

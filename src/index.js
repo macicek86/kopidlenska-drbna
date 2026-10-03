@@ -77,6 +77,7 @@ import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
 import { adminQuery, formFields } from "./forms.js";
 import { NDIC_PUSH_PATH, ndicPush } from "./ndic/push.js";
+import { runNdic } from "./ndic/run.js";
 import { visitPath, visitTarget } from "./visits.js";
 import { loadStats, pathViews, recordVisit, STAT_PERIODS } from "./visits-db.js";
 import { html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
@@ -500,7 +501,7 @@ async function renderPost(request, env, url, execution) {
     (await articlesPost(path, request, env, fields)) ??
     (await adsPost(path, request, env, fields)) ??
     (await eventsPost(path, request, env, fields)) ??
-    (await outagePost(path, request, env, fields)) ??
+    (await outagePost(path, request, env, fields, execution)) ??
     (await placesPost(path, request, env, fields)) ??
     (await stockPost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
@@ -530,7 +531,7 @@ export default {
       }
       await ensureSchema(env);
       // Zprávy od NDIC (uzavírky silnic): vlastní přihlášení jménem a heslem, bez kontroly původu.
-      if (url.pathname === NDIC_PUSH_PATH) return await ndicPush(request, env);
+      if (url.pathname === NDIC_PUSH_PATH) return await ndicPush(request, env, execution);
       if (request.method === "GET" || request.method === "HEAD") {
         const response = await renderGet(request, env, url, execution);
         const visit = visitPath(request, response);
@@ -550,5 +551,6 @@ export default {
     ctx.waitUntil(runImport(env).catch(() => {}));
     ctx.waitUntil(runFootball(env).catch(() => {}));
     ctx.waitUntil(runDenik(env).catch(() => {}));
+    ctx.waitUntil(runNdic(env).catch(() => {}));
   },
 };
