@@ -106,7 +106,7 @@ import { ARTICLES_OK, articlesPost } from "./post-articles.js";
 import { ADS_OK, adsPost } from "./post-ads.js";
 import { EVENTS_OK, eventsPost } from "./post-events.js";
 
-const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
+const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
 const OK = {
   ...ARTICLES_OK,
