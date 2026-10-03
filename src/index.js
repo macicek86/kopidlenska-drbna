@@ -9,13 +9,11 @@ import {
   loadPublic,
   login,
   logout,
-  removeArticle,
   removeClosure,
   removeDoctor,
   removeDoctorChange,
   removeEvent,
   removeYard,
-  saveArticle,
   saveClosure,
   saveCopy,
   saveDoctor,
@@ -35,19 +33,8 @@ import {
   setContributorPassword,
   userCan,
 } from "./db.js";
-import {
-  approveAdProposal,
-  loadAd,
-  loadAds,
-  rejectAdProposal,
-  removeAd,
-  saveAd,
-  saveAdProposal,
-  setAdEnabled,
-  withdrawAdProposal,
-} from "./ads-db.js";
+import { loadAd, loadAds } from "./ads-db.js";
 import { ACCESS_LOGOUT, accessConfig } from "./access.js";
-import { approveProposal, discardProposal, rejectProposal, saveProposal, withdrawProposal } from "./proposals-db.js";
 import {
   adPage,
   adsPage,
@@ -68,6 +55,7 @@ import { articlePage, newsPage } from "./news.js";
 import {
   adminAds,
   adminArticles,
+  adminChat,
   adminDoctors,
   adminDrbena,
   adminEvents,
@@ -107,13 +95,18 @@ import { continueDenik, runDenik } from "./denik/run.js";
 import { loadDenikSettings } from "./denik/store.js";
 import { continueFootball, runFootball } from "./fotbal/run.js";
 import { loadFootballSettings } from "./fotbal/store.js";
+import { chatPost } from "./chat/run.js";
+import { chatEnabled, loadChatAdmin } from "./chat/store.js";
+import { turnstileConfig } from "./chat/pass.js";
+import { CHAT_OK, chatAdminPost } from "./post-chat.js";
+import { ARTICLES_OK, articlesPost } from "./post-articles.js";
+import { ADS_OK, adsPost } from "./post-ads.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2)$/i;
 
 const OK = {
-  zprava: "Zpráva je uložená.",
-  "zprava-upravena": "Zpráva je upravená.",
-  "zprava-smazana": "Zpráva je smazaná.",
+  ...ARTICLES_OK,
+  ...ADS_OK,
   akce: "Akce je uložená.",
   "akce-upravena": "Akce je upravená.",
   "akce-smazana": "Akce je smazaná.",
@@ -126,16 +119,6 @@ const OK = {
   "dvur-smazan": "Sběrný dvůr je smazaný.",
   uzavreni: "Mimořádné uzavření je zapsané.",
   "uzavreni-smazane": "Mimořádné uzavření je zrušené.",
-  reklama: "Nabídka je uložená.",
-  "reklama-upravena": "Nabídka je upravená.",
-  "reklama-vypnuta": "Nabídka je vypnutá.",
-  "reklama-zapnuta": "Nabídka je zase zapnutá.",
-  "reklama-smazana": "Nabídka je smazaná.",
-  "reklama-navrh": "Návrh nabídky čeká na schválení.",
-  "reklama-navrh-upraven": "Návrh nabídky je upravený a pořád čeká na schválení.",
-  "reklama-stazena": "Návrh nabídky je stažený.",
-  "reklama-schvalena": "Nabídka je schválená a na webu.",
-  "reklama-vracena": "Návrh nabídky je vrácený autorovi.",
   lekar: "Ordinace je uložená.",
   "lekar-upraven": "Ordinace je upravená.",
   "lekar-smazan": "Ordinace je smazaná.",
@@ -145,12 +128,6 @@ const OK = {
   rubrika: "Rubrika je uložená.",
   "rubrika-upravena": "Rubrika je upravená.",
   "rubrika-smazana": "Rubrika je smazaná.",
-  navrh: "Návrh čeká na schválení.",
-  "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
-  "navrh-stazen": "Návrh je stažený.",
-  "navrh-smazan": "Návrh je smazaný.",
-  schvaleno: "Příspěvek je schválený a na webu.",
-  vraceno: "Návrh je vrácený autorovi.",
   clovek: "Přispěvatel má účet.",
   "clovek-vypnut": "Účet je vypnutý.",
   "clovek-zapnut": "Účet je zase aktivní.",
@@ -163,6 +140,7 @@ const OK = {
   ...DRBENA_OK,
   ...FOOTBALL_OK,
   ...DENIK_OK,
+  ...CHAT_OK,
 };
 
 // Stránky, které berou data z loadPublic.
@@ -242,13 +220,15 @@ async function renderGet(request, env, url, execution) {
 
   // Texty a data stránky najednou: na sobě nezávisí.
   const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
-  const [copy, data, admin, story] = await Promise.all([
+  const [copy, data, admin, story, chat] = await Promise.all([
     loadCopy(env),
     minimalHome || PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
     path.startsWith("/redakce/") ? loadAdmin(env, request) : null,
     slug == null ? null : loadStory(env, slug, path),
+    path.startsWith("/redakce") || base.minimal ? false : chatEnabled(env),
   ]);
-  const ctx = { ...base, copy };
+  // Okénko chatu s Drběnou: jen na hlavním webu, když ho redakce zapnula.
+  const ctx = { ...base, copy, chat: chat ? { siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
   if (minimalHome || path === "/popelnice") {
     return html(
@@ -314,7 +294,7 @@ async function renderGet(request, env, url, execution) {
     const data = admin;
     const tab = path.slice("/redakce/".length);
     const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", "drbena"]);
+    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", "drbena", "chat"]);
     if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
       return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
     }
@@ -373,6 +353,10 @@ async function renderGet(request, env, url, execution) {
       return html(adminDenik(ctx, data, message, query));
     }
     if (tab === "drbena") return html(adminDrbena(ctx, data, message));
+    if (tab === "chat") {
+      if (data.signedIn) data.chat = await loadChatAdmin(env);
+      return html(adminChat(ctx, data, message, query));
+    }
     if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
@@ -383,6 +367,10 @@ async function renderPost(request, env, url, execution) {
   if (!sameOrigin(request)) return new Response("Cizí původ.", { status: 403 });
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const https = secure(request);
+
+  // Chat posílá JSON, formulář se tu nečte.
+  const chat = await chatPost(path, request, env, execution);
+  if (chat) return chat;
 
   if (path === "/redakce/texty/ulozit") {
     const result = await saveCopy(env, request);
@@ -400,33 +388,6 @@ async function renderPost(request, env, url, execution) {
   if (path === "/redakce/odhlasit") {
     await logout(env, request);
     return redirect(accessConfig(env) ? ACCESS_LOGOUT : "/redakce/prehled", clearCookie(https));
-  }
-  if (path === "/redakce/zpravy/navrh") {
-    const result = await saveProposal(env, request, fields);
-    if (!result.ok) return redirect(withError(deskQuery(fields), result.error));
-    return redirect(`/redakce/zpravy?ok=${result.updated ? "navrh-upraven" : "navrh"}`);
-  }
-  if (path === "/redakce/zpravy/stahnout") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/zpravy");
-    const result = await withdrawProposal(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy?ok=navrh-stazen");
-  }
-  if (path === "/redakce/zpravy/smazat-navrh") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/zpravy");
-    const result = await discardProposal(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy?ok=navrh-smazan");
-  }
-  if (path === "/redakce/zpravy/schvalit") {
-    const result = await approveProposal(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/zpravy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy?ok=schvaleno");
-  }
-  if (path === "/redakce/zpravy/vratit") {
-    const result = await rejectProposal(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/zpravy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy?ok=vraceno");
   }
   if (path === "/redakce/lide/ulozit") {
     const result = await createContributor(env, request, fields);
@@ -453,46 +414,6 @@ async function renderPost(request, env, url, execution) {
     if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/heslo?ok=jmeno");
   }
-  if (path === "/redakce/reklamy/ulozit") {
-    const result = await saveAd(env, request, fields);
-    if (!result.ok) {
-      const back = fields.id ? `/redakce/reklamy?id=${fields.id}` : "/redakce/reklamy";
-      return redirect(withError(back, result.error));
-    }
-    return redirect(`/redakce/reklamy?ok=${fields.id ? "reklama-upravena" : "reklama"}`);
-  }
-  if (path === "/redakce/reklamy/navrh") {
-    const result = await saveAdProposal(env, request, fields);
-    if (!result.ok) return redirect(withError(adDeskQuery(fields), result.error));
-    return redirect(`/redakce/reklamy?ok=${result.updated ? "reklama-navrh-upraven" : "reklama-navrh"}`);
-  }
-  if (path === "/redakce/reklamy/stahnout") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/reklamy");
-    const result = await withdrawAdProposal(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/reklamy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/reklamy?ok=reklama-stazena");
-  }
-  if (path === "/redakce/reklamy/schvalit") {
-    const result = await approveAdProposal(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/reklamy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/reklamy?ok=reklama-schvalena");
-  }
-  if (path === "/redakce/reklamy/vratit") {
-    const result = await rejectAdProposal(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/reklamy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/reklamy?ok=reklama-vracena");
-  }
-  if (path === "/redakce/reklamy/stav") {
-    const result = await setAdEnabled(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/reklamy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect(`/redakce/reklamy?ok=${result.enabled ? "reklama-zapnuta" : "reklama-vypnuta"}`);
-  }
-  if (path === "/redakce/reklamy/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/reklamy");
-    const result = await removeAd(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/reklamy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/reklamy?ok=reklama-smazana");
-  }
   if (path === "/redakce/rubriky/ulozit") {
     const result = await saveRubric(env, request, fields);
     if (!result.ok) {
@@ -506,17 +427,6 @@ async function renderPost(request, env, url, execution) {
     const result = await removeRubric(env, request, fields.id);
     if (!result.ok) return redirect(`/redakce/rubriky?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/rubriky?ok=rubrika-smazana");
-  }
-  if (path === "/redakce/zpravy/ulozit") {
-    const result = await saveArticle(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect(`/redakce/zpravy?ok=${fields.id ? "zprava-upravena" : "zprava"}`);
-  }
-  if (path === "/redakce/zpravy/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/zpravy");
-    const result = await removeArticle(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/zpravy?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy?ok=zprava-smazana");
   }
   if (path === "/redakce/akce/ulozit") {
     const result = await saveEvent(env, request, fields);
@@ -590,13 +500,16 @@ async function renderPost(request, env, url, execution) {
     return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
   }
   const section =
+    (await articlesPost(path, request, env, fields)) ??
+    (await adsPost(path, request, env, fields)) ??
     (await outagePost(path, request, env, fields)) ??
     (await placesPost(path, request, env, fields)) ??
     (await stockPost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??
-    (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena")));
+    (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena"))) ??
+    (await chatAdminPost(path, request, env, fields));
   if (section) return section;
   if (path === "/redakce/heslo/ulozit") {
     const result = await changePassword(env, request, fields.current, fields.next);
@@ -606,17 +519,7 @@ async function renderPost(request, env, url, execution) {
   return new Response("Tahle akce tu není.", { status: 404 });
 }
 
-function adDeskQuery(fields) {
-  if (fields.id) return `/redakce/reklamy?navrh=${fields.id}`;
-  if (fields.adId) return `/redakce/reklamy?id=${fields.adId}`;
-  return "/redakce/reklamy";
-}
 
-function deskQuery(fields) {
-  if (fields.id) return `/redakce/zpravy?navrh=${fields.id}`;
-  if (fields.articleId) return `/redakce/zpravy?clanek=${fields.articleId}`;
-  return "/redakce/zpravy";
-}
 
 export default {
   async fetch(request, env, execution) {

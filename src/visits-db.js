@@ -55,11 +55,16 @@ async function daySalt(env, day) {
   return saltCache.salt;
 }
 
+// Dnešní otisk návštěvníka (bez cookies a IP). Používá ho i chat na denní limit otázek.
+export async function dayVisitor(env, request, day) {
+  const salt = await daySalt(env, day);
+  return visitorHash(salt, request.headers.get("cf-connecting-ip"), request.headers.get("user-agent"));
+}
+
 export async function recordVisit(env, request, path, now = new Date()) {
   const day = pragueNow(now).date;
   const headers = request.headers;
-  const salt = await daySalt(env, day);
-  const hash = await visitorHash(salt, headers.get("cf-connecting-ip"), headers.get("user-agent"));
+  const hash = await dayVisitor(env, request, day);
   const fresh = wrote(await env.DB.prepare("insert or ignore into visit_seen (day, hash) values (?, ?)").bind(day, hash).run());
   const add = fresh ? 1 : 0;
   const writes = [

@@ -1,5 +1,5 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
-import { asBool, clip, requireChief, requireUser, slugify, uniqueSlug } from "./db-core.js";
+import { asBool, clip, IMPORT_ITEM_TABLES, requireChief, requireUser, slugify, uniqueSlug } from "./db-core.js";
 import { readArticle, redactedFlag, textWasEdited } from "./db.js";
 import { releaseImage } from "./images.js";
 import { formImage } from "./stock-db.js";
@@ -114,6 +114,14 @@ export async function withdrawProposal(env, request, id) {
   return { ok: true };
 }
 
+// Import, ze kterého návrh vznikl, si zapamatuje i hotovou zprávu (chat pak u ní najde původní text).
+async function linkImports(env, proposalId, articleId) {
+  if (!articleId) return;
+  for (const table of IMPORT_ITEM_TABLES) {
+    await env.DB.prepare(`update ${table} set article_id = ? where proposal_id = ? and article_id is null`).bind(articleId, proposalId).run();
+  }
+}
+
 export async function approveProposal(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
@@ -182,7 +190,7 @@ export async function approveProposal(env, request, input) {
     if (previousArticleImage && previousArticleImage !== nextImage) await releaseImage(env, previousArticleImage);
   } else {
     const slug = await uniqueSlug(env, slugify(parsed.title));
-    await env.DB.prepare(
+    const inserted = await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
        values (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?)`,
     )
@@ -202,6 +210,7 @@ export async function approveProposal(env, request, input) {
         textWasEdited(submitted, finalText) ? 1 : 0,
       )
       .run();
+    await linkImports(env, proposal.id, Number(inserted.meta?.last_row_id));
   }
 
   await env.DB.prepare(

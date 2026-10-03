@@ -543,3 +543,7 @@
 .stock-option img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-sm); border: 2px solid transparent; }
 .stock-option input:checked + img { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand); }
 .stock-option input:focus-visible + img { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Chat s Drběnou: odpověď u uložené otázky */
+.chat-answer summary { cursor: pointer; font-weight: 600; color: var(--brand); font-size: 0.9rem; }
+.chat-answer p { margin: 0.5rem 0 0; padding: 0.7rem 0.9rem; border-radius: 0.6rem; background: var(--surface-2); font-size: 0.92rem; line-height: 1.5; }

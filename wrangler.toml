@@ -5,6 +5,9 @@ compatibility_date = "2026-09-01"
 # Cloudflare Access: ACCESS_TEAM (název týmu, třeba „drbna“ z drbna.cloudflareaccess.com) a ACCESS_AUD
 # (Application Audience tag) se nastavují jako tajemství: npx wrangler secret put ACCESS_TEAM
 # Místně nejsou, takže náhled a vývoj se dál přihlašují heslem.
+#
+# Chat s Drběnou: Turnstile (ověření, že píše člověk) zapnou tajemství TURNSTILE_SITE_KEY a TURNSTILE_SECRET
+# z widgetu Turnstile v Cloudflare (npx wrangler secret put …). Bez nich chat chrání jen limity z redakce.
 
 [assets]
 directory = "./public"

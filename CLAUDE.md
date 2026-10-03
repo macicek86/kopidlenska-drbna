@@ -4,7 +4,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 ## Kde co je
 
-- `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`)
+- `src/index.js`: router, formuláře a přesměrování po POST (`?ok=…` / `?chyba=…`); obsluha formulářů jednotlivých sekcí je v `src/post-*.js`
 - `src/view.js`: veřejné stránky a sdílené pomocné funkce (`esc`, `credit`, `adPanel`…); `src/home.js` titulka (upozornění vedle maskota, na počítači ve dvou sloupcích, styly v `public/home.css`)
 - `src/schema.js`: založení a migrace databáze. Běží jen když verze v tabulce `schema_version` nesedí se `SCHEMA_VERSION`, jinak stojí studený start jeden dotaz. **Kdo změní migrace (tabulka, sloupec, index, výchozí data), zvedne `SCHEMA_VERSION`**; `test/schema.test.js` hlídá otisk SQL a řekne, co přepsat
 - `src/db.js`: data webu (`loadPublic` a `loadAdmin` načítají všechno souběžně, seznamy zpráv bez textu); `src/users-db.js` účty redakce (heslo, e-mail, přispěvatelé, oprávnění); `src/proposals-db.js` návrhy zpráv (uložení, schválení, vrácení, stažení, smazání); `src/db-core.js` přihlášení, oprávnění a drobné pomocníky; `src/ads-db.js` reklamy; `src/outages-db.js` odstávky elektřiny
@@ -18,6 +18,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 - `src/denik/`: články z Jičínského deníku (`feed.js` RSS, výběr jen Kopidlna a částí, volná část článku před paywallem; `ai.js` pokyny a kontrola podmínek Deníku; `store.js` D1; `run.js` průchod). Deník to dovolil jen takto: žádné citace ani opsané věty, žádné „jak píše Deník“, jen podstatné věci. `denikProblem` výsledek, který to poruší, vrátí Claudovi k přepsání. Fotky z Deníku se neberou, odkaz na zdroj jen se zapnutým nastavením
 - `src/import-context.js`: společné pro Munipolis a Deník (co už na drbně je, rubriky, datum ze zdroje, souhrn)
 - `src/drbena.js`: povaha kozy Drběny (výchozí text a `voiceFor`: povaha, u fotbalu k ní fotbalové zvyky); `src/drbena-db.js` ji ukládá (`drbena_settings`), redakce ji upravuje na stránce Koza Drběna (`src/admin/drbena.js`). Výchozí text se neukládá, ať změna v kódu platí všude. Tamtéž „Vyzkoušet povahu“ (`src/drbena-try.js`): vložený článek Drběna napíše stejnými pokyny jako import, podle povahy z polí (i neuložené), nic se neukládá
+- `src/chat/`: chat s Drběnou, plovoucí okénko na každé veřejné stránce (`public/chat.js`, `public/chat.css`; rozhovor drží v sessionStorage). `prompt.js` pokyny (mluví v první osobě; povaha z článků + „Jak se chová v chatu“), `context.js` co ví: stránky služeb vykreslené z D1 stejnými funkcemi jako web a převedené na text (`htmlText`), posledních 30 zpráv a nástroje `hledat_zpravy`, `precist_zpravu` (u zprávy z Munipolisu či fotbalu přiloží původní text ze zdroje), `precist_zdroj` (zdroje Munipolisu a fotbalu, ze kterých zpráva zatím není; Deník nikdy, jeho podmínky to nedovolují). `ai.js` model (Sonnet 5.5 / Haiku 4.5 podle redakce) a cena, `pass.js` Turnstile a podepsaný lístek na rozhovor, `store.js` nastavení, denní součty, limity (na návštěvníka podle otisku z počítadla návštěv, za den, měsíční rozpočet v Kč) a uložené otázky (mažou se po `keep_days`), `run.js` adresy `POST /chat/zacit` a `/chat/zeptat` (JSON, routuje se před čtením formuláře). Redakce `src/admin/chat.js` (jen hlavní redaktor), ve výchozím stavu vypnuto. Turnstile zapnou tajemství `TURNSTILE_SITE_KEY` a `TURNSTILE_SECRET`, bez nich chat chrání jen limity
 - `src/claude.js`: společné volání Claude (model, JSON podle schématu, chyby česky); `src/bot-article.js`: uložení článku od kozy Drběny (rovnou na web, nebo jako návrh)
 - `src/background.js`: fronta importů. Cron (se zapnutým importem) bere sám jen čerstvé položky (`fresh_days` podle data ve zdroji, u zápasu den zápasu) a píše je s dnešním datem; starší odloží jako `stare`, i když už čekají ve frontě, ať se drbna po prvním spuštění nebo dlouhé pauze nenaplní starými věcmi. Tlačítko „Zkontrolovat teď“ jen načte položky jako `nacteno` a redakce zaškrtne, co zpracovat (`manual = 1`): to Drběna napíše vždy a s datem ze zdroje (`proposals.publish_on` se při schválení stane datem zprávy). Vybrané se píšou na pozadí (`ctx.waitUntil`, asi 30 s, krátká dávka) při výběru a při každém otevření stránky, ta se sama obnovuje (`data-refresh` v `public/admin.js`); zbytek dopíše cron. Zámek `running_at` nese čas, kdy vyprší
 - `src/admin/imports.js`: společné kousky redakce pro Munipolis a fotbal (stav, zaškrtávání, pruh s tím, co Drběna dělá)
@@ -43,7 +44,7 @@ Až drbna přejde na kopidlenskadrbna.org, vypnout `workers_dev` a `preview_urls
 Každé okno má svou adresu (`?novy=1`, `?id=3`, `?smazat=3`, `?navrh=5`, `?uzavreni=1`, `?hodiny=2`, `?zmena=2`, `?upravit=4`…).
 Server okno na té adrese vykreslí otevřené (`<dialog data-autoopen>`), takže všechno funguje i bez JS.
 S JS odkaz `data-modal` stránku stáhne na pozadí, vezme z ní okno a otevře ho. Odkaz `data-open` otevře okno, které už na stránce je (formuláře „Nový…“).
-CSP povoluje jen skripty a styly z vlastní domény: žádné inline `style=""` ani `<script>`.
+CSP povoluje jen skripty a styly z vlastní domény: žádné inline `style=""` ani `<script>`. Jediná výjimka je skript a rámeček Turnstile z `challenges.cloudflare.com` (chat s Drběnou).
 
 ## Náhled v Chromu (i pro agenty)
 
@@ -56,6 +57,8 @@ npm run screens            # snímky redakce do .screens/ (desktop i mobil, i ot
 npm run screens -- lekari  # jen vybrané sekce
 LOGIN=jana PASSWORD=… OUT=.screens/prispevatel npm run screens   # pohled přispěvatele
 ```
+
+Chat s Drběnou jde vyzkoušet stejně (zapnout v redakci na stránce Chat s Drběnou); Turnstile s testovacími klíči Cloudflare `--var TURNSTILE_SITE_KEY:1x00000000000000000000AA --var TURNSTILE_SECRET:1x0000000000000000000000000000000AA`. Prohlížeč bez okna (HeadlessChrome) chat odmítne jako robota, v Playwrightu nastavit běžný `userAgent`.
 
 Import z Munipolisu, Deníku i fotbal jde v náhledu vyzkoušet bez skutečného Claude: `npx wrangler dev --port 8788 --persist-to .wrangler/nahled --var ANTHROPIC_API_KEY:x --var ANTHROPIC_BASE_URL:http://127.0.0.1:<port>` a na tom portu malý server, který na `POST /v1/messages` vrátí JSON podle schématu z `outputSchema()` (fotbal: `footballSchema()`).
 

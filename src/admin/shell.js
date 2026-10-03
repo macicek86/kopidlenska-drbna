@@ -43,7 +43,7 @@ function nav(data) {
     },
     {
       name: "Nastavení",
-      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], ["heslo", "Můj účet", "user"]],
+      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], ["heslo", "Můj účet", "user"]],
     },
   ];
   return groups
@@ -67,7 +67,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "texty", "lide", "heslo"];
+export const ADMIN_TABS = ["prehled", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "texty", "lide", "heslo"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

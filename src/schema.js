@@ -15,8 +15,9 @@ import { ensureDrbenaTable } from "./drbena-db.js";
 import { ensureUserColumns } from "./users-db.js";
 import { ensureVisitTables } from "./visits-db.js";
 import { ensureStockTables } from "./stock-db.js";
+import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 let schemaReady = false;
 
@@ -334,6 +335,7 @@ async function migrateSchema(env) {
   await ensurePlaceTables(env);
   await ensureVisitTables(env);
   await ensureStockTables(env);
+  await ensureChatTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
@@ -357,7 +359,10 @@ async function migrateSchema(env) {
     const proposalsTable = await env.DB.prepare(
       "select 1 as ok from sqlite_master where type = 'table' and name = 'proposals'",
     ).first();
-    if (proposalsTable) await ensureProposalColumns(env);
+    if (proposalsTable) {
+      await ensureProposalColumns(env);
+      await linkApprovedImports(env);
+    }
     await seedRubrics(env);
   }
   await env.DB.prepare(

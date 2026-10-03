@@ -61,6 +61,7 @@ export function layout({
   image = "",
   published = "",
   jsonLd = [],
+  chat = null,
 }) {
   const brandHref = minimal ? "/popelnice" : "/";
   const base = siteOrigin(origin, mainOrigin);
@@ -118,6 +119,7 @@ export function layout({
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site.css">
+  ${chat ? `<link rel="stylesheet" href="/chat.css">` : ""}
   ${head}
 </head>
 <body>
@@ -138,6 +140,7 @@ export function layout({
     </footer>
   </div>
   ${script}
+  ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"></div><script src="/chat.js" defer></script>` : ""}
 </body>
 </html>`;
 }

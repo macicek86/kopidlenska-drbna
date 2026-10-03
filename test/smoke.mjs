@@ -16,7 +16,8 @@ assert(home.text.includes("Kopidlenská"), "home title missing");
 assert(home.text.includes("Popelnice"), "waste teaser missing");
 assert(/Svoz je dnes|Svoz je zítra|Za \d+ dn/.test(home.text), "countdown missing");
 assert(home.text.includes("/kozel-maskot.webp"), "mascot missing");
-assert(!/<script(?! type="application\/ld\+json")/.test(home.text), "unexpected script");
+// Jen strukturovaná data a soubory z vlastní domény (třeba /chat.js), žádný vložený ani cizí skript.
+assert(!/<script(?! type="application\/ld\+json")(?! src="\/[\w.-]+\.js")/.test(home.text), "unexpected script");
 
 const css = await get("/site-base.css");
 assert(css.status === 200 && css.text.includes("--brand"), "css missing");

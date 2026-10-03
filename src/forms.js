@@ -33,6 +33,7 @@ export function adminQuery(url) {
     upload: url.searchParams.has("nahrat"),
     uploadTopicId: positiveParam(url, "nahrat"),
     freshTopic: url.searchParams.has("nove-tema"),
+    clearChat: url.searchParams.has("smazat-otazky"),
   };
 }
 
@@ -123,6 +124,11 @@ export async function formFields(request) {
     sourceUrl: text("sourceUrl"),
     feedUrl: text("feedUrl"),
     persona: text("persona"),
+    model: text("model"),
+    perVisitor: text("perVisitor"),
+    perDay: text("perDay"),
+    budget: text("budget"),
+    keepDays: text("keepDays"),
     football: text("football"),
     articleText: text("text"),
     autoPublish: form.get("autoPublish") === "1",

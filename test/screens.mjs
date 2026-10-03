@@ -27,9 +27,11 @@ const TABS = [
   "oteviraci-doba",
   "odstavky",
   "drbena",
+  "chat",
   "lide",
   "heslo",
   // Otevřená okna. Název souboru je adresa bez lomítek.
+  "chat?nastaveni=1",
   "zpravy?novy=1",
   "zpravy?id=1",
   "reklamy?novy=1",
