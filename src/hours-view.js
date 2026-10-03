@@ -24,18 +24,19 @@ function glueDates(text) {
     .replace(/ (od|do) (?=\d)/g, " $1&nbsp;");
 }
 
-function partLine(label, part) {
+// Dopoledne a odpoledne se nepíše, je to zřejmé z času.
+function partLine(part) {
   if (!part?.open) return "";
   const note = part.note ? `<span class="hint">${esc(part.note)}</span>` : "";
-  return `<p class="part"><span class="slot"><strong>${esc(`${part.from}–${part.to}`)}</strong><span class="when">${esc(label)}</span></span>${note}</p>`;
+  return `<p class="part"><span class="slot"><strong>${esc(`${part.from}–${part.to}`)}</strong></span>${note}</p>`;
 }
 
 function doctorWeekList(week, today, { superseded = false } = {}) {
   const todayDay = civilWeekday(today);
   return `<ul class="week-list doctor-week">${week
     .map((slot) => {
-      const morning = partLine("dopoledne", slot.morning);
-      const afternoon = partLine("odpoledne", slot.afternoon);
+      const morning = partLine(slot.morning);
+      const afternoon = partLine(slot.afternoon);
       const open = Boolean(morning || afternoon);
       const todayRow = slot.day === todayDay;
       const loud = todayRow && !superseded;
@@ -158,6 +159,6 @@ export function placesPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "places_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "places_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "places_lede"))}</p>
-      <div class="stack">${cards}</div>`,
+      <div class="stack place-grid">${cards}</div>`,
   });
 }

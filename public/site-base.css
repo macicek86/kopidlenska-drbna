@@ -725,15 +725,8 @@ a.card { display: block; text-decoration: none; color: inherit; }
   white-space: nowrap;
 }
 
-.doctor-week .when {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
 .doctor-week .hint { font-weight: 400; line-height: 1.35; }
 
-.week-list.doctor-week li.is-today .when,
 .week-list.doctor-week li.is-today .hint { color: var(--muted); font-weight: 400; }
 
 .banner p { margin: 0.15rem 0; }
@@ -799,6 +792,10 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
   .cards-3, .dates { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dates.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pair { grid-template-columns: 1fr 1fr; }
+  /* Otevírací doba: karty vedle sebe, kolik se jich vejde, aby týden zůstal čitelný */
+  .place-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); align-items: start; }
+  .place-grid .dates.compact { grid-template-columns: 1fr; }
+  .place-grid .doctor-week li { grid-template-columns: 7.6rem minmax(0, 1fr); }
   .about { grid-template-columns: 16rem 1fr; align-items: start; }
   .about img { position: sticky; top: 1.5rem; }
 }
