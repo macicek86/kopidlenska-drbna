@@ -1,5 +1,6 @@
 // Claude roztřídí zprávu z Munipolisu, pozná duplicitu a přepíše ji hlasem kozy Drběny.
 import { callClaude, MODEL } from "../claude.js";
+import { clubRules } from "../clubs.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
 import { DEFAULT_VOICE } from "../drbena.js";
@@ -116,9 +117,10 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
   return schema;
 }
 
-export function systemPrompt(voice) {
+export function systemPrompt(voice, { rubricSlugs = null } = {}) {
   const style = String(voice ?? "").trim() || DEFAULT_VOICE;
-  return `${RULES}\n\nHlas a styl textů:\n${style}`;
+  const clubs = clubRules(rubricSlugs);
+  return `${RULES}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
 }
 
 function line(value, max = 220) {
@@ -272,7 +274,7 @@ export async function askClaude(env, { item, known, images = [], topics = [], ru
     { type: "text", text: userText(item, known, { today, force, topics, images: shown.length }) },
   ];
   const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug) });
-  const answer = await callClaude(env, { system: systemPrompt(voice), content, schema });
+  const answer = await callClaude(env, { system: systemPrompt(voice, { rubricSlugs }), content, schema });
   if (!answer.ok) return answer;
   return readDecision(answer.raw, { rubricSlugs, force });
 }

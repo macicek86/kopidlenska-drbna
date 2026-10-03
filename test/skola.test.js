@@ -68,6 +68,13 @@ test("článek v aktualitách ZŠ i MŠ se vezme jednou a nefunkční kanál nev
   assert.equal(down.ok, false);
 });
 
+test("pokyny: modeláři jdou do rubriky spolku a bez řečí o škole, jen když rubrika existuje", () => {
+  const prompt = skolaPrompt("", { rubricSlugs: ["skola", "spolky", "letecti-modelari"] });
+  assert.match(prompt, /LMK Kopidlno[^\n]*rubrika "letecti-modelari"/);
+  assert.match(prompt, /školu ani učitele nezmiňuj/);
+  assert.doesNotMatch(skolaPrompt("", { rubricSlugs: ["skola"] }), /letecti-modelari/);
+});
+
 test("adresy kanálů: jedna na řádek, jen https, prázdné vrátí výchozí", () => {
   assert.deepEqual(readFeedUrls(""), DEFAULT_FEEDS);
   assert.deepEqual(readFeedUrls("https://a.cz/x\n\nhttps://a.cz/y\nhttps://a.cz/x"), ["https://a.cz/x", "https://a.cz/y"]);

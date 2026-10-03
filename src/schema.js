@@ -7,6 +7,7 @@ import { DOCTOR_SEEDS } from "./doctors.js";
 import { KOPIDLNO } from "./outages.js";
 import { ensurePlaceTables } from "./places-db.js";
 import { SEED_RUBRICS } from "./rubrics.js";
+import { CLUB_PARENT, CLUBS } from "./clubs.js";
 import { ensureNoticeTables } from "./notices-db.js";
 import { ensureImportTables } from "./munipolis/store.js";
 import { ensureFootballTables } from "./fotbal/store.js";
@@ -21,7 +22,7 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 let schemaReady = false;
 
@@ -251,6 +252,27 @@ async function seedSchoolRubric(env) {
   ).run();
 }
 
+// Rubrika Spolky a pod ní spolky, o kterých Drběna píše ze zpráv školy a Deníku (`src/clubs.js`).
+// Kdyby si redakce Spolky založila sama pod jinou adresou, poznají se podle jména.
+async function seedClubRubrics(env) {
+  await env.DB.prepare(
+    `insert into rubrics (parent_id, name, slug, sort_order)
+     select null, ?, ?, ?
+     where not exists (select 1 from rubrics where slug = ? or name = ?)`,
+  )
+    .bind(CLUB_PARENT.name, CLUB_PARENT.slug, CLUB_PARENT.sortOrder, CLUB_PARENT.slug, CLUB_PARENT.name)
+    .run();
+  for (const club of CLUBS) {
+    await env.DB.prepare(
+      `insert into rubrics (parent_id, name, slug, sort_order)
+       select (select id from rubrics where slug = ? or name = ? order by slug = ? desc limit 1), ?, ?, ?
+       where not exists (select 1 from rubrics where slug = ?)`,
+    )
+      .bind(CLUB_PARENT.slug, CLUB_PARENT.name, CLUB_PARENT.slug, club.name, club.slug, club.sortOrder, club.slug)
+      .run();
+  }
+}
+
 async function migrateSession(env) {
   const row = await env.DB.prepare("select session_token from settings where id = 1").first();
   if (!row?.session_token) return;
@@ -420,6 +442,7 @@ async function migrateSchema(env) {
     }
     await seedRubrics(env);
     await seedSchoolRubric(env);
+    await seedClubRubrics(env);
   }
   await env.DB.prepare(
     `insert into users (login, name, password_hash, role)

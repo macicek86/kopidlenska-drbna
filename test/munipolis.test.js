@@ -67,6 +67,10 @@ test("schéma pro Claude má u všech objektů zakázané další vlastnosti a r
 test("pokyny pro Claude obsahují hlas Drběny, přehled webu a zprávu", () => {
   assert.match(systemPrompt(""), /koza Drběna/);
   assert.match(systemPrompt("Piš jako básník."), /Piš jako básník\./);
+  const clubs = systemPrompt("", { rubricSlugs: ["zpravy", "letecti-modelari"] });
+  assert.match(clubs, /rubrika "letecti-modelari"/);
+  assert.match(clubs, /kdo spolku pomohl nebo přispěl/);
+  assert.doesNotMatch(systemPrompt(""), /letecti-modelari/);
   const known = {
     articles: [{ id: 12, createdOn: "2026-09-28", title: "Bazárek je tu", excerpt: "Přineste věci." }],
     proposals: [],

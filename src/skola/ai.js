@@ -1,5 +1,6 @@
 // Claude roztřídí článek z webu školy, pozná duplicitu a přepíše ho hlasem kozy Drběny. Co brát, říká škola v `sources.js`.
 import { callClaude } from "../claude.js";
+import { clubRules } from "../clubs.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { base64, contextText, outputSchema, readDecision, visibleImages } from "../munipolis/ai.js";
 import { topicsText } from "../stock.js";
@@ -12,7 +13,7 @@ Pravidla:
 - Jména dětí a studentů piš jen tak, jak je uvádí škola, a nepřidávej o nich nic dalšího (třídu, bydliště, rodinu), co ve zdroji není.
 - Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
 - rubric: zprávy z téhle školy patří do rubriky "{RUBRIC}", pokud je v seznamu. Jinak vyber nejbližší.
-{IMAGES}
+{IMAGES}{CLUBS}
 - title: do 90 znaků, vlastní, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
@@ -29,10 +30,12 @@ const STOCK_IMAGES = `- image_topic: téma z knihovny obrázků, které k člán
 
 const FORCE = "Redakce chce tenhle článek zpracovat, i když jsi ho předtím přeskočila nebo měla za duplicitu. Nevracej \"preskocit\" ani \"duplicita\".";
 
-export function skolaPrompt(voice, { ownPhotos = false, source = SCHOOLS.skola } = {}) {
+export function skolaPrompt(voice, { ownPhotos = false, source = SCHOOLS.skola, rubricSlugs = null } = {}) {
   const style = String(voice ?? "").trim() || DEFAULT_VOICE;
+  const clubs = clubRules(rubricSlugs, { hideSchool: source.tag === "skola" });
   const rules = RULES.replace("{SOURCE}", source.rules)
     .replace("{IMAGES}", ownPhotos ? OWN_IMAGES.replace("{PEOPLE}", source.people) : STOCK_IMAGES)
+    .replace("{CLUBS}", clubs ? `\n${clubs}` : "")
     .replace("{RUBRIC}", source.rubric);
   return `${rules}\n\nHlas a styl textů:\n${style}`;
 }
@@ -61,7 +64,7 @@ export async function askSkola(env, { source = SCHOOLS.skola, item, known, image
     { type: "text", text: skolaText(item, known, { today, force, topics, images: shown.length, source }) },
   ];
   const schema = outputSchema(rubricSlugs, { topics: topics.map((topic) => topic.slug), ownImage: ownPhotos });
-  const answer = await callClaude(env, { system: skolaPrompt(voice, { ownPhotos, source }), content, schema });
+  const answer = await callClaude(env, { system: skolaPrompt(voice, { ownPhotos, source, rubricSlugs }), content, schema });
   if (!answer.ok) return answer;
   const decision = readDecision(answer.raw, { rubricSlugs, force });
   if (!decision.ok || decision.decision !== "vytvorit") return decision;

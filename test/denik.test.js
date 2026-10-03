@@ -68,6 +68,13 @@ test("pokyny zakazují citace a zmínky o Deníku", () => {
   assert.match(text, /\[denik:2\] 2026-09-29 · Pouť/);
 });
 
+test("pokyny: články o modelářích jdou do rubriky spolku", () => {
+  const prompt = denikPrompt("", { rubricSlugs: ["sport", "letecti-modelari"] });
+  assert.match(prompt, /rubrika "letecti-modelari"/);
+  assert.doesNotMatch(prompt, /školu ani učitele nezmiňuj/);
+  assert.doesNotMatch(denikPrompt("", { rubricSlugs: ["sport"] }), /letecti-modelari/);
+});
+
 test("výsledek, který cituje nebo zmiňuje Deník, neprojde", () => {
   const source = { title: "Hasiči z Drahorazi slaví 130 let", text: "Sbor dobrovolných hasičů z Drahorazi oslaví v sobotu na hřišti sto třicet let od svého založení." };
   const answer = (body, title = "Drahorazští hasiči mají kulatiny") => ({ article: { title, excerpt: "V sobotu se slaví.", body } });

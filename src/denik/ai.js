@@ -1,6 +1,7 @@
 // Claude vybere z článku Jičínského deníku jen to důležité o Kopidlnu a napíše to vlastními slovy hlasem kozy Drběny.
 // Deník to dovolil s podmínkou: žádné citace jeho textu, žádné „jak píše Deník“, ne celý článek, jen podstatné věci.
 import { callClaude } from "../claude.js";
+import { clubRules } from "../clubs.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { contextText, outputSchema, readDecision } from "../munipolis/ai.js";
 import { topicsText } from "../stock.js";
@@ -37,9 +38,10 @@ Pravidla:
 
 const FORCE = "Redakce chce tenhle článek zpracovat, i když jsi ho předtím přeskočila nebo měla za duplicitu. Nevracej \"preskocit\" ani \"duplicita\".";
 
-export function denikPrompt(voice) {
+export function denikPrompt(voice, { rubricSlugs = null } = {}) {
   const style = String(voice ?? "").trim() || DEFAULT_VOICE;
-  return `${RULES}\n\nHlas a styl textů:\n${style}`;
+  const clubs = clubRules(rubricSlugs);
+  return `${RULES}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
 }
 
 export function denikText(item, known, { today, force = false, retry = "", topics = [] }) {
@@ -110,7 +112,7 @@ export async function askDenik(env, { item, known, topics = [], rubricSlugs, voi
   let problem = "";
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const content = [{ type: "text", text: denikText(item, known, { today, force, retry, topics }) }];
-    const answer = await callClaude(env, { system: denikPrompt(voice), content, schema });
+    const answer = await callClaude(env, { system: denikPrompt(voice, { rubricSlugs }), content, schema });
     if (!answer.ok) return answer;
     const decision = readDecision(answer.raw, { rubricSlugs, force });
     if (!decision.ok || decision.decision !== "vytvorit") return decision;
