@@ -7,6 +7,24 @@ const COOKIE = "drbna_editor";
 // Tabulky importů (Munipolis, fotbal, Deník): položka zdroje a zpráva nebo návrh, který z ní vznikl.
 export const IMPORT_ITEM_TABLES = ["import_items", "football_items", "denik_items", "skola_items", "zahradka_items"];
 
+export const REOPENED_REASON = "Redakce zprávu smazala. Jde zpracovat znovu.";
+
+// Smazaná zpráva nebo návrh od Drběny vrátí zdrojovou položku do fronty jako „smazano“: sama se znovu nezpracuje,
+// redakce ji ale může vybrat. Akce, která z položky vznikla, zůstává v kalendáři.
+export async function reopenImports(env, { articleId = 0, proposalIds = [] } = {}) {
+  const ids = proposalIds.map(Number).filter((id) => id > 0);
+  const marks = ids.map(() => "?").join(", ");
+  const match = ids.length ? `article_id = ? or proposal_id in (${marks})` : "article_id = ?";
+  for (const table of IMPORT_ITEM_TABLES) {
+    await env.DB.prepare(
+      `update ${table} set status = 'smazano', reason = ?, article_id = null, proposal_id = null, manual = 0, attempts = 0
+       where status = 'hotovo' and (${match})`,
+    )
+      .bind(REOPENED_REASON, Number(articleId) || 0, ...ids)
+      .run();
+  }
+}
+
 export function clip(value, max) {
   return String(value ?? "")
     .replace(/\r\n/g, "\n")

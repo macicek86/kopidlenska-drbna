@@ -5,7 +5,7 @@ import { esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { badge, callout, item, modalLink } from "./ui.js";
 
-export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad" };
+export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad", smazano: "off" };
 
 // Kam vede značka, kterou Claude použil v duplicate_of nebo kterou zpráva vytvořila.
 export function refLink(ref) {
@@ -73,7 +73,8 @@ export function pickForm(base, formId) {
 
 export function processButton(base, entry) {
   if (entry.status === "hotovo" || picked(entry)) return "";
-  const label = entry.status === "preskoceno" || entry.status === "duplicita" ? "Přesto zpracovat" : "Zpracovat teď";
+  const label =
+    entry.status === "smazano" ? "Zpracovat znovu" : entry.status === "preskoceno" || entry.status === "duplicita" ? "Přesto zpracovat" : "Zpracovat teď";
   return `<form method="post" action="${base}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Posílám Drběně…">${label}</button></form>`;
 }
 

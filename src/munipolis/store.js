@@ -15,6 +15,7 @@ export const STATUS = {
   preskoceno: "Přeskočeno",
   duplicita: "Duplicita",
   chyba: "Chyba",
+  smazano: "Zpráva smazaná",
 };
 export const MAX_ATTEMPTS = 3;
 export const DEFAULT_FRESH_DAYS = 3;

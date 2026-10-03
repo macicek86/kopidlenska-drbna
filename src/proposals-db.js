@@ -1,6 +1,6 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
 // Návrhy od Drběny smí schválit i přispěvatel s oprávněním `drbena_navrhy`.
-import { asBool, clip, IMPORT_ITEM_TABLES, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
+import { asBool, clip, IMPORT_ITEM_TABLES, reopenImports, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
 import { readArticle, redactedFlag, textWasEdited } from "./db.js";
 import { forgetProposal, linkEventsToArticle } from "./events-db.js";
 import { releaseImage } from "./images.js";
@@ -265,6 +265,7 @@ export async function discardProposal(env, request, id) {
   if (!row || row.status !== "pending") return { ok: false, error: "Ten návrh už tu není." };
   await env.DB.prepare("delete from proposals where id = ?").bind(id).run();
   await forgetProposal(env, id);
+  await reopenImports(env, { proposalIds: [id] });
   await releaseImage(env, row.image_key ? String(row.image_key) : null);
   return { ok: true };
 }

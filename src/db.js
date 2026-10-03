@@ -13,6 +13,7 @@ import {
   asBool,
   clip,
   identify,
+  reopenImports,
   requireChief,
   slugify,
   uniqueSlug,
@@ -465,13 +466,14 @@ export async function removeArticle(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   const current = await env.DB.prepare("select image_key from articles where id = ?").bind(id).first();
-  const proposals = (await env.DB.prepare("select image_key from proposals where article_id = ?").bind(id).all()).results ?? [];
+  const proposals = (await env.DB.prepare("select id, image_key from proposals where article_id = ?").bind(id).all()).results ?? [];
   const keys = new Set();
   if (current?.image_key) keys.add(String(current.image_key));
   for (const row of proposals) if (row.image_key) keys.add(String(row.image_key));
   await env.DB.prepare("delete from proposals where article_id = ?").bind(id).run();
   await env.DB.prepare("delete from articles where id = ?").bind(id).run();
   await forgetArticle(env, id);
+  await reopenImports(env, { articleId: id, proposalIds: proposals.map((row) => row.id) });
   for (const key of keys) await releaseImage(env, key);
   return { ok: true };
 }

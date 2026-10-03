@@ -146,3 +146,30 @@ test("redakce má stránku Škola s nastavením fotek a detailem článku", () =
   assert.match(page, /Fotky jen z knihovny\./);
   assert.match(page, /href="\/redakce\/skola"/);
 });
+
+test("smazaná zpráva od Drběny vrátí zdrojový článek k novému zpracování", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { reopenImports, IMPORT_ITEM_TABLES } = await import("../src/db-core.js");
+  const { markManual } = await import("../src/background.js");
+  const db = new DatabaseSync(":memory:");
+  const statement = (sql, values = []) => ({
+    bind: (...next) => statement(sql, next),
+    run: async () => ({ meta: { changes: db.prepare(sql).run(...values).changes } }),
+    first: async () => db.prepare(sql).get(...values) ?? null,
+  });
+  const env = { DB: { prepare: (sql) => statement(sql) } };
+  for (const table of IMPORT_ITEM_TABLES) {
+    db.exec(`create table ${table} (id integer primary key, status text, reason text, article_id integer, proposal_id integer, manual integer, attempts integer)`);
+  }
+  db.exec(`insert into skola_items values (1, 'hotovo', '', 7, 3, 1, 1), (2, 'hotovo', '', 8, null, 0, 0), (3, 'hotovo', '', null, 5, 0, 0)`);
+  await reopenImports(env, { articleId: 7, proposalIds: [] });
+  await reopenImports(env, { proposalIds: [5] });
+  const rows = db.prepare("select id, status, article_id, proposal_id from skola_items order by id").all().map((row) => ({ ...row }));
+  assert.deepEqual(rows, [
+    { id: 1, status: "smazano", article_id: null, proposal_id: null },
+    { id: 2, status: "hotovo", article_id: 8, proposal_id: null },
+    { id: 3, status: "smazano", article_id: null, proposal_id: null },
+  ]);
+  assert.equal(await markManual(env, "skola_items", [1, 2]), 1);
+  assert.equal(db.prepare("select status from skola_items where id = 1").get().status, "nove");
+});
