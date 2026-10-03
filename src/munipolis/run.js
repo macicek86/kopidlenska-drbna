@@ -1,5 +1,5 @@
 // Jeden průchod importu: stáhnout RSS, nové zprávy dát Claudovi a výsledek uložit jako návrh, akci nebo odstávku.
-import { insertBotEvent } from "../events-db.js";
+import { saveBotEvent } from "../events-db.js";
 import {
   CLICK_BUDGET_MS,
   CLICK_LOCK_SECONDS,
@@ -104,9 +104,11 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
       }),
     );
   }
-  if (answer.event) {
+  if (answer.event || item.eventId) {
     // K akci patří zpráva (nebo návrh), kterou Drběna napsala ze stejné zprávy.
-    made.eventId = await insertBotEvent(env, answer.event, {
+    // Při novém zpracování smazané zprávy zůstává stará akce, nová se nezakládá.
+    made.eventId = await saveBotEvent(env, answer.event, {
+      existingId: item.eventId,
       published: settings.autoPublish,
       articleId: made.articleId,
       proposalId: made.proposalId,

@@ -1,5 +1,5 @@
 // Jeden průchod Deníku: z RSS vybrat články o Kopidlnu, stáhnout jejich volnou část a nechat Drběnu napsat, co je podstatné.
-import { insertBotEvent } from "../events-db.js";
+import { saveBotEvent } from "../events-db.js";
 import {
   CLICK_BUDGET_MS,
   CLICK_LOCK_SECONDS,
@@ -89,9 +89,11 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
       }),
     );
   }
-  if (answer.event) {
+  if (answer.event || item.eventId) {
     // K akci patří zpráva (nebo návrh), kterou Drběna napsala ze stejné zprávy.
-    made.eventId = await insertBotEvent(env, answer.event, {
+    // Při novém zpracování smazané zprávy zůstává stará akce, nová se nezakládá.
+    made.eventId = await saveBotEvent(env, answer.event, {
+      existingId: item.eventId,
       published: settings.autoPublish,
       articleId: made.articleId,
       proposalId: made.proposalId,

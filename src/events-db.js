@@ -118,6 +118,19 @@ export async function insertBotEvent(env, event, { published, articleId = null, 
   return Number(result.meta.last_row_id);
 }
 
+// Akce k položce importu. Když ji položka už má (zpráva z ní byla smazaná a Drběna ji píše znovu) a akce v kalendáři
+// pořád je, připojí k ní novou zprávu a nechá ji, jak je (redakce ji mohla upravit). Jinak založí novou, je-li z čeho.
+export async function saveBotEvent(env, event, { existingId = null, published, articleId = null, proposalId = null }) {
+  const existing = existingId ? await env.DB.prepare("select id from events where id = ?").bind(existingId).first() : null;
+  if (existing) {
+    await env.DB.prepare("update events set article_id = ?, proposal_id = ? where id = ?")
+      .bind(articleId ?? null, proposalId ?? null, existing.id)
+      .run();
+    return Number(existing.id);
+  }
+  return event ? insertBotEvent(env, event, { published, articleId, proposalId }) : null;
+}
+
 // Zpráva napsaná v redakci k akci (tlačítko „Napsat zprávu“ u akce).
 export async function attachArticle(env, eventId, articleId) {
   if (!eventId || !articleId) return;
