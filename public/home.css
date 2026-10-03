@@ -5,7 +5,15 @@
 
 .home-today > .waste-teaser { margin-top: 0; }
 
+/* Perex u menších zpráv vedle hlavní: na mobilu jeden řádek, dlouhý skončí „…“ a „víc ›“; na počítači až tři řádky a „víc ›“ vpravo dole */
+.card-side { min-width: 0; }
+.card-side .side-excerpt { display: flex; gap: 0.35em; margin: 0.35rem 0 0; white-space: nowrap; }
+.side-excerpt > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.side-more { flex: none; font-weight: 600; color: var(--brand-dark); }
+
 @media (min-width: 900px) {
+  .card-side .side-excerpt { align-items: flex-end; white-space: normal; }
+  .side-excerpt > :first-child { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
   .home-hero { grid-template-columns: 24rem minmax(0, 1fr); gap: 2rem; }
   .home-hero > .mascot > img { width: 22rem; }
   .home-today { display: block; columns: 2; column-gap: 0.8rem; }

@@ -108,6 +108,7 @@ function newsHtml(data, ctx) {
       (article) => `<a class="card card-side" href="/zpravy/${esc(article.slug)}">
         ${rubricKicker(article)}
         <h3>${esc(article.title)}</h3>
+        <p class="muted side-excerpt"><span>${esc(article.excerpt)}</span> <span class="side-more">víc ›</span></p>
       </a>`,
     )
     .join("");
