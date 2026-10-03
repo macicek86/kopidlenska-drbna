@@ -60,10 +60,10 @@ async function downloadImages(urls, fetchImpl) {
   return images;
 }
 
-// Fotku ze školního webu jen se zapnutým nastavením a když ji Drběna vybrala (plakát ne), jinak ilustrační z knihovny.
+// Fotku ze školního webu jen se zapnutým nastavením a když ji Drběna vybrala (i pěkný plakát, ořízne se jako fotka), jinak ilustrační z knihovny.
 export async function skolaImage(env, article, images, ownPhotos, source = SCHOOLS.skola) {
   const [own] = visibleImages(images);
-  if (ownPhotos && article.imageUse === "vlastni" && own) {
+  if (ownPhotos && article.imageUse !== "knihovna" && own) {
     return { key: await storeImageBytes(env, own), focus: "", caption: photoCaption(article.imageCaption, source) };
   }
   return pickStockImage(env, article.imageTopic);

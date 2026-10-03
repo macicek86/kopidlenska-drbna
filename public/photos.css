@@ -13,6 +13,9 @@
   background: var(--paper-deep);
 }
 
+/* Plakát se neořezává, v kartě je vidět celý na podkladu. */
+.cover.is-whole, .story-photo.is-whole { object-fit: contain; }
+
 /* Bod výřezu z redakce: x a y po desítkách procent. */
 .fx-0 { --fx: 0%; }
 .fx-1 { --fx: 10%; }

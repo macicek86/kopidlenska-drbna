@@ -1021,6 +1021,9 @@ test("bod výřezu fotky se zaokrouhlí na desítky a nese ho třída", () => {
   assert.equal(readFocus("x 20"), "");
   assert.equal(focusClass("50 30"), "fx-5 fy-3");
   assert.equal(focusClass(""), "");
+  // Plakát se neořezává.
+  assert.equal(readFocus("cele"), "cele");
+  assert.equal(focusClass("cele"), "is-whole");
   const card = storyPhoto({ imageKey: "clanky/a.webp", imageFocus: "20 80" }, "story-photo");
   assert.match(card, /class="story-photo fx-2 fy-8"/);
   assert.doesNotMatch(card, /style=/);

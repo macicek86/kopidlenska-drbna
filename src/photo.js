@@ -9,8 +9,12 @@ function tenth(value) {
   return Math.min(100, Math.max(0, Math.round(number / 10) * 10));
 }
 
+// Plakát se neořezává: místo bodu výřezu nese značku, že má být vidět celý.
+export const WHOLE = "cele";
+
 // Bod výřezu je „x y“ v procentech, po desítkách. Prázdný znamená střed.
 export function readFocus(value) {
+  if (String(value ?? "").trim() === WHOLE) return WHOLE;
   const parts = String(value ?? "").trim().split(/\s+/);
   if (parts.length !== 2) return "";
   const x = tenth(parts[0]);
@@ -27,6 +31,7 @@ export function readCaption(value) {
 export function focusClass(focus) {
   const clean = readFocus(focus);
   if (!clean) return "";
+  if (clean === WHOLE) return "is-whole";
   const [x, y] = clean.split(" ").map((part) => Number(part) / 10);
   return `fx-${x} fy-${y}`;
 }

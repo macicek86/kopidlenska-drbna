@@ -25,9 +25,11 @@ ${KEYWORDS_RULE}
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná. Odstávky a uzavírky (notice) škola nehlásí, notice nech vždy include false.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
 
-const OWN_IMAGES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná ({PEOPLE}) a nese málo textu. Plakát, leták, pozvánka, logo, tabulka nebo koláž s textem jsou "knihovna". Když nic přiložené není, taky "knihovna".
+const OWN_IMAGES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná ({PEOPLE}) a nese málo textu.
+  "plakat", když je přiložený pěkně udělaný plakát nebo pozvánka na akci, kde aspoň zhruba třetinu plochy zabírají fotky nebo kresby. Delší odstavce textu nevadí, rozhodují obrázky. Oznámení, která nezvou na akci (zavřeno, změna, upozornění), jsou "knihovna", i když mají pěkné malované pozadí nebo ozdoby.
+  "knihovna" u plakátu nebo letáku, na kterém fotky a kresby skoro nejsou, nebo jsou jen malé (logo, ikonka, drobný obrázek v rohu), a u loga, tabulky nebo koláže s textem. Když nic přiložené není, taky "knihovna".
 - image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Použije se, když vlastní fotka není. Když nesedí žádné, nech prázdné.
-- image_caption: krátký popisek vlastní fotky, nebo prázdný text. Když škola u článku píše, kdo fotky pořídil nebo poskytl, přidej to do popisku. U "knihovna" vždy prázdný.`;
+- image_caption: krátký popisek vlastní fotky nebo plakátu, nebo prázdný text. Když škola u článku píše, kdo fotky pořídil nebo poskytl, přidej to do popisku. U "knihovna" vždy prázdný.`;
 
 const STOCK_IMAGES = `- image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné. Fotky ze školního webu se neberou, image_caption nech prázdné.`;
 

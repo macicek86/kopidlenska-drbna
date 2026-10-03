@@ -39,7 +39,7 @@ test("Claude dostane témata knihovny a smí vybrat jen z nich", () => {
   assert.match(text, /Přiložené obrázky: 1/);
   const schema = outputSchema(SLUGS, { topics: ["obecne", "kultura"] }).properties.article;
   assert.deepEqual(schema.properties.image_topic.enum, ["obecne", "kultura", ""]);
-  assert.deepEqual(schema.properties.image_use.enum, ["vlastni", "knihovna"]);
+  assert.deepEqual(schema.properties.image_use.enum, ["vlastni", "plakat", "knihovna"]);
   assert.ok(schema.required.includes("image_use") && schema.required.includes("image_topic"));
 });
 
@@ -49,7 +49,7 @@ test("Deník vlastní fotku vybrat nemůže", () => {
   assert.ok(!schema.required.includes("image_use"));
 });
 
-test("plakát jde do knihovny a jeho popisek se zahodí", () => {
+test("textový plakát jde do knihovny a jeho popisek se zahodí, pěkný zůstane", () => {
   const poster = readDecision(answer({ image_use: "knihovna", image_topic: "kultura", image_caption: "Plakát na pouť" }), { rubricSlugs: SLUGS });
   assert.equal(poster.article.imageUse, "knihovna");
   assert.equal(poster.article.imageTopic, "kultura");
@@ -57,6 +57,9 @@ test("plakát jde do knihovny a jeho popisek se zahodí", () => {
   const photo = readDecision(answer({ image_use: "vlastni", image_caption: "Kolotoče" }), { rubricSlugs: SLUGS });
   assert.equal(photo.article.imageUse, "vlastni");
   assert.equal(photo.article.imageCaption, "Kolotoče");
+  const nice = readDecision(answer({ image_use: "plakat", image_caption: "Plakát bazárku" }), { rubricSlugs: SLUGS });
+  assert.equal(nice.article.imageUse, "plakat");
+  assert.equal(nice.article.imageCaption, "Plakát bazárku");
   // Bez image_use (Deník) je obrázek vždy z knihovny.
   assert.equal(readDecision(answer({}), { rubricSlugs: SLUGS }).article.imageUse, "knihovna");
 });

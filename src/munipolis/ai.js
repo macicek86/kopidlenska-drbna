@@ -16,9 +16,11 @@ export { addArticles, articleLine, contextText } from "../import-overview.js";
 const MAX_IMAGE_BYTES = 3_700_000;
 
 // Obrázek u článku: vlastní fotka jen když stojí za to, jinak ilustrační z knihovny obrázků.
-const IMAGE_RULES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu. Plakát, leták, pozvánka, vyhláška, tabulka, mapa nebo logo jsou "knihovna", i když jsou barevné. Když nic přiložené není, taky "knihovna".
+const IMAGE_RULES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu.
+  "plakat", když je přiložený pěkně udělaný plakát nebo pozvánka na akci, kde aspoň zhruba třetinu plochy zabírají fotky nebo kresby. Delší odstavce textu nevadí, rozhodují obrázky. Oznámení, která nezvou na akci (zavřeno, změna, upozornění), jsou "knihovna", i když mají pěkné malované pozadí nebo ozdoby.
+  "knihovna" u plakátu nebo letáku, na kterém fotky a kresby skoro nejsou, nebo jsou jen malé (logo, ikonka, drobný obrázek v rohu), a u vyhlášky, tabulky, mapy nebo loga, i když jsou barevné. Když nic přiložené není, taky "knihovna".
 - image_topic: téma z knihovny obrázků, které ke zprávě nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.
-- image_caption: krátký popisek vlastní fotky, nebo prázdný text. U "knihovna" vždy prázdný.`;
+- image_caption: krátký popisek vlastní fotky nebo plakátu (u plakátu třeba „Plakát bazárku“), nebo prázdný text. U "knihovna" vždy prázdný.`;
 
 const RULES = `Dostaneš jednu zprávu z městského Munipolisu Kopidlna a přehled toho, co už na webu Kopidlenská drbna je.
 
@@ -117,7 +119,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
   };
   if (ownImage) {
     schema.properties.article.required.push("image_use");
-    schema.properties.article.properties.image_use = { type: "string", enum: ["vlastni", "knihovna"] };
+    schema.properties.article.properties.image_use = { type: "string", enum: ["vlastni", "plakat", "knihovna"] };
   }
   if (hours) {
     schema.required.push("hours");
@@ -168,7 +170,7 @@ export function readArticle(raw, rubricSlugs) {
   const excerpt = clean(raw.excerpt, 320);
   const rubric = rubricSlugs.includes(raw.rubric) ? raw.rubric : "";
   if (title.length < 3 || excerpt.length < 3 || prepared.text.length < 3 || !rubric) return null;
-  const imageUse = raw.image_use === "vlastni" ? "vlastni" : "knihovna";
+  const imageUse = ["vlastni", "plakat"].includes(raw.image_use) ? raw.image_use : "knihovna";
   return {
     title,
     excerpt,
@@ -176,7 +178,7 @@ export function readArticle(raw, rubricSlugs) {
     rubric,
     imageUse,
     imageTopic: clean(raw.image_topic, 60),
-    imageCaption: imageUse === "vlastni" ? clean(raw.image_caption, 200) : "",
+    imageCaption: imageUse !== "knihovna" ? clean(raw.image_caption, 200) : "",
     keywords: readKeywords(raw.keywords),
   };
 }

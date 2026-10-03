@@ -58,10 +58,13 @@ async function downloadImages(urls, fetchImpl) {
   return images;
 }
 
-// Vlastní fotku ze zprávy jen tehdy, když ji Drběna vybrala (plakát ne), jinak ilustrační z knihovny.
+// Vlastní fotku nebo pěkný plakát ze zprávy jen tehdy, když je Drběna vybrala, jinak ilustrační z knihovny.
+// Plakát se zatím ořezává jako fotka (celý by šel ukázat s bodem výřezu WHOLE).
 export async function articleImage(env, article, images) {
   const [own] = visibleImages(images);
-  if (article.imageUse === "vlastni" && own) return { key: await storeImageBytes(env, own), focus: "", caption: article.imageCaption };
+  if (article.imageUse !== "knihovna" && own) {
+    return { key: await storeImageBytes(env, own), focus: "", caption: article.imageCaption };
+  }
   return pickStockImage(env, article.imageTopic);
 }
 
