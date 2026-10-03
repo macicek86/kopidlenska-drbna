@@ -60,7 +60,7 @@ export function parseWordpressPosts(json, { maxItems = MAX_ITEMS, skip = [] } = 
       guid: guid.slice(0, 300),
       link: link.slice(0, 300),
       title,
-      text: htmlToText(html),
+      text: htmlToText(html, { links: link || true }),
       images: images.slice(0, 3),
       section: sections.join(", ").slice(0, 80),
       term: "",

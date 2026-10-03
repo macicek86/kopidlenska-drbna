@@ -140,3 +140,14 @@ test("přílohy ve zprávě: čtení, odškrtnutí v redakci a výpis pod člán
   assert.match(html, /Jízdní řád &lt;723&gt;/);
   assert.equal(attachmentsSection({ attachments: [] }), "");
 });
+
+test("odkazy ze zdroje zůstanou v textu pro Drběnu jako „popis (adresa)“", async () => {
+  const { htmlToText } = await import("../src/munipolis/feed.js");
+  const html = `<p>Trasa: <a href="https://mapy.com/s/x">https://mapy.com/s/x</a>, <a href="/prihlaska.pdf">přihláška</a>,
+    <a href="mailto:skola@kopidlno.cz">napište</a>, <a href="javascript:alert(1)">zlé</a>, <a href="/foto.jpg"><img src="/foto.jpg"></a></p>`;
+  assert.equal(
+    htmlToText(html, { links: "https://skola.cz/clanek/5" }),
+    "Trasa: https://mapy.com/s/x, přihláška (https://skola.cz/prihlaska.pdf),\nnapište (mailto:skola@kopidlno.cz), zlé,",
+  );
+  assert.equal(htmlToText(html).includes("prihlaska"), false);
+});

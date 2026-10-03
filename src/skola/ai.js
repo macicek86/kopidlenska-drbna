@@ -4,7 +4,7 @@ import { clubRules } from "../clubs.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { KEYWORDS_RULE } from "../keywords.js";
-import { base64, contextText, outputSchema, readArticle, readDecision, visibleImages } from "../munipolis/ai.js";
+import { base64, contextText, LINK_RULE, outputSchema, readArticle, readDecision, visibleImages } from "../munipolis/ai.js";
 import { topicsText } from "../stock.js";
 import { SCHOOLS } from "./sources.js";
 
@@ -18,7 +18,8 @@ Pravidla:
 {IMAGES}{CLUBS}
 - title: do 90 znaků, vlastní, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
-- body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
+${LINK_RULE}
+- body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li>, <h3> a <a> s odkazem ze zdroje. Odkaz na zdroj nepiš, drbna ho doplní sama.
 - event.description: prostý text, jedna až tři věty.
 ${KEYWORDS_RULE}
 - Datum piš jako RRRR-MM-DD a čas jako HH:MM.

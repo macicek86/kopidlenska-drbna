@@ -27,6 +27,9 @@ const IMAGE_RULES = `- Obrázky jsou očíslované (Obrázek 1, 2…). Vlastní 
 - image_topic: téma z knihovny obrázků, které ke zprávě nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.
 - image_caption: krátký popisek vlastní fotky nebo plakátu (u plakátu třeba „Plakát bazárku“), nebo prázdný text. U "knihovna" vždy prázdný.`;
 
+// Odkazy ze zdroje do článku (Munipolis i školy). Ve zdroji jsou jako „popis (adresa)“, viz htmlToText v feed.js.
+export const LINK_RULE = `- Odkazy ze zdroje, které čtenáři pomůžou (mapa, objízdná trasa, přihláška, formulář, e-mail), smíš dát do textu jako <a href="adresa">krátký popis</a>. Ve zdroji jsou jako „popis (adresa)“. Adresu opiš přesně, jiné nevymýšlej a odkaz na samotný článek zdroje nedávej.`;
+
 // Přílohy pod článkem (src/attachments.js): zpráva z Munipolisu mívá v galerii jízdní řády, mapy nebo rozpisy.
 const ATTACHMENT_RULES = `- attachments: obrázky, které si čtenář potřebuje prohlédnout sám a jejich obsah se do textu nevejde: jízdní řády, mapa uzavírky nebo objížďky, rozpis, tabulka, leták s podrobnostmi. U každého číslo obrázku (image) a krátký popisek, co na něm je (caption), třeba „Výlukový jízdní řád linky 723 Kopidlno – Mladá Boleslav“. Obrázek 1 sem nedávej, když je image_use "vlastni" nebo "plakat". Fotky, loga, ozdoby a obrázky, jejichž údaje už celé jsou v textu, taky ne. Když nic takového není, dej prázdné pole.
   Když přílohy jsou, napiš v textu, že jsou pod článkem („jízdní řády najdete pod článkem“).`;
@@ -52,7 +55,7 @@ Pravidla:
 - Data, časy, místa, jména, ceny a telefony opiš přesně podle zdroje. Nic nevymýšlej. Když údaj chybí, nech pole prázdné. Rok doplň podle data zveřejnění zprávy.
 - Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
 - Zprávu podej jako svou novinku, ne jako převyprávěné oznámení. Nepiš, že město nebo radnice něco oznámila, informuje, zveřejnila, prosí nebo se omlouvá, ani „v příloze oznámení“. Co zpráva čtenářům říká, napiš rovnou („Řidiči i cestující, počítejte s omezením.“). Město jmenuj jen tam, kde samo něco dělá (opravuje, pořádá, rozhodlo). Odkaz na zdroj drbna přidá sama.
-- Odkazy ze zdroje, které čtenáři pomůžou (mapa uzavírky, objízdná trasa, přihláška), smíš dát do textu jako <a href="adresa">krátký popis</a>. Adresu opiš přesně ze zdroje, jiné nevymýšlej.
+${LINK_RULE}
 ${IMAGE_RULES}
 ${ATTACHMENT_RULES}
 ${KEYWORDS_RULE}

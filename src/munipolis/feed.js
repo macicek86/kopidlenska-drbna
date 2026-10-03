@@ -29,9 +29,30 @@ export function tag(block, name) {
   return match ? unwrap(match[1]) : "";
 }
 
+// Odkaz zůstane v textu jako „popis (adresa)“, ať ho Drběna může dát do článku. Relativní adresu doplní podle `base`
+// (adresa článku), jiné než https, http a mailto zahodí, stejně jako odkazy na obrázky. Když je popis sám adresou, zůstane jen on.
+function keepLinks(html, base) {
+  return html.replace(/<a\b[^>]*?\bhref\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (all, href, inner) => {
+    let url = "";
+    try {
+      url = new URL(decodeEntities(href).trim(), base || undefined).href;
+    } catch {
+      return inner;
+    }
+    if (!/^(https?:|mailto:)/i.test(url)) return inner;
+    const label = decodeEntities(inner.replace(/<[^>]+>/g, "")).trim();
+    // Odkaz bez popisu bývá fotka v galerii, ta Drběně nic neřekne.
+    if (!label || /\.(?:jpe?g|png|webp|gif)(?:[?#]|$)/i.test(url)) return inner;
+    if (label.includes(url.replace(/^mailto:/i, "").replace(/\/$/, ""))) return inner;
+    return `${inner} (${url})`;
+  });
+}
+
 // Text zprávy pro AI i pro náhled v redakci: odstavce oddělené prázdným řádkem, bez značek.
-export function htmlToText(html) {
-  const text = String(html ?? "")
+// `links` nechá u odkazů adresu (true, nebo adresa článku pro doplnění relativních odkazů).
+export function htmlToText(html, { links = false } = {}) {
+  const source = links ? keepLinks(String(html ?? ""), typeof links === "string" ? links : "") : String(html ?? "");
+  const text = source
     .replace(/\r\n?/g, "\n")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n")
@@ -77,7 +98,7 @@ export function parseFeed(xml, { maxItems = MAX_ITEMS } = {}) {
       guid: guid.slice(0, 300),
       link: /^https:\/\//i.test(link) ? link.slice(0, 300) : "",
       title,
-      text: htmlToText(html),
+      text: htmlToText(html, { links: link || true }),
       images: imagesIn(html).slice(0, 3),
       publishedAt: isoStamp(tag(block, "pubDate")),
     });
