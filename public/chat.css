@@ -174,7 +174,8 @@
 
 .chat-fine { margin: 0; padding: 0 0.9rem 0.65rem; color: var(--muted); font-size: 0.75rem; line-height: 1.35; }
 
-@media (max-width: 540px) {
+/* Telefon, i otočený na šířku (nízký dotykový displej): okénko přes celou viditelnou plochu. */
+@media (max-width: 540px), (pointer: coarse) and (max-height: 540px) {
   .chat { right: 0.75rem; bottom: 0.75rem; }
   /* Výšku a polohu nad klávesnicí dopočítá chat.js (top, height). */
   .chat.is-open { inset: 0.5rem; bottom: auto; height: calc(100dvh - 1rem); }

@@ -285,24 +285,50 @@ function setup() {
     field.style.overflowY = height > 120 ? "auto" : "hidden";
   }
 
-  // Na mobilu okénko vyplní jen viditelnou část nad klávesnicí, ať hlavička nezajede nahoru.
-  const phone = window.matchMedia("(max-width: 540px)");
+  // Na mobilu (i na šířku) okénko vyplní jen viditelnou část nad klávesnicí, ať hlavička nezajede nahoru.
+  // Prohlížeče hlásí změnu klávesnice nespolehlivě (iOS často až po animaci, někdy vůbec),
+  // proto se po každém podnětu ještě chvíli přeměřuje v každém snímku.
+  const phone = window.matchMedia("(max-width: 540px), (pointer: coarse) and (max-height: 540px)");
   const viewport = window.visualViewport;
+  let fitted = "";
+  let settleFrame = 0;
 
   function fitScreen() {
     if (panel.hidden || !phone.matches || !viewport) {
-      root.style.removeProperty("top");
-      root.style.removeProperty("height");
+      if (fitted) {
+        root.style.removeProperty("top");
+        root.style.removeProperty("height");
+        fitted = "";
+      }
       return;
     }
-    root.style.top = `${Math.round(viewport.offsetTop) + 8}px`;
-    root.style.height = `${Math.round(viewport.height) - 16}px`;
+    const top = Math.max(0, Math.round(viewport.offsetTop)) + 8;
+    const height = Math.round(viewport.height) - 16;
+    const next = `${top}:${height}`;
+    if (next === fitted) return;
+    fitted = next;
+    root.style.top = `${top}px`;
+    root.style.height = `${height}px`;
     log.scrollTop = log.scrollHeight;
   }
 
-  viewport?.addEventListener("resize", fitScreen);
-  viewport?.addEventListener("scroll", fitScreen);
-  phone.addEventListener("change", fitScreen);
+  function settle(ms = 800) {
+    const until = performance.now() + ms;
+    cancelAnimationFrame(settleFrame);
+    const tick = () => {
+      fitScreen();
+      if (performance.now() < until) settleFrame = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+
+  viewport?.addEventListener("resize", () => settle());
+  viewport?.addEventListener("scroll", () => settle());
+  window.addEventListener("resize", () => settle());
+  window.addEventListener("orientationchange", () => settle(1200));
+  phone.addEventListener("change", () => settle());
+  field.addEventListener("focus", () => settle(1200));
+  field.addEventListener("blur", () => settle(1200));
 
   function open() {
     panel.hidden = false;
@@ -310,8 +336,8 @@ function setup() {
     root.classList.add("is-open");
     document.documentElement.classList.add("chat-lock");
     render();
-    fitScreen();
     field.focus();
+    settle(1200);
   }
 
   function shut() {
