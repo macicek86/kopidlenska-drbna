@@ -448,8 +448,8 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   const home = homePage({ ...bare, ads: [ad] }, ctx);
   assert.match(home, /class="ad-panel has-photo"/);
   assert.match(home, /Reklama/);
-  // JSON-LD je jen data (CSP ho nehlídá), jiný skript na titulce být nemá.
-  assert.doesNotMatch(home, /<script(?! type="application\/ld\+json")/);
+  // JSON-LD je jen data (CSP ho nehlídá), jiný skript než vlastní menu na titulce být nemá.
+  assert.doesNotMatch(home, /<script(?! type="application\/ld\+json")(?! src="\/nav\.js")/);
   const pinned = homePage(
     { ...bare, ads: [ad, { ...ad, id: 2, slug: "kolo", title: "Seřízení kola" }], ad },
     ctx,
@@ -1045,4 +1045,16 @@ test("odkaz na Facebook jde upravit i vypnout pomlčkou", () => {
   const page = layout({ title: "T", path: "/", body: "", copy: {} });
   assert.match(page, /<footer>[\s\S]*facebook\.com\/groups\/kopidlenskadrbna[\s\S]*<\/footer>/);
   assert.doesNotMatch(layout({ title: "T", path: "/", body: "", copy: { facebook_url: "-" } }), /facebook\.com\/groups/);
+});
+
+test("služby jsou v menu pod Praktické, na mobilu na konci", () => {
+  const page = layout({ path: "/odstavky", copy: {}, title: "T", description: "", body: "" });
+  const desktop = page.match(/<nav class="nav" aria-label="Hlavní">(.*?)<\/nav>/s)[1];
+  assert.match(desktop, /<summary class="nav-link is-on">Praktické<\/summary><div class="nav-drop">.*href="\/popelnice".*href="\/odstavky".*<\/div><\/details><a class="nav-link" href="\/reklamy">/s);
+  assert.match(desktop, /^<a class="nav-link" href="\/zpravy">/);
+  const mobile = page.match(/<nav aria-label="Mobilní">(.*?)<\/nav>/s)[1];
+  assert.match(mobile, /href="\/o-nas">O nás<\/a><p class="nav-head">Praktické<\/p><a class="nav-link" href="\/popelnice">/);
+  assert.match(page, /<script src="\/nav\.js" defer><\/script>/);
+  const news = layout({ path: "/zpravy", copy: {}, title: "T", description: "", body: "" });
+  assert.match(news, /<summary class="nav-link">Praktické<\/summary>/);
 });

@@ -155,6 +155,41 @@ a { color: inherit; }
 
 .mobile-nav .nav-link { padding: 0.7rem 0.8rem; }
 
+.mobile-nav .nav-head {
+  margin: 0.45rem 0.8rem 0;
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nav-more { position: relative; }
+
+.nav-more summary { list-style: none; cursor: pointer; }
+
+.nav-more summary::-webkit-details-marker { display: none; }
+
+.nav-more summary::after { content: "▾"; margin-left: 0.35rem; font-size: 0.8em; }
+
+.nav-more[open] summary::after { content: "▴"; }
+
+.nav-drop {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  display: grid;
+  gap: 0.2rem;
+  min-width: 13rem;
+  margin-top: 0.4rem;
+  padding: 0.4rem;
+  border-radius: 1rem;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.nav-drop .nav-link { padding: 0.6rem 0.8rem; }
+
 main { flex: 1; padding-bottom: 2.5rem; }
 
 footer {

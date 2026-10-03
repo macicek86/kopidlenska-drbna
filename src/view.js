@@ -12,17 +12,15 @@ export { homePage } from "./home.js";
 export { eventsPage } from "./events-view.js";
 export { doctorsPage, placesPage } from "./hours-view.js";
 
-const NAV = [
-  ["/zpravy", "nav_news"],
-  ["/akce", "nav_events"],
-  ["/reklamy", "nav_ads"],
+// Služby jsou v menu pod jednou rozbalovací položkou, ať se menu na počítači vejde vedle loga.
+const PRACTICAL = [
   ["/popelnice", "nav_bins"],
   ["/sberne-dvory", "nav_yards"],
   ["/lekari", "nav_doctors"],
   ["/oteviraci-doba", "nav_places"],
   ["/odstavky", "nav_outages"],
-  ["/o-nas", "nav_about"],
 ];
+const NAV = [["/zpravy", "nav_news"], ["/akce", "nav_events"], PRACTICAL, ["/reklamy", "nav_ads"], ["/o-nas", "nav_about"]];
 
 const OG_IMAGE = "/og.webp";
 const OG_WIDTH = 1200;
@@ -70,16 +68,22 @@ export function layout({
   const siteName = tx(copy, "site_name");
   const facebook = facebookUrl(copy);
   const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
-  const links = NAV.map(
-    ([href, key]) =>
-      `<a class="nav-link${active(path, href)}" href="${href}">${esc(tx(copy, key))}</a>`,
+  const link = ([href, key]) => `<a class="nav-link${active(path, href)}" href="${href}">${esc(tx(copy, key))}</a>`;
+  const practical = esc(tx(copy, "nav_practical"));
+  const practicalOn = PRACTICAL.some(([href]) => active(path, href)) ? " is-on" : "";
+  const desktopLinks = NAV.map((entry) =>
+    entry === PRACTICAL
+      ? `<details class="nav-more" data-nav-more><summary class="nav-link${practicalOn}">${practical}</summary><div class="nav-drop">${PRACTICAL.map(link).join("")}</div></details>`
+      : link(entry),
   ).join("");
+  // Na mobilu jsou služby na konci pod nadpisem, ať k nim nepatří Reklamy a O nás.
+  const mobileLinks = `${NAV.filter((entry) => entry !== PRACTICAL).map(link).join("")}<p class="nav-head">${practical}</p>${PRACTICAL.map(link).join("")}`;
   const headerNav = minimal
     ? `<a class="btn btn-line" href="${esc(mainOrigin)}">${esc(tx(copy, "link_whole"))}</a>`
-    : `<nav class="nav" aria-label="Hlavní">${links}</nav>
+    : `<nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
        <details class="mobile-nav">
          <summary>${esc(tx(copy, "menu_label"))}</summary>
-         <nav aria-label="Mobilní">${links}</nav>
+         <nav aria-label="Mobilní">${mobileLinks}</nav>
        </details>`;
   return `<!doctype html>
 <html lang="cs">
@@ -138,6 +142,7 @@ export function layout({
     </footer>
   </div>
   ${script}
+  ${minimal ? "" : `<script src="/nav.js" defer></script>`}
   ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>
 </html>`;

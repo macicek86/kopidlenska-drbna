@@ -5,6 +5,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "nav_news", label: "Menu: zprávy", value: "Zprávy", max: 40 },
   { group: "Hlavička a patička", key: "nav_events", label: "Menu: akce", value: "Akce", max: 40 },
   { group: "Hlavička a patička", key: "nav_ads", label: "Menu: reklamy", value: "Reklamy", max: 40 },
+  { group: "Hlavička a patička", key: "nav_practical", label: "Menu: rozbalovací položka se službami", value: "Praktické", max: 40 },
   { group: "Hlavička a patička", key: "nav_bins", label: "Menu: popelnice", value: "Popelnice", max: 40 },
   { group: "Hlavička a patička", key: "nav_yards", label: "Menu: sběrné dvory", value: "Sběrné dvory", max: 40 },
   { group: "Hlavička a patička", key: "nav_doctors", label: "Menu: lékaři", value: "Lékaři", max: 40 },
