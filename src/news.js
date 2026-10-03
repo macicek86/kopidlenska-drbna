@@ -91,15 +91,17 @@ export function articlePage(article, ctx, extras = {}) {
     published: article.createdOn,
     jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
     body: `
-      <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
-      ${articleCrumbs(article)}
-      <h1 class="article-title">${esc(article.title)}</h1>
-      ${articleMeta(article, extras.views)}
-      <div class="article-body${article.imageKey ? " has-photo" : ""}">
-        ${articleFigure(article)}
-        <div class="prose">${renderArticleHtml(article.body)}</div>
-      </div>
-      ${facebookInvite(ctx.copy)}
-      ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}`,
+      <div class="article-page">
+        <a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>
+        ${articleCrumbs(article)}
+        <h1 class="article-title">${esc(article.title)}</h1>
+        ${articleMeta(article, extras.views)}
+        <div class="article-body${article.imageKey ? " has-photo" : ""}">
+          ${articleFigure(article)}
+          <div class="prose">${renderArticleHtml(article.body)}</div>
+        </div>
+        ${facebookInvite(ctx.copy)}
+        ${ad ? `<div class="ad-slot">${adPanel(ad, ctx.copy)}</div>` : ""}
+      </div>`,
   });
 }
