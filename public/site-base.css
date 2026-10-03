@@ -21,9 +21,10 @@
 
 html { scroll-behavior: smooth; }
 
-/* Menší monitory (notebooky): všechno je v rem, takže menší základ zmenší celý web. Plných 16 px od šířky asi 1850 px, mobil beze změny. */
+/* Menší monitory (notebooky): všechno je v rem, takže menší základ zmenší celý web. Podle šířky i výšky okna
+   (nízké notebookové obrazovky), plných 16 px od asi 1900 × 930 px, mobil beze změny. */
 @media (min-width: 900px) {
-  html { font-size: clamp(14px, 0.4vw + 8.6px, 16px); }
+  html { font-size: clamp(12.5px, min(0.5vw + 6.5px, 1.4vh + 3px), 16px); }
 }
 
 body {
