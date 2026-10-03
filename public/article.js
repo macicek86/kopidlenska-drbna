@@ -20,8 +20,9 @@ function hugOrphans(body) {
     const rect = block.getBoundingClientRect();
     if (rect.top >= floatEnd) return;
     if (rect.bottom <= floatEnd) continue;
-    const below = rect.bottom - floatEnd;
-    if (below <= lineHeight(block) * 1.5) block.classList.add("hug");
+    // Řádky, které celé začínají až pod fotkou; ten, co začíná vedle ní, se nepočítá.
+    const linesBelow = Math.floor((rect.bottom - floatEnd + 1) / lineHeight(block));
+    if (linesBelow <= 1) block.classList.add("hug");
     return;
   }
 }
