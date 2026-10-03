@@ -26,8 +26,8 @@ function hugOrphans(body) {
     const linesBeside = Math.ceil((floatEnd - rect.top - 1) / line);
     if (linesBelow > 1 || linesBeside < 2) return;
     block.classList.add("hug");
-    // Pod fotkou nesmí zůstat víc než asi řádek prázdného místa, jinak radši osiřelý řádek.
-    if (block.getBoundingClientRect().bottom - floatEnd > line * 1.5) block.classList.remove("hug");
+    // Pod fotkou nesmí zůstat víc než asi dva řádky prázdného místa, jinak radši osiřelý řádek.
+    if (block.getBoundingClientRect().bottom - floatEnd > line * 2) block.classList.remove("hug");
     return;
   }
 }
