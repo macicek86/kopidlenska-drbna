@@ -729,6 +729,10 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .week-list.doctor-week li.is-today .hint { color: var(--muted); font-weight: 400; }
 
+.place-jump { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
+.place-jump .chip { color: var(--ink); }
+.place-card { scroll-margin-top: 1rem; }
+
 .banner p { margin: 0.15rem 0; }
 
 .banner .banner-note { font-weight: 500; margin-top: 0.28rem; }

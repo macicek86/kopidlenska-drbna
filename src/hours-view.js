@@ -134,7 +134,7 @@ function placeCard(place, today, ctx) {
     : `<p class="muted">${esc(tx(ctx.copy, "places_missing_hours"))}</p>`;
   const meta = [esc(place.place), phone].filter(Boolean).join(" · ");
   // Bloky karty jsou řádky mřížky (záhlaví, nadpis týdne, 7 dnů, změny), na počítači se srovnají s kartami vedle.
-  return `<article class="card yard place-card">
+  return `<article class="card yard place-card" id="misto-${place.id}">
     <div class="place-head">
       ${place.label ? `<p class="kicker">${esc(place.label)}</p>` : ""}
       <h2>${esc(place.name)}</h2>
@@ -153,6 +153,11 @@ export function placesPage(data, ctx) {
   const cards = places.length
     ? places.map((place) => placeCard(place, today, ctx)).join("")
     : `<p class="card dashed muted">${esc(tx(ctx.copy, "places_empty"))}</p>`;
+  const jump = places.length > 1
+    ? `<nav class="place-jump" aria-label="Rychlý přechod na místo">${places
+        .map((place) => `<a class="chip" href="#misto-${place.id}">${esc(place.name)}</a>`)
+        .join("")}</nav>`
+    : "";
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "places_heading")} | ${tx(ctx.copy, "site_name")}`,
@@ -161,6 +166,7 @@ export function placesPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "places_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "places_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "places_lede"))}</p>
+      ${jump}
       <div class="stack place-grid">${cards}</div>`,
   });
 }
