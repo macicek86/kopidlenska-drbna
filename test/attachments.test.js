@@ -90,7 +90,7 @@ test("schéma Munipolisu chce přílohy, ostatní importy ne; pokyny o uzavírce
   assert.equal(outputSchema(SLUGS).properties.article.properties.attachments, undefined);
   const system = systemPrompt("");
   assert.match(system, /attachments:/);
-  assert.match(system, /nepiš, že je zavřené celé náměstí/);
+  assert.match(system, /Nevysvětluj, co zavřené není/);
   assert.match(system, /Nepiš, že město nebo radnice něco oznámila/);
 });
 

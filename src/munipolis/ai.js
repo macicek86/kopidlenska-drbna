@@ -41,7 +41,7 @@ ${FOLLOWUP_DECISION}
 
 Co vytvořit:
 - Odstávka vody: notice s kind "voda". Každou ulici nebo část obce dej do places zvlášť. Článek jen tehdy, když zpráva říká víc než samotnou odstávku.
-- Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice. Piš přesně, co je zavřené: kterou ulici nebo silnici a odkud kam, podle textu nebo mapy na obrázku. Nadpis zdroje bývá zkratka („Uzavírka – Hilmarovo náměstí“). Když je zavřený jen kus silnice, který na náměstí nebo do obce vede, nepiš, že je zavřené celé náměstí nebo obec, ani v nadpisu. Do notice.places dej jen uzavřené úseky („Tomáše Svobody, úsek před vjezdem na náměstí“), ne celé náměstí.
+- Uzavírka silnice nebo objížďka: notice s kind "uzavirka" a k tomu článek v praktické rubrice. Úsek popiš tak, jak opravdu je (ulice, odkud kam, podle textu nebo mapy na obrázku), jednou a přirozeně. Nadpis zdroje bývá zkratka, nepiš podle něj víc, než je zavřené. Nevysvětluj, co zavřené není, a stejný údaj neopakuj. Nadpis piš lidsky, ne jako výčet ulic, třeba „Silnice u stadionu je zavřená, bruslaři musí jezdit jinudy“. Do notice.places dej jen uzavřené úseky.
 - Pozvánka na akci s datem: event a k tomu krátký článek s pozvánkou.
 - Zavření nebo jiná otevírací doba: hours, viz níže.
 - Cokoli jiného: článek.
