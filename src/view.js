@@ -322,6 +322,7 @@ export function eventsPage(data, ctx) {
       <p class="eyebrow">${esc(tx(ctx.copy, "events_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>
       <p class="lede">${esc(tx(ctx.copy, "events_lede"))}</p>
+      ${askLine(ctx, "events", "K akcím: ")}
       ${eventList(tx(ctx.copy, "events_upcoming"), upcoming, tx(ctx.copy, "events_upcoming_empty"))}
       ${adSlot(data, ctx)}
       ${past.length ? eventList(tx(ctx.copy, "events_past"), past, "") : ""}`,
