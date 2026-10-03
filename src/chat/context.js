@@ -37,15 +37,23 @@ function articleLine(article) {
   return `- ${formatShort(article.createdOn)} · ${rubric} · ${article.title} (/zpravy/${article.slug}): ${article.excerpt}`;
 }
 
+// Zapnuté reklamy (nabídky sousedů). Ukázkové ne, ty nikdo nenabízí doopravdy.
+export function adLines(ads) {
+  return (ads ?? [])
+    .filter((ad) => !ad.sample)
+    .map((ad) => `- ${ad.title} (/reklamy/${ad.slug}): ${ad.body}${ad.place ? ` · ${ad.place}` : ""}`);
+}
+
 // Přehled pro pokyny. Mění se jen se změnou dat, ne s časem, ať se dá uložit do cache.
-export function siteOverview(data, ctx) {
+export function siteOverview(data, ctx, { ads: withAds = true } = {}) {
   const articles = (data.articles ?? []).slice(0, RECENT_ARTICLES).map(articleLine);
+  const ads = withAds ? adLines(data.ads) : [];
   return `# Co je teď na drbně
 
 ## Nejnovější zprávy (/zpravy), starší najdeš nástrojem hledat_zpravy
 ${articles.length ? articles.join("\n") : "Zatím žádné zprávy."}
 
-${sitePages(data, ctx).join("\n\n")}`;
+${sitePages(data, ctx).join("\n\n")}${ads.length ? `\n\n## Reklamy: nabídky sousedů a místních (/reklamy)\n${ads.join("\n")}` : ""}`;
 }
 
 // Bez diakritiky a malými písmeny, ať „knihovně“ najde „knihovna“.

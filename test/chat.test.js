@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { askDrbena, usageCost } from "../src/chat/ai.js";
-import { fold, scoreArticle, searchStems, slugFrom } from "../src/chat/context.js";
+import { adLines, fold, scoreArticle, searchStems, slugFrom } from "../src/chat/context.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "../src/chat/pass.js";
 import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, ownChatPersona } from "../src/chat/prompt.js";
 import { readHistory } from "../src/chat/run.js";
@@ -88,8 +88,9 @@ test("historie z prohlížeče: začíná otázkou, je krátká a oříznutá", 
 
 test("nastavení chatu: meze a výchozí hodnoty", () => {
   const value = readChatSettings({ enabled: true, model: "opus", perVisitor: "9999", perDay: "", budget: "-5", keepDays: "14", persona: DEFAULT_CHAT_PERSONA });
-  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, persona: "" });
+  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, persona: "", ads: false });
   assert.equal(readChatSettings({ model: "haiku" }).model, "haiku");
+  assert.equal(readChatSettings({ chatAds: true }).ads, true);
 });
 
 test("cena odpovědi podle modelu i s cache", () => {
@@ -174,4 +175,13 @@ test("Drběna zná skupinu na Facebooku, jen když je zapnutá", () => {
   const url = "https://www.facebook.com/groups/kopidlenskadrbna";
   assert.match(chatInstructions({}, "", url), /\[skupina Kopidlenská drbna\]\(https:\/\/www\.facebook\.com\/groups\/kopidlenskadrbna\)/);
   assert.doesNotMatch(chatInstructions({}, ""), /Facebook/);
+});
+
+test("chat vidí reklamy, ukázkové ne", () => {
+  const ads = [
+    { title: "Seřízení kola", slug: "serizeni-kola", body: "Srovnám brzdy.", place: "Mlýnec", sample: false },
+    { title: "Čerstvý chléb", slug: "chleb", body: "V sobotu.", place: "", sample: true },
+  ];
+  assert.deepEqual(adLines(ads), ["- Seřízení kola (/reklamy/serizeni-kola): Srovnám brzdy. · Mlýnec"]);
+  assert.match(chatInstructions(null, ""), /Reklamy z přehledu/);
 });

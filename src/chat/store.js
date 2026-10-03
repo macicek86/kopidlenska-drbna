@@ -1,6 +1,6 @@
 // Chat s Drběnou v D1: nastavení, denní součty a cena, denní limity a uložené otázky.
 // Limity počítají otisk návštěvníka z počítadla návštěv (denní sůl, žádné IP); dnešní otisky se druhý den smažou.
-import { asBool, clip, IMPORT_ITEM_TABLES, requireChief, wrote } from "../db-core.js";
+import { addColumn, asBool, clip, IMPORT_ITEM_TABLES, requireChief, wrote } from "../db-core.js";
 import { addDays, pragueNow } from "../waste.js";
 import { chatModel, DEFAULT_CHAT_MODEL, USD_CZK } from "./ai.js";
 import { turnstileConfig } from "./pass.js";
@@ -19,7 +19,8 @@ export const CHAT_TABLES = [
     budget_czk integer not null default 500,
     keep_days integer not null default 30,
     persona text not null default '',
-    secret text not null default ''
+    secret text not null default '',
+    ads integer not null default 1
   )`,
   `create table if not exists chat_days (
     day text primary key,
@@ -57,6 +58,9 @@ function randomSecret() {
 
 export async function ensureChatTables(env) {
   for (const sql of CHAT_TABLES) await env.DB.prepare(sql).run();
+  const info = await env.DB.prepare("pragma table_info(chat_settings)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "ads", "alter table chat_settings add column ads integer not null default 1");
   await env.DB.prepare("insert into chat_settings (id, secret) select 1, ? where not exists (select 1 from chat_settings where id = 1)")
     .bind(randomSecret())
     .run();
@@ -88,6 +92,7 @@ function mapSettings(row) {
     budget: bounded(row?.budget_czk, BOUNDS.budget, CHAT_DEFAULTS.budget),
     keepDays: bounded(row?.keep_days, BOUNDS.keepDays, CHAT_DEFAULTS.keepDays),
     persona: ownChatPersona(row?.persona),
+    ads: row?.ads == null ? true : asBool(row.ads),
     secret: String(row?.secret ?? ""),
   };
 }
@@ -111,6 +116,7 @@ export function readChatSettings(fields) {
     budget: bounded(fields.budget, BOUNDS.budget, CHAT_DEFAULTS.budget),
     keepDays: bounded(fields.keepDays, BOUNDS.keepDays, CHAT_DEFAULTS.keepDays),
     persona: ownChatPersona(fields.persona),
+    ads: Boolean(fields.chatAds),
   };
 }
 
@@ -119,10 +125,10 @@ export async function saveChatSettings(env, request, fields) {
   if (!gate.ok) return gate;
   const value = readChatSettings(fields);
   await env.DB.prepare(
-    `update chat_settings set enabled = ?, model = ?, per_visitor = ?, per_day = ?, budget_czk = ?, keep_days = ?, persona = ?
+    `update chat_settings set enabled = ?, model = ?, per_visitor = ?, per_day = ?, budget_czk = ?, keep_days = ?, persona = ?, ads = ?
      where id = 1`,
   )
-    .bind(value.enabled ? 1 : 0, value.model, value.perVisitor, value.perDay, value.budget, value.keepDays, value.persona)
+    .bind(value.enabled ? 1 : 0, value.model, value.perVisitor, value.perDay, value.budget, value.keepDays, value.persona, value.ads ? 1 : 0)
     .run();
   return { ok: true, enabled: value.enabled };
 }

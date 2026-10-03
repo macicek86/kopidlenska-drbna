@@ -78,6 +78,7 @@ function settingsForm(settings) {
       ${numberField("Měsíční rozpočet v Kč", "budget", settings.budget, 0, 100000, "Když ho chat vyčerpá, do konce měsíce se odmlčí.")}
       ${numberField("Otázky uchovávat dní", "keepDays", settings.keepDays, 1, 365, "Starší se samy smažou.")}
     </div>
+    ${check("chatAds", "1", settings.ads, "Drběna vidí reklamy", "Nabídku sousedů zmíní, jen když se hodí k otázce, a řekne, že jde o reklamu.")}
     ${field(
       `Jak se Drběna chová v chatu ${settings.persona ? badge("Vlastní text", "info") : badge("Výchozí text")}`,
       `<textarea class="${input}" name="persona" rows="6" maxlength="${CHAT_PERSONA_MAX}">${esc(settings.persona || DEFAULT_CHAT_PERSONA)}</textarea>`,
@@ -97,6 +98,7 @@ function toggleButton(settings) {
     keepDays: settings.keepDays,
     persona: settings.persona,
   };
+  if (settings.ads) fields.chatAds = "1";
   if (!settings.enabled) fields.enabled = "1";
   return postButton(`${BASE}/ulozit`, fields, settings.enabled ? "Vypnout chat" : "Zapnout chat", settings.enabled ? "btn-line" : "btn-primary");
 }

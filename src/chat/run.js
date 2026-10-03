@@ -76,7 +76,7 @@ async function chatSystem(env, request) {
   const now = pragueNow();
   return [
     { type: "text", text: chatInstructions(drbena, settings.persona, facebookUrl(copy)) },
-    { type: "text", text: siteOverview(data, ctx), cache_control: { type: "ephemeral" } },
+    { type: "text", text: siteOverview(data, ctx, { ads: settings.ads }), cache_control: { type: "ephemeral" } },
     { type: "text", text: `Teď je ${formatLong(now.date).toLowerCase()} ${now.date.slice(0, 4)}, ${now.time} (${now.date}).` },
   ];
 }
