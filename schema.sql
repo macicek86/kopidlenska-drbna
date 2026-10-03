@@ -124,8 +124,6 @@ insert into copy (key, value) values
   ('countdown_tomorrow', 'Svoz je zítra.'),
   ('countdown_few', 'Za {n} dny.'),
   ('countdown_many', 'Za {n} dní.'),
-  ('popelnice_label', 'popelnice.kopidlenskadrbna.org'),
-  ('popelnice_url', 'https://popelnice.kopidlenskadrbna.org/'),
   ('about_description', 'Sousedská, ne úřední stránka pro Kopidlno a jeho části.'),
   ('about_eyebrow', 'O stránce'),
   ('about_heading', 'Sousedská, ne úřední'),

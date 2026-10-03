@@ -52,7 +52,6 @@ export {
 export { ensureSchema } from "./schema.js";
 export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
 export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
-export const POPELNICE_URL = "https://popelnice.kopidlenskadrbna.org/";
 const ARTICLE_FIELDS =
   "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 // Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
@@ -636,9 +635,6 @@ export async function saveCopy(env, request) {
   for (const item of COPY) {
     const value = clip(form.get(item.key), item.max);
     if (!value) return { ok: false, error: `Doplňte pole: ${item.label}.` };
-    if (item.key === "popelnice_url" && !/^https?:\/\//i.test(value)) {
-      return { ok: false, error: "Adresa původního svozu musí začínat na https://." };
-    }
     statements.push(
       env.DB.prepare(
         "insert into copy (key, value) values (?, ?) on conflict(key) do update set value = excluded.value",

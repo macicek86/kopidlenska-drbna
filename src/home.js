@@ -9,7 +9,7 @@ import { groupedNotices } from "./places.js";
 import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
 import { siteLd } from "./seo.js";
-import { clockOf, contentAd, externalHref, layout, signedWhen, siteOrigin } from "./view.js";
+import { clockOf, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
 
 function wasteTeaser(data, ctx) {
   return `<div class="card waste-teaser">
@@ -18,7 +18,6 @@ function wasteTeaser(data, ctx) {
     <p class="count">${esc(countdownLabel(data.waste.daysUntil, ctx.copy))}</p>
     <div class="row">
       <a class="btn btn-primary" href="/popelnice">${esc(tx(ctx.copy, "home_waste_button"))}</a>
-      <a class="btn btn-line" href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
     </div>
   </div>`;
 }

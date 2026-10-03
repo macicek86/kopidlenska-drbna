@@ -237,7 +237,6 @@ async function renderGet(request, env, url, execution) {
   if (minimalHome || path === "/popelnice") {
     return html(
       binsPage(data.waste, { ...ctx, path: "/popelnice", minimal: minimalHome || ctx.minimal }, {
-        showExternal: !minimalHome,
         standaloneTitle: minimalHome,
       }),
     );

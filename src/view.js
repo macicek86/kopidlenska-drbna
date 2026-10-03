@@ -11,11 +11,6 @@ export { outageCard, outageEmpty, outagesPage } from "./outages-view.js";
 export { homePage } from "./home.js";
 export { doctorsPage, placesPage } from "./hours-view.js";
 
-export function externalHref(copy) {
-  const value = tx(copy, "popelnice_url").trim();
-  return /^https?:\/\//i.test(value) ? value : "https://popelnice.kopidlenskadrbna.org/";
-}
-
 const NAV = [
   ["/zpravy", "nav_news"],
   ["/akce", "nav_events"],
@@ -329,7 +324,7 @@ export function eventsPage(data, ctx) {
   });
 }
 
-export function binsPage(waste, ctx, { showExternal, standaloneTitle }) {
+export function binsPage(waste, ctx, { standaloneTitle }) {
   const dates = waste.upcoming
     .map(
       (iso) => `<article class="date-tile"><strong>${esc(formatShort(iso))}</strong><span>${esc(formatLong(iso))}</span></article>`,
@@ -352,11 +347,6 @@ export function binsPage(waste, ctx, { showExternal, standaloneTitle }) {
             <span class="chip">${esc(waste.holidayNote)}</span>
             <span class="chip">${esc(tx(ctx.copy, "bins_kind"))}</span>
           </div>
-          ${
-            showExternal
-              ? `<a class="back" href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>`
-              : ""
-          }
           ${ctx.minimal ? "" : `<a class="back" href="/sberne-dvory">${esc(tx(ctx.copy, "bins_yards_link"))}</a>`}
         </div>
         <div class="bin-photo"><img src="/kozel-popelar.webp" alt="${esc(tx(ctx.copy, "bins_alt"))}"></div>

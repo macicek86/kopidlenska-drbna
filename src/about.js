@@ -1,7 +1,7 @@
 // Stránka O nás: volný text z Textů webu, kontakt na redakci a rozcestník.
 import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
-import { externalHref, layout } from "./view.js";
+import { layout } from "./view.js";
 
 // Prázdný řádek dělí odstavce, jednoduchý konec řádku zůstane uvnitř odstavce.
 export function paragraphs(value) {
@@ -39,7 +39,6 @@ export function aboutPage(data, ctx) {
             <a href="/oteviraci-doba">${esc(tx(ctx.copy, "about_places_link"))}</a>
             <a href="/odstavky">${esc(tx(ctx.copy, "about_outages_link"))}</a>
             <a href="/reklamy">${esc(tx(ctx.copy, "about_ads_link"))}</a>
-            <a href="${esc(externalHref(ctx.copy))}" target="_blank" rel="noreferrer">${esc(tx(ctx.copy, "popelnice_label"))}</a>
           </div>
         </div>
       </section>`,

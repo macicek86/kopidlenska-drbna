@@ -21,7 +21,7 @@ export function sitePages(data, ctx) {
   const bare = { ...data, ads: [], ad: null };
   const page = { ...ctx, chat: null, minimal: false };
   return [
-    ["Svoz odpadu (/popelnice)", binsPage(data.waste, { ...page, path: "/popelnice" }, { showExternal: true, standaloneTitle: false })],
+    ["Svoz odpadu (/popelnice)", binsPage(data.waste, { ...page, path: "/popelnice" }, { standaloneTitle: false })],
     ["Sběrné dvory (/sberne-dvory)", yardsPage(bare, { ...page, path: "/sberne-dvory" })],
     ["Lékaři (/lekari)", doctorsPage(bare, { ...page, path: "/lekari" })],
     ["Otevírací doba (/oteviraci-doba)", placesPage(bare, { ...page, path: "/oteviraci-doba" })],

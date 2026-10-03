@@ -70,8 +70,6 @@ export const COPY = [
   { group: "Popelnice", key: "countdown_tomorrow", label: "Odpočet, svoz zítra", value: "Svoz je zítra.", max: 80 },
   { group: "Popelnice", key: "countdown_few", label: "Odpočet do 4 dnů, {n} je počet", value: "Za {n} dny.", max: 80 },
   { group: "Popelnice", key: "countdown_many", label: "Odpočet od 5 dnů, {n} je počet", value: "Za {n} dní.", max: 80 },
-  { group: "Popelnice", key: "popelnice_label", label: "Text odkazu na původní svoz", value: "popelnice.kopidlenskadrbna.org", max: 120 },
-  { group: "Popelnice", key: "popelnice_url", label: "Adresa původního svozu", value: "https://popelnice.kopidlenskadrbna.org/", max: 200 },
   { group: "Popelnice", key: "bins_yards_link", label: "Odkaz ze svozu na sběrné dvory", value: "Sběrné dvory", max: 80 },
 
   { group: "Sběrné dvory", key: "yards_description", label: "Popis stránky sběrných dvorů", value: "Sběrné dvory v Kopidlně: co se tam vozí, kdy mají otevřeno a kdy je mimořádně zavřeno.", max: 240, long: true },
