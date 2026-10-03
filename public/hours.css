@@ -128,18 +128,22 @@
 .hours-pop .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.25rem; }
 .hours-pop .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 
-/* Místa mají krátké nebo žádné poznámky, den a časy jsou i na mobilu vedle sebe (lékaři pod sebou kvůli dlouhým poznámkám). */
-@media (max-width: 719.98px) {
-  .place-grid .doctor-week li:not(.is-off),
-  .place-grid .doctor-week li.is-off { grid-template-columns: 9rem minmax(0, 1fr); gap: 0.15rem 0.6rem; align-items: start; }
-  .place-grid .doctor-week li.is-today .day { font-size: inherit; }
+/* Lékaři i místa: den a čas na jednom řádku, poznámka k času pod nimi přes celou šířku karty.
+   Sloupec času má pevnou šířku u pravého okraje, ať časy všech dnů začínají pod sebou. */
+:is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off),
+:is(.doctor-grid, .place-grid) .doctor-week li.is-off {
+  grid-template-columns: minmax(0, 1fr) 6.2rem;
+  gap: 0.1rem 0.6rem;
+  align-items: baseline;
 }
 
-/* V okně běžné doby místa taky vedle sebe. */
-.place-grid .hours-pop .doctor-week li:not(.is-off),
-.place-grid .hours-pop .doctor-week li.is-off { grid-template-columns: 7rem minmax(0, 1fr); gap: 0.15rem 0.6rem; align-items: start; }
+:is(.doctor-grid, .place-grid) .doctor-week .parts,
+:is(.doctor-grid, .place-grid) .doctor-week .part { display: contents; }
 
-/* Den s datem a štítkem „dnes“ je delší než samotný název dne. */
-@media (min-width: 720px) {
-  .place-grid .next-days li { grid-template-columns: 9.4rem minmax(0, 1fr); }
-}
+:is(.doctor-grid, .place-grid) .doctor-week .slot { grid-column: 2; }
+
+:is(.doctor-grid, .place-grid) .doctor-week .hint { grid-column: 1 / -1; margin-bottom: 0.25rem; }
+
+:is(.doctor-grid, .place-grid) .doctor-week .hint:last-child { margin-bottom: 0; }
+
+:is(.doctor-grid, .place-grid) .doctor-week li.is-today .day { font-size: inherit; }
