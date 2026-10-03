@@ -21,8 +21,13 @@ function hugOrphans(body) {
     if (rect.top >= floatEnd) return;
     if (rect.bottom <= floatEnd) continue;
     // Řádky, které celé začínají až pod fotkou; ten, co začíná vedle ní, se nepočítá.
-    const linesBelow = Math.floor((rect.bottom - floatEnd + 1) / lineHeight(block));
-    if (linesBelow <= 1) block.classList.add("hug");
+    const line = lineHeight(block);
+    const linesBelow = Math.floor((rect.bottom - floatEnd + 1) / line);
+    const linesBeside = Math.ceil((floatEnd - rect.top - 1) / line);
+    if (linesBelow > 1 || linesBeside < 2) return;
+    block.classList.add("hug");
+    // Pod fotkou nesmí zůstat víc než asi řádek prázdného místa, jinak radši osiřelý řádek.
+    if (block.getBoundingClientRect().bottom - floatEnd > line * 1.5) block.classList.remove("hug");
     return;
   }
 }
