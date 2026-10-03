@@ -35,32 +35,48 @@ function el(tag, className, text) {
   return node;
 }
 
+// Česká sazba: nezlomitelná mezera tam, kde se řádek lámat nemá (telefon, částka, datum, čas od–do,
+// zkratka před číslem, jednopísmenná předložka nebo spojka na konci řádku). Zkratky a předložky
+// dvakrát, ať se chytí i dvě za sebou („č. p.“, „a v“); lookbehind starší Safari nezná.
+const NBSP = "\u00A0";
+function tie(text) {
+  return String(text)
+    .replace(/(\+\d{3}|\d)[ \t]+(?=\d)/g, `$1${NBSP}`)
+    .replace(/(\d\.)[ \t]+(?=[\d\p{Ll}])/gu, `$1${NBSP}`)
+    .replace(/(\d)[ \t]+(?=(?:Kč|km|kg|min|hod|h|m|l|%|°C)(?![\p{L}\d]))/gu, `$1${NBSP}`)
+    .replace(/(\d)[ \t]+(?=[–—-][ \t]*\d)/g, `$1${NBSP}`)
+    .replace(/(^|[^\p{L}\d])(č|čp|tel|ul|nám|str|MUDr|Mgr|Ing|pí|p)\.[ \t]+(?=\S)/gu, `$1$2.${NBSP}`)
+    .replace(/(^|[^\p{L}\d])(č|čp|tel|ul|nám|str|MUDr|Mgr|Ing|pí|p)\.[ \t]+(?=\S)/gu, `$1$2.${NBSP}`)
+    .replace(/(^|[\s(„"])([kKsSvVzZoOuUaAiI])[ \t]+(?=\S)/g, `$1$2${NBSP}`)
+    .replace(/(^|[\s(„"])([kKsSvVzZoOuUaAiI])[ \t]+(?=\S)/g, `$1$2${NBSP}`);
+}
+
 // Odkazy jen na vlastní web ([text](/adresa)) a na skupinu drbny na Facebooku, tučné písmo (**text**). Všechno ostatní je čistý text.
 function inline(parent, text) {
   const pattern = /\[([^\]]+)\]\(((?:\/(?!\/)|https:\/\/)[^)\s]*)\)|\*\*([^*]+)\*\*/g;
   let last = 0;
   for (const match of text.matchAll(pattern)) {
-    parent.append(text.slice(last, match.index));
+    parent.append(tie(text.slice(last, match.index)));
     if (match[2]?.startsWith("/")) {
-      const link = el("a", "", match[1]);
+      const link = el("a", "", tie(match[1]));
       link.href = match[2];
       parent.append(link);
     } else if (match[2]) {
       if (match[2] === root.dataset.facebook) {
-        const link = el("a", "", match[1]);
+        const link = el("a", "", tie(match[1]));
         link.href = match[2];
         link.target = "_blank";
         link.rel = "noopener";
         parent.append(link);
       } else {
-        parent.append(match[1]);
+        parent.append(tie(match[1]));
       }
     } else {
-      parent.append(el("strong", "", match[3]));
+      parent.append(el("strong", "", tie(match[3])));
     }
     last = match.index + match[0].length;
   }
-  parent.append(text.slice(last));
+  parent.append(tie(text.slice(last)));
 }
 
 function richText(text) {
