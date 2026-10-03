@@ -1,7 +1,9 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
-import { asBool, clip, IMPORT_ITEM_TABLES, requireChief, requireUser, slugify, uniqueSlug } from "./db-core.js";
+// Návrhy od Drběny smí schválit i přispěvatel s oprávněním `drbena_navrhy`.
+import { asBool, clip, IMPORT_ITEM_TABLES, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
 import { readArticle, redactedFlag, textWasEdited } from "./db.js";
 import { releaseImage } from "./images.js";
+import { BOT_LOGIN } from "./munipolis/store.js";
 import { formImage } from "./stock-db.js";
 
 export async function saveProposal(env, request, input) {
@@ -122,18 +124,24 @@ async function linkImports(env, proposalId, articleId) {
   }
 }
 
+function canApprove(user, proposal) {
+  if (user.role === "hlavni") return true;
+  return String(proposal.author_login ?? "") === BOT_LOGIN && userCan(user, "drbena_navrhy");
+}
+
 export async function approveProposal(env, request, input) {
-  const gate = await requireChief(env, request);
+  const gate = await requireUser(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   if (!input.id) return { ok: false, error: "Ten návrh už tu není." };
   const proposal = await env.DB.prepare(
-    `select id, article_id, author_id, author_name, image_key, submitted_title, submitted_excerpt,
-            submitted_body, submitted_category, status, publish_on
-     from proposals where id = ?`,
+    `select p.id, p.article_id, p.author_id, p.author_name, p.image_key, p.submitted_title, p.submitted_excerpt,
+            p.submitted_body, p.submitted_category, p.status, p.publish_on, u.login as author_login
+     from proposals p left join users u on u.id = p.author_id where p.id = ?`,
   )
     .bind(input.id)
     .first();
   if (!proposal || proposal.status !== "pending") return { ok: false, error: "Ten návrh už tu není." };
+  if (!canApprove(gate.user, proposal)) return { ok: false, error: "Tohle schvaluje jen hlavní redaktor." };
   const parsed = await readArticle(env, input);
   if (parsed.error) return { ok: false, error: parsed.error };
 

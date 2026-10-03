@@ -7,7 +7,7 @@ import { SCHEMA_VERSION } from "../src/schema.js";
 
 // Otisk migrací. Když test spadne: zvedni SCHEMA_VERSION v src/schema.js a sem napiš novou verzi a otisk,
 // jinak produkce migraci nespustí (databáze se starší verzí ji nespustí, novější verzi nikdo nezapíše).
-const KNOWN = { version: 4, fingerprint: "a5062e9b5d113f1b" };
+const KNOWN = { version: 4, fingerprint: "8aff1341e9ab44f6" };
 
 function sources(dir) {
   return readdirSync(dir, { withFileTypes: true })
@@ -41,9 +41,10 @@ function fingerprint() {
       hash.update(text.replace(/export const SCHEMA_VERSION = \d+;/, ""));
       continue;
     }
-    // Ostatní moduly: všechny řetězce, které zakládají nebo mění tabulky a indexy.
+    // Ostatní moduly: všechny řetězce, které zakládají nebo mění tabulky a indexy. Soubor bez nich
+    // otisk nemění, ať nový modul bez SQL test neshodí.
     const ddl = literals(text).filter((value) => /\b(?:create|alter)\s+(?:table|unique index|index)\b/i.test(value));
-    hash.update(`${file}\n${ddl.join("\n")}\n`);
+    if (ddl.length) hash.update(`${file}\n${ddl.join("\n")}\n`);
   }
   return hash.digest("hex").slice(0, 16);
 }

@@ -5,7 +5,7 @@ import { DEFAULT_CLUB_URL } from "../fotbal/club.js";
 import { DEFAULT_TRUTH_URL } from "../fotbal/fotbalunas.js";
 import { DEFAULT_FRESH_DAYS, footballRunning, INTERVALS } from "../fotbal/store.js";
 import { esc } from "../view.js";
-import { rubricOptions } from "./articles.js";
+import { rubricOptions } from "./article-form.js";
 import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";

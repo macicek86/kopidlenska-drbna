@@ -21,6 +21,11 @@ export const PERMISSIONS = [
     detail: "Může měnit otevírací dobu míst, dočasné změny a novou otevírací dobu. Místa samotná zakládá hlavní redaktor.",
   },
   {
+    code: "drbena_navrhy",
+    label: "Články od Drběny",
+    detail: "Může upravit a schválit články, které koza Drběna napsala z importu a čekají na schválení. Smazat je nemůže.",
+  },
+  {
     code: "obrazky",
     label: "Knihovna obrázků",
     detail: "Může nahrávat a mazat ilustrační fotky a měnit jejich témata.",

@@ -34,6 +34,7 @@ export function adminOverview(ctx, data, message) {
       ]
     : [
         stat("/redakce/zpravy", "news", pending.length + adPending.length, "návrhů čeká"),
+        ...((data.botProposals ?? []).length ? [stat("/redakce/zpravy", "news", data.botProposals.length, "od Drběny ke schválení", "warn")] : []),
         stat("/redakce/zpravy", "x", returned.length + adReturned.length, "vráceno k úpravě", returned.length + adReturned.length ? "bad" : ""),
         stat("/redakce/zpravy", "news", (data.articles ?? []).filter((row) => row.authorId === data.user?.id).length, "mých zpráv na webu"),
       ];
@@ -58,6 +59,14 @@ export function adminOverview(ctx, data, message) {
         ),
       ]
     : [
+        ...(data.botProposals ?? []).map((row) =>
+          item({
+            title: row.title,
+            meta: `Od Drběny · ${esc(credit(row))}`,
+            badges: badge("Ke schválení", "warn"),
+            actions: modalLink(`/redakce/zpravy?navrh=${row.id}`, "Posoudit", "btn-primary"),
+          }),
+        ),
         ...(data.proposals ?? []).map((row) =>
           item({
             title: row.title,
@@ -105,7 +114,7 @@ export function adminOverview(ctx, data, message) {
     <div class="stats">${stats.join("")}</div>
     <div class="quick">${actions}</div>
     <div class="cards-2">
-      ${panel({ id: "fronta", title: chief ? "Ke schválení" : "Moje návrhy", count: queueItems.length, body: list(queueItems, chief ? "Nic nečeká. Hezký den." : "Nemáte žádný rozpracovaný návrh."), tone: queueItems.length && chief ? "warn" : "" })}
+      ${panel({ id: "fronta", title: chief ? "Ke schválení" : (data.botProposals ?? []).length ? "Návrhy" : "Moje návrhy", count: queueItems.length, body: list(queueItems, chief ? "Nic nečeká. Hezký den." : "Nemáte žádný rozpracovaný návrh."), tone: queueItems.length && chief ? "warn" : "" })}
       ${panel({ id: "brzy", title: "Chystá se", count: soon.length, body: list(soon, "Nic zvláštního se nechystá.") })}
     </div>`;
   return adminShell(ctx, data, "prehled", message, body, { title: "Přehled", rich: true });

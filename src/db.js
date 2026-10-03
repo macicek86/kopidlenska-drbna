@@ -19,7 +19,7 @@ import {
   userCan,
 } from "./db-core.js";
 import { loadNoticeBoard, loadNotices } from "./notices-db.js";
-import { loadImportItems, loadImportSettings } from "./munipolis/store.js";
+import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
 import { loadDrbena } from "./drbena-db.js";
@@ -338,6 +338,7 @@ export async function loadAdmin(env, request) {
     articles: [],
     events: [],
     proposals: [],
+    botProposals: [],
     users: [],
     yards: [],
     doctors: [],
@@ -366,7 +367,7 @@ export async function loadAdmin(env, request) {
   const articleSql = chief
     ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
     : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
-  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, desk, stock, newMessages] = await Promise.all([
+  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, botProposals, desk, stock, newMessages] = await Promise.all([
     loadRubrics(env),
     loadAds(env),
     chief ? loadAdProposals(env, "where p.status = 'pending' order by p.id asc") : loadAdProposals(env, ...mine),
@@ -379,11 +380,13 @@ export async function loadAdmin(env, request) {
     ),
     when(chief || userCan(user, "oteviraci_doba"), () => loadPlaces(env, { publicOnly: !chief }), base.places),
     chief ? loadProposals(env, "where p.status = 'pending' order by p.id asc") : loadProposals(env, ...mine),
+    // Hlavní redaktor má návrhy od Drběny mezi ostatními v `proposals`.
+    when(!chief && userCan(user, "drbena_navrhy"), () => loadProposals(env, "where p.status = 'pending' and u.login = ? order by p.id asc", BOT_LOGIN), base.botProposals),
     when(chief, () => loadChiefDesk(env), null),
     loadStock(env),
     when(userCan(user, "vzkazy"), () => countNewMessages(env), 0),
   ]);
-  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, stock, newMessages });
+  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, botProposals, stock, newMessages });
   if (desk) Object.assign(base, desk, { hasApiKey: Boolean(env.ANTHROPIC_API_KEY) });
   return base;
 }

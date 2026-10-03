@@ -7,7 +7,7 @@ function nav(data) {
   const chief = data.user?.role === "hlavni";
   const waiting = (data.proposals ?? []).filter((item) => item.status === "pending").length;
   const adWaiting = (data.adProposals ?? []).filter((item) => item.status === "pending").length;
-  const returned = chief ? 0 : (data.proposals ?? []).filter((item) => item.status === "rejected").length;
+  const returned = chief ? 0 : (data.proposals ?? []).filter((item) => item.status === "rejected").length + (data.botProposals ?? []).length;
   const adReturned = chief ? 0 : (data.adProposals ?? []).filter((item) => item.status === "rejected").length;
   const importFailed = (data.importItems ?? []).filter((item) => item.status === "chyba").length;
   const footballFailed = (data.footballItems ?? []).filter((item) => item.status === "chyba").length;

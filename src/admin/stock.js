@@ -1,7 +1,7 @@
 // Redakce: Knihovna obrázků. Ilustrační fotky podle témat, které Koza Drběna dává ke zprávám bez vlastní fotky.
 import { STOCK_LABEL } from "../stock.js";
 import { esc, mediaUrl } from "../view.js";
-import { photoControl } from "./articles.js";
+import { photoControl } from "./article-form.js";
 import { adminShell } from "./shell.js";
 import {
   badge,
