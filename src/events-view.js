@@ -4,6 +4,7 @@ import { text as tx } from "./copy.js";
 import { formatLong } from "./format.js";
 import { esc } from "./html.js";
 import { eventLd } from "./seo.js";
+import { escTie } from "./typo.js";
 import { adPanel, askLine, layout, siteOrigin } from "./view.js";
 
 // Akce se čtou méně často než zprávy, reklama v seznamu jen po každých deseti.
@@ -31,9 +32,9 @@ export function eventLinks(event, ctx) {
 function eventCard(event, ctx) {
   return `<article class="card">
             <p class="kicker">${esc(formatLong(event.startsOn))}${event.startsTime ? ` · ${esc(event.startsTime)}` : ""}</p>
-            <h3>${esc(event.title)}</h3>
+            <h3>${escTie(event.title)}</h3>
             <p class="meta">${esc(event.place)}</p>
-            ${event.description ? `<p class="muted">${esc(event.description)}</p>` : ""}
+            ${event.description ? `<p class="muted">${escTie(event.description)}</p>` : ""}
             ${eventLinks(event, ctx)}
           </article>`;
 }

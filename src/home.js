@@ -9,6 +9,7 @@ import { groupedNotices } from "./places.js";
 import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
 import { siteLd } from "./seo.js";
+import { escTie } from "./typo.js";
 import { eventLinks } from "./events-view.js";
 import { clockOf, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
 
@@ -99,8 +100,8 @@ function newsHtml(data, ctx) {
     ? `<a class="card card-lead" href="/zpravy/${esc(lead.slug)}">
         ${storyPhoto(lead, "cover")}
         ${rubricKicker(lead)}
-        <h3>${esc(lead.title)}</h3>
-        <p class="muted">${esc(lead.excerpt)} <span class="side-more">víc ›</span></p>
+        <h3>${escTie(lead.title)}</h3>
+        <p class="muted">${escTie(lead.excerpt)} <span class="side-more">víc ›</span></p>
         <p class="meta">${esc(signedWhen(lead, formatDayMonth(lead.createdOn)))}</p>
       </a>`
     : `<p class="card muted">${esc(tx(ctx.copy, "empty_articles"))}</p>`;
@@ -108,8 +109,8 @@ function newsHtml(data, ctx) {
     .map(
       (article) => `<a class="card card-side" href="/zpravy/${esc(article.slug)}">
         ${rubricKicker(article)}
-        <h3>${esc(article.title)}</h3>
-        <p class="muted side-excerpt"><span>${esc(article.excerpt)}</span> <span class="side-more">víc ›</span></p>
+        <h3>${escTie(article.title)}</h3>
+        <p class="muted side-excerpt"><span>${escTie(article.excerpt)}</span> <span class="side-more">víc ›</span></p>
       </a>`,
     )
     .join("");
@@ -123,7 +124,7 @@ function eventsHtml(data, ctx) {
     .map(
       (event) => `<article class="card">
         <p class="kicker">${esc(formatLong(event.startsOn))}</p>
-        <h3>${esc(event.title)}</h3>
+        <h3>${escTie(event.title)}</h3>
         <p class="muted">${esc(event.place)}${event.startsTime ? ` · ${esc(event.startsTime)}` : ""}</p>
         ${eventLinks(event, ctx)}
       </article>`,

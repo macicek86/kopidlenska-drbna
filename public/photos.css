@@ -103,4 +103,7 @@
 
   /* Seznamy a citace vedle fotky drží pohromadě, ať odrážky nezajedou pod ni. */
   .article-body.has-photo .prose :is(ul, ol, blockquote) { display: flow-root; }
+
+  /* Odstavec, ze kterého by pod fotku přetekl jen jeden řádek, drží celý vedle ní (public/article.js). */
+  .article-body.has-photo .prose .hug { display: flow-root; }
 }

@@ -9,6 +9,7 @@ import { renderArticleHtml } from "./rich.js";
 import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
 import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
 import { articleCrumbsLd, articleImage, articleLd } from "./seo.js";
+import { escTie, tieHtml } from "./typo.js";
 import { adPanel, layout, signedWhen, siteOrigin } from "./view.js";
 import { readCount } from "./visits.js";
 
@@ -19,8 +20,8 @@ function storyCard(article) {
             ${storyPhoto(article, "story-photo")}
             <div class="story-text">
               ${rubricKicker(article)}
-              <h2>${esc(article.title)}</h2>
-              <p class="muted">${esc(article.excerpt)}</p>
+              <h2>${escTie(article.title)}</h2>
+              <p class="muted">${escTie(article.excerpt)}</p>
               <p class="meta">${esc(signedWhen(article, formatDayMonth(article.createdOn)))}</p>
             </div>
           </a>`;
@@ -86,7 +87,7 @@ function moreNews(articles, copy) {
     .map(
       (item) => `<li><a href="/zpravy/${esc(item.slug)}">
               ${rubricKicker(item)}
-              <span class="more-title">${esc(item.title)}</span>
+              <span class="more-title">${escTie(item.title)}</span>
               <span class="more-date">${esc(formatDayMonth(item.createdOn))}</span>
             </a></li>`,
     )
@@ -109,16 +110,17 @@ export function articlePage(article, ctx, extras = {}) {
     image: articleImage(base, article),
     published: article.createdOn,
     jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
+    script: article.imageKey ? `<script src="/article.js" defer></script>` : "",
     body: `
       <div class="article-page">
         <div class="article-main">
           <a class="back" href="/zpravy" data-back>${esc(tx(ctx.copy, "article_back"))}</a>
           ${articleCrumbs(article)}
-          <h1 class="article-title">${esc(article.title)}</h1>
+          <h1 class="article-title">${escTie(article.title)}</h1>
           ${articleMeta(article, extras.views)}
           <div class="article-body${article.imageKey ? " has-photo" : ""}">
             ${articleFigure(article)}
-            <div class="prose">${renderArticleHtml(article.body)}</div>
+            <div class="prose">${tieHtml(renderArticleHtml(article.body))}</div>
           </div>
           ${facebookInvite(ctx.copy)}
         </div>
