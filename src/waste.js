@@ -73,6 +73,6 @@ export function buildWasteView(rule, today = pragueToday()) {
     today,
     nextDate,
     daysUntil: daysBetween(today, nextDate),
-    upcoming: upcomingPickups(nextDate, rule.stepDays, 6),
+    upcoming: upcomingPickups(nextDate, rule.stepDays, 7),
   };
 }

@@ -2,7 +2,7 @@ import { pickAd, safeAdLink } from "./ads.js";
 import { byline } from "./db.js";
 import { esc, mediaUrl } from "./html.js";
 import { facebookUrl, text as tx } from "./copy.js";
-import { countdownLabel, formatDayMonth, formatLong, formatShort, ruleLabel } from "./format.js";
+import { formatDayMonth, formatLong } from "./format.js";
 import { civilWeekday } from "./waste.js";
 import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
@@ -294,40 +294,6 @@ export function missingPage(ctx) {
     title: `${tx(ctx.copy, "missing_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "missing_description"),
     body: `<h1>${esc(tx(ctx.copy, "missing_heading"))}</h1><a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>`,
-  });
-}
-
-export function binsPage(waste, ctx, { standaloneTitle }) {
-  const dates = waste.upcoming
-    .map(
-      (iso) => `<article class="date-tile"><strong>${esc(formatShort(iso))}</strong><span>${esc(formatLong(iso))}</span></article>`,
-    )
-    .join("");
-  return layout({
-    ...ctx,
-    title: `${tx(ctx.copy, standaloneTitle ? "bins_standalone" : "bins_title")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "bins_description"),
-    minimal: ctx.minimal,
-    body: `
-      <section class="bins">
-        <div class="card bin-copy">
-          <p class="pill">${esc(tx(ctx.copy, "bins_pill"))}</p>
-          <h1>${esc(formatLong(waste.nextDate))}</h1>
-          <p class="count">${esc(countdownLabel(waste.daysUntil, ctx.copy))}</p>
-          <p class="muted">${esc(waste.note)}</p>
-          <p class="rule">${esc(ruleLabel(waste))}</p>
-          <div class="row">
-            <span class="chip">${esc(waste.holidayNote)}</span>
-            <span class="chip">${esc(tx(ctx.copy, "bins_kind"))}</span>
-          </div>
-          ${ctx.minimal ? "" : `<a class="back" href="/sberne-dvory">${esc(tx(ctx.copy, "bins_yards_link"))}</a>`}
-        </div>
-        <div class="bin-photo"><img src="/kozel-popelar.webp" alt="${esc(tx(ctx.copy, "bins_alt"))}"></div>
-      </section>
-      <section class="card block">
-        <h2>${esc(tx(ctx.copy, "bins_more"))}</h2>
-        <div class="dates">${dates}</div>
-      </section>`,
   });
 }
 

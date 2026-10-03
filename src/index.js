@@ -36,7 +36,6 @@ import { ACCESS_LOGOUT, accessConfig } from "./access.js";
 import {
   adPage,
   adsPage,
-  binsPage,
   brokenPage,
   doctorsPage,
   eventsPage,
@@ -47,6 +46,7 @@ import {
   missingPage,
   yardsPage,
 } from "./view.js";
+import { binsPage } from "./bins-view.js";
 import { aboutPage } from "./about.js";
 import { media } from "./images.js";
 import { articlePage, newsPage } from "./news.js";

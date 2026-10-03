@@ -2,7 +2,8 @@
 import { aboutPage } from "../about.js";
 import { formatShort } from "../format.js";
 import { addMessageContact, MESSAGE_KINDS, saveChatMessage } from "../messages-db.js";
-import { binsPage, doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
+import { binsPage } from "../bins-view.js";
+import { doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
 import { htmlText } from "./prompt.js";
 
 const PAGE_MAX = 6000;

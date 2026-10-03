@@ -67,7 +67,7 @@ export const COPY = [
   { group: "Popelnice", key: "bins_pill", label: "Štítek nejbližšího svozu", value: "Nejbližší svoz", max: 40 },
   { group: "Popelnice", key: "bins_more", label: "Nadpis dalších termínů", value: "Další termíny", max: 40 },
   { group: "Popelnice", key: "bins_kind", label: "Druh odpadu", value: "Směsný komunální odpad", max: 80 },
-  { group: "Popelnice", key: "bins_alt", label: "Popis fotky popeláře", value: "Koza Drběna v montérkách s popelnicí na kopidlenském náměstí", max: 160 },
+  { group: "Popelnice", key: "bins_alt", label: "Popis fotky popeláře", value: "Koza Drběna v reflexní pracovní soupravě s koštětem a popelnicí", max: 160 },
   { group: "Popelnice", key: "countdown_today", label: "Odpočet, svoz dnes", value: "Svoz je dnes.", max: 80 },
   { group: "Popelnice", key: "countdown_tomorrow", label: "Odpočet, svoz zítra", value: "Svoz je zítra.", max: 80 },
   { group: "Popelnice", key: "countdown_few", label: "Odpočet do 4 dnů, {n} je počet", value: "Za {n} dny.", max: 80 },

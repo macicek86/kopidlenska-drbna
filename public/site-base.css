@@ -326,7 +326,7 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .section-head a, .back, .links a { color: var(--brand); font-weight: 700; }
 
-.news-grid, .bins, .about, .split { display: grid; gap: 0.8rem; }
+.news-grid, .about, .split { display: grid; gap: 0.8rem; }
 
 .split > * { min-width: 0; }
 
@@ -339,8 +339,6 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .redigovano { color: var(--muted); font-weight: 600; }
 
 .article-title { max-width: 18ch; }
-
-.bin-photo img { width: 100%; border-radius: var(--radius); object-fit: cover; }
 
 .prose { max-width: 40rem; font-size: 1.12rem; line-height: 1.6; }
 
@@ -552,14 +550,6 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .rich-area a { color: var(--brand); text-decoration: underline; }
 
 .rich-area > div { margin: 0 0 1rem; }
-
-.bin-copy h1 { font-size: clamp(2.4rem, 7vw, 3.6rem); }
-
-.rule { font-weight: 700; }
-
-.bin-photo { overflow: hidden; border-radius: var(--radius); border: 1px solid var(--line); background: var(--paper-deep); box-shadow: var(--shadow); }
-
-.bin-photo img { height: 100%; max-height: 34rem; display: block; }
 
 .dates { display: grid; gap: 0.7rem; }
 
@@ -863,8 +853,7 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 @media (min-width: 900px) {
   .nav { display: flex; }
   .mobile-nav { display: none; }
-  .hero, .bins { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
-  .bins { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
+  .hero { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
   .news-grid, .split { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); }
   .mascot { min-height: 28rem; }
   .place-grid.yard-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
