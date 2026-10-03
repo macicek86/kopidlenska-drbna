@@ -285,11 +285,32 @@ function setup() {
     field.style.overflowY = height > 120 ? "auto" : "hidden";
   }
 
+  // Na mobilu okénko vyplní jen viditelnou část nad klávesnicí, ať hlavička nezajede nahoru.
+  const phone = window.matchMedia("(max-width: 540px)");
+  const viewport = window.visualViewport;
+
+  function fitScreen() {
+    if (panel.hidden || !phone.matches || !viewport) {
+      root.style.removeProperty("top");
+      root.style.removeProperty("height");
+      return;
+    }
+    root.style.top = `${Math.round(viewport.offsetTop) + 8}px`;
+    root.style.height = `${Math.round(viewport.height) - 16}px`;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  viewport?.addEventListener("resize", fitScreen);
+  viewport?.addEventListener("scroll", fitScreen);
+  phone.addEventListener("change", fitScreen);
+
   function open() {
     panel.hidden = false;
     fab.setAttribute("aria-expanded", "true");
     root.classList.add("is-open");
+    document.documentElement.classList.add("chat-lock");
     render();
+    fitScreen();
     field.focus();
   }
 
@@ -297,6 +318,8 @@ function setup() {
     panel.hidden = true;
     fab.setAttribute("aria-expanded", "false");
     root.classList.remove("is-open");
+    document.documentElement.classList.remove("chat-lock");
+    fitScreen();
     fab.focus();
   }
 
