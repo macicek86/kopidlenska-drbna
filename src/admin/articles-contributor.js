@@ -21,6 +21,7 @@ function contributorForm(data, { proposal, target, linked }) {
         imageKey: source.imageKey || linked?.imageKey || null,
         imageFocus: source.imageFocus || linked?.imageFocus || "",
         imageCaption: source.imageCaption || linked?.imageCaption || "",
+        attachments: proposal && !proposal.ownAttachments ? (linked?.attachments ?? []) : source.attachments,
       }
     : null;
   const returned =

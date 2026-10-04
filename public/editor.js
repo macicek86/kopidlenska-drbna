@@ -1,46 +1,54 @@
 const MAX_EDGE = 1600;
 const MAX_BYTES = 500_000;
+// Víc smí pole, které to řekne v data-edge a data-bytes (přílohy zprávy: jízdní řád musí jít přečíst).
+const TOP_EDGE = 3000;
+const TOP_BYTES = 2_000_000;
 const START_QUALITY = 0.82;
 
 function photoLimits(input) {
   const edge = Number(input.dataset.edge);
   const bytes = Number(input.dataset.bytes);
   return {
-    edge: Number.isInteger(edge) && edge >= 320 && edge <= MAX_EDGE ? edge : MAX_EDGE,
-    bytes: Number.isInteger(bytes) && bytes >= 40_000 && bytes <= MAX_BYTES ? bytes : MAX_BYTES,
+    edge: Number.isInteger(edge) && edge >= 320 && edge <= TOP_EDGE ? edge : MAX_EDGE,
+    bytes: Number.isInteger(bytes) && bytes >= 40_000 && bytes <= TOP_BYTES ? bytes : MAX_BYTES,
   };
 }
 
+// Fotky se před odesláním zmenší v prohlížeči: fotka zprávy (image), víc fotek do knihovny (images) a přílohy zprávy.
+const SHRINK_INPUTS = ["image", "images", "attachment_files"].map((name) => `input[type="file"][name="${name}"]`).join(", ");
+
 function bootPhotos(root) {
   for (const form of root.querySelectorAll("form")) {
-    bindPhoto(form);
-    bindPhotos(form);
+    bindShrink(form);
+    bindAttachmentCaptions(form);
   }
 }
 
-// Knihovna obrázků: víc fotek najednou (pole images). Každou zmenší stejně jako jednu fotku u zprávy.
-function bindPhotos(form) {
-  const fileInput = form.querySelector('input[type="file"][name="images"]');
-  if (!fileInput || form.dataset.photosBound) return;
-  form.dataset.photosBound = "1";
+function bindShrink(form) {
+  if (!form.querySelector(SHRINK_INPUTS) || form.dataset.photoBound) return;
+  form.dataset.photoBound = "1";
   let ready = false;
   form.addEventListener("submit", async (event) => {
     if (ready) return;
-    const files = [...(fileInput.files ?? [])].filter((file) => file.size > 0);
-    if (!files.length) return;
+    const inputs = [...form.querySelectorAll(SHRINK_INPUTS)].filter((input) => [...(input.files ?? [])].some((file) => file.size > 0));
+    if (!inputs.length) return;
     event.preventDefault();
+    const total = inputs.reduce((sum, input) => sum + input.files.length, 0);
     const button = form.querySelector('button[type="submit"]');
     const previous = button?.textContent ?? "";
     if (button) button.disabled = true;
     try {
-      const limits = photoLimits(fileInput);
-      const transfer = new DataTransfer();
-      for (const [index, file] of files.entries()) {
-        if (button) button.textContent = `Zmenšuji fotky… ${index + 1}/${files.length}`;
-        const small = file.type === "image/webp" && file.size <= limits.bytes ? await edgeOf(file) : null;
-        transfer.items.add(small !== null && small <= limits.edge ? file : await toWebp(file, limits));
+      let done = 0;
+      for (const input of inputs) {
+        const limits = photoLimits(input);
+        const transfer = new DataTransfer();
+        for (const file of input.files) {
+          done += 1;
+          if (button) button.textContent = total > 1 ? `Zmenšuji fotky… ${done}/${total}` : "Zmenšuji fotku…";
+          if (file.size > 0) transfer.items.add(await shrunk(file, limits));
+        }
+        input.files = transfer.files;
       }
-      fileInput.files = transfer.files;
       ready = true;
       if (button) {
         button.disabled = false;
@@ -57,44 +65,42 @@ function bindPhotos(form) {
   });
 }
 
-function bindPhoto(form) {
-  const fileInput = form.querySelector('input[type="file"][name="image"]');
-  if (!fileInput || form.dataset.photoBound) return;
-  form.dataset.photoBound = "1";
-  let ready = false;
-  form.addEventListener("submit", async (event) => {
-    if (ready) return;
-    const input = fileInput;
-    const file = input.files?.[0];
-    if (!file || file.size === 0) return;
-    const limits = photoLimits(input);
-    if (file.type === "image/webp" && file.size <= limits.bytes) {
-      const small = await edgeOf(file);
-      if (small !== null && small <= limits.edge) return;
-    }
-    event.preventDefault();
-    const button = form.querySelector('button[type="submit"]');
-    const previous = button?.textContent ?? "";
-    if (button) {
-      button.disabled = true;
-      button.textContent = "Zmenšuji fotku…";
-    }
-    try {
-      const next = await toWebp(file, photoLimits(input));
-      const transfer = new DataTransfer();
-      transfer.items.add(next);
-      input.files = transfer.files;
-      ready = true;
-      if (button) button.disabled = false;
-      form.requestSubmit();
-    } catch (error) {
-      ready = false;
-      if (button) {
-        button.disabled = false;
-        button.textContent = previous;
-      }
-      window.alert(error instanceof Error ? error.message : "Fotku se nepodařilo zmenšit.");
-    }
+async function shrunk(file, limits) {
+  if (file.type === "image/webp" && file.size <= limits.bytes) {
+    const edge = await edgeOf(file);
+    if (edge !== null && edge <= limits.edge) return file;
+  }
+  return toWebp(file, limits);
+}
+
+// Nové přílohy zprávy: ke každému vybranému obrázku náhled a pole na popisek (new_attachment_caption ve stejném pořadí).
+function bindAttachmentCaptions(form) {
+  const input = form.querySelector('input[type="file"][name="attachment_files"]');
+  const list = form.querySelector("[data-attachment-new]");
+  if (!input || !list || input.dataset.captionsBound) return;
+  input.dataset.captionsBound = "1";
+  let urls = [];
+  input.addEventListener("change", () => {
+    for (const url of urls) URL.revokeObjectURL(url);
+    urls = [];
+    const items = [...(input.files ?? [])].map((file) => {
+      const url = URL.createObjectURL(file);
+      urls.push(url);
+      const item = document.createElement("li");
+      item.className = "attachment-pick attachment-new";
+      const image = document.createElement("img");
+      image.src = url;
+      image.alt = "";
+      const caption = document.createElement("input");
+      caption.className = "control";
+      caption.name = "new_attachment_caption";
+      caption.maxLength = 200;
+      caption.placeholder = "Popisek, třeba Jízdní řád";
+      caption.setAttribute("aria-label", `Popisek přílohy ${file.name}`);
+      item.append(image, caption);
+      return item;
+    });
+    list.replaceChildren(...items);
   });
 }
 

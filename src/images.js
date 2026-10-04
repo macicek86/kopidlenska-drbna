@@ -12,7 +12,7 @@ export async function storeImage(env, file, folder = "clanky") {
   if (file.size > 4 * 1024 * 1024) return { error: "Fotka může mít nejvýš 4 MB." };
   const ext = IMAGE_TYPES[file.type];
   if (!ext) return { error: "Fotka musí být JPG, PNG, WEBP nebo GIF." };
-  const prefix = ["reklamy", "knihovna"].includes(folder) ? folder : "clanky";
+  const prefix = ["reklamy", "knihovna", "prilohy"].includes(folder) ? folder : "clanky";
   const key = `${prefix}/${crypto.randomUUID()}.${ext}`;
   await env.BUCKET.put(key, await file.arrayBuffer(), {
     httpMetadata: { contentType: file.type },

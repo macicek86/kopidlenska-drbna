@@ -4,10 +4,17 @@ import { asBool, clip, IMPORT_ITEM_TABLES, reopenImports, requireChief, requireU
 import { readArticle, readCreatedOn, redactedFlag, textWasEdited } from "./db.js";
 import { pragueNow } from "./waste.js";
 import { forgetProposal, linkEventsToArticle } from "./events-db.js";
-import { attachmentKeys, keptAttachments } from "./attachments.js";
+import { attachmentKeys, formAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
 import { BOT_LOGIN } from "./munipolis/store.js";
 import { formImage } from "./stock-db.js";
+
+// Návrh úpravy zprávy drží celý seznam příloh, jak má po schválení být. Prázdný seznam ukládá jako „[]“,
+// prázdný sloupec znamená návrh z doby před přílohami od lidí a platí přílohy zprávy.
+function proposalAttachments(proposal, article) {
+  const own = String(proposal?.attachments ?? "");
+  return own !== "" || !article ? own : String(article.attachments ?? "");
+}
 
 export async function saveProposal(env, request, input) {
   const gate = await requireUser(env, request);
@@ -19,7 +26,7 @@ export async function saveProposal(env, request, input) {
   let existing = null;
   if (input.id) {
     existing = await env.DB.prepare(
-      "select id, author_id, article_id, image_key, status from proposals where id = ?",
+      "select id, author_id, article_id, image_key, attachments, status from proposals where id = ?",
     )
       .bind(input.id)
       .first();
@@ -35,7 +42,7 @@ export async function saveProposal(env, request, input) {
     if (!article || !asBool(article.published)) return { ok: false, error: "Tahle zpráva se nedá navrhnout k úpravě." };
     articleId = Number(article.id);
     existing = await env.DB.prepare(
-      `select id, author_id, article_id, image_key, status from proposals
+      `select id, author_id, article_id, image_key, attachments, status from proposals
        where article_id = ? and author_id = ? and status in ('pending', 'rejected')
        order by id desc`,
     )
@@ -47,13 +54,21 @@ export async function saveProposal(env, request, input) {
   if (stored.error) return { ok: false, error: stored.error };
   Object.assign(parsed, stored.photo);
 
+  const article = articleId ? await env.DB.prepare("select attachments from articles where id = ?").bind(articleId).first() : null;
+  const attachments = await formAttachments(env, proposalAttachments(existing, article), input);
+  if (attachments.error) {
+    await releaseImage(env, stored.key);
+    return { ok: false, error: attachments.error };
+  }
+  const attachmentsValue = articleId ? attachments.json || "[]" : attachments.json;
+
   if (existing) {
     let imageKey = existing.image_key ? String(existing.image_key) : null;
     const previous = imageKey;
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
       `update proposals
-       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, image_focus = ?, image_caption = ?,
+       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, image_focus = ?, image_caption = ?, attachments = ?,
            submitted_title = ?, submitted_excerpt = ?, submitted_body = ?, submitted_category = ?,
            author_name = ?, status = 'pending', note = '', keywords = ''
        where id = ?`,
@@ -67,6 +82,7 @@ export async function saveProposal(env, request, input) {
         imageKey,
         parsed.imageFocus,
         parsed.imageCaption,
+        attachmentsValue,
         parsed.title,
         parsed.excerpt,
         parsed.body,
@@ -76,14 +92,15 @@ export async function saveProposal(env, request, input) {
       )
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
+    for (const key of attachments.removed) await releaseImage(env, key);
     return { ok: true, updated: true };
   }
 
   await env.DB.prepare(
     `insert into proposals (
-       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption,
+       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments,
        submitted_title, submitted_excerpt, submitted_body, submitted_category, status
-     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
   )
     .bind(
       articleId,
@@ -97,6 +114,7 @@ export async function saveProposal(env, request, input) {
       stored.key,
       parsed.imageFocus,
       parsed.imageCaption,
+      attachmentsValue,
       parsed.title,
       parsed.excerpt,
       parsed.body,
@@ -156,7 +174,7 @@ export async function approveProposal(env, request, input) {
 
   let article = null;
   if (proposal.article_id) {
-    article = await env.DB.prepare("select id, image_key, redacted from articles where id = ?")
+    article = await env.DB.prepare("select id, image_key, attachments, redacted from articles where id = ?")
       .bind(proposal.article_id)
       .first();
     if (!article) return { ok: false, error: "Tahle zpráva už tu není." };
@@ -180,8 +198,12 @@ export async function approveProposal(env, request, input) {
   };
   let imageKey = proposal.image_key ? String(proposal.image_key) : null;
   const previousProposalImage = imageKey;
-  // Přílohy přejdou do nové zprávy (úprava existující zprávy je nemá) a návrh si je už nedrží.
-  const attachments = keptAttachments(proposal.attachments, input);
+  // Přílohy přejdou do zprávy (u úpravy nahradí ty její) a návrh si je už nedrží.
+  const attachments = await formAttachments(env, proposalAttachments(proposal, article), input);
+  if (attachments.error) {
+    await releaseImage(env, stored.key);
+    return { ok: false, error: attachments.error };
+  }
   if (stored.key) imageKey = stored.key;
 
   if (article) {
@@ -191,7 +213,7 @@ export async function approveProposal(env, request, input) {
     const redacted = redactedFlag(article.redacted, submitted, finalText) ? 1 : 0;
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, published = 1, redacted = ?, keywords = '' where id = ?`,
+         image_focus = ?, image_caption = ?, attachments = ?, published = 1, redacted = ?, keywords = '' where id = ?`,
     )
       .bind(
         parsed.title,
@@ -202,6 +224,7 @@ export async function approveProposal(env, request, input) {
         nextImage,
         parsed.imageFocus,
         parsed.imageCaption,
+        attachments.json,
         redacted,
         article.id,
       )
@@ -258,7 +281,10 @@ export async function approveProposal(env, request, input) {
   if (stored.key && previousProposalImage && previousProposalImage !== stored.key) {
     await releaseImage(env, previousProposalImage);
   }
-  for (const key of article ? attachmentKeys(proposal.attachments) : attachments.removed) await releaseImage(env, key);
+  // Co vypadlo z návrhu i ze zprávy. Co zpráva pořád používá, releaseImage nesmaže.
+  for (const key of new Set([...attachments.removed, ...attachmentKeys(article?.attachments), ...attachmentKeys(proposal.attachments)])) {
+    await releaseImage(env, key);
+  }
   return { ok: true, planned: !article && createdOn > pragueNow().date };
 }
 

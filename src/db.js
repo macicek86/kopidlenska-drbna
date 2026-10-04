@@ -1,6 +1,6 @@
 import { loadAdProposals, loadAds } from "./ads-db.js";
 import { COPY, WELCOME_VERSION } from "./copy.js";
-import { attachmentKeys, keptAttachments, readAttachments } from "./attachments.js";
+import { attachmentKeys, formAttachments, readAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
 import { formImage, loadStock } from "./stock-db.js";
 import { readCaption, readFocus } from "./photo.js";
@@ -132,6 +132,8 @@ function mapProposal(row) {
     imageFocus: String(row.image_focus ?? ""),
     imageCaption: String(row.image_caption ?? ""),
     attachments: readAttachments(row.attachments),
+    // Návrh úpravy zprávy z doby před přílohami od lidí přílohy nemá, platí ty ze zprávy (src/proposals-db.js).
+    ownAttachments: !row.article_id || String(row.attachments ?? "") !== "",
     submittedTitle: String(row.submitted_title),
     submittedExcerpt: String(row.submitted_excerpt),
     submittedBody: String(row.submitted_body),
@@ -451,7 +453,11 @@ export async function saveArticle(env, request, input) {
       { title, excerpt, body, category },
     );
     const redacted = (authorIsOther && edited) || asBool(current.redacted) ? 1 : 0;
-    const attachments = keptAttachments(current.attachments, input);
+    const attachments = await formAttachments(env, current.attachments, input);
+    if (attachments.error) {
+      await releaseImage(env, stored.key);
+      return { ok: false, error: attachments.error };
+    }
     // Po úpravě textu se klíčová slova smažou a cron je dopočítá znovu (src/keywords.js).
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
@@ -465,12 +471,17 @@ export async function saveArticle(env, request, input) {
     return { ok: true };
   }
 
+  const attachments = await formAttachments(env, "", input);
+  if (attachments.error) {
+    await releaseImage(env, stored.key);
+    return { ok: false, error: attachments.error };
+  }
   const slug = await uniqueSlug(env, slugify(title));
   const inserted = await env.DB.prepare(
-    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   )
-    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name)
+    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, attachments.json, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name)
     .run();
   // Zpráva psaná k akci (z redakce akcí) se k ní rovnou připojí.
   await attachArticle(env, input.eventId, Number(inserted.meta?.last_row_id));

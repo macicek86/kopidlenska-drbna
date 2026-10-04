@@ -6,6 +6,7 @@ import { formatShort } from "../format.js";
 import { pragueNow } from "../waste.js";
 import { prepareArticleBody } from "../rich.js";
 import { rubricsFrom } from "../rubrics.js";
+import { MAX_ATTACHMENTS } from "../attachments.js";
 import { mediaUrl } from "../html.js";
 import { credit, esc } from "../view.js";
 import { photoField } from "./photo-field.js";
@@ -57,23 +58,28 @@ export function photoControl(source, stock = null) {
   )}`;
 }
 
-// Přílohy ze zdroje (jízdní řády, mapy). Nové se tu nepřidávají, jen jde odškrtnout, co ve zprávě být nemá.
+// Přílohy pod zprávou (jízdní řád, mapa, plakát): od Drběny ze zdroje, nebo je nahraje, kdo zprávu píše.
+// Odškrtnutá se po uložení smaže. Popisky nových příloh doplní public/editor.js, bez JS se dají dopsat po uložení.
+const ATTACHMENT_LIMITS = 'data-edge="2400" data-bytes="1500000"';
+
 function attachmentsControl(source) {
   const list = source?.attachments ?? [];
-  if (!list.length) return "";
   const items = list
     .map(
-      (item) => `<li><label class="attachment-pick">
-          <input type="checkbox" name="keep_attachment" value="${esc(item.key)}" checked>
+      (item) => `<li class="attachment-pick">
+          <input type="checkbox" name="keep_attachment" value="${esc(item.key)}" checked aria-label="Nechat přílohu">
           <a href="${mediaUrl(item.key)}" target="_blank" rel="noopener"><img src="${mediaUrl(item.key)}" alt="" loading="lazy"></a>
-          <span>${esc(item.caption || "Bez popisku")}</span>
-        </label></li>`,
+          ${hidden("attachment_key", item.key)}
+          <input class="${input}" name="attachment_caption" maxlength="200" value="${esc(item.caption)}" placeholder="Popisek" aria-label="Popisek přílohy">
+        </li>`,
     )
     .join("");
-  return `<div class="field"><span>Přílohy</span>
+  return `<div class="field" data-attachments><span>Přílohy</span>
       ${hidden("attachments_shown", "1")}
-      <ul class="plain attachment-picks">${items}</ul>
-      <span class="hint">Ukážou se pod zprávou. Odškrtnutá příloha se po uložení smaže.</span>
+      ${list.length ? `<ul class="plain attachment-picks">${items}</ul>` : ""}
+      <input class="control" type="file" name="attachment_files" multiple accept="image/jpeg,image/png,image/webp,image/gif" ${ATTACHMENT_LIMITS}>
+      <ul class="plain attachment-picks" data-attachment-new></ul>
+      <span class="hint">Obrázky, které si čtenář prohlédne sám: jízdní řád, mapa, plakát. Ukážou se pod zprávou, nejvýš ${MAX_ATTACHMENTS}.${list.length ? " Odškrtnutá příloha se po uložení smaže." : ""}</span>
     </div>`;
 }
 
@@ -150,6 +156,9 @@ export function reviewForm(data, proposal, { chief = true } = {}) {
     ? `<button class="btn btn-line" type="button" data-toggle="vratit-${proposal.id}">Vrátit autorovi…</button>
         ${modalLink(`${BASE}?smazat-navrh=${proposal.id}`, "Smazat", "btn-ghost btn-danger-text")}`
     : cancelLink(BASE);
+  // Návrh úpravy z doby před přílohami od lidí: ukáže přílohy zprávy (src/proposals-db.js).
+  const linked = proposal.ownAttachments ? null : data.articles?.find((row) => row.id === proposal.articleId);
+  const source = linked ? { ...proposal, attachments: linked.attachments } : proposal;
   const form = `<form class="form" method="post" action="${BASE}/schvalit" enctype="multipart/form-data">
       ${callout(`${intro}${
         proposal.articleTitle ? `<br>Ke zprávě: <b>${esc(proposal.articleTitle)}</b>` : ""
@@ -157,7 +166,7 @@ export function reviewForm(data, proposal, { chief = true } = {}) {
         !chief && proposal.publishOn && !proposal.articleId ? `<br>Vyjde s datem ze zdroje: <b>${esc(formatShort(proposal.publishOn))}</b>` : ""
       }`)}
       ${hidden("id", proposal.id)}
-      ${articleFields(proposal, data, { date: chief && !proposal.articleId ? proposalDate(proposal) : null })}
+      ${articleFields(source, data, { date: chief && !proposal.articleId ? proposalDate(proposal) : null })}
       ${formFoot("Schválit a zveřejnit", extra)}
     </form>`;
   if (!chief) return form;

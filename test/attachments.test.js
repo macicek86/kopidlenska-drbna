@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachmentKeys, attachmentsJson, attachmentsSection, keptAttachments, readAttachments } from "../src/attachments.js";
+import { attachmentKeys, attachmentsJson, attachmentsSection, formAttachments, readAttachments } from "../src/attachments.js";
 import { outputSchema, readDecision, systemPrompt, visibleImages } from "../src/munipolis/ai.js";
 import { mergeImageUrls, pageImages } from "../src/munipolis/page.js";
 import { articleAttachments } from "../src/munipolis/run.js";
@@ -117,7 +117,7 @@ test("vybrané přílohy se uloží do R2 a čísla sedí na obrázky, které Cl
   assert.deepEqual(put.map(([, size]) => size), [20]);
 });
 
-test("přílohy ve zprávě: čtení, odškrtnutí v redakci a výpis pod článkem", () => {
+test("přílohy ve zprávě: čtení, odškrtnutí v redakci a výpis pod článkem", async () => {
   const json = attachmentsJson([
     { key: "prilohy/0a1b-2c.jpg", caption: "Jízdní řád <723>" },
     { key: "prilohy/ffff.png", caption: "" },
@@ -128,10 +128,15 @@ test("přílohy ve zprávě: čtení, odškrtnutí v redakci a výpis pod člán
   assert.equal(attachmentsJson([]), "");
   assert.deepEqual(attachmentKeys(json), ["prilohy/0a1b-2c.jpg", "prilohy/ffff.png"]);
 
-  // Formulář bez příloh nic nemění, s nimi zůstane jen zaškrtnuté.
-  assert.deepEqual(keptAttachments(json, {}), { json, removed: [] });
-  const kept = keptAttachments(json, { attachmentsShown: true, keepAttachments: ["prilohy/ffff.png"] });
-  assert.deepEqual(readAttachments(kept.json).map((item) => item.key), ["prilohy/ffff.png"]);
+  // Formulář bez příloh nic nemění, s nimi zůstane jen zaškrtnuté a popisek jde přepsat.
+  assert.deepEqual(await formAttachments({}, json, {}), { json, added: [], removed: [] });
+  const kept = await formAttachments({}, json, {
+    attachmentsShown: true,
+    keepAttachments: ["prilohy/ffff.png"],
+    attachmentKeys: ["prilohy/0a1b-2c.jpg", "prilohy/ffff.png"],
+    attachmentCaptions: ["Jízdní řád", "  Mapa   objížďky "],
+  });
+  assert.deepEqual(readAttachments(kept.json), [{ key: "prilohy/ffff.png", caption: "Mapa objížďky" }]);
   assert.deepEqual(kept.removed, ["prilohy/0a1b-2c.jpg"]);
 
   const html = attachmentsSection({ attachments: list });
@@ -150,4 +155,28 @@ test("odkazy ze zdroje zůstanou v textu pro Drběnu jako „popis (adresa)“",
     "Trasa: https://mapy.com/s/x, přihláška (https://skola.cz/prihlaska.pdf),\nnapište (mailto:skola@kopidlno.cz), zlé,",
   );
   assert.equal(htmlToText(html).includes("prihlaska"), false);
+});
+
+test("přílohy nahrané v redakci: uloží se do prilohy/ s popiskem, nad limit a špatný soubor neprojdou", async () => {
+  const put = [];
+  const env = { BUCKET: { put: async (key) => put.push(key), delete: async () => {} }, DB: { prepare: () => ({ bind: () => ({ first: async () => null }) }) } };
+  const file = (name, type = "image/webp") => new File([new Uint8Array(10)], name, { type });
+  const json = attachmentsJson([{ key: "prilohy/aaaa.jpg", caption: "Stará" }]);
+  const result = await formAttachments(env, json, {
+    attachmentsShown: true,
+    keepAttachments: ["prilohy/aaaa.jpg"],
+    attachmentFiles: [file("rad.webp"), new File([], "prazdny.png")],
+    newAttachmentCaptions: ["Jízdní řád 723"],
+  });
+  assert.equal(put.length, 1);
+  assert.match(put[0], /^prilohy\/[0-9a-f-]+\.webp$/);
+  assert.deepEqual(readAttachments(result.json), [
+    { key: "prilohy/aaaa.jpg", caption: "Stará" },
+    { key: put[0], caption: "Jízdní řád 723" },
+  ]);
+  assert.deepEqual(result.added, [put[0]]);
+
+  const many = Array.from({ length: 8 }, (_, index) => file(`${index}.webp`));
+  assert.match((await formAttachments(env, json, { attachmentFiles: many })).error, /nejvýš 8/);
+  assert.match((await formAttachments(env, "", { attachmentFiles: [file("x.pdf", "application/pdf")] })).error, /x\.pdf: Fotka musí být/);
 });

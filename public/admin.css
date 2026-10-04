@@ -555,6 +555,8 @@ html { font-size: 100%; }
 /* Přílohy zprávy: náhled s popiskem, zaškrtnuté zůstávají */
 .attachment-picks { display: grid; gap: 0.5rem; }
 .attachment-pick { display: grid; grid-template-columns: auto 4.5rem minmax(0, 1fr); gap: 0.6rem; align-items: center; font-size: 0.9rem; }
+.attachment-new { grid-template-columns: 4.5rem minmax(0, 1fr); }
+[data-attachment-new]:empty { display: none; }
 .attachment-pick img { display: block; width: 4.5rem; height: 3.2rem; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-2); }
 
 /* --- Pomocník při psaní (public/assist.js) ------------------------------ */
