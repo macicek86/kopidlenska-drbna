@@ -1,5 +1,6 @@
 // Formulář zprávy v redakci: pole zprávy, rubrika, fotka a schválení návrhu.
 import { formatShort } from "../format.js";
+import { pragueNow } from "../waste.js";
 import { prepareArticleBody } from "../rich.js";
 import { rubricsFrom } from "../rubrics.js";
 import { mediaUrl } from "../html.js";
@@ -83,7 +84,16 @@ function richTextField(body) {
   </div>`;
 }
 
-export function articleFields(source, data, { publish } = {}) {
+// Datum zprávy: u zprávy hlavního redaktora a při schválení nového příspěvku. Datum v budoucnu je plánované zveřejnění.
+function dateField(value, hint = "") {
+  return field(
+    "Datum zprávy",
+    `<input class="${input}" type="date" name="created_on" required value="${esc(value)}">`,
+    `${hint}Podle něj se zprávy řadí. Datum v budoucnu: zpráva se na webu ukáže až ten den.`,
+  );
+}
+
+export function articleFields(source, data, { publish, date } = {}) {
   return `<div class="form-cols">
     <div class="form-col-main">
       ${field("Nadpis", `<input class="${input} control-lg" name="title" required maxlength="160" value="${esc(source?.title ?? "")}">`)}
@@ -95,9 +105,15 @@ export function articleFields(source, data, { publish } = {}) {
       ${photoControl(source, data.stock)}
       ${attachmentsControl(source)}
       ${publish ? `<div class="field"><span>Viditelnost</span>${check("published", "1", publish.checked, "Zveřejnit na webu")}</div>` : ""}
-      ${publish ? field("Datum zprávy", `<input class="${input}" type="date" name="created_on" required value="${esc(source?.createdOn || publish.today)}">`, "Podle něj se zprávy řadí. Datum v budoucnu: zpráva se na webu ukáže až ten den.") : ""}
+      ${publish ? dateField(source?.createdOn || publish.today) : ""}
+      ${date ? dateField(date.value, date.hint) : ""}
     </div>
   </div>`;
+}
+
+function proposalDate(proposal) {
+  if (proposal.publishOn) return { value: proposal.publishOn, hint: "Předvyplněné datum ze zdroje. " };
+  return { value: pragueNow().date };
 }
 
 export function proposalKind(proposal) {
@@ -118,10 +134,10 @@ export function reviewForm(data, proposal, { chief = true } = {}) {
       ${callout(`${intro}${
         proposal.articleTitle ? `<br>Ke zprávě: <b>${esc(proposal.articleTitle)}</b>` : ""
       }${
-        proposal.publishOn && !proposal.articleId ? `<br>Vyjde s datem ze zdroje: <b>${esc(formatShort(proposal.publishOn))}</b>` : ""
+        !chief && proposal.publishOn && !proposal.articleId ? `<br>Vyjde s datem ze zdroje: <b>${esc(formatShort(proposal.publishOn))}</b>` : ""
       }`)}
       ${hidden("id", proposal.id)}
-      ${articleFields(proposal, data)}
+      ${articleFields(proposal, data, { date: chief && !proposal.articleId ? proposalDate(proposal) : null })}
       ${formFoot("Schválit a zveřejnit", extra)}
     </form>`;
   if (!chief) return form;

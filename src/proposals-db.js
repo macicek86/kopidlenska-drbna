@@ -1,7 +1,8 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
 // Návrhy od Drběny smí schválit i přispěvatel s oprávněním `drbena_navrhy`.
 import { asBool, clip, IMPORT_ITEM_TABLES, reopenImports, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
-import { readArticle, redactedFlag, textWasEdited } from "./db.js";
+import { readArticle, readCreatedOn, redactedFlag, textWasEdited } from "./db.js";
+import { pragueNow } from "./waste.js";
 import { forgetProposal, linkEventsToArticle } from "./events-db.js";
 import { attachmentKeys, keptAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
@@ -148,6 +149,10 @@ export async function approveProposal(env, request, input) {
   if (!canApprove(gate.user, proposal)) return { ok: false, error: "Tohle schvaluje jen hlavní redaktor." };
   const parsed = await readArticle(env, input);
   if (parsed.error) return { ok: false, error: parsed.error };
+  // Datum nové zprávy: hlavní redaktor ho při schválení může změnit (i do budoucna), jinak datum ze zdroje nebo dnešek.
+  const chosen = gate.user.role === "hlavni" ? readCreatedOn(input.createdOn) : { date: null };
+  if (chosen.error) return { ok: false, error: chosen.error };
+  const createdOn = chosen.date ?? (proposal.publish_on ? String(proposal.publish_on) : pragueNow().date);
 
   let article = null;
   if (proposal.article_id) {
@@ -208,7 +213,7 @@ export async function approveProposal(env, request, input) {
     const inserted = await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted,
          keywords, follows_id)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, coalesce(nullif(?, ''), date('now')), ?, ?, ?, ?, ?)`,
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -221,7 +226,7 @@ export async function approveProposal(env, request, input) {
         parsed.imageFocus,
         parsed.imageCaption,
         attachments.json,
-        String(proposal.publish_on ?? ""),
+        createdOn,
         proposal.author_id,
         proposal.author_name,
         edited ? 1 : 0,
@@ -254,7 +259,7 @@ export async function approveProposal(env, request, input) {
     await releaseImage(env, previousProposalImage);
   }
   for (const key of article ? attachmentKeys(proposal.attachments) : attachments.removed) await releaseImage(env, key);
-  return { ok: true };
+  return { ok: true, planned: !article && createdOn > pragueNow().date };
 }
 
 export async function rejectProposal(env, request, input) {

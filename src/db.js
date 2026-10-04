@@ -410,7 +410,7 @@ export async function loadAdmin(env, request) {
 }
 
 // Datum zprávy z redakce. Prázdné nechá stávající (u nové dnešní). Datum v budoucnu je plánované zveřejnění.
-function readCreatedOn(value) {
+export function readCreatedOn(value) {
   const text = String(value ?? "").trim();
   if (!text) return { date: null };
   const date = isoDate(text);

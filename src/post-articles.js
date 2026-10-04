@@ -12,6 +12,7 @@ export const ARTICLES_OK = {
   "navrh-stazen": "Návrh je stažený.",
   "navrh-smazan": "Návrh je smazaný.",
   schvaleno: "Příspěvek je schválený a na webu.",
+  "schvaleno-planovano": "Příspěvek je schválený a na webu se ukáže v naplánovaný den.",
   vraceno: "Návrh je vrácený autorovi.",
 };
 
@@ -43,7 +44,7 @@ export async function articlesPost(path, request, env, fields) {
   if (path === "/redakce/zpravy/schvalit") {
     const result = await approveProposal(env, request, fields);
     if (!result.ok) return redirect(`/redakce/zpravy?navrh=${fields.id ?? ""}&chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/zpravy?ok=schvaleno");
+    return redirect(`/redakce/zpravy?ok=${result.planned ? "schvaleno-planovano" : "schvaleno"}`);
   }
   if (path === "/redakce/zpravy/vratit") {
     const result = await rejectProposal(env, request, fields);
