@@ -1,9 +1,9 @@
-// Výpis hodin lékařů a míst: příštích 7 dní (změny přepíšou běžné hodiny a jsou zvýrazněné),
+// Výpis hodin lékařů a míst: příštích 7 dní (stejné dny po sobě sloučené, změny přepíšou běžné hodiny a jsou zvýrazněné),
 // běžný týden v okně a stručné dlaždice změn, které do 7 dní celé nespadají.
 import { periodClosed } from "./doctors.js";
 import { addDays, civilWeekday, daysBetween } from "./waste.js";
 import { esc } from "./html.js";
-import { laterChanges, nextDays } from "./hours-days.js";
+import { dayGroups, laterChanges } from "./hours-days.js";
 import { closureLabel, dayLabel } from "./view.js";
 import { formatLong } from "./format.js";
 
@@ -34,18 +34,35 @@ export function regularWeekList(week) {
     .join("")}</ul>`;
 }
 
+// Časy bez poznámek jdou na jeden řádek, s poznámkou má každý svůj.
+function groupBody(slot) {
+  const parts = [slot.morning, slot.afternoon].filter((part) => part?.open);
+  if (!parts.length || parts.some((part) => part.note)) return dayBody(slot);
+  return `<p class="parts one-line">${parts.map((part) => `<strong>${esc(`${part.from}–${part.to}`)}</strong>`).join(", ")}</p>`;
+}
+
+// „Pondělí 5. 10.“, sloučené dny „Pondělí–čtvrtek 5.–8. 10.“ (přes konec měsíce „30. 9.–2. 10.“).
+function groupLabel(from, to) {
+  const first = dayLabel(civilWeekday(from));
+  if (from === to) return `${esc(first)} ${shortDate(from)}`;
+  const last = dayLabel(civilWeekday(to)).toLowerCase();
+  const sameMonth = from.slice(0, 7) === to.slice(0, 7);
+  const start = sameMonth ? `${Number(from.slice(8))}.` : shortDate(from);
+  return `${esc(first)}–${esc(last)} ${start}–${shortDate(to)}`;
+}
+
 // Příštích 7 dní od dneška. Den se změnou má štítek a důvod změny.
 export function nextDaysList(entity, today) {
-  return `<ul class="week-list doctor-week next-days">${nextDays(entity, today)
-    .map(({ iso, slot, change, kind }) => {
+  return `<ul class="week-list doctor-week next-days">${dayGroups(entity, today)
+    .map(({ from, to, slot, change, kind }) => {
       const open = Boolean(slot.morning?.open || slot.afternoon?.open);
-      const classes = [iso === today ? "is-today" : "", change ? "is-change" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
-      const mark = iso === today ? `<span class="today-mark">dnes</span>` : "";
+      const classes = [from === today ? "is-today" : "", change ? "is-change" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
+      const mark = from === today ? `<span class="today-mark">dnes</span>` : "";
       const label = kind === "nova" ? "nová doba" : "změna";
       const note = change
         ? `<p class="change-note"><span class="change-mark">${label}</span>${change.note ? ` ${esc(change.note)}` : ""}</p>`
         : "";
-      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${esc(dayLabel(slot.day))} ${shortDate(iso)}${mark}</span>${dayBody(slot)}${note}</li>`;
+      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${groupLabel(from, to)}${mark}</span>${groupBody(slot)}${note}</li>`;
     })
     .join("")}</ul>`;
 }

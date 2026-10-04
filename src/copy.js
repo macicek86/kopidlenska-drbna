@@ -123,6 +123,7 @@ export const COPY = [
   { group: "Otevírací doba", key: "places_ask_chat", label: "Odkaz pod úvodem, když je chat zapnutý", value: "Řekněte to Drběně v chatu", max: 80 },
   { group: "Otevírací doba", key: "places_ask_mail", label: "Odkaz pod úvodem, když je chat vypnutý", value: "Napište redakci", max: 80 },
   { group: "Otevírací doba", key: "places_empty", label: "Když není žádné místo", value: "Zatím tu není žádné místo. Až ho redakce doplní, objeví se tady.", max: 240, long: true },
+  { group: "Otevírací doba", key: "places_now", label: "Nadpis přehledu, kdo má teď otevřeno", value: "Kdo má teď otevřeno", max: 60 },
   { group: "Otevírací doba", key: "places_hours", label: "Nadpis otevírací doby", value: "Otevírací doba", max: 40 },
   { group: "Otevírací doba", key: "places_regular", label: "Tlačítko a okno s běžnou dobou", value: "Běžná otevírací doba", max: 40 },
   { group: "Otevírací doba", key: "places_offers", label: "Tlačítko a okno se seznamem, co místo nabízí", value: "Co tu najdete", max: 40 },

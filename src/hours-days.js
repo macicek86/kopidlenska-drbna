@@ -52,3 +52,20 @@ export function laterChanges(entity, today, count = NEXT_DAYS) {
     .filter((change) => (change.kind === "trvala" ? change.startsOn > last : change.endsOn > last))
     .sort((a, b) => a.startsOn.localeCompare(b.startsOn));
 }
+
+function sameChange(a, b) {
+  return (a.change?.id ?? null) === (b.change?.id ?? null) && a.kind === b.kind;
+}
+
+// Příštích 7 dní sloučené: po sobě jdoucí dny se stejnými hodinami (a stejnou změnou) jsou jeden řádek,
+// dnešek je vždy zvlášť. Běžně zavřené dny se vynechají, zavřeno kvůli změně zůstane.
+export function dayGroups(entity, today, count = NEXT_DAYS) {
+  const groups = [];
+  for (const day of nextDays(entity, today, count)) {
+    const last = groups.at(-1);
+    const joins = last && day.iso !== today && last.from !== today && sameChange(last, day) && sameSlot(last.slot, day.slot);
+    if (joins) last.to = day.iso;
+    else groups.push({ ...day, from: day.iso, to: day.iso });
+  }
+  return groups.filter((group) => group.from === today || group.change || group.slot.morning?.open || group.slot.afternoon?.open);
+}

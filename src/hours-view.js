@@ -2,6 +2,7 @@
 import { text as tx } from "./copy.js";
 import { hasOpenSlot } from "./doctors.js";
 import { esc } from "./html.js";
+import { nowOverview } from "./hours-now.js";
 import { laterChangeTiles, nextDaysList, popover, popoverButton, regularWeekList } from "./hours-week-view.js";
 import { placeNotices } from "./places.js";
 import { askLine, layout } from "./view.js";
@@ -95,7 +96,6 @@ function placeCard(place, today, ctx) {
   const phone = phoneLink(place.phone);
   const { days, more } = hoursBlock(place, today, ctx, PLACE_KEYS);
   const meta = [esc(place.place), phone].filter(Boolean).join(" · ");
-  // Bloky karty jsou řádky mřížky (záhlaví, nadpis, 7 dnů, zbytek), na počítači se srovnají s kartami vedle.
   return `<article class="card yard place-card" id="misto-${place.id}">
     <div class="place-head">
       ${place.label ? `<p class="kicker">${esc(place.label)}</p>` : ""}
@@ -115,11 +115,14 @@ export function placesPage(data, ctx) {
   const cards = places.length
     ? places.map((place) => placeCard(place, today, ctx)).join("")
     : `<p class="card dashed muted">${esc(tx(ctx.copy, "places_empty"))}</p>`;
-  const jump = places.length > 1
-    ? `<nav class="place-jump" aria-label="Rychlý přechod na místo">${places
-        .map((place) => `<a class="chip" href="#misto-${place.id}">${esc(place.name)}</a>`)
-        .join("")}</nav>`
-    : "";
+  // Nahoře kdo má teď otevřeno, řádky vedou na karty míst. Bez času (třeba v testu) jen rychlé odkazy.
+  const jump = data.now
+    ? nowOverview(places, data.now, tx(ctx.copy, "places_now"))
+    : places.length > 1
+      ? `<nav class="place-jump" aria-label="Rychlý přechod na místo">${places
+          .map((place) => `<a class="chip" href="#misto-${place.id}">${esc(place.name)}</a>`)
+          .join("")}</nav>`
+      : "";
   const ask = askLine(ctx, "places", "Chybí mi tu místo: ");
   return layout({
     ...ctx,
@@ -131,6 +134,6 @@ export function placesPage(data, ctx) {
       <p class="lede">${esc(tx(ctx.copy, "places_lede"))}</p>
       ${ask}
       ${jump}
-      <div class="stack place-grid">${cards}</div>`,
+      <div class="stack place-grid places-list">${cards}</div>`,
   });
 }

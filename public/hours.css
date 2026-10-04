@@ -163,3 +163,43 @@
 
 :is(.doctor-grid, .place-grid) .next-days li.is-change .parts { border-left-color: var(--soon); }
 :is(.doctor-grid, .place-grid) .next-days li.is-change .part strong { font-weight: 700; }
+
+/* Časy bez poznámek na jednom řádku (sloučené dny). */
+:is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off) .parts.one-line {
+  display: block;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+:is(.doctor-grid, .place-grid) .doctor-week .parts.one-line strong { font-weight: 500; white-space: nowrap; }
+:is(.doctor-grid, .place-grid) .next-days li.is-change .parts.one-line strong { font-weight: 700; }
+
+/* Karty míst mají různě řádků (sloučené dny), proto se s kartami vedle nesrovnávají po řádcích. */
+@media (min-width: 720px) {
+  .places-list .place-card,
+  .places-list .place-card .week-list { display: block; }
+}
+
+/* Kdo má teď otevřeno: jméno vlevo, stav vpravo; na počítači dva sloupce. */
+.now-board { margin: 0 0 1rem; }
+.now-board h2 { margin: 0 0 0.5rem; font-family: var(--display); font-size: 1.35rem; }
+.now-time { color: var(--muted); font-family: inherit; font-size: 0.95rem; font-weight: 600; }
+.now-list { list-style: none; margin: 0; padding: 0; column-gap: 2rem; }
+.now-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.1rem 1rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--line);
+  break-inside: avoid;
+}
+.now-list a { color: var(--ink); font-weight: 700; }
+.now-state { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.now-list .is-open .now-state { color: var(--pine); }
+.now-list .is-soon .now-state { color: var(--soon); }
+.now-list .is-closed .now-state { color: var(--muted); }
+.now-note { display: block; color: var(--soon); font-size: 0.9rem; font-weight: 500; }
+
+@media (min-width: 720px) {
+  .now-list { columns: 2; }
+}
