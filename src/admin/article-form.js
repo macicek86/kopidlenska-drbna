@@ -97,18 +97,18 @@ function dateField(value, hint = "") {
 }
 
 // Pomocník při psaní (public/assist.js): Drběna přepíše, co je v polích, nebo to jen učeše. Bez JS se neukáže.
+// Jeden řádek nad Nadpisem, nápověda se ukáže po ťuknutí na „i“, stav až po použití.
 function assistBar(user) {
   if (!userCan(user, ASSIST_PERMISSION)) return "";
   const buttons = Object.entries(ASSIST_MODES)
-    .map(([mode, label]) => `<button class="btn ${mode === "drbena" ? "btn-line" : "btn-ghost"}" type="button" data-assist-run="${mode}">${esc(label)}</button>`)
+    .map(([mode, label]) => `<button class="assist-link" type="button" data-assist-run="${mode}">${esc(label)}</button>`)
     .join("");
   return `<div class="assist" data-assist hidden>
-      <img class="assist-face" src="/drbena-uvitani.webp" alt="" width="48" height="48">
-      <div class="assist-main">
-        <p class="assist-hint">Napište, co víte, klidně jen v bodech. Drběna z toho udělá zprávu a navrhne rubriku i fotku.</p>
-        <div class="assist-actions">${buttons}<button class="btn btn-ghost" type="button" data-assist-undo hidden>Vrátit můj text</button></div>
-        <p class="assist-status" data-assist-status role="status" aria-live="polite"></p>
-      </div>
+      <img class="assist-face" src="/drbena-uvitani.webp" alt="" width="28" height="28">
+      <div class="assist-actions">${buttons}<button class="assist-link assist-undo" type="button" data-assist-undo hidden>Vrátit můj text</button></div>
+      <button class="assist-info" type="button" data-assist-info aria-expanded="false" aria-label="Jak pomocník funguje">i</button>
+      <p class="assist-hint" data-assist-hint hidden>Napište, co víte, klidně jen v bodech. Drběna z toho udělá zprávu a navrhne rubriku i fotku. Nic se neuloží, dokud nedáte Uložit.</p>
+      <p class="assist-status" data-assist-status role="status" aria-live="polite"></p>
     </div>`;
 }
 

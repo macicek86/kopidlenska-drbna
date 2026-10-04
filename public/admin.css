@@ -559,16 +559,27 @@ html { font-size: 100%; }
 
 /* --- Pomocník při psaní (public/assist.js) ------------------------------ */
 
-.assist { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.7rem 0.85rem; border: 1px dashed var(--line-2); border-radius: var(--r); background: var(--surface-2); }
+.assist { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.55rem; padding-bottom: 0.55rem; border-bottom: 1px solid var(--line-2); }
 .assist[hidden], .assist [hidden] { display: none; }
-.assist-face { flex: none; width: 3rem; height: 3rem; border-radius: 50%; object-fit: cover; background: var(--surface); }
-.assist-main { min-width: 0; flex: 1; }
-.assist-hint { margin: 0 0 0.5rem; font-size: 0.9rem; line-height: 1.4; color: var(--off-ink); }
-.assist-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.assist-status { margin: 0.5rem 0 0; font-size: 0.88rem; line-height: 1.4; }
+.assist-face { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 50%; object-fit: cover; background: var(--surface-2); }
+.assist-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.9rem; min-width: 0; flex: 1; }
+.assist-link {
+  padding: 0.2rem 0; border: 0; background: none; color: var(--brand); font: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+.assist-link:hover { text-decoration-color: currentColor; }
+.assist-link:disabled { opacity: 0.5; cursor: progress; }
+.assist-undo { color: var(--muted); }
+.assist-info {
+  flex: none; width: 1.3rem; height: 1.3rem; padding: 0; border: 1px solid var(--line-2); border-radius: 50%;
+  background: none; color: var(--muted); font: 700 0.72rem/1 var(--sans); cursor: pointer;
+}
+.assist-info[aria-expanded="true"] { background: var(--surface-2); color: var(--ink); }
+.assist-hint, .assist-status { flex-basis: 100%; margin: 0; font-size: 0.84rem; line-height: 1.4; }
+.assist-hint { color: var(--muted); }
 .assist-status:empty { display: none; }
 .assist-status.is-bad { color: var(--bad-ink); }
 .assist-status.is-ok { color: var(--ok-ink); }
 .assist.is-busy .assist-face { animation: assist-nod 0.9s ease-in-out infinite alternate; }
-@keyframes assist-nod { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+@keyframes assist-nod { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
 @media (prefers-reduced-motion: reduce) { .assist.is-busy .assist-face { animation: none; } }

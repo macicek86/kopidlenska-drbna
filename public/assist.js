@@ -145,6 +145,14 @@ document.addEventListener("click", (event) => {
     if (bar) run(bar, runButton.dataset.assistRun);
     return;
   }
+  const info = event.target.closest?.("[data-assist-info]");
+  if (info) {
+    const hint = info.closest("[data-assist]")?.querySelector("[data-assist-hint]");
+    if (!hint) return;
+    hint.hidden = !hint.hidden;
+    info.setAttribute("aria-expanded", String(!hint.hidden));
+    return;
+  }
   const undoButton = event.target.closest?.("[data-assist-undo]");
   if (undoButton) {
     const bar = undoButton.closest("[data-assist]");
