@@ -1,7 +1,7 @@
 // RSS z Munipolisu: rozebrání kanálu na zprávy s textem a obrázky. Bez sítě, ať jde testovat.
 
 export const DEFAULT_FEED_URL = "https://kopidlno.munipolis.cz/rss";
-export const USER_AGENT = "KopidlenskaDrbna/1.0 (+https://kopidlenskadrbna.org)";
+export const USER_AGENT = "KopidlenskaDrbna/1.0 (+https://www.kopidlenskadrbna.org)";
 const MAX_ITEMS = 40;
 const MAX_TEXT = 12000;
 

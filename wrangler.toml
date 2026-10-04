@@ -2,6 +2,16 @@ name = "kopidlenska-drbna"
 main = "src/index.js"
 compatibility_date = "2026-09-01"
 
+# Vlastní doména. Hlavní adresa je www.kopidlenskadrbna.org, kopidlenskadrbna.org na ni přesměruje
+# (hostRedirect v src/http.js). popelnice.kopidlenskadrbna.org zatím zůstává u starého webu: až se má
+# přesměrovat na /popelnice (umí to taky hostRedirect), přidat sem i její řádek.
+routes = [
+  { pattern = "kopidlenskadrbna.org", custom_domain = true },
+  { pattern = "www.kopidlenskadrbna.org", custom_domain = true }
+]
+# Až Cloudflare Access hlídá redakci i na kopidlenskadrbna.org, přidat nahoru k name workers_dev = false
+# a preview_urls = false, ať redakce nejde obejít kolem Accessu.
+
 # Cloudflare Access: ACCESS_TEAM (název týmu, třeba „drbna“ z drbna.cloudflareaccess.com) a ACCESS_AUD
 # (Application Audience tag) se nastavují jako tajemství: npx wrangler secret put ACCESS_TEAM
 # Místně nejsou, takže náhled a vývoj se dál přihlašují heslem.
@@ -29,11 +39,3 @@ bucket_name = "kopidlenska-drbna"
 
 [triggers]
 crons = ["15 */4 * * *"]
-
-# Až drbna pojede na vlastní doméně: odkomentovat routes a přidat workers_dev = false a preview_urls = false
-# nahoru k name, ať redakce nejde obejít kolem Cloudflare Access.
-# routes = [
-#   { pattern = "kopidlenskadrbna.org", custom_domain = true },
-#   { pattern = "www.kopidlenskadrbna.org", custom_domain = true },
-#   { pattern = "popelnice.kopidlenskadrbna.org", custom_domain = true }  # jen přesměruje na /popelnice
-# ]

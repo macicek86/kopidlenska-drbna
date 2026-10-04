@@ -106,9 +106,11 @@ test("chybějící stránka se nemá indexovat", () => {
 
 test("popelnice. přesměruje na stránku svozu na hlavní doméně", async () => {
   const { default: worker } = await import("../src/index.js");
-  const response = await worker.fetch(new Request("https://popelnice.drbna.test/cokoli?x=1"), {}, {});
+  const response = await worker.fetch(new Request("https://popelnice.kopidlenskadrbna.org/cokoli?x=1"), {}, {});
   assert.equal(response.status, 301);
-  assert.equal(response.headers.get("location"), "https://drbna.test/popelnice");
+  assert.equal(response.headers.get("location"), "https://www.kopidlenskadrbna.org/popelnice");
+  const ndic = await worker.fetch(new Request("https://kopidlenska-drbna.camledian.workers.dev/ndic/uzavirky", { method: "POST" }), {}, {});
+  assert.notEqual(ndic.status, 308);
 });
 
 test("chybějící obrázek dostane stránku 404 jen v prohlížeči, ne v <img>", async () => {
@@ -118,4 +120,17 @@ test("chybějící obrázek dostane stránku 404 jen v prohlížeči, ne v <img>
   assert.equal(wantsPage(new Request("https://drbna.test/neco.png", { headers: { accept: "image/avif,image/webp,image/*,*/*;q=0.8" } })), false);
   assert.equal(wantsPage(new Request("https://drbna.test/neco.css", { headers: { accept: "text/css,*/*;q=0.1" } })), false);
   assert.equal(wantsPage(new Request("https://drbna.test/neco.js")), false);
+});
+
+test("kopidlenskadrbna.org a workers.dev přesměrují na www", async () => {
+  const { hostRedirect } = await import("../src/http.js");
+  const bare = hostRedirect(new Request("https://kopidlenskadrbna.org/akce?mesic=2026-10"));
+  assert.equal(bare.status, 301);
+  assert.equal(bare.headers.get("location"), "https://www.kopidlenskadrbna.org/akce?mesic=2026-10");
+  const post = hostRedirect(new Request("https://kopidlenskadrbna.org/chat/zeptat", { method: "POST" }));
+  assert.equal(post.status, 308);
+  const old = hostRedirect(new Request("https://kopidlenska-drbna.camledian.workers.dev/redakce/zpravy?id=3"));
+  assert.equal(old.headers.get("location"), "https://www.kopidlenskadrbna.org/redakce/zpravy?id=3");
+  assert.equal(hostRedirect(new Request("https://www.kopidlenskadrbna.org/")), null);
+  assert.equal(hostRedirect(new Request("http://127.0.0.1:8788/")), null);
 });

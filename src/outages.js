@@ -5,7 +5,7 @@ import { addDays, pragueNow } from "./waste.js";
 // Ptá se ho jen worker, výsledek drží D1 a stránky už ČEZ nevolají.
 export const BEZSTAVY_API = "https://api.bezstavy.cz";
 export const BEZSTAVY_CDN = "https://cdn.bezstavy.cz";
-export const USER_AGENT = "KopidlenskaDrbna/1.0 (+https://kopidlenskadrbna.org)";
+export const USER_AGENT = "KopidlenskaDrbna/1.0 (+https://www.kopidlenskadrbna.org)";
 export const KOPIDLNO = { code: "573060", name: "Kopidlno" };
 export const MAX_AREAS = 12;
 export const HOME_LEAD_DAYS = 7;

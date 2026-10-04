@@ -54,7 +54,7 @@ import { NDIC_PUSH_PATH, ndicPush } from "./ndic/push.js";
 import { runNdic } from "./ndic/run.js";
 import { visitPath, visitTarget } from "./visits.js";
 import { pathViews, recordVisit } from "./visits-db.js";
-import { html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
+import { hostRedirect, html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
 import { robotsTxt, sitemapXml } from "./seo.js";
 import { loadSitemap } from "./seo-db.js";
 import { outagePost } from "./post-outages.js";
@@ -355,10 +355,9 @@ async function handlePost(request, env, path, https, fields, execution) {
 export default {
   async fetch(request, env, execution) {
     const url = new URL(request.url);
-    // Samostatný web popelnic skončil: popelnice.kopidlenskadrbna.org vede na stránku svozu.
-    if (url.hostname.startsWith("popelnice.")) {
-      return Response.redirect(`${url.protocol}//${url.hostname.slice("popelnice.".length)}/popelnice`, 301);
-    }
+    // NDIC přesměrování nesleduje: zprávy o uzavírkách se berou na kterékoli adrese.
+    const moved = url.pathname === NDIC_PUSH_PATH ? null : hostRedirect(request);
+    if (moved) return moved;
     try {
       // Statické soubory databázi nepotřebují.
       if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
