@@ -30,6 +30,16 @@ function followupPanel(drbena) {
     </form>`;
 }
 
+// Paměť (src/drbena-memory.js): navázat na související zprávu, trvající odstávku nebo nedávnou akci.
+function memoryPanel(drbena) {
+  return `<form class="panel form" method="post" action="${BASE}/pamet" data-dirty>
+      <header class="panel-head"><h2>Paměť Drběny</h2>${drbena.memory ? badge("Zapnuto", "info") : badge("Vypnuto")}</header>
+      <p class="panel-note">Drběna si v článcích z Munipolisu, Deníku, škol a uzavírek pamatuje, co se v Kopidlně děje. Jednou větou naváže na související zprávu („Sotva si Drběna zvykla na bagry na náměstí…“), připomene odstávku, která pořád trvá, nebo vzpomene na akci z posledního týdne („Drběna se sotva vrátila z drakiády…“). Na každou akci jen jednou a o jejím průběhu si nic nevymýšlí.</p>
+      ${check("memory", "1", drbena.memory, "Drběna si pamatuje", "Bez zaškrtnutí píše každý článek jen sám o sobě.")}
+      <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
+    </form>`;
+}
+
 function czk(value) {
   return `${value.toLocaleString("cs-CZ", { maximumFractionDigits: value < 10 ? 2 : 0 })} Kč`;
 }
@@ -70,12 +80,19 @@ function tryPanel(values = TRY_DEMO) {
       ${field("Druh", `<select class="${input}" name="kind" form="${FORM}">${kindOptions(values.kind)}</select>`)}
       ${field("Nadpis", `<input class="${input}" name="title" form="${FORM}" maxlength="200" value="${esc(values.title)}">`, "Nepovinné.")}
       ${field("Text článku", `<textarea class="${input}" name="text" form="${FORM}" rows="10" maxlength="${TRY_TEXT_MAX}">${esc(values.text)}</textarea>`)}
+      <label class="check"><input type="checkbox" name="memory" value="1" form="${FORM}"${values.memory ? " checked" : ""}> <span>S pamětí</span></label>
+      <span class="hint check-hint">Jen u zprávy města. Drběna může navázat na zprávy, odstávky a akce, které na drbně opravdu jsou. Zkouška akci neoznačí, ve skutečném článku na ni Drběna vzpomenout může.</span>
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-line" type="submit" form="${FORM}" formaction="${BASE}/zkusit#ukazka" data-busy="Drběna píše…">Napsat ukázku</button></div>
     </section>`;
 }
 
 function extras(result) {
   const rows = [];
+  if (result.recalled) {
+    rows.push(`<li><b>Vzpomněla na akci:</b> ${esc(result.recalled.title)} · ${esc(result.recalled.startsOn)}</li>`);
+  }
+  if (result.target) rows.push(`<li><b>Navazuje na zprávu:</b> ${esc(result.target.title)}</li>`);
+  if (result.decision === "duplicita" && result.duplicateOf) rows.push(`<li><b>Má to za duplicitu s:</b> ${esc(result.duplicateOf)}</li>`);
   if (result.event) {
     const when = [result.event.startsOn, result.event.startsTime].filter(Boolean).join(" ");
     rows.push(`<li><b>Akce do kalendáře:</b> ${esc(result.event.title)} · ${esc(when)} · ${esc(result.event.place)}</li>`);
@@ -111,7 +128,7 @@ function samplePanel(trial, unsaved) {
 
 // `trial` je zkouška povahy: { input, result }. Povaha se pak ukáže tak, jak byla v polích.
 export function adminDrbena(ctx, data, message, trial = null) {
-  const drbena = data.drbena ?? { persona: "", football: "", followupPublish: false };
+  const drbena = data.drbena ?? { persona: "", football: "", followupPublish: false, memory: true };
   const persona = trial ? trial.input.persona.trim() || DEFAULT_PERSONA : drbena.persona || DEFAULT_PERSONA;
   const football = trial ? trial.input.football.trim() || DEFAULT_FOOTBALL : drbena.football || DEFAULT_FOOTBALL;
   const ownP = trial ? ownPersona(persona) : drbena.persona;
@@ -129,6 +146,7 @@ export function adminDrbena(ctx, data, message, trial = null) {
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit povahu</button></div>
     </form>
     ${followupPanel(drbena)}
+    ${memoryPanel(drbena)}
     ${assistPanel(data.assist)}
     ${tryPanel(trial?.input)}
     ${trial ? samplePanel(trial, unsaved) : ""}`;

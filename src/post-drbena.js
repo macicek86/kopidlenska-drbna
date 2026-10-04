@@ -3,7 +3,7 @@ import { adminDrbena } from "./admin/drbena.js";
 import { loadAssistAdmin, saveAssistSettings } from "./assist/store.js";
 import { loadAdmin } from "./db.js";
 import { requireChief } from "./db-core.js";
-import { saveDrbena, saveFollowupSetting } from "./drbena-db.js";
+import { saveDrbena, saveFollowupSetting, saveMemorySetting } from "./drbena-db.js";
 import { readTry, tryVoice } from "./drbena-try.js";
 import { html, redirect, withError } from "./http.js";
 import { pragueNow } from "./waste.js";
@@ -13,6 +13,7 @@ const BASE = "/redakce/drbena";
 export const DRBENA_OK = {
   drbena: "Povaha Drběny je uložená.",
   "drbena-navazujici": "Nastavení navazujících zpráv je uložené.",
+  "drbena-pamet": "Nastavení paměti je uložené.",
   "drbena-pomocnik": "Limity pomocníka při psaní jsou uložené.",
 };
 
@@ -35,6 +36,11 @@ export async function drbenaPost(path, request, env, fields, ctx) {
     const result = await saveFollowupSetting(env, request, fields);
     if (!result.ok) return redirect(withError(BASE, result.error));
     return redirect(`${BASE}?ok=drbena-navazujici`);
+  }
+  if (path === `${BASE}/pamet`) {
+    const result = await saveMemorySetting(env, request, fields);
+    if (!result.ok) return redirect(withError(BASE, result.error));
+    return redirect(`${BASE}?ok=drbena-pamet`);
   }
   if (path !== `${BASE}/ulozit`) return null;
   const result = await saveDrbena(env, request, fields);

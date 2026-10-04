@@ -20,6 +20,11 @@ export function articleLine(row, tag) {
     .join(" · ");
 }
 
+// Konec odstávky nebo uzavírky, ať Drběna pozná, jestli ještě trvá.
+function noticeEnd(row) {
+  return row.endsOn ? ` až ${row.endsOn}${row.endsTime ? ` ${row.endsTime}` : ""}` : "";
+}
+
 // Zprávy a návrhy z přehledu (sdílí je i fotbal).
 export function addArticles(add, known) {
   add("Zprávy na webu za poslední týdny", (known.articles ?? []).map((row) => articleLine(row, "zprava")));
@@ -38,10 +43,17 @@ export function contextText(known) {
       (row) => `[akce:${row.id}] ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 140)} · ${line(row.place, 80)}`,
     ),
   );
+  if (known.recent?.length) {
+    add(
+      "Akce, které nedávno proběhly a Drběna na nich byla",
+      known.recent.map((row) => `[akce:${row.id}] ${row.startsOn} · ${line(row.title, 140)} · ${line(row.place, 80)}`),
+    );
+  }
   add(
     "Odstávky vody a uzavírky",
     (known.notices ?? []).map(
-      (row) => `[odstavka:${row.id}] ${row.kind} ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 100)} · ${line(row.places.join(", "))}`,
+      (row) =>
+        `[odstavka:${row.id}] ${row.kind} ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""}${noticeEnd(row)} · ${line(row.title, 100)} · ${line(row.places.join(", "))}`,
     ),
   );
   add(

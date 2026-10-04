@@ -4,6 +4,7 @@ import { CLICK_BUDGET_MS, CLICK_LOCK_SECONDS, CRON_BUDGET_MS, CRON_LOCK_SECONDS,
 import { saveBotArticle } from "../bot-article.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
+import { memoryOn, withMemory } from "../drbena-memory.js";
 import { knownContent, rubricMap } from "../import-context.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { pragueNow } from "../waste.js";
@@ -30,14 +31,16 @@ export async function processClosure(env, row, settings, { ask = askNdic } = {})
   const today = pragueNow().date;
   const rubrics = await rubricMap(env);
   const wantArticle = wantsArticle(row, settings);
+  const drbena = await loadDrbena(env);
+  const memory = memoryOn(drbena, "", today);
   const answer = await ask(env, {
     row,
-    known: await knownContent(env, { itemId: 0, today, table: "road_closures", closureRef: row.ref }),
+    known: await knownContent(env, { itemId: 0, today, table: "road_closures", closureRef: row.ref, recall: memory }),
     settings,
     wantArticle,
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
-    voice: voiceFor(await loadDrbena(env)),
+    voice: withMemory(voiceFor(drbena), memory),
     today,
   });
   if (!answer.ok) {

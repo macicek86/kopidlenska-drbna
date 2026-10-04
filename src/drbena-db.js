@@ -11,12 +11,20 @@ export async function ensureDrbenaTable(env) {
     )`,
   ).run();
   const info = await env.DB.prepare("pragma table_info(drbena_settings)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
   // Navazující zprávy (doplnění ke starší zprávě) rovnou na web. Ve výchozím stavu jdou jako návrh.
   await addColumn(
     env,
-    new Set((info.results ?? []).map((row) => row.name)),
+    names,
     "followup_publish",
     "alter table drbena_settings add column followup_publish integer not null default 0",
+  );
+  // Paměť: navázat na související zprávu a vzpomenout na nedávnou akci (src/drbena-memory.js). Ve výchozím stavu zapnutá.
+  await addColumn(
+    env,
+    names,
+    "memory",
+    "alter table drbena_settings add column memory integer not null default 1",
   );
   if (await env.DB.prepare("select 1 as ok from drbena_settings where id = 1").first()) return;
   // Dřív měl Munipolis i fotbal vlastní pole „Jak Drběna píše“. Vlastní text odtamtud se stane povahou.
@@ -27,14 +35,26 @@ export async function ensureDrbenaTable(env) {
 }
 
 export async function loadDrbena(env) {
-  const row = await env.DB.prepare("select persona, football, followup_publish from drbena_settings where id = 1").first();
-  return { persona: ownPersona(row?.persona), football: ownFootball(row?.football), followupPublish: asBool(row?.followup_publish) };
+  const row = await env.DB.prepare("select persona, football, followup_publish, memory from drbena_settings where id = 1").first();
+  return {
+    persona: ownPersona(row?.persona),
+    football: ownFootball(row?.football),
+    followupPublish: asBool(row?.followup_publish),
+    memory: row ? asBool(row.memory) : true,
+  };
 }
 
 export async function saveFollowupSetting(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   await env.DB.prepare("update drbena_settings set followup_publish = ? where id = 1").bind(input.followupPublish ? 1 : 0).run();
+  return { ok: true };
+}
+
+export async function saveMemorySetting(env, request, input) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  await env.DB.prepare("update drbena_settings set memory = ? where id = 1").bind(input.memory ? 1 : 0).run();
   return { ok: true };
 }
 

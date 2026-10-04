@@ -11,6 +11,7 @@ import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
 import { MAX_ATTACHMENTS } from "../attachments.js";
+import { readRecall } from "../drbena-memory.js";
 
 export { MODEL, DEFAULT_VOICE };
 export { addArticles, articleLine, contextText } from "../import-overview.js";
@@ -90,7 +91,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
       article: {
         type: "object",
         additionalProperties: false,
-        required: ["include", "title", "excerpt", "body_html", "rubric", "image_caption", "image_topic", "keywords"],
+        required: ["include", "title", "excerpt", "body_html", "rubric", "image_caption", "image_topic", "keywords", "recall"],
         properties: {
           include: { type: "boolean" },
           title: stringField(),
@@ -100,6 +101,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
           image_caption: stringField(),
           image_topic: { type: "string", enum: [...new Set([...topics, ""])] },
           keywords: keywordsSchema(),
+          recall: stringField(),
         },
       },
       event: {
@@ -208,6 +210,7 @@ export function readArticle(raw, rubricSlugs) {
     imageTopic: clean(raw.image_topic, 60),
     imageCaption: imageUse !== "knihovna" ? clean(raw.image_caption, 200) : "",
     keywords: readKeywords(raw.keywords),
+    recall: readRecall(raw.recall),
     attachments: readAttachmentPicks(raw.attachments, imageUse),
   };
 }

@@ -15,6 +15,7 @@ import { followupReason, saveFollowup } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
+import { memoryOn, withMemory } from "../drbena-memory.js";
 import { fetchImage, storeImageBytes } from "../images.js";
 import { importSourceDate, importSummary, knownContent, outcomeOf, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
@@ -88,13 +89,15 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   const force = item.manual;
   const rubrics = await rubricMap(env);
   const images = await downloadImages(item, fetchImpl);
+  const drbena = await loadDrbena(env);
+  const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
     item,
-    known: await knownContent(env, { itemId: item.id, today }),
+    known: await knownContent(env, { itemId: item.id, today, recall: memory }),
     images,
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
-    voice: voiceFor(await loadDrbena(env)),
+    voice: withMemory(voiceFor(drbena), memory),
     today,
     force,
   });

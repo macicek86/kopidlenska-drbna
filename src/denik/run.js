@@ -15,6 +15,7 @@ import { followupReason, saveFollowup } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
+import { memoryOn, withMemory } from "../drbena-memory.js";
 import { importSourceDate, importSummary, knownContent, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
@@ -57,12 +58,14 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
     await saveDenikText(env, item.id, page.text);
   }
   const rubrics = await rubricMap(env);
+  const drbena = await loadDrbena(env);
+  const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
     item,
-    known: await knownContent(env, { itemId: item.id, today, table: "denik_items" }),
+    known: await knownContent(env, { itemId: item.id, today, table: "denik_items", recall: memory }),
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
-    voice: voiceFor(await loadDrbena(env)),
+    voice: withMemory(voiceFor(drbena), memory),
     today,
     force: item.manual,
   });

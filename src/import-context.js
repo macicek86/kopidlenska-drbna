@@ -5,6 +5,7 @@ import { knownClosures } from "./ndic/store.js";
 import { shownKeywords } from "./keywords.js";
 import { loadPlaces } from "./places-db.js";
 import { addDays, pragueNow } from "./waste.js";
+import { recentEvents } from "./drbena-memory.js";
 
 const LOOKBACK_DAYS = 60;
 // Starší zprávy už jen s nadpisem a klíčovými slovy, ať Drběna nepíše znovu o věci z jara.
@@ -119,7 +120,8 @@ export async function knownArticles(env, today) {
 
 // Co už na drbně je, aby Claude poznal stejnou věc od někoho jiného. `table` je tabulka zpracovávané položky,
 // `closureRef` uzavírka z NDIC, kterou zrovna zpracovává Drběna (sama sebe v přehledu mít nesmí).
-export async function knownContent(env, { itemId, today, table = "import_items", closureRef = 0 }) {
+// `recall` přidá nedávné akce, na které smí Drběna vzpomenout (paměť, src/drbena-memory.js).
+export async function knownContent(env, { itemId, today, table = "import_items", closureRef = 0, recall = false }) {
   const since = addDays(today, -LOOKBACK_DAYS);
   const { articles, older, proposals } = await knownArticles(env, today);
   const events = await rows(
@@ -138,6 +140,7 @@ export async function knownContent(env, { itemId, today, table = "import_items",
     notices,
     closures: (await knownClosures(env)).filter((row) => row.ref !== closureRef),
     imports,
+    recent: recall ? await recentEvents(env, today) : [],
     places: await loadPlaces(env, { today }),
     doctors: await loadDoctors(env, { today }),
   };

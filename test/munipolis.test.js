@@ -369,11 +369,21 @@ test("zkouška povahy napíše ukázku podle neuložené povahy a nic neuloží"
     asked = args;
     return { ok: true, decision: "vytvorit", article: { title: "Drběna jde na trh", excerpt: "V sobotu je trh.", body: "<p>Trh na náměstí.</p>" }, event: null, notice: null };
   };
+  const loadKnown = async (_env, options) => ({ recent: options.recall ? [{ id: 5, title: "Drakiáda", startsOn: "2026-10-02" }] : [] });
   const input = readTry({ kind: "mesto", title: "Trh", articleText: "V sobotu bude na náměstí farmářský trh od osmi.", persona: "Jsem jiná koza.", football: "" });
-  const result = await tryVoice(env, input, { askCity });
+  const result = await tryVoice(env, input, { askCity, loadKnown });
   assert.equal(result.ok, true);
   assert.equal(asked.force, true);
   assert.match(asked.voice, /^Jsem jiná koza\./);
+  assert.doesNotMatch(asked.voice, /Drběna si pamatuje/);
+  assert.equal(result.recalled, null);
+
+  // S pamětí dostane pravidlo a nedávné akce a ukázka řekne, na kterou vzpomněla.
+  const remembering = async (_env, args) => ((asked = args), { ok: true, decision: "vytvorit", article: { title: "Večírek", excerpt: "Ve středu.", body: "<p>Text.</p>", recall: "akce:5" }, event: null, notice: null });
+  const withMemory = await tryVoice(env, readTry({ kind: "mesto", articleText: "Ve středu bude taneční večírek v sokolovně.", persona: "", football: "", memory: "1" }), { askCity: remembering, loadKnown });
+  assert.match(asked.voice, /Drběna si pamatuje/);
+  assert.equal(asked.known.recent.length, 1);
+  assert.equal(withMemory.recalled.title, "Drakiáda");
   assert.deepEqual(asked.rubricSlugs, ["zpravy"]);
 
   let ball = null;
@@ -383,7 +393,7 @@ test("zkouška povahy napíše ukázku podle neuložené povahy a nic neuloží"
   assert.equal(ball.item.kind, "zapas");
   assert.match(ball.voice, /klubovou šálou/);
 
-  assert.equal((await tryVoice(env, readTry({ articleText: "krátké" }), { askCity })).ok, false);
+  assert.equal((await tryVoice(env, readTry({ articleText: "krátké" }), { askCity, loadKnown })).ok, false);
 
   const data = { signedIn: true, user: { id: 1, login: "admin", name: "Admin", role: "hlavni" }, drbena: { persona: "", football: "" } };
   const page = adminDrbena(CTX, data, "", { input, result });
@@ -391,6 +401,7 @@ test("zkouška povahy napíše ukázku podle neuložené povahy a nic neuloží"
   assert.match(page, /class="panel form is-dirty"/);
   assert.match(page, /neuložené povahy/);
   assert.match(page, /<h3>Drběna jde na trh<\/h3>/);
+  assert.match(adminDrbena(CTX, data, "", { input: { ...input, memory: true }, result: withMemory }), /Vzpomněla na akci:<\/b> Drakiáda · 2026-10-02/);
   assert.match(page, /formaction="\/redakce\/drbena\/zkusit#ukazka"/);
   const fresh = adminDrbena(CTX, data, "");
   assert.doesNotMatch(fresh, /id="ukazka"/);

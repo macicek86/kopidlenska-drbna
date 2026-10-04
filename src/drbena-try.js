@@ -1,7 +1,9 @@
 // Zkouška povahy: Drběna napíše z vloženého textu ukázku stejně jako při importu. Nic se neukládá.
+// Zpráva města dostane skutečný přehled toho, co na drbně je, a s pamětí i pravidlo src/drbena-memory.js.
 import { askFootball } from "./fotbal/ai.js";
 import { ownFootball, ownPersona, voiceFor } from "./drbena.js";
-import { rubricMap } from "./import-context.js";
+import { withMemory } from "./drbena-memory.js";
+import { knownContent, rubricMap } from "./import-context.js";
 import { askClaude } from "./munipolis/ai.js";
 import { pragueNow } from "./waste.js";
 
@@ -16,6 +18,7 @@ export const TRY_TEXT_MAX = 8000;
 // Vymyšlená zpráva města, ať jde povaha vyzkoušet hned. Má datum, čas, místo, ceny i výčet.
 export const TRY_DEMO = {
   kind: "mesto",
+  memory: true,
   title: "Pozvánka na Drakiádu 2026",
   text: `Město Kopidlno a Sbor dobrovolných hasičů Kopidlno zvou všechny děti i dospělé na tradiční Drakiádu, která se uskuteční v neděli 18. října 2026 od 14:00 na louce za fotbalovým hřištěm.
 
@@ -43,30 +46,38 @@ export function readTry(fields) {
     text: clean(fields.articleText, TRY_TEXT_MAX),
     persona: String(fields.persona ?? ""),
     football: String(fields.football ?? ""),
+    memory: Boolean(fields.memory),
   };
 }
 
-// Vrací { ok: true, article, event, notice } nebo { ok: false, error }.
-export async function tryVoice(env, input, { askCity = askClaude, askBall = askFootball } = {}) {
+// Akce, na kterou Drběna v ukázce vzpomněla (jen z přehledu, nic se neoznačí), nebo null.
+function recalledEvent(article, known) {
+  const id = Number(String(article?.recall ?? "").replace("akce:", ""));
+  return (known.recent ?? []).find((event) => event.id === id) ?? null;
+}
+
+// Vrací { ok: true, article, event, notice, recalled } nebo { ok: false, error }.
+export async function tryVoice(env, input, { askCity = askClaude, askBall = askFootball, loadKnown = knownContent } = {}) {
   if (input.text.length < 20) return { ok: false, error: "Vložte text článku, aspoň pár vět." };
   const today = pragueNow().date;
   const drbena = { persona: ownPersona(input.persona), football: ownFootball(input.football) };
   const title = input.title || "(bez nadpisu)";
-  const known = {};
   if (input.kind === "mesto") {
     const rubrics = await rubricMap(env);
-    return askCity(env, {
+    const known = await loadKnown(env, { itemId: 0, today, recall: input.memory });
+    const answer = await askCity(env, {
       item: { title, text: input.text, publishedAt: today },
       known,
       rubricSlugs: [...rubrics.keys()],
-      voice: voiceFor(drbena),
+      voice: withMemory(voiceFor(drbena), input.memory),
       today,
       force: true,
     });
+    return answer.ok ? { ...answer, recalled: recalledEvent(answer.article, known) } : answer;
   }
   const answer = await askBall(env, {
     item: { kind: input.kind, title, text: input.text, publishedOn: today },
-    known,
+    known: {},
     voice: voiceFor(drbena, "fotbal"),
     today,
     force: true,

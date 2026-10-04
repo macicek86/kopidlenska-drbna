@@ -24,7 +24,7 @@ import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 import { ensureRequestTables } from "./hours-requests-db.js";
 
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 let schemaReady = false;
 

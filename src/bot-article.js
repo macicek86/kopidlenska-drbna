@@ -3,10 +3,12 @@
 // `image` je { key, focus, caption } (fotka ze zdroje nebo z knihovny obrázků), nebo null.
 // `article.keywords` jsou klíčová slova (src/keywords.js), `followsId` zpráva, na kterou článek navazuje.
 // `attachments` jsou přílohy pod článek ([{ key, caption }], src/attachments.js).
+// `article.recall` je akce, na kterou Drběna v článku vzpomněla; podruhé už na ni nevzpomene (src/drbena-memory.js).
 import { slugify, uniqueSlug } from "./db-core.js";
 import { ensureBot } from "./munipolis/store.js";
 import { prepareArticleBody } from "./rich.js";
 import { attachmentsJson } from "./attachments.js";
+import { markRecalled } from "./drbena-memory.js";
 
 export async function saveBotArticle(env, { article, image, attachments = [], sourceHtml, autoPublish, rubric, publishOn = "", followsId = null }) {
   const bot = await ensureBot(env);
@@ -16,6 +18,7 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
   const caption = image?.caption ?? article.imageCaption ?? "";
   const keywords = article.keywords ?? "";
   const attached = attachmentsJson(attachments);
+  if (article.recall) await markRecalled(env, article.recall);
   if (autoPublish) {
     const slug = await uniqueSlug(env, slugify(article.title));
     const result = await env.DB.prepare(

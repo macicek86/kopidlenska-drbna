@@ -14,6 +14,8 @@ export async function ensureEventColumns(env) {
   await addColumn(env, names, "article_id", "alter table events add column article_id integer");
   await addColumn(env, names, "proposal_id", "alter table events add column proposal_id integer");
   await addColumn(env, names, "link", "alter table events add column link text not null default ''");
+  // Drběna už na akci v článku vzpomněla (src/drbena-memory.js), podruhé ne.
+  await addColumn(env, names, "recalled", "alter table events add column recalled integer not null default 0");
 }
 
 function optionalId(value) {

@@ -16,6 +16,7 @@ import { followupReason, saveFollowup } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
+import { memoryOn, withMemory } from "../drbena-memory.js";
 import { fetchImage, storeImageBytes } from "../images.js";
 import { importSourceDate, importSummary, knownContent, rubricMap } from "../import-context.js";
 import { visibleImages } from "../munipolis/ai.js";
@@ -74,14 +75,16 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   const today = pragueNow().date;
   const rubrics = await rubricMap(env);
   const images = await downloadImages(item.images, fetchImpl);
+  const drbena = await loadDrbena(env);
+  const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
     source,
     item,
-    known: await knownContent(env, { itemId: item.id, today, table: source.itemsTable }),
+    known: await knownContent(env, { itemId: item.id, today, table: source.itemsTable, recall: memory }),
     images,
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
-    voice: voiceFor(await loadDrbena(env)),
+    voice: withMemory(voiceFor(drbena), memory),
     today,
     force: item.manual,
     ownPhotos: settings.ownPhotos,
