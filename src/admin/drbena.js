@@ -1,5 +1,6 @@
 // Redakce: povaha kozy Drběny. Jedno místo pro hlas, kterým píše zprávy města i fotbal.
 import { DEFAULT_FOOTBALL, DEFAULT_PERSONA, FOOTBALL_MAX, PERSONA_MAX, ownFootball, ownPersona } from "../drbena.js";
+import { ASSIST_BOUNDS } from "../assist/store.js";
 import { TRY_DEMO, TRY_KINDS, TRY_TEXT_MAX } from "../drbena-try.js";
 import { NOTICE_KINDS } from "../notices.js";
 import { esc } from "../view.js";
@@ -26,6 +27,37 @@ function followupPanel(drbena) {
       <p class="panel-note">Když o věci už na drbně zpráva je a Munipolis, Deník nebo škola přinesou něco nového (výsledek, jména, jiný termín), napíše Drběna navazující zprávu s odkazem na tu původní. K jedné zprávě nejvýš dvě.</p>
       ${check("followupPublish", "1", drbena.followupPublish, "Navazující zprávy rovnou zveřejňovat", "Jen u importů, které zveřejňují rovnou. Bez zaškrtnutí čeká každá navazující zpráva jako návrh.")}
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
+    </form>`;
+}
+
+function czk(value) {
+  return `${value.toLocaleString("cs-CZ", { maximumFractionDigits: value < 10 ? 2 : 0 })} Kč`;
+}
+
+function usageRows(month) {
+  if (!month.people.length) return `<p class="panel-note">Zatím nikdo.</p>`;
+  const rows = month.people
+    .map((row) => `<li><b>${esc(row.name)}</b>${row.chief ? " (hlavní redaktor)" : ""}: ${row.uses}×${row.failed ? `, nepovedlo se ${row.failed}×` : ""}, ${czk(row.czk)}</li>`)
+    .join("");
+  return `<ul class="plain">${rows}</ul>`;
+}
+
+// Pomocník při psaní (src/assist/): limity pro přispěvatele a kolik to stálo.
+function assistPanel(assist) {
+  if (!assist) return "";
+  const { settings, thisMonth, lastMonth } = assist;
+  const number = (name, value, [min, max]) => `<input class="${input}" type="number" name="${name}" min="${min}" max="${max}" required value="${value}">`;
+  return `<form class="panel form" method="post" action="${BASE}/pomocnik" data-dirty>
+      <header class="panel-head"><h2>Pomocník při psaní</h2>${badge(`tento měsíc ${czk(thisMonth.czk)}`)}</header>
+      <p class="panel-note">U zprávy jde nechat Drběnu přepsat text svým hlasem (podle povahy nahoře) nebo ho jen učesat. Přispěvatel na to potřebuje oprávnění Pomocník při psaní (stránka Lidé). Hlavní redaktor limity nemá.</p>
+      <div class="pair">
+        ${field("Denně na přispěvatele", number("assistPerDay", settings.perDay, ASSIST_BOUNDS.perDay), "Kolikrát za den smí jeden přispěvatel pomocníka použít.")}
+        ${field("Měsíční rozpočet (Kč)", number("assistBudget", settings.budget, ASSIST_BOUNDS.budget), `Za všechny přispěvatele dohromady. Tento měsíc ${czk(thisMonth.contributorsCzk)}. Jedno použití stojí zhruba 30 haléřů až korunu.`)}
+      </div>
+      <p class="panel-note"><b>Tento měsíc</b></p>
+      ${usageRows(thisMonth)}
+      ${lastMonth.people.length ? `<p class="panel-note"><b>Minulý měsíc</b> (${czk(lastMonth.czk)})</p>${usageRows(lastMonth)}` : ""}
+      <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit limity</button></div>
     </form>`;
 }
 
@@ -97,6 +129,7 @@ export function adminDrbena(ctx, data, message, trial = null) {
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit povahu</button></div>
     </form>
     ${followupPanel(drbena)}
+    ${assistPanel(data.assist)}
     ${tryPanel(trial?.input)}
     ${trial ? samplePanel(trial, unsaved) : ""}`;
   return adminShell(ctx, data, "drbena", message, body, { title: "Koza Drběna" });

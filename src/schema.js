@@ -19,10 +19,11 @@ import { ensureUserColumns } from "./users-db.js";
 import { ensureVisitTables } from "./visits-db.js";
 import { ensureStockTables } from "./stock-db.js";
 import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
+import { ensureAssistTables } from "./assist/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 let schemaReady = false;
 
@@ -416,6 +417,7 @@ async function migrateSchema(env) {
   await ensureVisitTables(env);
   await ensureStockTables(env);
   await ensureChatTables(env);
+  await ensureAssistTables(env);
   await ensureMessageTables(env);
   await ensureNdicTables(env);
   const settingsReady = await env.DB.prepare(

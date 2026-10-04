@@ -26,6 +26,11 @@ export const PERMISSIONS = [
     detail: "Může upravit a schválit články, které koza Drběna napsala z importu a čekají na schválení. Smazat je nemůže.",
   },
   {
+    code: "ai_pomocnik",
+    label: "Pomocník při psaní",
+    detail: "U zprávy může nechat Drběnu přepsat text svým hlasem nebo ho jen učesat. Kolikrát denně, nastavuje hlavní redaktor na stránce Koza Drběna.",
+  },
+  {
     code: "obrazky",
     label: "Knihovna obrázků",
     detail: "Může nahrávat a mazat ilustrační fotky a měnit jejich témata.",

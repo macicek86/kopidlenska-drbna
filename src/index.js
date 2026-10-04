@@ -105,6 +105,9 @@ import { loadSkolaSettings } from "./skola/store.js";
 import { continueFootball, runFootball } from "./fotbal/run.js";
 import { loadFootballSettings } from "./fotbal/store.js";
 import { chatPost } from "./chat/run.js";
+import { assistPost } from "./assist/run.js";
+import { loadAssistAdmin } from "./assist/store.js";
+import { pragueNow } from "./waste.js";
 import { chatEnabled, loadChatAdmin } from "./chat/store.js";
 import { turnstileConfig } from "./chat/pass.js";
 import { CHAT_OK, chatAdminPost } from "./post-chat.js";
@@ -381,7 +384,10 @@ async function renderGet(request, env, url, execution) {
       }
       return html(adminSkola(ctx, data, message, query, source));
     }
-    if (tab === "drbena") return html(adminDrbena(ctx, data, message));
+    if (tab === "drbena") {
+      if (data.signedIn) data.assist = await loadAssistAdmin(env, pragueNow().date);
+      return html(adminDrbena(ctx, data, message));
+    }
     if (tab === "chat") {
       if (data.signedIn) data.chat = await loadChatAdmin(env);
       return html(adminChat(ctx, data, message, query));
@@ -397,9 +403,11 @@ async function renderPost(request, env, url, execution) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const https = secure(request);
 
-  // Chat posílá JSON, formulář se tu nečte.
+  // Chat a pomocník při psaní posílají JSON, formulář se tu nečte.
   const chat = await chatPost(path, request, env, execution);
   if (chat) return chat;
+  const assist = await assistPost(path, request, env);
+  if (assist) return assist;
 
   if (path === "/redakce/texty/ulozit") {
     const result = await saveCopy(env, request);

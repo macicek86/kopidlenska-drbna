@@ -1,4 +1,7 @@
 // Formulář zprávy v redakci: pole zprávy, rubrika, fotka a schválení návrhu.
+import { ASSIST_MODES } from "../assist/ai.js";
+import { ASSIST_PERMISSION } from "../assist/store.js";
+import { userCan } from "../db-core.js";
 import { formatShort } from "../format.js";
 import { pragueNow } from "../waste.js";
 import { prepareArticleBody } from "../rich.js";
@@ -93,9 +96,26 @@ function dateField(value, hint = "") {
   );
 }
 
+// Pomocník při psaní (public/assist.js): Drběna přepíše, co je v polích, nebo to jen učeše. Bez JS se neukáže.
+function assistBar(user) {
+  if (!userCan(user, ASSIST_PERMISSION)) return "";
+  const buttons = Object.entries(ASSIST_MODES)
+    .map(([mode, label]) => `<button class="btn ${mode === "drbena" ? "btn-line" : "btn-ghost"}" type="button" data-assist-run="${mode}">${esc(label)}</button>`)
+    .join("");
+  return `<div class="assist" data-assist hidden>
+      <img class="assist-face" src="/drbena-uvitani.webp" alt="" width="48" height="48">
+      <div class="assist-main">
+        <p class="assist-hint">Napište, co víte, klidně jen v bodech. Drběna z toho udělá zprávu a navrhne rubriku i fotku.</p>
+        <div class="assist-actions">${buttons}<button class="btn btn-ghost" type="button" data-assist-undo hidden>Vrátit můj text</button></div>
+        <p class="assist-status" data-assist-status role="status" aria-live="polite"></p>
+      </div>
+    </div>`;
+}
+
 export function articleFields(source, data, { publish, date } = {}) {
   return `<div class="form-cols">
     <div class="form-col-main">
+      ${assistBar(data.user)}
       ${field("Nadpis", `<input class="${input} control-lg" name="title" required maxlength="160" value="${esc(source?.title ?? "")}">`)}
       ${field("Perex", `<textarea class="${input}" name="excerpt" required maxlength="320" rows="3" data-count>${esc(source?.excerpt ?? "")}</textarea>`, "Krátké shrnutí do přehledu zpráv. Nejvýš 320 znaků.")}
       ${richTextField(source?.body ?? "")}

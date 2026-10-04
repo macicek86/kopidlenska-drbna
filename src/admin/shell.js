@@ -106,6 +106,7 @@ ${body}
 ${rich ? `<script src="/vendor/trix/trix.umd.min.js" defer></script>` : ""}
 <script src="/editor.js" defer></script>
 <script src="/photo-pick.js" defer></script>
+<script src="/assist.js" defer></script>
 <script src="/admin.js" defer></script>
 </body>
 </html>`;
