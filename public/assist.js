@@ -161,9 +161,10 @@ document.addEventListener("click", (event) => {
 });
 
 // Lišta je bez JS schovaná. Okna načtená na pozadí pošlou drbna:mount.
-function boot(root) {
+// Vlastní jméno: skripty redakce sdílejí globální prostor a `boot` už má editor.js.
+function bootAssist(root) {
   for (const bar of root.querySelectorAll("[data-assist][hidden]")) bar.hidden = false;
 }
 
-document.addEventListener("drbna:mount", (event) => boot(event.target instanceof Element ? event.target : document));
-boot(document);
+document.addEventListener("drbna:mount", (event) => bootAssist(event.target instanceof Element ? event.target : document));
+bootAssist(document);
