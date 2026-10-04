@@ -110,3 +110,12 @@ test("popelnice. přesměruje na stránku svozu na hlavní doméně", async () =
   assert.equal(response.status, 301);
   assert.equal(response.headers.get("location"), "https://drbna.test/popelnice");
 });
+
+test("chybějící obrázek dostane stránku 404 jen v prohlížeči, ne v <img>", async () => {
+  const { wantsPage } = await import("../src/index.js");
+  const browser = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8";
+  assert.equal(wantsPage(new Request("https://drbna.test/neco.png", { headers: { accept: browser } })), true);
+  assert.equal(wantsPage(new Request("https://drbna.test/neco.png", { headers: { accept: "image/avif,image/webp,image/*,*/*;q=0.8" } })), false);
+  assert.equal(wantsPage(new Request("https://drbna.test/neco.css", { headers: { accept: "text/css,*/*;q=0.1" } })), false);
+  assert.equal(wantsPage(new Request("https://drbna.test/neco.js")), false);
+});

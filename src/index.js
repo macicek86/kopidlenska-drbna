@@ -116,6 +116,11 @@ import { EVENTS_OK, eventsPost } from "./post-events.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
+// Prohlížeč otevírá stránku (adresa v řádku, odkaz), ne obrázek nebo styl pro stránku.
+export function wantsPage(request) {
+  return /text\/html/i.test(request.headers.get("accept") ?? "");
+}
+
 const OK = {
   ...ARTICLES_OK,
   ...ADS_OK,
@@ -546,7 +551,9 @@ export default {
     try {
       // Statické soubory databázi nepotřebují.
       if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
-        return env.ASSETS.fetch(request);
+        const asset = await env.ASSETS.fetch(request);
+        // Chybějící soubor: obrázkům a stylům stačí prázdná 404, člověk s adresou v prohlížeči dostane stránku s Drběnou.
+        if (asset.status !== 404 || !wantsPage(request)) return asset;
       }
       await ensureSchema(env);
       // Zprávy od NDIC (uzavírky silnic): vlastní přihlášení jménem a heslem, bez kontroly původu.
