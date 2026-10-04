@@ -2,6 +2,7 @@
 // Import nejdřív jen rozhodne „doplneni“ (stejné volání jako duplicita), teprve pak druhé volání dostane celou starou
 // zprávu a napíše novou, která na ni navazuje. Jde jako návrh, rovnou na web jen se zapnutým nastavením na stránce Koza Drběna.
 import { saveBotArticle } from "./bot-article.js";
+import { pragueNow } from "./waste.js";
 import { callClaude } from "./claude.js";
 import { loadDrbena } from "./drbena-db.js";
 import { prepareArticleBody } from "./rich.js";
@@ -49,7 +50,8 @@ export async function loadFollowTarget(env, id) {
   )
     .bind(id)
     .first();
-  if (!row || !Number(row.published)) return null;
+  // Naplánovaná zpráva ještě není na webu, navázat na ni nejde.
+  if (!row || !Number(row.published) || String(row.created_at).slice(0, 10) > pragueNow().date) return null;
   return {
     id: Number(row.id),
     slug: String(row.slug),

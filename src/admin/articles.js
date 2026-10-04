@@ -1,6 +1,7 @@
 // Sekce Zprávy: hlavní redaktor píše zprávy a schvaluje návrhy, přispěvatel viz `articles-contributor.js`.
 import { byline } from "../db.js";
-import { formatLong } from "../format.js";
+import { formatLong, formatShort } from "../format.js";
+import { pragueNow } from "../waste.js";
 import { rubricLabel } from "../rubrics.js";
 import { credit, esc } from "../view.js";
 import { articleFields, BASE, proposalKind, reviewForm } from "./article-form.js";
@@ -19,7 +20,7 @@ function articleForm(data, editing, close, event = null) {
     ${callout(`${help}${forEvent}`)}
     ${editing ? hidden("id", editing.id) : ""}
     ${event ? hidden("akce", event.id) : ""}
-    ${articleFields(editing ?? eventDraft(event), data, { publish: { checked: editing ? editing.published : true } })}
+    ${articleFields(editing ?? eventDraft(event), data, { publish: { checked: editing ? editing.published : true, today: pragueNow().date } })}
     ${formFoot("Uložit", cancelLink(close))}
   </form>`;
 }
@@ -54,16 +55,19 @@ function chiefArticles(ctx, data, message, query) {
       tone: "warn",
     }),
   );
-  const rows = data.articles.map((row) =>
-    item({
+  const today = pragueNow().date;
+  const rows = data.articles.map((row) => {
+    const planned = row.published && row.createdOn > today;
+    const live = row.published && !planned;
+    return item({
       title: row.title,
       meta: [esc(rubricLabel(row)), esc(credit(row)), row.createdOn ? esc(formatLong(row.createdOn)) : ""].filter(Boolean).join(" · "),
-      badges: `${row.published ? badge("Na webu", "ok") : badge("Skrytá", "off")}${row.redacted ? badge("Redigováno") : ""}`,
+      badges: `${planned ? badge(`Vyjde ${formatShort(row.createdOn)}`, "warn") : live ? badge("Na webu", "ok") : badge("Skrytá", "off")}${row.redacted ? badge("Redigováno") : ""}`,
       actions: `${modalLink(`${BASE}?id=${row.id}`, "Upravit")}
-        ${row.published && row.slug ? `<a class="btn btn-sm btn-ghost" href="/zpravy/${esc(row.slug)}" target="_blank" rel="noopener">Zobrazit</a>` : ""}
+        ${live && row.slug ? `<a class="btn btn-sm btn-ghost" href="/zpravy/${esc(row.slug)}" target="_blank" rel="noopener">Zobrazit</a>` : ""}
         ${modalLink(`${BASE}?smazat=${row.id}`, "Smazat", "btn-ghost btn-danger-text")}`,
-    }),
-  );
+    });
+  });
 
   const dialogs = [
     modal({

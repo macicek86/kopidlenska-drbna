@@ -1,5 +1,6 @@
 // Co Drběna v chatu ví: stránky drbny jako text (z D1 přes stejné funkce jako web), nástroje na zprávy a vzkazy redakci.
 import { aboutPage } from "../about.js";
+import { liveArticle } from "../db-core.js";
 import { formatShort } from "../format.js";
 import { addMessageContact, MESSAGE_KINDS, saveChatMessage } from "../messages-db.js";
 import { binsPage } from "../bins-view.js";
@@ -94,7 +95,7 @@ async function poolArticles(env) {
   const rows = await env.DB.prepare(
     `select a.slug, a.title, a.excerpt, a.body, a.keywords, a.created_at, coalesce(r.name, a.category) as rubric
      from articles a left join rubrics r on r.id = a.rubric_id
-     where a.published = 1 order by a.created_at desc, a.id desc limit ?`,
+     where ${liveArticle()} order by a.created_at desc, a.id desc limit ?`,
   )
     .bind(SEARCH_POOL)
     .all();
@@ -204,7 +205,7 @@ export async function readArticle(env, address) {
   if (!slug) return "Chybí adresa zprávy.";
   const row = await env.DB.prepare(
     `select a.id, a.slug, a.title, a.excerpt, a.body, a.created_at, coalesce(r.name, a.category) as rubric
-     from articles a left join rubrics r on r.id = a.rubric_id where a.slug = ? and a.published = 1`,
+     from articles a left join rubrics r on r.id = a.rubric_id where a.slug = ? and ${liveArticle()}`,
   )
     .bind(slug)
     .first();

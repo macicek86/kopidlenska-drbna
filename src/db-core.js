@@ -1,6 +1,7 @@
 // Společné kousky pro práci s D1: ořez textu, slug, přihlášený člověk a oprávnění.
 
 import { accessConfig, accessEmail } from "./access.js";
+import { pragueNow } from "./waste.js";
 
 const COOKIE = "drbna_editor";
 
@@ -23,6 +24,12 @@ export async function reopenImports(env, { articleId = 0, proposalIds = [] } = {
       .bind(REOPENED_REASON, Number(articleId) || 0, ...ids)
       .run();
   }
+}
+
+// Zpráva je na webu, když je zveřejněná a její den už nastal: datum v budoucnu je plánované zveřejnění.
+// Starší zprávy mají v `created_at` i čas, proto se porovná jen den. Dnešek je vždy YYYY-MM-DD z pragueNow.
+export function liveArticle(alias = "a", today = pragueNow().date) {
+  return `${alias}.published = 1 and substr(${alias}.created_at, 1, 10) <= '${today}'`;
 }
 
 export function clip(value, max) {

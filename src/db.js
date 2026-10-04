@@ -6,6 +6,7 @@ import { formImage, loadStock } from "./stock-db.js";
 import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
 import { buildWasteView, pragueNow } from "./waste.js";
+import { isoDate } from "./notices.js";
 import { loadPlaces } from "./places-db.js";
 import { loadDoctors } from "./doctors-db.js";
 import { loadYards } from "./yards-db.js";
@@ -14,6 +15,7 @@ import {
   asBool,
   clip,
   identify,
+  liveArticle,
   reopenImports,
   requireChief,
   slugify,
@@ -244,7 +246,7 @@ export async function loadPublic(env) {
     settings(env),
     env.DB.prepare(
       `select ${ARTICLE_LIST_FIELDS}
-       from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`,
+       from ${ARTICLE_FROM} where ${liveArticle()} order by a.created_at desc, a.id desc`,
     ).all(),
     loadEvents(env, { publicOnly: true }),
     loadYards(env, { publicOnly: true, today }),
@@ -275,7 +277,7 @@ export async function loadPublic(env) {
 export async function loadArticle(env, slug) {
   const row = await env.DB.prepare(
     `select ${ARTICLE_FIELDS}
-     from ${ARTICLE_FROM} where a.slug = ? and a.published = 1`,
+     from ${ARTICLE_FROM} where a.slug = ? and ${liveArticle()}`,
   )
     .bind(slug)
     .first();
@@ -286,7 +288,7 @@ export async function loadArticle(env, slug) {
 export async function loadMoreArticles(env, slug, limit = 5) {
   const { results } = await env.DB.prepare(
     `select ${ARTICLE_LIST_FIELDS}
-     from ${ARTICLE_FROM} where a.published = 1 and a.slug != ? order by a.created_at desc, a.id desc limit ?`,
+     from ${ARTICLE_FROM} where ${liveArticle()} and a.slug != ? order by a.created_at desc, a.id desc limit ?`,
   )
     .bind(slug, limit)
     .all();
@@ -382,7 +384,7 @@ export async function loadAdmin(env, request) {
   const mine = ["where p.author_id = ? and p.status in ('pending', 'rejected') order by p.id desc", user.id];
   const articleSql = chief
     ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
-    : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where a.published = 1 order by a.created_at desc, a.id desc`;
+    : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where ${liveArticle()} order by a.created_at desc, a.id desc`;
   const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, botProposals, desk, stock, newMessages] = await Promise.all([
     loadRubrics(env),
     loadAds(env),
@@ -407,6 +409,15 @@ export async function loadAdmin(env, request) {
   return base;
 }
 
+// Datum zprávy z redakce. Prázdné nechá stávající (u nové dnešní). Datum v budoucnu je plánované zveřejnění.
+function readCreatedOn(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return { date: null };
+  const date = isoDate(text);
+  if (!date) return { error: "Datum zprávy není platné." };
+  return { date };
+}
+
 export async function saveArticle(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
@@ -416,6 +427,8 @@ export async function saveArticle(env, request, input) {
   if (stored.error) return { ok: false, error: stored.error };
   Object.assign(parsed, stored.photo);
   const { title, excerpt, body, category, rubricId, imageFocus, imageCaption } = parsed;
+  const createdOn = readCreatedOn(input.createdOn);
+  if (createdOn.error) return { ok: false, error: createdOn.error };
 
   if (input.id) {
     const current = await env.DB.prepare(
@@ -442,9 +455,10 @@ export async function saveArticle(env, request, input) {
     // Po úpravě textu se klíčová slova smažou a cron je dopočítá znovu (src/keywords.js).
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = case when ? then '' else keywords end where id = ?`,
+         image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = case when ? then '' else keywords end,
+         created_at = case when ? is null or substr(created_at, 1, 10) = ? then created_at else ? end where id = ?`,
     )
-      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, redacted, edited ? 1 : 0, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, redacted, edited ? 1 : 0, createdOn.date, createdOn.date, createdOn.date, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     for (const key of attachments.removed) await releaseImage(env, key);
@@ -454,9 +468,9 @@ export async function saveArticle(env, request, input) {
   const slug = await uniqueSlug(env, slugify(title));
   const inserted = await env.DB.prepare(
     `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, published, created_at, author_id, author_name, redacted)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, date('now'), ?, ?, 0)`,
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
   )
-    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, input.published ? 1 : 0, gate.user.id, gate.user.name)
+    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name)
     .run();
   // Zpráva psaná k akci (z redakce akcí) se k ní rovnou připojí.
   await attachArticle(env, input.eventId, Number(inserted.meta?.last_row_id));

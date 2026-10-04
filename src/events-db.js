@@ -1,9 +1,9 @@
 // Akce v kalendáři v D1. Akce může mít zprávu (`article_id`), návrh zprávy od Drběny, který čeká na schválení
 // (`proposal_id`, po schválení se z něj stane `article_id`), a odkaz jinam (`link`, přidává jen redakce).
-import { addColumn, asBool, clip, requireChief } from "./db-core.js";
+import { addColumn, asBool, clip, liveArticle, requireChief } from "./db-core.js";
 
-const EVENT_FIELDS = `e.id, e.title, e.place, e.starts_on, e.starts_time, e.description, e.published, e.link,
-  e.article_id, a.slug as article_slug, a.title as article_title, a.published as article_published,
+const eventFields = () => `e.id, e.title, e.place, e.starts_on, e.starts_time, e.description, e.published, e.link,
+  e.article_id, a.slug as article_slug, a.title as article_title, (${liveArticle()}) as article_published,
   e.proposal_id, p.title as proposal_title, p.status as proposal_status`;
 const EVENT_FROM = "events e left join articles a on a.id = e.article_id left join proposals p on p.id = e.proposal_id";
 const EVENT_ORDER = "order by e.starts_on asc, e.starts_time asc, e.id asc";
@@ -43,7 +43,7 @@ export function mapEvent(row) {
 
 export async function loadEvents(env, { publicOnly = false } = {}) {
   const where = publicOnly ? "where e.published = 1" : "";
-  const rows = await env.DB.prepare(`select ${EVENT_FIELDS} from ${EVENT_FROM} ${where} ${EVENT_ORDER}`).all();
+  const rows = await env.DB.prepare(`select ${eventFields()} from ${EVENT_FROM} ${where} ${EVENT_ORDER}`).all();
   return (rows.results ?? []).map(mapEvent);
 }
 

@@ -95,6 +95,7 @@ export function articleFields(source, data, { publish } = {}) {
       ${photoControl(source, data.stock)}
       ${attachmentsControl(source)}
       ${publish ? `<div class="field"><span>Viditelnost</span>${check("published", "1", publish.checked, "Zveřejnit na webu")}</div>` : ""}
+      ${publish ? field("Datum zprávy", `<input class="${input}" type="date" name="created_on" required value="${esc(source?.createdOn || publish.today)}">`, "Podle něj se zprávy řadí. Datum v budoucnu: zpráva se na webu ukáže až ten den.") : ""}
     </div>
   </div>`;
 }
