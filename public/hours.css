@@ -134,22 +134,32 @@
 .hours-pop .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.25rem; }
 .hours-pop .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 
-/* Lékaři i místa: den a čas na jednom řádku, poznámka k času pod nimi přes celou šířku karty.
-   Sloupec času má pevnou šířku u pravého okraje, ať časy všech dnů začínají pod sebou. */
-:is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off),
-:is(.doctor-grid, .place-grid) .doctor-week li.is-off {
-  grid-template-columns: minmax(0, 1fr) 6.2rem;
-  gap: 0.1rem 0.6rem;
+/* Lékaři i místa: den nahoře, pod ním každý čas na vlastním řádku a poznámka k němu hned vedle.
+   Svislá čára vede od dne k jeho časům; u dne se změnou je hnědá a časy tučně. */
+:is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.35rem; align-items: start; }
+:is(.doctor-grid, .place-grid) .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+
+:is(.doctor-grid, .place-grid) .doctor-week .day,
+:is(.doctor-grid, .place-grid) .doctor-week li.is-today .day { font-size: 1.02rem; }
+
+:is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off) .parts {
+  display: grid;
+  gap: 0.3rem;
+  margin-left: 0.15rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--line);
+}
+
+:is(.doctor-grid, .place-grid) .doctor-week .part {
+  display: grid;
+  grid-template-columns: 6.4rem minmax(0, 1fr);
+  gap: 0 0.7rem;
   align-items: baseline;
 }
 
-:is(.doctor-grid, .place-grid) .doctor-week .parts,
-:is(.doctor-grid, .place-grid) .doctor-week .part { display: contents; }
+:is(.doctor-grid, .place-grid) .doctor-week .slot { grid-column: 1; }
+:is(.doctor-grid, .place-grid) .doctor-week .hint { grid-column: 2; margin: 0; }
+:is(.doctor-grid, .place-grid) .doctor-week .part strong { font-weight: 500; }
 
-:is(.doctor-grid, .place-grid) .doctor-week .slot { grid-column: 2; }
-
-:is(.doctor-grid, .place-grid) .doctor-week .hint { grid-column: 1 / -1; margin-bottom: 0.25rem; }
-
-:is(.doctor-grid, .place-grid) .doctor-week .hint:last-child { margin-bottom: 0; }
-
-:is(.doctor-grid, .place-grid) .doctor-week li.is-today .day { font-size: inherit; }
+:is(.doctor-grid, .place-grid) .next-days li.is-change .parts { border-left-color: var(--soon); }
+:is(.doctor-grid, .place-grid) .next-days li.is-change .part strong { font-weight: 700; }
