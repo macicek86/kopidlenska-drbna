@@ -419,7 +419,7 @@ test("panel reklamy se při načtení střídá a je označený", () => {
 });
 
 test("reklama se vloží do zpráv a v redakci má náhled", () => {
-  const ctx = { path: "/", copy: {}, minimal: false, mainOrigin: "http://127.0.0.1:8787" };
+  const ctx = { path: "/", copy: {}, mainOrigin: "http://127.0.0.1:8787" };
   const waste = {
     today: "2026-09-29",
     nextDate: "2026-10-05",
@@ -851,7 +851,7 @@ test("stránka odstávek bere uložený přehled a na titulce je jen blízká", 
   assert.match(page, /Parcela 2290/);
   assert.match(page, /href="https:\/\/www\.bezstavy\.cz\/"/);
 
-  const ctx = { path: "/", copy: {}, minimal: false, mainOrigin: "http://127.0.0.1:8787" };
+  const ctx = { path: "/", copy: {}, mainOrigin: "http://127.0.0.1:8787" };
   const waste = {
     today: "2026-09-30",
     nextDate: "2026-10-05",
@@ -966,7 +966,7 @@ test("filtr sportu zahrne fotbal a podrubrika se ukáže až po výběru", () =>
   assert.equal(articleInRubric(koncert, rubrics[0], rubrics), false);
   assert.equal(articleInRubric(zapas, rubrics[1], rubrics), true);
   assert.equal(articleInRubric(koncert, rubrics[1], rubrics), false);
-  const ctx = { path: "/zpravy", copy: {}, minimal: false, mainOrigin: "http://127.0.0.1:8787" };
+  const ctx = { path: "/zpravy", copy: {}, mainOrigin: "http://127.0.0.1:8787" };
   const data = { articles: [zapas, koncert], ads: [], rubrics };
   const all = newsPage(data, ctx, "");
   assert.match(all, /href="\/zpravy\?rubrika=sport"/);

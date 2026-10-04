@@ -45,7 +45,7 @@ test("znovu zpracovaná položka importu nezaloží druhou akci, jen k ní přip
 });
 
 test("dnešní akce je pod Dnes, ne mezi chystanými, a kalendář ukáže měsíc z adresy", () => {
-  const ctx = { path: "/akce", copy: {}, minimal: false, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
+  const ctx = { path: "/akce", copy: {}, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
   const events = [
     { id: 1, title: "Posvícení", place: "Náměstí", startsOn: "2026-10-03", startsTime: "14:00", description: "" },
     { id: 2, title: "Drakiáda", place: "Louka", startsOn: "2026-10-11", startsTime: "", description: "" },

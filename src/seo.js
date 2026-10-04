@@ -23,16 +23,14 @@ function urlEntry(loc, lastmod) {
   return `  <url><loc>${esc(loc)}</loc>${lastmod ? `<lastmod>${esc(lastmod)}</lastmod>` : ""}</url>`;
 }
 
-export function sitemapXml(origin, data, { minimal = false } = {}) {
+export function sitemapXml(origin, data) {
   const newest = data.articles[0]?.createdOn ?? "";
-  const entries = minimal
-    ? [urlEntry(`${origin}/`)]
-    : [
-        ...PAGES.map((path) => urlEntry(`${origin}${path}`, path === "/" || path === "/zpravy" ? newest : "")),
-        ...data.rubrics.map((rubric) => urlEntry(`${origin}${rubricHref(rubric.slug)}`)),
-        ...data.articles.map((article) => urlEntry(`${origin}/zpravy/${encodeURIComponent(article.slug)}`, article.createdOn)),
-        ...data.ads.map((ad) => urlEntry(`${origin}/reklamy/${encodeURIComponent(ad.slug)}`, ad.createdOn)),
-      ];
+  const entries = [
+    ...PAGES.map((path) => urlEntry(`${origin}${path}`, path === "/" || path === "/zpravy" ? newest : "")),
+    ...data.rubrics.map((rubric) => urlEntry(`${origin}${rubricHref(rubric.slug)}`)),
+    ...data.articles.map((article) => urlEntry(`${origin}/zpravy/${encodeURIComponent(article.slug)}`, article.createdOn)),
+    ...data.ads.map((ad) => urlEntry(`${origin}/reklamy/${encodeURIComponent(ad.slug)}`, ad.createdOn)),
+  ];
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${entries.join("\n")}

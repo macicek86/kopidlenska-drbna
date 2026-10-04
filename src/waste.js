@@ -33,7 +33,7 @@ export function daysBetween(from, to) {
   return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000);
 }
 
-/** Stejný výpočet ISO týdne jako na popelnice.kopidlenskadrbna.org */
+/** Číslo týdne podle ISO */
 export function isoWeek(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   const x = new Date(Date.UTC(y, m - 1, d));

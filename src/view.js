@@ -48,7 +48,6 @@ export function layout({
   title,
   description,
   path,
-  minimal,
   mainOrigin,
   origin,
   body,
@@ -63,7 +62,6 @@ export function layout({
   jsonLd = [],
   chat = null,
 }) {
-  const brandHref = minimal ? "/popelnice" : "/";
   const base = siteOrigin(origin, mainOrigin);
   const pagePath = typeof canonical === "string" && canonical.startsWith("/")
     ? canonical
@@ -73,7 +71,6 @@ export function layout({
   const defaultImage = !image;
   const siteName = tx(copy, "site_name");
   const facebook = facebookUrl(copy);
-  const brandImg = minimal ? "/kozel-popelar.webp" : "/kozel-maskot.webp";
   const link = ([href, key]) => `<a class="nav-link${active(path, href)}" href="${href}">${esc(tx(copy, key))}</a>`;
   const practical = esc(tx(copy, "nav_practical"));
   const practicalOn = PRACTICAL.some(([href]) => active(path, href)) ? " is-on" : "";
@@ -84,9 +81,7 @@ export function layout({
   ).join("");
   // Na mobilu jsou služby na konci pod nadpisem, ať k nim nepatří Reklamy a O nás.
   const mobileLinks = `${NAV.filter((entry) => entry !== PRACTICAL).map(link).join("")}<p class="nav-head">${practical}</p>${PRACTICAL.map(link).join("")}`;
-  const headerNav = minimal
-    ? `<a class="btn btn-line" href="${esc(mainOrigin)}">${esc(tx(copy, "link_whole"))}</a>`
-    : `<nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
+  const headerNav = `<nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
        <details class="mobile-nav">
          <summary>${esc(tx(copy, "menu_label"))}</summary>
          <nav aria-label="Mobilní">${mobileLinks}</nav>
@@ -135,8 +130,8 @@ export function layout({
   <div class="wrap">
     <a class="skip" href="#obsah">${esc(tx(copy, "skip"))}</a>
     <header class="top">
-      <a class="brand" href="${brandHref}">
-        <img src="${brandImg}" alt="">
+      <a class="brand" href="/">
+        <img src="/kozel-maskot.webp" alt="">
         <span>${esc(tx(copy, "brand_line"))}<span>${esc(tx(copy, "brand_accent"))}</span></span>
       </a>
       ${headerNav}
@@ -146,11 +141,11 @@ export function layout({
       <p>${esc(tx(copy, "footer_copy"))}</p>
       ${facebook ? `<p><a href="${esc(facebook)}" rel="noopener">${esc(tx(copy, "footer_facebook"))}</a></p>` : ""}
       <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
-      ${minimal ? "" : `<a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>`}
+      <a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>
     </footer>
   </div>
   ${script}
-  ${minimal ? "" : `<script src="/nav.js" defer></script>`}
+  <script src="/nav.js" defer></script>
   ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>
 </html>`;

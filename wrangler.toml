@@ -35,5 +35,5 @@ crons = ["15 */4 * * *"]
 # routes = [
 #   { pattern = "kopidlenskadrbna.org", custom_domain = true },
 #   { pattern = "www.kopidlenskadrbna.org", custom_domain = true },
-#   { pattern = "popelnice.kopidlenskadrbna.org", custom_domain = true }
+#   { pattern = "popelnice.kopidlenskadrbna.org", custom_domain = true }  # jen přesměruje na /popelnice
 # ]

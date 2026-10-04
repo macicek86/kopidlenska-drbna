@@ -44,7 +44,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 Na produkci hlídá redakci Cloudflare Access (Zero Trust), zatím na adrese `*.workers.dev`. Worker ověří token z hlavičky `Cf-Access-Jwt-Assertion` (podpis, AUD, vydavatel, platnost; `src/access.js`) a podle e-mailu najde účet v `users.email`. Hesla jsou pak vypnutá, odhlášení vede na `/cdn-cgi/access/logout`.
 Zapíná se to tajemstvími `ACCESS_TEAM` a `ACCESS_AUD` (`npx wrangler secret put …`). Bez nich (místně, náhled, smoke test) se redakce přihlašuje heslem jako dřív.
-Až drbna přejde na kopidlenskadrbna.org, vypnout `workers_dev` a `preview_urls` (návod je ve `wrangler.toml`) a Access nastavit na všechny tři domény.
+Až drbna přejde na kopidlenskadrbna.org, vypnout `workers_dev` a `preview_urls` (návod je ve `wrangler.toml`) a Access nastavit na `kopidlenskadrbna.org` a `www.`; `popelnice.kopidlenskadrbna.org` jen přesměruje na `/popelnice` (`src/index.js`), Access nepotřebuje.
 
 ## Redakce: jak fungují okna
 

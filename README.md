@@ -1,8 +1,8 @@
 # Kopidlenská drbna pro Cloudflare
 
-Samostatný Worker. Články, akce, heslo redakce a pravidlo svozu jsou v **D1**. Fotky nahrané v redakci jdou do **R2**. Maskot a popelář jsou soubory `public/kozel-maskot.webp` a `public/kozel-popelar.webp`.
+Samostatný Worker. Články, akce, heslo redakce a pravidlo svozu jsou v **D1**. Fotky nahrané v redakci jdou do **R2**. Maskot je soubor `public/kozel-maskot.webp`.
 
-Stejný Worker obslouží i `popelnice.kopidlenskadrbna.org`: na té doméně je titulka jen stránka svozu.
+Adresa `popelnice.kopidlenskadrbna.org` jen přesměruje na `/popelnice` (samostatný web popelnic skončil).
 
 ## Co potřebuješ
 

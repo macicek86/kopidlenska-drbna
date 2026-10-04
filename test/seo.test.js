@@ -5,7 +5,7 @@ import { jsonLdTag, pragueOffset, robotsTxt, sitemapXml } from "../src/seo.js";
 import { eventsPage, homePage } from "../src/view.js";
 import { notFoundPage } from "../src/notfound-view.js";
 
-const ctx = { path: "/", copy: {}, minimal: false, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
+const ctx = { path: "/", copy: {}, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
 
 function ldOf(html) {
   return [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
@@ -28,8 +28,6 @@ test("sitemap má stránky, rubriky, zprávy i reklamy", () => {
   assert.match(xml, /<loc>https:\/\/drbna.test\/zpravy\?rubrika=sport<\/loc>/);
   assert.match(xml, /<loc>https:\/\/drbna.test\/reklamy\/kolo<\/loc>/);
   assert.match(xml, /<loc>https:\/\/drbna.test\/lekari<\/loc>/);
-  const minimal = sitemapXml("https://popelnice.drbna.test", data, { minimal: true });
-  assert.equal(minimal.match(/<url>/g).length, 1);
 });
 
 test("JSON-LD neuzavře značku textem z článku", () => {
@@ -104,4 +102,11 @@ test("chybějící stránka se nemá indexovat", () => {
   assert.match(html, /<a href="\/akce">/);
   assert.match(html, /class="ad-panel/);
   assert.equal(html.includes('rel="canonical"'), false);
+});
+
+test("popelnice. přesměruje na stránku svozu na hlavní doméně", async () => {
+  const { default: worker } = await import("../src/index.js");
+  const response = await worker.fetch(new Request("https://popelnice.drbna.test/cokoli?x=1"), {}, {});
+  assert.equal(response.status, 301);
+  assert.equal(response.headers.get("location"), "https://drbna.test/popelnice");
 });

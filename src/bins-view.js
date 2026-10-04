@@ -18,13 +18,12 @@ function nextDates(waste, copy) {
     .join("");
 }
 
-export function binsPage(waste, ctx, { standaloneTitle }) {
+export function binsPage(waste, ctx) {
   const soon = waste.daysUntil <= 1 ? " is-soon" : "";
   return layout({
     ...ctx,
-    title: `${tx(ctx.copy, standaloneTitle ? "bins_standalone" : "bins_title")} | ${tx(ctx.copy, "site_name")}`,
+    title: `${tx(ctx.copy, "bins_title")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "bins_description"),
-    minimal: ctx.minimal,
     body: `
       <section class="card bins-hero">
         <div class="bins-copy">
@@ -37,7 +36,7 @@ export function binsPage(waste, ctx, { standaloneTitle }) {
             <li>${esc(waste.holidayNote)}</li>
           </ul>
           <p class="bins-note">${esc(waste.note)}</p>
-          ${ctx.minimal ? "" : `<a class="back" href="/sberne-dvory">${esc(tx(ctx.copy, "bins_yards_link"))} →</a>`}
+          <a class="back" href="/sberne-dvory">${esc(tx(ctx.copy, "bins_yards_link"))} →</a>
         </div>
         <div class="bins-drbena">
           <span class="bins-sun" aria-hidden="true"></span>

@@ -30,7 +30,6 @@ export function visitTarget(request) {
   if (/prefetch|prerender/i.test(`${headers.get("purpose") ?? ""} ${headers.get("sec-purpose") ?? ""}`)) return null;
   if (isBot(headers.get("user-agent"))) return null;
   if (EDITOR_COOKIE.test(headers.get("cookie") ?? "")) return null;
-  if (url.hostname.startsWith("popelnice.") && path === "/") return "/popelnice";
   return path.slice(0, 200);
 }
 
@@ -47,7 +46,7 @@ const SOURCES = [
 
 export const DIRECT = "Přímo";
 
-// Odkud člověk přišel: jen název webu, nikdy celá adresa. Z vlastního webu (i popelnice.) je to „Přímo“.
+// Odkud člověk přišel: jen název webu, nikdy celá adresa. Z vlastního webu je to „Přímo“.
 export function visitSource(referer, ownHost) {
   let host;
   try {

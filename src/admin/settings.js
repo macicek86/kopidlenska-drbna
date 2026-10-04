@@ -61,7 +61,7 @@ export function adminSite(ctx, data, message) {
   const days = [1, 2, 3, 4, 5, 6, 0]
     .map((day) => `<option value="${day}"${waste.weekday === day ? " selected" : ""}>${weekdayName(day)}</option>`)
     .join("");
-  const body = `${pageHead("Popelnice", "Pravidlo svozu, stejné jako na popelnice.kopidlenskadrbna.org.")}
+  const body = `${pageHead("Popelnice", "Pravidlo svozu pro stránku Popelnice a titulku.")}
     <form class="settings-form" method="post" action="/redakce/svoz/ulozit" data-dirty>
       <section class="panel">
         <header class="panel-head"><h2>Svoz</h2><p class="panel-note">Příští svoz: <b>${esc(formatLong(waste.nextDate))}</b></p></header>

@@ -190,15 +190,13 @@ function htmlAd(request, body, ad, status = 200) {
 
 // Stránka 404 s Drběnou a jednou reklamou.
 async function notFound(request, env, ctx, { heading, ads } = {}) {
-  const ad = ctx.minimal ? null : chooseAd(request, ads ?? (await loadAds(env, { enabledOnly: true })));
+  const ad = chooseAd(request, ads ?? (await loadAds(env, { enabledOnly: true })));
   return htmlAd(request, notFoundPage(ctx, { heading, ad }), ad, 404);
 }
 
 function ctxFor(request, path) {
   const url = new URL(request.url);
-  const minimal = url.hostname.startsWith("popelnice.");
-  const host = minimal ? url.hostname.replace(/^popelnice\./, "") : url.hostname;
-  return { path, minimal, mainOrigin: `${url.protocol}//${host}`, origin: url.origin };
+  return { path, mainOrigin: url.origin, origin: url.origin };
 }
 
 function messageFrom(url) {
@@ -217,7 +215,6 @@ function kickOutageRefresh(env, ctx, board) {
 async function renderGet(request, env, url, execution) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const base = ctxFor(request, path);
-  const minimalHome = base.minimal && path === "/";
 
   if (path === "/media" || path.startsWith("/media/")) {
     const key = decodeURIComponent(path.slice("/media/".length));
@@ -234,28 +231,22 @@ async function renderGet(request, env, url, execution) {
 
   if (path === "/robots.txt") return plain(robotsTxt(url.origin), "text/plain");
   if (path === "/sitemap.xml") {
-    return plain(sitemapXml(url.origin, await loadSitemap(env), { minimal: base.minimal }), "application/xml");
+    return plain(sitemapXml(url.origin, await loadSitemap(env)), "application/xml");
   }
 
   // Texty a data stránky najednou: na sobě nezávisí.
   const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
   const [copy, data, admin, story, chat] = await Promise.all([
     loadCopy(env),
-    minimalHome || PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
+    PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
     path.startsWith("/redakce/") ? loadAdmin(env, request) : null,
     slug == null ? null : loadStory(env, slug, path),
-    path.startsWith("/redakce") || base.minimal ? false : chatEnabled(env),
+    path.startsWith("/redakce") ? false : chatEnabled(env),
   ]);
   // Okénko chatu s Drběnou: jen na hlavním webu, když ho redakce zapnula.
   const ctx = { ...base, copy, chat: chat ? { siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
-  if (minimalHome || path === "/popelnice") {
-    return html(
-      binsPage(data.waste, { ...ctx, path: "/popelnice", minimal: minimalHome || ctx.minimal }, {
-        standaloneTitle: minimalHome,
-      }),
-    );
-  }
+  if (path === "/popelnice") return html(binsPage(data.waste, ctx));
   if (path === "/") {
     kickOutageRefresh(env, execution, data.outages);
     const ad = chooseAd(request, data.ads);
@@ -548,6 +539,10 @@ async function renderPost(request, env, url, execution) {
 export default {
   async fetch(request, env, execution) {
     const url = new URL(request.url);
+    // Samostatný web popelnic skončil: popelnice.kopidlenskadrbna.org vede na stránku svozu.
+    if (url.hostname.startsWith("popelnice.")) {
+      return Response.redirect(`${url.protocol}//${url.hostname.slice("popelnice.".length)}/popelnice`, 301);
+    }
     try {
       // Statické soubory databázi nepotřebují.
       if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {

@@ -73,7 +73,7 @@ export function readHistory(value) {
 async function chatSystem(env, request) {
   const origin = new URL(request.url).origin;
   const [data, copy, drbena, settings] = await Promise.all([loadPublic(env), loadCopy(env), loadDrbena(env), loadChatSettings(env)]);
-  const ctx = { path: "/", minimal: false, mainOrigin: origin, origin, copy };
+  const ctx = { path: "/", mainOrigin: origin, origin, copy };
   const archive = await loadArchive(env, { skip: RECENT_ARTICLES, limit: settings.archive });
   const now = pragueNow();
   return [

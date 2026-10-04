@@ -14,7 +14,6 @@ export const COPY = [
   { group: "Hlavička a patička", key: "nav_about", label: "Menu: o nás", value: "O nás", max: 40 },
   { group: "Hlavička a patička", key: "menu_label", label: "Tlačítko menu na mobilu", value: "Menu", max: 40 },
   { group: "Hlavička a patička", key: "skip", label: "Odkaz přeskočit na obsah", value: "Přeskočit na obsah", max: 80 },
-  { group: "Hlavička a patička", key: "link_whole", label: "Odkaz na celé noviny ze stránky svozu", value: "Celé noviny", max: 40 },
   { group: "Hlavička a patička", key: "footer_copy", label: "Patička, první řádek", value: "© 2026 Kopidlenská drbna", max: 120 },
   { group: "Hlavička a patička", key: "footer_fine", label: "Patička, upřesnění", value: "Neoficiální informační stránka — není provozována Městem Kopidlno.", max: 240, long: true },
   { group: "Hlavička a patička", key: "footer_admin", label: "Odkaz do redakce", value: "Redakce", max: 40 },
@@ -80,7 +79,6 @@ export const COPY = [
 
   { group: "Popelnice", key: "bins_description", label: "Popis stránky svozu", value: "Nejbližší svoz směsného odpadu v Kopidlně.", max: 240, long: true },
   { group: "Popelnice", key: "bins_title", label: "Název stránky svozu", value: "Kdy se sváží", max: 40 },
-  { group: "Popelnice", key: "bins_standalone", label: "Název samostatné stránky svozu", value: "Popelnice", max: 40 },
   { group: "Popelnice", key: "bins_pill", label: "Štítek nejbližšího svozu", value: "Nejbližší svoz", max: 40 },
   { group: "Popelnice", key: "bins_more", label: "Nadpis dalších termínů", value: "Další termíny", max: 40 },
   { group: "Popelnice", key: "bins_kind", label: "Druh odpadu", value: "Směsný komunální odpad", max: 80 },

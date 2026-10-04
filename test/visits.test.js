@@ -14,7 +14,7 @@ const page = new Response("<p>", { headers: { "content-type": "text/html; charse
 test("počítá se jen veřejná HTML stránka od člověka", () => {
   assert.equal(visitPath(get("https://drbna.cz/zpravy/"), page), "/zpravy");
   assert.equal(visitPath(get("https://drbna.cz/"), page), "/");
-  assert.equal(visitPath(get("https://popelnice.drbna.cz/"), page), "/popelnice");
+  assert.equal(visitPath(get("https://drbna.cz/popelnice"), page), "/popelnice");
   assert.equal(visitPath(get("https://drbna.cz/redakce/prehled"), page), null);
   assert.equal(visitPath(get("https://drbna.cz/nic"), new Response("", { status: 404, headers: { "content-type": "text/html" } })), null);
   assert.equal(visitPath(get("https://drbna.cz/odstavky.json"), new Response("{}", { headers: { "content-type": "application/json" } })), null);
