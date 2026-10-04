@@ -5,7 +5,7 @@ import { recordAudit } from "./audit-db.js";
 import { auditRoute } from "./audit-routes.js";
 
 // Sloupce, které se do historie nikdy nepíšou: tajné, nebo je dopočítá stroj.
-const OMIT = new Set(["id", "password_hash", "session_token", "keywords", "running_at", "checked_at"]);
+const OMIT = new Set(["id", "password_hash", "session_token", "token_hash", "keywords", "running_at", "checked_at"]);
 const TITLE_COLUMNS = ["title", "name", "summary", "caption", "reason", "note", "login", "code"];
 
 function same(a, b) {
@@ -118,30 +118,17 @@ export async function auditFinish(env, watch, response, messages = {}) {
   });
 }
 
-export async function auditLogin(env, result, loginName) {
-  if (result.ok) {
-    await recordAudit(env, { user: result.user, section: "prihlaseni", action: "Přihlášení heslem" });
+// Přihlášení kódem nebo odkazem z e-mailu (src/login.js). Nepovedené pokusy jdou pod e-mailem, který kdo zadal.
+export async function auditLogin(env, { user, how, email, error }) {
+  if (user) {
+    await recordAudit(env, { user, section: "prihlaseni", action: `Přihlášení ${how}` });
   } else {
-    await recordAudit(env, { userName: loginName, section: "prihlaseni", action: `Nepovedené přihlášení: ${result.error}` });
+    await recordAudit(env, { userName: email, section: "prihlaseni", action: `Nepovedené přihlášení: ${error}` });
   }
 }
 
 export async function auditLogout(env, user) {
   if (user) await recordAudit(env, { user, section: "prihlaseni", action: "Odhlášení" });
-}
-
-// S Cloudflare Access se přihlašuje mimo drbnu: první stránka redakce v okně prohlížeče
-// se zapíše jako přihlášení a cookie bez platnosti (do zavření prohlížeče) zabrání dalším zápisům.
-const SEEN = "drbna_seen";
-
-export function accessSeen(request) {
-  return (request.headers.get("cookie") ?? "").split(";").some((part) => part.trim().startsWith(`${SEEN}=`));
-}
-
-export async function auditAccessLogin(env, request, user, https) {
-  if (!user || accessSeen(request)) return null;
-  await recordAudit(env, { user, section: "prihlaseni", action: "Přihlášení přes Cloudflare Access" });
-  return `${SEEN}=1; HttpOnly; Path=/redakce; SameSite=Lax${https ? "; Secure" : ""}`;
 }
 
 // Článek od Drběny z importu: jen že vznikl, bez hodnot.

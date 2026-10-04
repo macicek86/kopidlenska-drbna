@@ -1,5 +1,6 @@
 // Stránky redakce (GET /redakce/…): kontrola oprávnění, doplnění dat sekce a vykreslení.
 import {
+  adminAccount,
   adminAds,
   adminArticles,
   adminAudit,
@@ -15,7 +16,6 @@ import {
   adminOutages,
   adminPlaces,
   adminOverview,
-  adminPassword,
   adminPeople,
   adminRubrics,
   adminSite,
@@ -32,6 +32,7 @@ import { canSeeHours } from "./hours-requests-db.js";
 import { html, redirect } from "./http.js";
 import { messageFrom } from "./ok-messages.js";
 import { loadMessages } from "./messages-db.js";
+import { listSessions, loginSettings } from "./login-db.js";
 import { loadStats, STAT_PERIODS } from "./visits-db.js";
 import { continueImport } from "./munipolis/run.js";
 import { loadImportSettings } from "./munipolis/store.js";
@@ -134,7 +135,13 @@ export async function renderAdmin(env, url, ctx, data, execution) {
     if (data.signedIn) data.audit = await loadAudit(env, auditQuery(url));
     return html(adminAudit(ctx, data, message, auditQuery(url)));
   }
-  if (tab === "lide") return html(adminPeople(ctx, data, message, query));
-  if (tab === "heslo") return html(adminPassword(ctx, data, message));
+  if (tab === "lide") {
+    if (data.signedIn) data.loginSettings = await loginSettings(env);
+    return html(adminPeople(ctx, data, message, query));
+  }
+  if (tab === "ucet") {
+    if (data.signedIn) data.sessions = await listSessions(env, data.user.id);
+    return html(adminAccount(ctx, data, message));
+  }
   return null;
 }

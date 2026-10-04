@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { ensureLoginTables, sha256 } from "../src/login-db.js";
 import { blankWeek } from "../src/doctors.js";
 import { ensurePlaceTables, PLACE_ACTIONS, removePlaceChange, savePlaceChange } from "../src/places-db.js";
 import { removeClosure, saveClosure, YARD_ACTIONS } from "../src/yards-db.js";
@@ -28,19 +29,30 @@ function as(who) {
   return new Request("http://drbna.test/", { headers: { cookie: `drbna_editor=${TOKENS[who]}` } });
 }
 
+// Přihlášené zařízení s pevným tokenem z testu.
+async function signIn(env, userId, token) {
+  await env.DB.prepare("insert into sessions (user_id, token_hash, created_at, last_seen) values (?, ?, ?, ?)")
+    .bind(userId, await sha256(token), Date.now(), Date.now())
+    .run();
+}
+
 async function freshEnv() {
   const env = { DB: d1() };
   const run = (sql, ...values) => env.DB.prepare(sql).bind(...values).run();
   await run(`create table users (id integer primary key, login text, name text, alias text default '', email text default '',
-    role text, session_token text, active integer default 1)`);
+    role text, active integer default 1)`);
   await run("create table user_permissions (user_id integer, code text)");
   await run("create table yards (id integer primary key, name text, place text, accepts text, hours text, sort_order integer default 0, published integer default 1)");
   await run("create table yard_closures (id integer primary key autoincrement, yard_id integer, starts_on text, ends_on text, reason text, created_by integer)");
   await ensurePlaceTables(env);
   await ensureRequestTables(env);
-  await run("insert into users (id, login, name, role, session_token) values (1, 'hlavni', 'Hlavní', 'hlavni', ?)", TOKENS.chief);
-  await run("insert into users (id, login, name, role, session_token) values (2, 'jana', 'Jana', 'prispevatel', ?)", TOKENS.jana);
-  await run("insert into users (id, login, name, role, session_token) values (3, 'petr', 'Petr', 'prispevatel', ?)", TOKENS.petr);
+  await ensureLoginTables(env);
+  await run("insert into users (id, login, name, role) values (1, 'hlavni', 'Hlavní', 'hlavni')");
+  await signIn(env, 1, TOKENS.chief);
+  await run("insert into users (id, login, name, role) values (2, 'jana', 'Jana', 'prispevatel')");
+  await signIn(env, 2, TOKENS.jana);
+  await run("insert into users (id, login, name, role) values (3, 'petr', 'Petr', 'prispevatel')");
+  await signIn(env, 3, TOKENS.petr);
   await run("insert into user_permissions values (2, 'oteviraci_doba_navrh'), (2, 'sberny_dvur_navrh'), (3, 'oteviraci_doba'), (3, 'oteviraci_doba_navrh')");
   await run("insert into yards (id, name, place, accepts, hours) values (1, 'Dvůr', 'Kopidlno', 'všechno', '[]')");
   return env;

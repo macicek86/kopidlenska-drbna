@@ -1,4 +1,5 @@
-// Snímky redakce v Chromu. Spusť `npm run dev` a pak `npm run screens`.
+// Snímky redakce v Chromu. Spusť `npm run nahled` a pak `npm run screens`.
+// Přihlašuje se kódem z e-mailu; náhled běží s LOGIN_CODE_ECHO=1, takže kód je vidět na stránce.
 // Obrázky jdou do .screens/ (desktop i mobil), ať je vidí každý, kdo na projektu dělá.
 import { mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -6,8 +7,7 @@ import { chromium } from "playwright-core";
 
 const base = process.env.BASE ?? "http://127.0.0.1:8787";
 const out = process.env.OUT ?? ".screens";
-const login = process.env.LOGIN ?? "redakce";
-const password = process.env.PASSWORD ?? "Drbna2026";
+const email = process.env.EMAIL ?? "redakce@example.cz";
 const only = process.argv.slice(2);
 
 const TABS = [
@@ -33,7 +33,7 @@ const TABS = [
   "chat",
   "lide",
   "historie",
-  "heslo",
+  "ucet",
   // Otevřená okna. Název souboru je adresa bez lomítek.
   "chat?nastaveni=1",
   "skola?nastaveni=1",
@@ -79,9 +79,11 @@ for (const [label, viewport] of sizes) {
   page.on("pageerror", (error) => console.error(`[${label}] chyba na stránce:`, error.message));
   await page.goto(`${base}/redakce/zpravy`);
   await page.screenshot({ path: `${out}/${label}-prihlaseni.png`, fullPage: true });
-  await page.fill("input[name=login]", login);
-  await page.fill("input[name=password]", password);
-  await Promise.all([page.waitForURL(/\/redakce\/prehled/), page.click("button[type=submit]")]);
+  await page.fill("input[name=email]", email);
+  await Promise.all([page.waitForURL(/kod=/), page.click("button[type=submit]")]);
+  await page.screenshot({ path: `${out}/${label}-prihlaseni-kod.png`, fullPage: true });
+  await page.fill("input[name=kod]", await page.textContent("[data-login-code]"));
+  await Promise.all([page.waitForURL(/\/redakce\/zpravy$/), page.click("button[type=submit]")]);
   for (const tab of TABS) {
     if (only.length && !only.some((name) => tab.startsWith(name))) continue;
     await page.goto(`${base}/redakce/${tab}`);

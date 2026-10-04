@@ -24,8 +24,9 @@ import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 import { ensureRequestTables } from "./hours-requests-db.js";
 import { ensureAuditTables } from "./audit-db.js";
+import { ensureLoginTables } from "./login-db.js";
 
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 let schemaReady = false;
 
@@ -284,18 +285,6 @@ async function seedClubRubrics(env) {
   }
 }
 
-async function migrateSession(env) {
-  const row = await env.DB.prepare("select session_token from settings where id = 1").first();
-  if (!row?.session_token) return;
-  const chief = await env.DB.prepare(
-    "select id, session_token from users where role = 'hlavni' order by id asc limit 1",
-  ).first();
-  if (chief && !chief.session_token) {
-    await env.DB.prepare("update users set session_token = ? where id = ?").bind(row.session_token, chief.id).run();
-  }
-  await env.DB.prepare("update settings set session_token = null where id = 1").run();
-}
-
 async function seedDoctors(env) {
   const info = await env.DB.prepare("pragma table_info(settings)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
@@ -424,6 +413,7 @@ async function migrateSchema(env) {
   await ensureNdicTables(env);
   await ensureRequestTables(env);
   await ensureAuditTables(env);
+  await ensureLoginTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();
@@ -464,7 +454,6 @@ async function migrateSchema(env) {
      select 'redakce', 'Redakce', password_hash, 'hlavni' from settings
      where id = 1 and not exists (select 1 from users)`,
   ).run();
-  await migrateSession(env);
   await ensureAdColumns(env);
   await seedAds(env);
   await renameCopy(env);

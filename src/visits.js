@@ -5,8 +5,8 @@
 const BOT =
   /bot|crawl|spider|slurp|scrape|facebookexternalhit|embedly|preview|headless|lighthouse|pagespeed|python|curl|wget|httpclient|java\/|go-http|node-fetch|undici|axios|okhttp|monitor|uptime|pingdom|feed|validator/i;
 
-// Přihlášený z redakce (heslem i přes Cloudflare Access) se nepočítá.
-const EDITOR_COOKIE = /(?:^|;\s*)(?:drbna_editor|CF_Authorization)=/;
+// Přihlášený z redakce (cookie drbna_editor) se nepočítá.
+const EDITOR_COOKIE = /(?:^|;\s*)drbna_editor=/;
 
 export function isBot(userAgent) {
   const ua = String(userAgent ?? "");

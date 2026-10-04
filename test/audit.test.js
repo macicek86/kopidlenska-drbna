@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { ensureLoginTables, sha256 } from "../src/login-db.js";
 import { auditFinish, auditLogin, auditStart, diffRows, outcome } from "../src/audit.js";
 import { ensureAuditTables, loadAudit, PAGE_SIZE, pruneAudit, recordAudit } from "../src/audit-db.js";
 import { auditRoute } from "../src/audit-routes.js";
@@ -29,20 +30,30 @@ const CHIEF = { id: 1, name: "Hlavní", role: "hlavni", permissions: [] };
 const JANA = { id: 2, name: "Jana", role: "prispevatel", permissions: ["sberny_dvur_navrh"] };
 const MESSAGES = { "zprava-upravena": "Zpráva je upravená.", zprava: "Zpráva je uložená.", "zprava-smazana": "Zpráva je smazaná." };
 
+// Přihlášené zařízení s pevným tokenem z testu.
+async function signIn(env, userId, token) {
+  await env.DB.prepare("insert into sessions (user_id, token_hash, created_at, last_seen) values (?, ?, ?, ?)")
+    .bind(userId, await sha256(token), Date.now(), Date.now())
+    .run();
+}
+
 async function freshEnv() {
   const env = { DB: d1() };
   const run = (sql, ...values) => env.DB.prepare(sql).bind(...values).run();
   await ensureAuditTables(env);
   await run(`create table users (id integer primary key, login text, name text, alias text default '', email text default '',
-    role text, password_hash text default '', session_token text, active integer default 1)`);
+    role text, password_hash text default '', active integer default 1)`);
   await run("create table user_permissions (user_id integer, code text)");
   await run("create table articles (id integer primary key autoincrement, title text, body text, author_id integer, keywords text default '')");
   await run("create table yards (id integer primary key, name text, place text, accepts text, hours text, sort_order integer default 0, published integer default 1)");
   await run("create table yard_closures (id integer primary key autoincrement, yard_id integer, starts_on text, ends_on text, reason text, created_by integer)");
   await ensurePlaceTables(env);
   await ensureRequestTables(env);
-  await run("insert into users (id, login, name, role, session_token) values (1, 'hlavni', 'Hlavní', 'hlavni', 'token-hlavni-0000000000')");
-  await run("insert into users (id, login, name, role, session_token) values (2, 'jana', 'Jana', 'prispevatel', 'token-jana-00000000000')");
+  await ensureLoginTables(env);
+  await run("insert into users (id, login, name, role) values (1, 'hlavni', 'Hlavní', 'hlavni')");
+  await signIn(env, 1, "token-hlavni-0000000000");
+  await run("insert into users (id, login, name, role) values (2, 'jana', 'Jana', 'prispevatel')");
+  await signIn(env, 2, "token-jana-00000000000");
   await run("insert into user_permissions values (2, 'sberny_dvur_navrh')");
   await run("insert into yards (id, name, place, accepts, hours) values (1, 'Dvůr', 'Kopidlno', 'všechno', '[]')");
   await run("insert into articles (title, body, author_id) values ('Stará', '<p>Text</p>', 1)");
@@ -115,7 +126,7 @@ test("bez přihlášení a na adresách mimo seznam se nic nefotí", async () =>
   const env = await freshEnv();
   assert.equal(await auditStart(env, "/redakce/zpravy/ulozit", {}, async () => null), null);
   assert.equal(await auditStart(env, "/redakce/drbena/zkusit", {}, async () => CHIEF), null);
-  assert.equal(auditRoute("/redakce/heslo/ulozit").section, "ucet");
+  assert.equal(auditRoute("/redakce/ucet/ulozit").section, "ucet");
   assert.equal(auditRoute("/redakce/munipolis/zkontrolovat").always, true);
 });
 
@@ -144,13 +155,13 @@ test("návrh uzavření dvora a jeho schválení: žádost, pak nové uzavření
   assert.deepEqual(approvedEntry.changes[0].fields.reason, [null, "inventura"]);
 });
 
-test("přihlášení: povedené s účtem, nepovedené se jménem, které člověk napsal", async () => {
+test("přihlášení: povedené s účtem, nepovedené s e-mailem, který člověk zadal", async () => {
   const env = await freshEnv();
-  await auditLogin(env, { ok: true, user: { id: 2, name: "Jana" } }, "jana");
-  await auditLogin(env, { ok: false, error: "Jméno nebo heslo nesedí." }, "janka");
+  await auditLogin(env, { user: { id: 2, name: "Jana" }, how: "kódem z e-mailu" });
+  await auditLogin(env, { email: "janka@example.cz", error: "Kód nesedí. Zbývá pokusů: 4." });
   const [ok, bad] = await entries(env);
-  assert.deepEqual([ok.user_id, ok.user_name, ok.action], [2, "Jana", "Přihlášení heslem"]);
-  assert.deepEqual([bad.user_id, bad.user_name, bad.action], [null, "janka", "Nepovedené přihlášení: Jméno nebo heslo nesedí."]);
+  assert.deepEqual([ok.user_id, ok.user_name, ok.action], [2, "Jana", "Přihlášení kódem z e-mailu"]);
+  assert.deepEqual([bad.user_id, bad.user_name, bad.action], [null, "janka@example.cz", "Nepovedené přihlášení: Kód nesedí. Zbývá pokusů: 4."]);
 });
 
 test("stránka historie: filtr, stránkování a okno se změnami", async () => {

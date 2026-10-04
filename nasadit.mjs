@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -58,6 +59,19 @@ if (bucketResult.code !== 0 && !/already exists|already owned/i.test(bucketResul
 console.log("Nahrávám schéma a výchozí texty…");
 run(["d1", "execute", dbName, "--remote", "--file=./schema.sql"]);
 
+// Do redakce se přihlašuje kódem z e-mailu: hlavní redaktor potřebuje e-mail, jinak se nikdo nepřihlásí.
+const chief = run(["d1", "execute", dbName, "--remote", "--json", "--command", "select email from users where role = 'hlavni' limit 1"], { allowFail: true });
+if (!/"email":\s*"[^"]+@/.test(chief.text)) {
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  let email = "";
+  while (!/^[^\s@'"]+@[^\s@'"]+\.[^\s@'"]+$/.test(email)) {
+    email = (await prompt.question("E-mail hlavního redaktora (na něj přijde kód pro přihlášení): ")).trim().toLowerCase();
+  }
+  prompt.close();
+  run(["d1", "execute", dbName, "--remote", "--command", `update users set email = '${email}' where role = 'hlavni'`]);
+}
+
 console.log("Nasazuji Worker…");
 run(["deploy"]);
-console.log("Hotovo. Redakce je na /redakce, výchozí přihlášení je redakce / Drbna2026. Hned si ho změň.");
+console.log("Hotovo. Redakce je na /redakce: zadej e-mail hlavního redaktora a přijde kód.");
+console.log("Kód chodí přes Cloudflare Email Service, doména musí být přidaná pro odesílání (NAVOD-PRIHLASENI.md).");

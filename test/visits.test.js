@@ -21,7 +21,6 @@ test("počítá se jen veřejná HTML stránka od člověka", () => {
   assert.equal(visitTarget(new Request("https://drbna.cz/", { method: "HEAD", headers: { "user-agent": BROWSER } })), null);
   assert.equal(visitTarget(get("https://drbna.cz/", { "sec-purpose": "prefetch" })), null);
   assert.equal(visitTarget(get("https://drbna.cz/", { cookie: "a=1; drbna_editor=xyz" })), null);
-  assert.equal(visitTarget(get("https://drbna.cz/", { cookie: "CF_Authorization=abc" })), null);
   assert.equal(visitTarget(get("https://drbna.cz/", { cookie: "drbna_ad=3" })), "/");
 });
 

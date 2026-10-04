@@ -457,6 +457,10 @@ html { font-size: 100%; }
 .login-card h1 { margin: 0; font-family: var(--display); font-size: 1.8rem; }
 .login-card .adm-lede { margin-top: -0.6rem; }
 .login-back { justify-self: center; color: var(--muted); }
+.login-code { font-size: 1.6rem; letter-spacing: 0.35em; text-align: center; font-variant-numeric: tabular-nums; }
+.login-turnstile:empty { display: none; }
+.login-card .callout code { display: block; margin-top: 0.4rem; word-break: break-all; font-size: 0.8rem; }
+.login-card .btn-ghost { margin-top: -0.4rem; }
 
 /* --- Šířky ------------------------------------------------------------- */
 

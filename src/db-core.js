@@ -1,6 +1,6 @@
 // Společné kousky pro práci s D1: ořez textu, slug, přihlášený člověk a oprávnění.
 
-import { accessConfig, accessEmail } from "./access.js";
+import { sessionAccount } from "./login-db.js";
 import { pragueNow } from "./waste.js";
 
 const COOKIE = "drbna_editor";
@@ -104,8 +104,8 @@ export function readCookie(request) {
   return null;
 }
 
-export function sessionCookie(token, secure) {
-  const parts = [`${COOKIE}=${encodeURIComponent(token)}`, "HttpOnly", "Path=/", "SameSite=Lax", "Max-Age=2592000"];
+export function sessionCookie(token, secure, maxAge = 2592000) {
+  const parts = [`${COOKIE}=${encodeURIComponent(token)}`, "HttpOnly", "Path=/", "SameSite=Lax", `Max-Age=${maxAge}`];
   if (secure) parts.push("Secure");
   return parts.join("; ");
 }
@@ -131,26 +131,12 @@ export async function permissionCodes(env, userId) {
   return (rows.results ?? []).map((row) => String(row.code));
 }
 
-const ACCOUNT_FIELDS = "id, login, name, alias, email, role, active";
 
-// Kdo je přihlášený. S Cloudflare Access podle ověřeného e-mailu (ten vrací i bez účtu, ať redakce
-// může říct, že pro něj účet nemá), jinak podle cookie z přihlášení heslem.
+// Kdo je přihlášený: podle cookie s tokenem přihlášeného zařízení (src/login-db.js). `sessionId` je to zařízení.
 export async function identify(env, request) {
-  const access = accessConfig(env);
-  if (access) {
-    const email = await accessEmail(request, access);
-    if (!email) return { user: null, email: null };
-    const row = await env.DB.prepare(`select ${ACCOUNT_FIELDS} from users where email = ? and active = 1`)
-      .bind(email)
-      .first();
-    return { user: row ? mapAccount(row, await permissionCodes(env, row.id)) : null, email };
-  }
-  const token = readCookie(request);
-  if (!token || token.length < 20) return { user: null, email: null };
-  const row = await env.DB.prepare(`select ${ACCOUNT_FIELDS} from users where session_token = ? and active = 1`)
-    .bind(token)
-    .first();
-  return { user: row ? mapAccount(row, await permissionCodes(env, row.id)) : null, email: null };
+  const found = await sessionAccount(env, readCookie(request));
+  if (!found) return { user: null, sessionId: null };
+  return { user: mapAccount(found.row, await permissionCodes(env, found.row.id)), sessionId: found.sessionId };
 }
 
 export async function currentUser(env, request) {

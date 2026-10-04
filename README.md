@@ -1,6 +1,6 @@
 # Kopidlenská drbna pro Cloudflare
 
-Samostatný Worker. Články, akce, heslo redakce a pravidlo svozu jsou v **D1**. Fotky nahrané v redakci jdou do **R2**. Maskot je soubor `public/kozel-maskot.webp`.
+Samostatný Worker. Články, akce, účty redakce a pravidlo svozu jsou v **D1**. Fotky nahrané v redakci jdou do **R2**. Maskot je soubor `public/kozel-maskot.webp`.
 
 Adresa `popelnice.kopidlenskadrbna.org` jen přesměruje na `/popelnice` (samostatný web popelnic skončil).
 
@@ -32,11 +32,11 @@ Domény musí být na stejném účtu. Stejné řádky jsou připravené zakomen
 
 ## Redakce
 
-Adresa `/redakce`. Na produkci se do ní přihlašuje e-mailem přes Cloudflare Access, nastavení je v [NAVOD-ACCESS.md](NAVOD-ACCESS.md). Po přihlášení se otevře Přehled: co čeká na schválení a co se chystá. Vlevo je menu sekcí (na mobilu nahoře). Úpravy, nové položky i mazání se otevírají v okně, seznamy jde prohledávat a před zavřením okna s neuloženými změnami se redakce zeptá. Ctrl+S uloží otevřený formulář. Účty jsou dvou druhů.
+Adresa `/redakce`. Přihlašuje se do ní kódem z e-mailu, nastavení odesílání a přihlášení je v [NAVOD-PRIHLASENI.md](NAVOD-PRIHLASENI.md). Po přihlášení se otevře Přehled: co čeká na schválení a co se chystá. Vlevo je menu sekcí (na mobilu nahoře). Úpravy, nové položky i mazání se otevírají v okně, seznamy jde prohledávat a před zavřením okna s neuloženými změnami se redakce zeptá. Ctrl+S uloží otevřený formulář. Účty jsou dvou druhů.
 
-Hlavní redaktor je jeden. Výchozí přihlášení je jméno `redakce` a heslo `Drbna2026`. Po prvním vstupu si heslo změň v sekci Můj účet. Může zprávy, akce, texty, svoz, sběrné dvory, odstávky elektřiny i účty. Jeho vlastní zpráva jde na web hned. Výchozí jméno pod článkem je Redakce. V sekci Můj účet si každý nastaví jméno a volitelný alias. Když alias používá, na webu se u jeho zpráv ukáže alias.
+Hlavní redaktor je jeden. Přihlašuje se e-mailem, který zadáš při `npm run nasadit`. Může zprávy, akce, texty, svoz, sběrné dvory, odstávky elektřiny i účty. Jeho vlastní zpráva jde na web hned. Výchozí jméno pod článkem je Redakce. V sekci Můj účet si každý nastaví jméno a volitelný alias. Když alias používá, na webu se u jeho zpráv ukáže alias.
 
-Přispěvatele přidá hlavní redaktor v sekci Lidé: jméno pod článkem, volitelný alias, přihlašovací jméno, heslo a oprávnění. Teď je tu oprávnění Sběrný dvůr. Přispěvatel píše nové zprávy a u zveřejněné zprávy, i cizí, může jen navrhnout úpravu. Na web se dostane až to, co hlavní redaktor schválí. Cizí text přímo nezmění a návrh úpravy jeho vlastní zprávy taky čeká na schválení. Člověk s oprávněním na sběrný dvůr navíc zapíše mimořádné uzavření a důvod. Dvůr, popis a otevírací dobu mění jen hlavní redaktor.
+Přispěvatele přidá hlavní redaktor v sekci Lidé: jméno pod článkem, volitelný alias, e-mail pro přihlášení a oprávnění. Teď je tu oprávnění Sběrný dvůr. Přispěvatel píše nové zprávy a u zveřejněné zprávy, i cizí, může jen navrhnout úpravu. Na web se dostane až to, co hlavní redaktor schválí. Cizí text přímo nezmění a návrh úpravy jeho vlastní zprávy taky čeká na schválení. Člověk s oprávněním na sběrný dvůr navíc zapíše mimořádné uzavření a důvod. Dvůr, popis a otevírací dobu mění jen hlavní redaktor.
 
 Hlavní redaktor může text před schválením upravit, nejčastěji češtinu. Veřejně se neukáže, co se měnilo. Když se zveřejněné znění liší od návrhu, u autora je nanejvýš slovo Redigováno. Autor příspěvku zůstává přispěvatel. U návrhu úpravy cizí zprávy zůstává původní autor.
 

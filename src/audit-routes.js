@@ -1,7 +1,7 @@
 // Které formuláře redakce jdou do historie změn (src/audit.js) a které záznamy se u nich porovnají.
 // Cíl `{ table, id }` vyfotí řádek podle id; když id chybí, hledá nově založený řádek (`existing` to vypne).
 // Cíl `{ label, read }` vyfotí hodnotu nebo { klíč: hodnota } (oprávnění, texty webu).
-// `always`: zapsat i bez změněných hodnot (načtení, spuštění Drběny, heslo). Ostatní se zapíšou jen se změnou.
+// `always`: zapsat i bez změněných hodnot (načtení, spuštění Drběny, odhlášení zařízení). Ostatní se zapíšou jen se změnou.
 import { SCHOOL_LIST } from "./skola/sources.js";
 
 const num = (value) => Number(value) || 0;
@@ -120,9 +120,10 @@ const ROUTES = {
   "/redakce/lide/ulozit": [fresh("users")],
   "/redakce/lide/stav": [existing("users", "id"), permissions],
   "/redakce/lide/udaje": [existing("users", "id"), permissions],
-  "/redakce/lide/heslo": "always",
-  "/redakce/jmeno/ulozit": [{ table: "users", label: "users", id: ({ user }) => user.id }],
-  "/redakce/heslo/ulozit": "always",
+  "/redakce/lide/prihlaseni": [single("login_settings", "nastavení přihlášení")],
+  "/redakce/ucet/ulozit": [{ table: "users", label: "users", id: ({ user }) => user.id }],
+  "/redakce/ucet/odhlasit-zarizeni": "always",
+  "/redakce/ucet/odhlasit-ostatni": "always",
 
   "/redakce/svoz/ulozit": [single("settings", "nastavení")],
   "/redakce/texty/ulozit": [copyTexts, single("settings", "nastavení")],
@@ -166,10 +167,9 @@ const ROUTES = {
   "/redakce/vzkazy/smazat": [existing("chat_messages", "id")],
 };
 
-// Sekce podle adresy (jako v menu redakce); Můj účet má dvě adresy.
+// Sekce podle adresy (jako v menu redakce).
 export function auditSection(path) {
-  const tab = path.split("/")[2] ?? "";
-  return tab === "jmeno" || tab === "heslo" ? "ucet" : tab;
+  return path.split("/")[2] ?? "";
 }
 
 export function auditRoute(path) {

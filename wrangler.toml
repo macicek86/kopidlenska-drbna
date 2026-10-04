@@ -10,20 +10,16 @@ routes = [
   { pattern = "www.kopidlenskadrbna.org", custom_domain = true }
 ]
 # Stará adresa *.workers.dev zatím jen přesměruje na www (hostRedirect). Až nebude potřeba, dát workers_dev = false.
-# Náhledy verzí (preview_urls) jsou vypnuté, ať redakce nejde obejít, až ji bude hlídat Cloudflare Access.
+# Náhledy verzí (preview_urls) jsou vypnuté: běží nad stejnou D1, ať redakce není ještě na další adrese.
 workers_dev = true
 preview_urls = false
 
-# Cloudflare Access: ACCESS_TEAM (název týmu, třeba „drbna“ z drbna.cloudflareaccess.com) a ACCESS_AUD
-# (Application Audience tag) se nastavují jako tajemství: npx wrangler secret put ACCESS_TEAM
-# Místně nejsou, takže náhled a vývoj se dál přihlašují heslem.
-#
-# Chat s Drběnou: Turnstile (ověření, že píše člověk) zapnou tajemství TURNSTILE_SITE_KEY a TURNSTILE_SECRET
-# z widgetu Turnstile v Cloudflare (npx wrangler secret put …). Bez nich chat chrání jen limity z redakce.
+# Chat s Drběnou a přihlášení do redakce: Turnstile (ověření, že píše člověk) zapnou tajemství TURNSTILE_SITE_KEY
+# a TURNSTILE_SECRET z widgetu Turnstile v Cloudflare (npx wrangler secret put …). Bez nich chrání chat i přihlášení
+# jen limity.
 #
 # Uzavírky z Dopravního info (NDIC): NDIC_PUSH_USER a NDIC_PUSH_PASSWORD jsou jméno a heslo, kterým se NDIC
 # hlásí na /ndic/uzavirky (stejné se zadají u odběru v portálu mobilitydata.rsd.cz). Bez nich je příjem vypnutý.
-# Cloudflare Access na tuhle adresu nesmí (NDIC se přes Access nepřihlásí): hlídat jen /redakce.
 
 [assets]
 directory = "./public"
@@ -34,6 +30,12 @@ run_worker_first = true
 binding = "DB"
 database_name = "kopidlenska-drbna"
 database_id = "6b49d75b-58bf-433d-91be-1869f543a388"
+
+# E-maily (kód pro přihlášení do redakce) přes Cloudflare Email Service. Doména kopidlenskadrbna.org musí být
+# v Email Service přidaná pro odesílání, jinak Cloudflare e-mail odmítne a do redakce se nikdo nepřihlásí.
+# Odesílá se z redakce@kopidlenskadrbna.org (src/mail.js). Místně e-mail nikam nejde, Wrangler ho jen vypíše.
+[[send_email]]
+name = "EMAIL"
 
 [[r2_buckets]]
 binding = "BUCKET"

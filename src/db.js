@@ -35,22 +35,18 @@ import { attachArticle, forgetArticle, loadEvents } from "./events-db.js";
 import { countNewMessages } from "./messages-db.js";
 import { canSeeHours, loadRequests } from "./hours-requests-db.js";
 import { loadUsers } from "./users-db.js";
-import { accessConfig } from "./access.js";
+import { loginState } from "./login.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
 export const CATEGORIES = SEED_RUBRICS.map((item) => item.name);
 export { clearCookie, readCookie, sessionCookie, userCan } from "./db-core.js";
 export {
   PERMISSIONS,
-  changePassword,
   createContributor,
   knownPermissions,
-  login,
-  logout,
   saveContributorAccess,
   saveProfile,
   setContributorActive,
-  setContributorPassword,
 } from "./users-db.js";
 export {
   addOutageArea,
@@ -148,7 +144,7 @@ function mapProposal(row) {
 
 async function settings(env) {
   const row = await env.DB.prepare(
-    `select password_hash, session_token, password_is_default, contact_note, waste_note, holiday_note, weekday, week_parity, step_days
+    `select contact_note, waste_note, holiday_note, weekday, week_parity, step_days
      from settings where id = 1`,
   ).first();
   if (!row) throw new Error("Databáze ještě nemá redakci. Na účtu spusťte schema.sql proti D1.");
@@ -272,7 +268,6 @@ export async function loadPublic(env) {
     waste: buildWasteView(wasteFrom(row), today),
     now,
     contactNote: String(row.contact_note),
-    showDefaultPassword: asBool(row.password_is_default),
     rubrics,
   };
 }
@@ -345,14 +340,13 @@ async function loadChiefDesk(env) {
 }
 
 export async function loadAdmin(env, request) {
-  const [row, { user, email }] = await Promise.all([settings(env), identify(env, request)]);
-  const access = Boolean(accessConfig(env));
+  const [row, { user, sessionId }] = await Promise.all([settings(env), identify(env, request)]);
   const base = {
     signedIn: Boolean(user),
     user,
-    access,
-    accessEmail: email,
-    showDefaultPassword: !access && asBool(row.password_is_default),
+    sessionId,
+    // Přihlašovací stránka: čeká prohlížeč na kód, Turnstile (src/login.js).
+    login: user ? null : await loginState(env, request),
     waste: buildWasteView(wasteFrom(row)),
     contactNote: String(row.contact_note),
     articles: [],

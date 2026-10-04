@@ -1,31 +1,20 @@
 import {
-  changePassword,
-  clearCookie,
-  createContributor,
   ensureSchema,
   loadArticle,
   loadAdmin,
   loadMoreArticles,
   loadCopy,
   loadPublic,
-  login,
-  logout,
   saveCopy,
-  saveProfile,
   saveSite,
   loadOutageBoard,
   refreshOutages,
   removeRubric,
   saveRubric,
-  sessionCookie,
-  saveContributorAccess,
-  setContributorActive,
-  setContributorPassword,
 } from "./db.js";
 import { loadAd, loadAds } from "./ads-db.js";
 import { notFoundPage } from "./notfound-view.js";
 import { text as tx } from "./copy.js";
-import { ACCESS_LOGOUT, accessConfig } from "./access.js";
 import { currentUser } from "./db-core.js";
 import {
   adPage,
@@ -44,8 +33,11 @@ import { aboutPage } from "./about.js";
 import { media } from "./images.js";
 import { articlePage, newsPage } from "./news.js";
 import { renderAdmin } from "./admin-get.js";
-import { auditAccessLogin, auditFinish, auditLogin, auditLogout, auditStart } from "./audit.js";
+import { auditFinish, auditStart } from "./audit.js";
 import { pruneAudit } from "./audit-db.js";
+import { echoEnabled, loginGet, loginPost } from "./login.js";
+import { pruneLogin } from "./login-db.js";
+import { accountPost } from "./post-account.js";
 import { OK } from "./ok-messages.js";
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
@@ -141,14 +133,6 @@ function kickOutageRefresh(env, ctx, board) {
   ctx.waitUntil(refreshOutages(env).catch(() => {}));
 }
 
-// S Cloudflare Access: první stránka redakce v okně prohlížeče jde do historie jako přihlášení.
-async function withAccessLogin(env, request, data, response) {
-  if (!accessConfig(env) || !data?.user) return response;
-  const cookie = await auditAccessLogin(env, request, data.user, secure(request)).catch(() => null);
-  if (cookie) response.headers.append("set-cookie", cookie);
-  return response;
-}
-
 async function renderGet(request, env, url, execution) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
   const base = ctxFor(request, path);
@@ -237,8 +221,12 @@ async function renderGet(request, env, url, execution) {
   }
   if (path === "/redakce") return redirect("/redakce/prehled");
   if (path.startsWith("/redakce/")) {
+    const login = await loginGet(path, request, env, url);
+    if (login) return login;
+    // Místní náhled s LOGIN_CODE_ECHO: kód z adresy se ukáže na přihlašovací stránce.
+    if (admin.login && echoEnabled(env, url)) admin.login.echo = /^\d{6}$/.test(url.searchParams.get("kod") ?? "") ? url.searchParams.get("kod") : "";
     const page = await renderAdmin(env, url, ctx, admin, execution);
-    if (page) return withAccessLogin(env, request, admin, page);
+    if (page) return page;
   }
   return notFound(request, env, { ...ctx, path: "/" });
 }
@@ -246,7 +234,6 @@ async function renderGet(request, env, url, execution) {
 async function renderPost(request, env, url, execution) {
   if (!sameOrigin(request)) return new Response("Cizí původ.", { status: 403 });
   const path = url.pathname.replace(/\/+$/, "") || "/";
-  const https = secure(request);
 
   // Chat a pomocník při psaní posílají JSON, formulář se tu nečte.
   const chat = await chatPost(path, request, env, execution);
@@ -254,60 +241,25 @@ async function renderPost(request, env, url, execution) {
   const assist = await assistPost(path, request, env);
   if (assist) return assist;
 
-  if (path === "/redakce/prihlasit") {
-    const fields = await formFields(request);
-    const result = await login(env, fields.login, fields.password);
-    await auditLogin(env, result, fields.login).catch(() => {});
-    if (!result.ok) return redirect(`/redakce/prehled?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/prehled", sessionCookie(result.token, https));
-  }
-  if (path === "/redakce/odhlasit") {
-    await auditLogout(env, await currentUser(env, request)).catch(() => {});
-    await logout(env, request);
-    return redirect(accessConfig(env) ? ACCESS_LOGOUT : "/redakce/prehled", clearCookie(https));
-  }
-
   // Texty webu čtou formulář samy (pole podle seznamu textů).
   const fields = path === "/redakce/texty/ulozit" ? {} : await formFields(request);
+  // Přihlášení a odhlášení: mimo historii změn, zapisují se samy (src/login.js).
+  const login = await loginPost(path, request, env, url, fields);
+  if (login) return login;
   // Historie změn: snímek dotčených záznamů před uložením a po něm.
   const watch = path.startsWith("/redakce/") ? await auditStart(env, path, fields, () => currentUser(env, request)).catch(() => null) : null;
-  const response = await handlePost(request, env, path, https, fields, execution);
+  const response = await handlePost(request, env, path, fields, execution);
   await auditFinish(env, watch, response, OK).catch(() => {});
   return response;
 }
 
-async function handlePost(request, env, path, https, fields, execution) {
+async function handlePost(request, env, path, fields, execution) {
   if (path === "/redakce/texty/ulozit") {
     const result = await saveCopy(env, request);
     if (!result.ok) return redirect(`/redakce/texty?chyba=${encodeURIComponent(result.error)}`);
     return redirect(`/redakce/texty?ok=${result.welcomeAgain ? "uvitani" : "texty"}`);
   }
 
-  if (path === "/redakce/lide/ulozit") {
-    const result = await createContributor(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lide?ok=clovek");
-  }
-  if (path === "/redakce/lide/stav") {
-    const result = await setContributorActive(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
-    return redirect(`/redakce/lide?ok=${result.active ? "clovek-zapnut" : "clovek-vypnut"}`);
-  }
-  if (path === "/redakce/lide/heslo") {
-    const result = await setContributorPassword(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lide?ok=clovek-heslo");
-  }
-  if (path === "/redakce/lide/udaje") {
-    const result = await saveContributorAccess(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lide?ok=clovek-udaje");
-  }
-  if (path === "/redakce/jmeno/ulozit") {
-    const result = await saveProfile(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/heslo?ok=jmeno");
-  }
   if (path === "/redakce/rubriky/ulozit") {
     const result = await saveRubric(env, request, fields);
     if (!result.ok) {
@@ -328,6 +280,7 @@ async function handlePost(request, env, path, https, fields, execution) {
     return redirect("/redakce/svoz?ok=web");
   }
   const section =
+    (await accountPost(path, request, env, fields)) ??
     (await articlesPost(path, request, env, fields)) ??
     (await adsPost(path, request, env, fields)) ??
     (await eventsPost(path, request, env, fields)) ??
@@ -344,11 +297,6 @@ async function handlePost(request, env, path, https, fields, execution) {
     (await chatAdminPost(path, request, env, fields)) ??
     (await messagesPost(path, request, env, fields));
   if (section) return section;
-  if (path === "/redakce/heslo/ulozit") {
-    const result = await changePassword(env, request, fields.current, fields.next);
-    if (!result.ok) return redirect(`/redakce/heslo?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/heslo?ok=heslo", sessionCookie(result.token, https));
-  }
   return new Response("Tahle akce tu není.", { status: 404 });
 }
 
@@ -391,5 +339,6 @@ export default {
     ctx.waitUntil(runNdic(env).catch(() => {}));
     ctx.waitUntil(fillKeywords(env).catch(() => {}));
     ctx.waitUntil(pruneAudit(env).catch(() => {}));
+    ctx.waitUntil(pruneLogin(env).catch(() => {}));
   },
 };

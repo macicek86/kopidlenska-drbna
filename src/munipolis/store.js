@@ -2,7 +2,6 @@
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
 import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { splitRefs } from "../import-context.js";
-import { hashPassword } from "../password.js";
 import { DEFAULT_FEED_URL, readFeedUrl } from "./feed.js";
 
 export const BOT_LOGIN = "drbena";
@@ -213,13 +212,12 @@ export async function saveImportSettings(env, request, input) {
   return { ok: true };
 }
 
-// Autorka převzatých zpráv. Účet je vypnutý, takže se do něj nikdo nepřihlásí.
+// Autorka převzatých zpráv. Účet je vypnutý a bez e-mailu, takže se do něj nikdo nepřihlásí.
 export async function ensureBot(env) {
   const row = await env.DB.prepare("select id, name from users where login = ?").bind(BOT_LOGIN).first();
   if (row) return { id: Number(row.id), name: String(row.name) };
-  const secret = crypto.getRandomValues(new Uint8Array(24)).join("-");
-  await env.DB.prepare("insert or ignore into users (login, name, alias, password_hash, role, active) values (?, ?, '', ?, 'prispevovatel', 0)")
-    .bind(BOT_LOGIN, BOT_NAME, await hashPassword(secret))
+  await env.DB.prepare("insert or ignore into users (login, name, alias, password_hash, role, active) values (?, ?, '', '', 'prispevovatel', 0)")
+    .bind(BOT_LOGIN, BOT_NAME)
     .run();
   const created = await env.DB.prepare("select id, name from users where login = ?").bind(BOT_LOGIN).first();
   return { id: Number(created.id), name: String(created.name) };

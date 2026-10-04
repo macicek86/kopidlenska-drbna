@@ -2,7 +2,8 @@ const base = process.env.BASE ?? "http://127.0.0.1:8787";
 
 async function get(path) {
   const response = await fetch(base + path);
-  const text = await response.text();
+  // Web dává nezlomitelné mezery za jednopísmenná slova (src/typo.js), test hledá obyčejné.
+  const text = (await response.text()).replace(/\u00a0/g, " ");
   return { status: response.status, text, headers: response.headers };
 }
 
@@ -28,28 +29,52 @@ assert(article.status === 200 && article.text.includes("neoficiální"), "articl
 const bins = await get("/popelnice");
 assert(bins.status === 200 && bins.text.includes("Nejbližší svoz"), "bins missing");
 
+// Přihlášení kódem z e-mailu. Server musí běžet s LOGIN_CODE_ECHO=1 (npm run nahled), pak kód přijde v adrese.
+const CHIEF_EMAIL = "redakce@example.cz";
+
+async function askCode(email) {
+  const response = await fetch(base + "/redakce/prihlasit", {
+    method: "POST",
+    headers: { origin: base, "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ email, next: "/redakce/prehled" }),
+    redirect: "manual",
+  });
+  assert(response.status === 303, `code request ${response.status}`);
+  const code = (response.headers.get("location") ?? "").match(/kod=(\d{6})/)?.[1] ?? "";
+  return { code, challenge: (response.headers.get("set-cookie") ?? "").split(";")[0] };
+}
+
+async function signIn(email) {
+  const { code, challenge } = await askCode(email);
+  assert(code, `no code for ${email} (běží server s LOGIN_CODE_ECHO=1?)`);
+  const response = await fetch(base + "/redakce/overit", {
+    method: "POST",
+    headers: { origin: base, cookie: challenge, "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ kod: code, next: "/redakce/prehled" }),
+    redirect: "manual",
+  });
+  assert(response.status === 303, `verify ${email} ${response.status}`);
+  const cookie = response.headers.getSetCookie().find((part) => part.startsWith("drbna_editor=")) ?? "";
+  assert(cookie && !cookie.startsWith("drbna_editor=;"), `session cookie for ${email}`);
+  return cookie.split(";")[0];
+}
+
 const login = await get("/redakce/zpravy");
-assert(login.status === 200 && login.text.includes("Drbna2026"), "default password hint missing");
+assert(login.status === 200 && login.text.includes("Poslat kód"), "login form missing");
 
-const bad = await fetch(base + "/redakce/prihlasit", {
+const stranger = await askCode("nikdo@example.cz");
+assert(!stranger.code && stranger.challenge.includes("drbna_login="), "unknown e-mail got a code");
+const wrong = await fetch(base + "/redakce/overit", {
   method: "POST",
-  headers: { origin: base, "content-type": "application/x-www-form-urlencoded" },
-  body: "login=redakce&password=spatne",
+  headers: { origin: base, cookie: stranger.challenge, "content-type": "application/x-www-form-urlencoded" },
+  body: "kod=123456",
   redirect: "manual",
 });
-assert(bad.status === 303, `bad login ${bad.status}`);
+assert((wrong.headers.get("location") ?? "").includes("chyba"), "wrong code accepted");
 
-const good = await fetch(base + "/redakce/prihlasit", {
-  method: "POST",
-  headers: { origin: base, "content-type": "application/x-www-form-urlencoded" },
-  body: "login=redakce&password=Drbna2026",
-  redirect: "manual",
-});
-assert(good.status === 303, `login ${good.status}`);
-const cookie = good.headers.get("set-cookie") ?? "";
-assert(cookie.includes("drbna_editor="), "session cookie missing");
+const cookie = await signIn(CHIEF_EMAIL);
 
-const editor = await fetch(base + "/redakce/zpravy", { headers: { cookie: cookie.split(";")[0] } });
+const editor = await fetch(base + "/redakce/zpravy", { headers: { cookie } });
 const editorHtml = await editor.text();
 assert(editor.status === 200 && editorHtml.includes("Nová zpráva"), "editor not signed in");
 
@@ -64,7 +89,7 @@ const saved = await fetch(base + "/redakce/zpravy/ulozit", {
   method: "POST",
   headers: {
     origin: base,
-    cookie: cookie.split(";")[0],
+    cookie,
     "content-type": "application/x-www-form-urlencoded",
   },
   body,
@@ -90,7 +115,7 @@ form.set("published", "1");
 form.set("image", new File([png], "namesti.png", { type: "image/png" }));
 const uploaded = await fetch(base + "/redakce/zpravy/ulozit", {
   method: "POST",
-  headers: { origin: base, cookie: cookie.split(";")[0] },
+  headers: { origin: base, cookie },
   body: form,
   redirect: "manual",
 });
@@ -100,10 +125,6 @@ const match = withPhoto.text.match(/\/media\/clanky\/[^"]+\.png/);
 assert(match, "uploaded image url missing");
 const photo = await get(match[0]);
 assert(photo.status === 200 && photo.headers.get("content-type")?.includes("image/png"), "r2 image not served");
-
-function cookieOf(response) {
-  return (response.headers.get("set-cookie") ?? "").split(";")[0];
-}
 
 async function postForm(path, cookie, body) {
   return fetch(base + path, {
@@ -118,26 +139,17 @@ async function postForm(path, cookie, body) {
   });
 }
 
-async function signIn(login, password) {
-  const response = await postForm("/redakce/prihlasit", "", { login, password });
-  assert(response.status === 303, `login ${login} ${response.status}`);
-  const cookie = cookieOf(response);
-  assert(cookie.includes("drbna_editor="), `cookie for ${login}`);
-  return cookie;
-}
-
 const stamp = Date.now().toString(36);
-const contributorLogin = `jana${stamp}`.replace(/[^a-z0-9]/g, "").slice(0, 32);
+const contributorEmail = `jana.${stamp}@example.cz`;
 const draftTitle = `Trh ${stamp}`;
 const draftBody = "Sousede, v sobotu je u zamku trh.";
 const proposedBody = "Sousede, v sobotu je u zamku trh a kavarne ma otevreno.";
 const correctedBody = "Sousedé, v sobotu je u zámku trh. Kavárna má otevřeno.";
 
-const chief = cookie.split(";")[0];
+const chief = cookie;
 const created = await postForm("/redakce/lide/ulozit", chief, {
   name: "Jana Nováková",
-  login: contributorLogin,
-  password: "hesloheslo",
+  email: contributorEmail,
 });
 assert(
   created.status === 303 && (created.headers.get("location") ?? "").includes("ok=clovek"),
@@ -145,7 +157,7 @@ assert(
 );
 
 await postForm("/redakce/odhlasit", chief, {});
-const jana = await signIn(contributorLogin, "hesloheslo");
+const jana = await signIn(contributorEmail);
 const people = await fetch(base + "/redakce/lide", { headers: { cookie: jana }, redirect: "manual" });
 assert(people.status === 303 && (people.headers.get("location") ?? "").includes("chyba"), "contributor opened people");
 
@@ -184,7 +196,7 @@ const eventAttempt = await postForm("/redakce/akce/ulozit", jana, {
 assert((eventAttempt.headers.get("location") ?? "").includes("chyba"), "contributor saved an event");
 
 await postForm("/redakce/odhlasit", jana, {});
-const chiefAgain = await signIn("redakce", "Drbna2026");
+const chiefAgain = await signIn(CHIEF_EMAIL);
 const desk = await fetch(base + "/redakce/zpravy", { headers: { cookie: chiefAgain } });
 const deskHtml = await desk.text();
 const titlePattern = draftTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -211,7 +223,7 @@ assert(published.text.includes(draftBody), "approved text missing");
 assert(!published.text.includes("Redigováno"), "unchanged approval marked as redacted");
 
 await postForm("/redakce/odhlasit", chiefAgain, {});
-const janaAgain = await signIn(contributorLogin, "hesloheslo");
+const janaAgain = await signIn(contributorEmail);
 const deskForId = await fetch(base + "/redakce/zpravy", { headers: { cookie: janaAgain } });
 const idMatch = (await deskForId.text()).match(
   new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,1200}?/redakce/zpravy\\?clanek=(\\d+)`),
@@ -229,7 +241,7 @@ const duringReview = await get(`/zpravy/${slugMatch[1]}`);
 assert(duringReview.text.includes(draftBody) && !duringReview.text.includes(proposedBody), "edit went live before approval");
 
 await postForm("/redakce/odhlasit", janaAgain, {});
-const editorAgain = await signIn("redakce", "Drbna2026");
+const editorAgain = await signIn(CHIEF_EMAIL);
 const reviewDesk = await (await fetch(base + "/redakce/zpravy", { headers: { cookie: editorAgain } })).text();
 const reviewMatch = reviewDesk.match(new RegExp(`<h3>${titlePattern}</h3>[\\s\\S]{0,1200}?/redakce/zpravy\\?navrh=(\\d+)`));
 assert(reviewMatch, "edit proposal missing");

@@ -1,4 +1,3 @@
-import { byline } from "../db.js";
 import { COPY, text as tx, WELCOME_VERSION } from "../copy.js";
 import { formatLong, weekdayName } from "../format.js";
 import { esc } from "../view.js";
@@ -92,42 +91,4 @@ export function adminSite(ctx, data, message) {
       ${saveBar("Uložit")}
     </form>`;
   return adminShell(ctx, data, "svoz", message, body, { title: "Popelnice" });
-}
-
-function emailPart(data) {
-  const email = data.user?.email ?? "";
-  if (data.user?.role !== "hlavni") {
-    return data.access ? "" : callout(email ? `E-mail pro přihlášení přes Cloudflare Access: <b>${esc(email)}</b>. Mění ho hlavní redaktor.` : "E-mail pro přihlášení přes Cloudflare Access vám nastaví hlavní redaktor.");
-  }
-  const hint = data.access
-    ? "S ním se přihlašujete. Když ho změníte, příště pustí redakce jen nový e-mail a ten musí být i v pravidle Cloudflare Access."
-    : "S ním se přihlásíte, až se zapne Cloudflare Access. Vyplňte ho dřív, než se zapne.";
-  return field("E-mail", `<input class="${input}" type="email" name="email" maxlength="120" value="${esc(email)}"${data.access ? " required" : ""} autocapitalize="none" autocomplete="email">`, hint);
-}
-
-function passwordPanel() {
-  return `<form class="panel form" method="post" action="/redakce/heslo/ulozit">
-        <header class="panel-head"><h2>Heslo</h2></header>
-        ${field("Současné heslo", `<input class="${input}" type="password" name="current" autocomplete="current-password" required>`)}
-        ${field("Nové heslo", `<input class="${input}" type="password" name="next" autocomplete="new-password" minlength="8" required>`, "Aspoň 8 znaků.")}
-        <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Změnit heslo</button></div>
-      </form>`;
-}
-
-export function adminPassword(ctx, data, message) {
-  const shown = byline(data.user);
-  const who = data.access ? data.user?.email : data.user?.login;
-  const body = `${pageHead("Můj účet", `Přihlášen jako <b>${esc(who ?? "")}</b>.`)}
-    <div class="cards-2">
-      <form class="panel form" method="post" action="/redakce/jmeno/ulozit">
-        <header class="panel-head"><h2>Jméno a alias</h2></header>
-        ${callout(`Na webu se teď ukáže: <b>${esc(shown)}</b>. Alias je dobrovolný. Když ho používáte, na webu se u vašich zpráv ukáže on. Když alias smažete, znovu se ukáže jméno.`)}
-        ${field("Jméno pod článkem", `<input class="${input}" name="name" required maxlength="60" value="${esc(data.user?.name ?? "")}">`)}
-        ${field("Alias", `<input class="${input}" name="alias" maxlength="60" value="${esc(data.user?.alias ?? "")}" autocomplete="nickname">`)}
-        ${emailPart(data)}
-        <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
-      </form>
-      ${data.access ? "" : passwordPanel()}
-    </div>`;
-  return adminShell(ctx, data, "heslo", message, body, { title: "Můj účet" });
 }

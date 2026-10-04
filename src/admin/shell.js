@@ -1,9 +1,10 @@
-import { ACCESS_LOGOUT } from "../access.js";
 import { byline, userCan } from "../db.js";
 import { canSeeHours } from "../hours-requests-db.js";
 import { SCHOOL_LIST } from "../skola/sources.js";
-import { esc, FAVICON_TAGS, flashOf } from "../view.js";
-import { field, icon, input } from "./ui.js";
+import { esc, flashOf } from "../view.js";
+import { adminDocument } from "./document.js";
+import { loginPage } from "./login.js";
+import { icon } from "./ui.js";
 
 function nav(data) {
   const chief = data.user?.role === "hlavni";
@@ -53,7 +54,7 @@ function nav(data) {
     },
     {
       name: "Nastavení",
-      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["historie", "Historie změn", "clock"], ["heslo", "Můj účet", "user"]],
+      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["historie", "Historie změn", "clock"], ["ucet", "Můj účet", "user"]],
     },
   ];
   return groups
@@ -77,7 +78,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "texty", "lide", "historie", "heslo"];
+export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "texty", "lide", "historie", "ucet"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";
@@ -87,93 +88,15 @@ function toastHtml(flash) {
   </div>`;
 }
 
-function document({ title, body, rich = false, bodyClass = "adm" }) {
-  return `<!doctype html>
-<html lang="cs">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex">
-  <title>${esc(title)}</title>
-  ${FAVICON_TAGS}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/site.css">
-  ${rich ? `<link rel="stylesheet" href="/vendor/trix/trix.css">` : ""}
-  <link rel="stylesheet" href="/admin.css">
-  <link rel="stylesheet" href="/photo-pick.css">
-</head>
-<body class="${bodyClass}">
-${body}
-${rich ? `<script src="/vendor/trix/trix.umd.min.js" defer></script>` : ""}
-<script src="/editor.js" defer></script>
-<script src="/photo-pick.js" defer></script>
-<script src="/assist.js" defer></script>
-<script src="/admin.js" defer></script>
-</body>
-</html>`;
-}
-
-// S Cloudflare Access sem člověk dojde, jen když ho Access pustil, ale v redakci pro jeho e-mail
-// účet není (nebo je vypnutý). Bez tokenu sem nedojde vůbec, leda obejitím Accessu.
-function accessPage(data) {
-  const text = data.accessEmail
-    ? `Pro <b>${esc(data.accessEmail)}</b> tu účet není, nebo je vypnutý. Napište hlavnímu redaktorovi, ať vám ho založí nebo zapne.`
-    : "Do redakce se přihlašuje e-mailem přes Cloudflare Access. Otevřete ji na hlavní adrese webu, Access se vás zeptá na e-mail.";
-  return document({
-    title: "Redakce | Kopidlenská drbna",
-    bodyClass: "adm adm-login",
-    body: `<main class="login-box" id="obsah">
-      <a class="login-brand" href="/"><img src="/kozel-maskot.webp" alt=""><span>Kopidlenská <b>drbna</b></span></a>
-      <div class="login-card form">
-        <h1>Redakce</h1>
-        <div class="callout callout-warn">${text}</div>
-        ${data.accessEmail ? `<a class="btn btn-block" href="${ACCESS_LOGOUT}">Přihlásit jiným e-mailem</a>` : ""}
-      </div>
-      <a class="login-back" href="/">← Zpět na web</a>
-    </main>`,
-  });
-}
-
-function loginPage(data, flash) {
-  if (data.access) return accessPage(data);
-  return document({
-    title: "Redakce | Kopidlenská drbna",
-    bodyClass: "adm adm-login",
-    body: `<main class="login-box" id="obsah">
-      <a class="login-brand" href="/"><img src="/kozel-maskot.webp" alt=""><span>Kopidlenská <b>drbna</b></span></a>
-      <form class="login-card form" method="post" action="/redakce/prihlasit">
-        <h1>Redakce</h1>
-        <p class="adm-lede">Přihlášení pro hlavního redaktora a přispěvatele.</p>
-        ${
-          data.showDefaultPassword
-            ? `<div class="callout callout-warn">Výchozí přihlášení je jméno <b>redakce</b> a heslo <b>Drbna2026</b>. Po vstupu si ho změňte.</div>`
-            : ""
-        }
-        ${flash.text ? `<div class="callout callout-bad" role="alert">${esc(flash.text)}</div>` : ""}
-        ${field("Přihlašovací jméno", `<input class="${input}" name="login" autocomplete="username" autocapitalize="none" required autofocus>`)}
-        ${field("Heslo", `<input class="${input}" type="password" name="password" autocomplete="current-password" required>`)}
-        <button class="btn btn-primary btn-block" type="submit">Přihlásit</button>
-      </form>
-      <a class="login-back" href="/">← Zpět na web</a>
-    </main>`,
-  });
-}
-
 export function adminShell(ctx, data, tab, message, inner, options = {}) {
   const flash = flashOf(message);
-  if (!data.signedIn) return loginPage(data, flash);
+  if (!data.signedIn) return loginPage(ctx, data, flash);
   const chief = data.user?.role === "hlavni";
   const who = chief ? "hlavní redaktor" : "přispěvatel";
   const name = data.user?.name ?? "";
   const initial = (byline(data.user) || name || "R").trim().charAt(0).toUpperCase();
   const home = ctx.mainOrigin || "/";
-  const warn =
-    chief && data.showDefaultPassword
-      ? `<div class="callout callout-warn">Pořád platí výchozí heslo. <a href="/redakce/heslo">Nastavte si vlastní</a>.</div>`
-      : "";
-  return document({
+  return adminDocument({
     title: `${options.title ? `${options.title} · ` : ""}Redakce | Kopidlenská drbna`,
     rich: Boolean(options.rich),
     body: `<a class="skip" href="#obsah">Přeskočit na obsah</a>
@@ -195,7 +118,6 @@ export function adminShell(ctx, data, tab, message, inner, options = {}) {
     </div>
   </aside>
   <main class="adm-main" id="obsah">
-    ${warn}
     ${inner}
   </main>
 </div>

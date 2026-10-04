@@ -1,8 +1,7 @@
-// Účty redakce: přihlášení heslem, e-mail pro Cloudflare Access, přispěvatelé a jejich oprávnění.
+// Účty redakce: e-mail, se kterým se člověk přihlašuje kódem (src/login.js), přispěvatelé a jejich oprávnění.
 
-import { accessConfig } from "./access.js";
-import { addColumn, asBool, clip, mapAccount, normalizeLogin, readCookie, requireChief, requireUser } from "./db-core.js";
-import { hashPassword, verifyPassword } from "./password.js";
+import { addColumn, clip, mapAccount, requireChief, requireUser } from "./db-core.js";
+import { endUserSessions } from "./login-db.js";
 
 export const PERMISSIONS = [
   {
@@ -62,8 +61,6 @@ export const PERMISSIONS = [
   },
 ];
 
-const ACCESS_ON = "Přihlášení heslem je vypnuté, redakce se přihlašuje e-mailem přes Cloudflare Access.";
-
 export function knownPermissions(values) {
   const allowed = new Set(PERMISSIONS.map((item) => item.code));
   const list = Array.isArray(values) ? values : [];
@@ -98,54 +95,6 @@ export async function loadUsers(env) {
   return attachPermissions(env, (rows.results ?? []).map((row) => mapAccount(row)));
 }
 
-function token() {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export async function login(env, loginName, password) {
-  if (accessConfig(env)) return { ok: false, error: ACCESS_ON };
-  const name = normalizeLogin(loginName);
-  if (!name || !String(password ?? "")) return { ok: false, error: "Doplňte jméno a heslo." };
-  const row = await env.DB.prepare("select id, name, password_hash, active from users where login = ?").bind(name).first();
-  if (!row || !asBool(row.active) || !(await verifyPassword(password, row.password_hash))) {
-    return { ok: false, error: "Jméno nebo heslo nesedí." };
-  }
-  const next = token();
-  await env.DB.prepare("update users set session_token = ? where id = ?").bind(next, row.id).run();
-  return { ok: true, token: next, user: { id: Number(row.id), name: String(row.name) } };
-}
-
-export async function logout(env, request) {
-  const session = readCookie(request);
-  if (!session) return;
-  await env.DB.prepare("update users set session_token = null where session_token = ?").bind(session).run();
-}
-
-export async function changePassword(env, request, current, next) {
-  if (accessConfig(env)) return { ok: false, error: ACCESS_ON };
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  if (next.trim().length < 8) return { ok: false, error: "Nové heslo musí mít aspoň 8 znaků." };
-  const row = await env.DB.prepare("select password_hash, role from users where id = ?").bind(gate.user.id).first();
-  if (!row || !(await verifyPassword(current, row.password_hash))) {
-    return { ok: false, error: "Současné heslo nesedí." };
-  }
-  const hash = await hashPassword(next.trim());
-  const session = token();
-  await env.DB.prepare("update users set password_hash = ?, session_token = ? where id = ?")
-    .bind(hash, session, gate.user.id)
-    .run();
-  if (row.role === "hlavni") {
-    await env.DB.prepare(
-      "update settings set password_hash = ?, password_is_default = 0, session_token = null where id = 1",
-    )
-      .bind(hash)
-      .run();
-  }
-  return { ok: true, token: session };
-}
-
 function readAlias(value) {
   const alias = clip(value, 60);
   if (alias && alias.length < 2) {
@@ -154,10 +103,10 @@ function readAlias(value) {
   return { alias };
 }
 
-// E-mail, se kterým se člověk přihlásí přes Cloudflare Access. S Accessem je povinný, bez něj nepovinný.
-export function readEmail(value, required) {
+// E-mail, se kterým se člověk přihlašuje. Účet bez něj se nepřihlásí.
+export function readEmail(value) {
   const email = String(value ?? "").trim().toLowerCase();
-  if (!email) return required ? { error: "Doplňte e-mail, se kterým se bude přihlašovat." } : { email: null };
+  if (!email) return { error: "Doplňte e-mail, se kterým se bude přihlašovat." };
   if (email.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "Tohle nevypadá jako e-mail." };
   }
@@ -182,7 +131,7 @@ export async function saveProfile(env, request, input) {
   // Svůj e-mail si mění jen hlavní redaktor, přispěvatelům ho nastavuje on.
   let email = gate.user.email || null;
   if (gate.user.role === "hlavni") {
-    const read = readEmail(input.email, Boolean(accessConfig(env)));
+    const read = readEmail(input.email);
     if (read.error) return { ok: false, error: read.error };
     if (await emailTaken(env, read.email, gate.user.id)) return { ok: false, error: EMAIL_TAKEN };
     email = read.email;
@@ -222,27 +171,19 @@ async function loginFromEmail(env, email) {
 export async function createContributor(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
-  const access = Boolean(accessConfig(env));
   const name = clip(input.name, 60);
   const alias = readAlias(input.alias);
-  const email = readEmail(input.email, access);
+  const email = readEmail(input.email);
   if (name.length < 2) return { ok: false, error: "Doplňte jméno, jak má být pod článkem." };
   if (alias.error) return { ok: false, error: alias.error };
   if (email.error) return { ok: false, error: email.error };
-  // S Accessem se jménem a heslem nikdo nepřihlásí: jméno se vezme z e-mailu a heslo je náhodné, nikdo ho nezná.
-  const loginName = access ? await loginFromEmail(env, email.email) : normalizeLogin(input.login);
-  const password = access ? token() : String(input.password ?? "").trim();
-  if (!/^[a-z0-9]{3,32}$/.test(loginName)) {
-    return { ok: false, error: "Přihlašovací jméno může mít 3 až 32 znaků: malá písmena a číslice." };
-  }
-  if (password.length < 8) return { ok: false, error: "Heslo musí mít aspoň 8 znaků." };
-  const existing = await env.DB.prepare("select id from users where login = ?").bind(loginName).first();
-  if (existing) return { ok: false, error: "Tohle přihlašovací jméno už někdo má." };
   if (await emailTaken(env, email.email)) return { ok: false, error: EMAIL_TAKEN };
+  // Přihlašovací jméno se vezme z e-mailu: je jen vnitřní značka účtu, nikdo ho nezadává. Heslo se nepoužívá.
+  const loginName = await loginFromEmail(env, email.email);
   await env.DB.prepare(
-    "insert into users (login, name, alias, email, password_hash, role) values (?, ?, ?, ?, ?, 'prispevovatel')",
+    "insert into users (login, name, alias, email, password_hash, role) values (?, ?, ?, ?, '', 'prispevovatel')",
   )
-    .bind(loginName, name, alias.alias, email.email, await hashPassword(password))
+    .bind(loginName, name, alias.alias, email.email)
     .run();
   const created = await env.DB.prepare("select id from users where login = ?").bind(loginName).first();
   if (created) await writePermissions(env, created.id, knownPermissions(input.permissions));
@@ -257,7 +198,7 @@ export async function saveContributorAccess(env, request, input) {
   if (row.role === "hlavni") return { ok: false, error: "Hlavní redaktor má všechna oprávnění." };
   const alias = readAlias(input.alias);
   if (alias.error) return { ok: false, error: alias.error };
-  const email = readEmail(input.email, Boolean(accessConfig(env)));
+  const email = readEmail(input.email);
   if (email.error) return { ok: false, error: email.error };
   if (await emailTaken(env, email.email, row.id)) return { ok: false, error: EMAIL_TAKEN };
   await env.DB.prepare("update users set alias = ?, email = ? where id = ?").bind(alias.alias, email.email, row.id).run();
@@ -272,25 +213,8 @@ export async function setContributorActive(env, request, input) {
   if (!row) return { ok: false, error: "Ten účet už tu není." };
   if (row.role === "hlavni") return { ok: false, error: "Účet hlavního redaktora takhle nejde vypnout." };
   const active = input.active === "1" || input.active === 1 || input.active === true;
-  await env.DB.prepare(
-    "update users set active = ?, session_token = case when ? = 0 then null else session_token end where id = ?",
-  )
-    .bind(active ? 1 : 0, active ? 1 : 0, row.id)
-    .run();
+  await env.DB.prepare("update users set active = ? where id = ?").bind(active ? 1 : 0, row.id).run();
+  // Vypnutý účet se odhlásí ze všech zařízení.
+  if (!active) await endUserSessions(env, row.id);
   return { ok: true, active };
-}
-
-export async function setContributorPassword(env, request, input) {
-  if (accessConfig(env)) return { ok: false, error: ACCESS_ON };
-  const gate = await requireChief(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const password = String(input.next ?? "").trim();
-  if (password.length < 8) return { ok: false, error: "Heslo musí mít aspoň 8 znaků." };
-  const row = await env.DB.prepare("select id, role from users where id = ?").bind(input.id).first();
-  if (!row) return { ok: false, error: "Ten účet už tu není." };
-  if (row.role !== "prispevovatel") return { ok: false, error: "Heslo hlavního redaktora se mění v sekci Můj účet." };
-  await env.DB.prepare("update users set password_hash = ?, session_token = null where id = ?")
-    .bind(await hashPassword(password), row.id)
-    .run();
-  return { ok: true };
 }

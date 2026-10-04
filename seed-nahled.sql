@@ -1,5 +1,8 @@
 -- Ukázkové zprávy jen pro místní náhled a smoke test. Na produkci se nenahrávají.
 
+-- Hlavní redaktor se v náhledu přihlašuje e-mailem redakce@example.cz (kód je vidět na stránce, LOGIN_CODE_ECHO).
+update users set email = 'redakce@example.cz' where role = 'hlavni' and (email is null or email = '');
+
 insert into articles (slug, title, excerpt, body, category)
 select
   'vitejte',
