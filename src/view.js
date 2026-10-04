@@ -95,6 +95,7 @@ export function layout({
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(description)}">
+  <meta name="seznam-wmt" content="pJGT9IZUMjhOPot4mtesZ4d4GAY6J35X">
   ${noindex ? `<meta name="robots" content="noindex">` : ""}
   ${pageUrl && !noindex ? `<link rel="canonical" href="${esc(pageUrl)}">` : ""}
   <meta property="og:type" content="${esc(ogType)}">
