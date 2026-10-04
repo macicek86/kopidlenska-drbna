@@ -61,6 +61,14 @@ const outageAreas = {
   },
 };
 
+const placeOrder = {
+  label: "pořadí míst",
+  async read({ env }) {
+    const rows = (await env.DB.prepare("select name from places order by sort_order asc, id asc").all()).results ?? [];
+    return { "pořadí": rows.map((row) => row.name).join(", ") };
+  },
+};
+
 // Dvory, lékaři a otevírací doba: hlavní záznam, jeho změny a žádosti ke schválení.
 function hoursRoutes(base, parent, parentField, child) {
   const requests = fresh("hours_requests", "návrh ke schválení");
@@ -131,6 +139,7 @@ const ROUTES = {
   ...hoursRoutes("/redakce/dvory", "yards", "yardId", "yard_closures"),
   ...hoursRoutes("/redakce/lekari", "doctors", "doctorId", "doctor_changes"),
   ...hoursRoutes("/redakce/oteviraci-doba", "places", "placeId", "place_changes"),
+  "/redakce/oteviraci-doba/posunout": [placeOrder],
 
   "/redakce/odstavky/pridat": [fresh("outage_areas")],
   "/redakce/odstavky/ulozit": [outageAreas],

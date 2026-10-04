@@ -129,6 +129,9 @@ html { font-size: 100%; }
 .adm .btn:disabled, .adm .btn[aria-busy="true"] { opacity: 0.6; cursor: progress; }
 .adm .btn:focus-visible, .adm-link:focus-visible, .adm-side-link:focus-visible { outline: 2px solid var(--tape); outline-offset: 2px; }
 .inline-form { display: inline-flex; margin: 0; }
+.btn-move { padding-inline: 0.45rem; }
+.adm .btn-move:disabled { opacity: 0.35; cursor: default; }
+.item[id] { scroll-margin-top: 5rem; }
 
 /* --- Panely a seznamy -------------------------------------------------- */
 

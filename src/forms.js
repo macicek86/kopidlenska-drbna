@@ -181,5 +181,7 @@ export async function formFields(request) {
     topicId: positive("topicId"),
     hint: text("hint"),
     fallbackTopicId: text("fallbackTopicId"),
+    // Šipky pořadí v seznamu (otevírací doba): up nebo down.
+    direction: text("direction"),
   };
 }

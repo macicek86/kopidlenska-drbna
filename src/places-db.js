@@ -171,6 +171,21 @@ export async function removePlace(env, request, id) {
   return { ok: true };
 }
 
+// Posune místo o jedno nahoru (`up`) nebo dolů. Pořadí všech míst přečísluje po deseti, ať jde zase posouvat.
+export async function movePlace(env, request, id, direction) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const rows = await env.DB.prepare("select id from places order by sort_order asc, id asc").all();
+  const ids = (rows.results ?? []).map((row) => Number(row.id));
+  const from = ids.indexOf(Number(id));
+  if (from < 0) return { ok: false, error: "Tohle místo už tu není." };
+  const to = direction === "up" ? from - 1 : from + 1;
+  if (to < 0 || to >= ids.length) return { ok: true };
+  [ids[from], ids[to]] = [ids[to], ids[from]];
+  await env.DB.batch(ids.map((placeId, index) => env.DB.prepare("update places set sort_order = ? where id = ?").bind((index + 1) * 10, placeId)));
+  return { ok: true };
+}
+
 // Změnu zapíše redakce i Drběna. Stejnou změnu podruhé nezapíše a vrátí tu, co už je.
 export async function insertPlaceChange(env, { placeId, kind, startsOn, endsOn, note, week, sourceUrl = "", createdBy = null }) {
   const hours = JSON.stringify(week);

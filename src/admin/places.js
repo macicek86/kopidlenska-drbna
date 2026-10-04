@@ -17,6 +17,7 @@ import {
   field,
   formFoot,
   hidden,
+  icon,
   input,
   item,
   list,
@@ -45,7 +46,7 @@ function placeForm(editing) {
     ${doctorHoursFields(editing?.week ?? blankWeek(), "Otevírací doba")}
     ${offersField(editing?.offers ?? [])}
     <div class="pair">
-      ${field("Pořadí", `<input class="${input} control-short" type="number" name="sortOrder" min="0" max="999" required value="${editing?.sortOrder ?? 0}">`, "Menší číslo je na stránce výš.")}
+      ${field("Pořadí", `<input class="${input} control-short" type="number" name="sortOrder" min="0" max="999" required value="${editing?.sortOrder ?? 0}">`, "Menší číslo je na stránce výš. Rychleji to jde šipkami u míst.")}
       <div class="field"><span>Viditelnost</span>${check("published", "1", editing ? editing.published : true, "Zveřejnit na webu")}</div>
     </div>
     ${formFoot("Uložit", cancelLink(BASE))}
@@ -108,6 +109,15 @@ function newHoursForm(place, opts = {}) {
   </form>`;
 }
 
+// Šipky pro pořadí na webu (jen hlavní redaktor). Fungují i bez JS, po uložení se stránka vrátí k místu.
+function moveButtons(place, index, count) {
+  const button = (direction, label, disabled) =>
+    `<form class="inline-form" method="post" action="${BASE}/posunout">${hidden("id", place.id)}${hidden("direction", direction)}
+      <button class="btn btn-ghost btn-sm btn-move" type="submit" aria-label="${label}" title="${label}"${disabled ? " disabled" : ""}>${icon(direction)}</button>
+    </form>`;
+  return `${button("up", "Posunout výš", index === 0)}${button("down", "Posunout níž", index === count - 1)}`;
+}
+
 // Formulář návrhu v okně schválení.
 function requestForm(places) {
   return (request, opts) => {
@@ -156,12 +166,14 @@ export function adminPlaces(ctx, data, message, query = {}) {
     if (found) cancelling = { place, change: found };
   }
 
-  const rows = places.map((place) =>
+  const rows = places.map((place, index) =>
     item({
+      id: `misto-${place.id}`,
       title: place.name,
       meta: [place.label, place.place, place.phone].filter(Boolean).map(esc).join(" · "),
       badges: `${place.published ? "" : badge("Skryté", "off")}${place.offers?.length ? badge(`Co tu najdete: ${place.offers.length}`) : ""}${place.changes.length ? badge(`Změny: ${place.changes.length}`, "warn") : ""}${waitingBadge(SECTION, place, requests)}<span class="item-sub">${esc(placeSummary(place))}</span>`,
-      actions: `${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
+      actions: `${chief ? moveButtons(place, index, places.length) : ""}
+        ${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
         ${modalLink(`${BASE}?zmena=${place.id}`, "Dočasná změna")}
         ${modalLink(`${BASE}?nova-doba=${place.id}`, "Nová doba")}
         ${chief ? "" : modalLink(`${BASE}?nabidka=${place.id}`, "Co tu najdete")}
@@ -219,7 +231,7 @@ export function adminPlaces(ctx, data, message, query = {}) {
     );
   }
   const lede = chief
-    ? "Úřad, knihovna, KVC a další místa. Zavření a dočasné změny ze zpráv města zapisuje i Koza Drběna."
+    ? "Úřad, knihovna, KVC a další místa v pořadí, v jakém jsou na webu (šipkami ho změníte). Zavření a dočasné změny ze zpráv města zapisuje i Koza Drběna."
     : `Místa zakládá hlavní redaktor. Vy tu měníte otevírací dobu, dočasné změny a novou dobu.${mode.note}`;
   const body = `${pageHead("Otevírací doba", lede, chief ? openButton("nove-misto", `${BASE}?novy=1`, "Nové místo") : "")}
     ${requestsPanel(SECTION, data)}

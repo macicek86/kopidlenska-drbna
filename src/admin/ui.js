@@ -20,6 +20,8 @@ const ICONS = {
   external: '<path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 11 13"/><path d="M17 14v4.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1H10"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  up: '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  down: '<path d="M12 5v14M6 13l6 6 6-6"/>',
   search: '<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>',
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   inbox: '<path d="M3.5 13.5 6 5.5h12l2.5 8"/><path d="M3.5 13.5v5h17v-5h-5a3.5 3.5 0 0 1-7 0z"/>',
@@ -85,9 +87,9 @@ export function postButton(action, fields, label, kind = "btn-line") {
   return `<form class="inline-form" method="post" action="${action}">${inputs}<button class="btn btn-sm ${kind}" type="submit">${label}</button></form>`;
 }
 
-export function item({ title, meta = "", badges = "", actions = "", extra = "", search = "", tone = "" }) {
+export function item({ title, meta = "", badges = "", actions = "", extra = "", search = "", tone = "", id = "" }) {
   const text = search || `${title} ${meta}`;
-  return `<li class="item${tone ? ` item-${tone}` : ""}" data-search="${esc(String(text).toLowerCase())}">
+  return `<li class="item${tone ? ` item-${tone}` : ""}"${id ? ` id="${esc(id)}"` : ""} data-search="${esc(String(text).toLowerCase())}">
     <div class="item-main">
       <h3>${esc(title)}</h3>
       ${meta ? `<p class="item-meta">${meta}</p>` : ""}
