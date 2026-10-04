@@ -111,7 +111,10 @@ export function articlePage(article, ctx, extras = {}) {
     image: articleImage(base, article),
     published: article.createdOn,
     jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
-    script: article.imageKey ? `<script src="/article.js" defer></script>` : "",
+    script: [
+      article.imageKey ? `<script src="/article.js" defer></script>` : "",
+      article.attachments?.length ? `<script src="/attachments.js" defer></script>` : "",
+    ].join(""),
     body: `
       <div class="article-page">
         <div class="article-main">

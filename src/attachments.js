@@ -39,7 +39,7 @@ export function attachmentKeys(value) {
   return readAttachments(value).map((item) => item.key);
 }
 
-// Pod zprávou: náhledy, ťuknutím se obrázek otevře celý.
+// Pod zprávou: náhledy, ťuknutím se obrázek otevře v okně na stránce (public/attachments.js), bez JS sám.
 export function attachmentsSection(article) {
   const list = article.attachments ?? [];
   if (!list.length) return "";
