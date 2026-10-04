@@ -1,9 +1,9 @@
 import { byline } from "../db.js";
-import { COPY, text as tx } from "../copy.js";
+import { COPY, text as tx, WELCOME_VERSION } from "../copy.js";
 import { formatLong, weekdayName } from "../format.js";
 import { esc } from "../view.js";
 import { adminShell } from "./shell.js";
-import { callout, field, icon, input, pageHead } from "./ui.js";
+import { callout, check, field, icon, input, pageHead } from "./ui.js";
 
 function saveBar(label) {
   return `<div class="save-bar"><span class="save-bar-note" data-dirty-note>Máte neuložené změny.</span><button class="btn btn-primary" type="submit">${label}</button></div>`;
@@ -16,6 +16,14 @@ function textField(label, value, control, long = false, hint = "") {
 function contactField(value) {
   const label = "Kontakt na redakci";
   return textField(label, value, `<textarea class="${input}" name="contactNote" rows="3" maxlength="600" required>${esc(value)}</textarea>`, true);
+}
+
+function welcomeAgainField(copy) {
+  const version = Number(copy?.[WELCOME_VERSION]);
+  const day = version > 1 ? formatLong(new Date(version).toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" })) : "";
+  const last = day ? ` Naposledy znovu ukázáno: ${day.charAt(0).toLowerCase()}${day.slice(1)}.` : "";
+  const hint = `Po uložení se okno ukáže při příští návštěvě i těm, kdo ho už zavřeli. Hodí se, když v něm oznamujete novinku. Kvůli opravě překlepu nezaškrtávejte.${last}`;
+  return `<div class="text-field text-field-long" data-search="ukázat okno znovu všem">${check("welcome_again", "1", false, "Ukázat okno znovu všem", esc(hint))}</div>`;
 }
 
 export function adminTexts(ctx, data, message) {
@@ -36,7 +44,7 @@ export function adminTexts(ctx, data, message) {
           return textField(row.label, value, control, row.long, row.hint);
         })
         .join("");
-      const extra = group.name === "O nás" ? contactField(data.contactNote) : "";
+      const extra = group.name === "O nás" ? contactField(data.contactNote) : group.name === "Uvítací okno" ? welcomeAgainField(ctx.copy) : "";
       return `<details class="text-group"${index === 0 ? " open" : ""}>
         <summary><span>${esc(group.name)}</span><small>${group.items.length + (extra ? 1 : 0)}</small></summary>
         <div class="text-group-body">${extra}${fields}</div>

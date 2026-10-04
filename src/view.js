@@ -7,6 +7,7 @@ import { focusClass } from "./photo.js";
 import { addDays, civilWeekday } from "./waste.js";
 import { coversDay, homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
+import { welcomeTemplate } from "./welcome.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
 export const FAVICON_TAGS = `<link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -81,6 +82,7 @@ export function layout({
   ).join("");
   // Na mobilu jsou služby na konci pod nadpisem, ať k nim nepatří Reklamy a O nás.
   const mobileLinks = `${NAV.filter((entry) => entry !== PRACTICAL).map(link).join("")}<p class="nav-head">${practical}</p>${PRACTICAL.map(link).join("")}`;
+  const welcome = welcomeTemplate(copy, Boolean(chat));
   const headerNav = `<nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
        <details class="mobile-nav">
          <summary>${esc(tx(copy, "menu_label"))}</summary>
@@ -146,6 +148,7 @@ export function layout({
   </div>
   ${script}
   <script src="/nav.js" defer></script>
+  ${welcome ? `${welcome}<script src="/welcome.js" defer></script>` : ""}
   ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>
 </html>`;

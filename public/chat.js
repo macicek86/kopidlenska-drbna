@@ -369,7 +369,8 @@ function setup() {
   }
 
   function offerHint() {
-    if (!matchMedia(MOBILE).matches || state.messages.length) return;
+    // Při první návštěvě má přednost uvítací okno (public/welcome.js), bublina počká na další stránku.
+    if (!matchMedia(MOBILE).matches || state.messages.length || document.documentElement.dataset.welcome) return;
     try {
       if (sessionStorage.getItem(HINT)) return;
       sessionStorage.setItem(HINT, "1");

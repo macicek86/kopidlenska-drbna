@@ -127,6 +127,7 @@ const OK = {
   ...EVENTS_OK,
   web: "Svoz a kontakt jsou uložené.",
   texty: "Texty jsou uložené.",
+  uvitani: "Texty jsou uložené. Uvítací okno se ukáže znovu všem, i těm, kdo ho už viděli.",
   heslo: "Heslo je změněné.",
   jmeno: "Údaje jsou uložené.",
   dvur: "Sběrný dvůr je uložený.",
@@ -403,7 +404,7 @@ async function renderPost(request, env, url, execution) {
   if (path === "/redakce/texty/ulozit") {
     const result = await saveCopy(env, request);
     if (!result.ok) return redirect(`/redakce/texty?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/texty?ok=texty");
+    return redirect(`/redakce/texty?ok=${result.welcomeAgain ? "uvitani" : "texty"}`);
   }
 
   const fields = await formFields(request);

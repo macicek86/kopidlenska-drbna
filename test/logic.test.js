@@ -448,8 +448,8 @@ test("reklama se vloží do zpráv a v redakci má náhled", () => {
   const home = homePage({ ...bare, ads: [ad] }, ctx);
   assert.match(home, /class="ad-panel has-photo"/);
   assert.match(home, /Reklama/);
-  // JSON-LD je jen data (CSP ho nehlídá), jiný skript než vlastní menu na titulce být nemá.
-  assert.doesNotMatch(home, /<script(?! type="application\/ld\+json")(?! src="\/nav\.js")/);
+  // JSON-LD je jen data (CSP ho nehlídá), jiný skript než vlastní menu a uvítací okno na titulce být nemá.
+  assert.doesNotMatch(home, /<script(?! type="application\/ld\+json")(?! src="\/nav\.js")(?! src="\/welcome\.js")/);
   const pinned = homePage(
     { ...bare, ads: [ad, { ...ad, id: 2, slug: "kolo", title: "Seřízení kola" }], ad },
     ctx,

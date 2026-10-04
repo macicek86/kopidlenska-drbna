@@ -181,7 +181,20 @@ export const COPY = [
   { group: "Facebook", key: "article_facebook", label: "Věta pod zprávou", value: "Chcete to probrat se sousedy?", max: 120 },
   { group: "Facebook", key: "article_facebook_link", label: "Odkaz pod zprávou", value: "Pokecejte ve skupině na Facebooku", max: 80 },
   { group: "O nás", key: "about_alt", label: "Popis maskota na stránce O nás", value: "Koza Drběna, maskot Kopidlenské drbny", max: 160 },
+  { group: "Uvítací okno", key: "welcome_heading", label: "Nadpis", value: "Mééé, vítejte na drbně!", max: 80 },
+  { group: "Uvítací okno", key: "welcome_body", label: "Co web umí", value: "Drběna je koza, která ví, co se v Kopidlně šustne. A aby nikdo nemusel celý den stát u plotu, sepisuje to všechno sem.\n\n- zprávy z Kopidlna a jeho částí: z města, ze školy, od fotbalistů i od sousedů\n- akce v kalendáři, ať žádná zábava neuteče\n- kdy jedou popelnice a kdy mají otevřeno sběrné dvory\n- ordinační hodiny lékařů a otevírací doba úřadu, knihovny a dalších míst\n- odstávky vody a elektřiny a uzavírky silnic", max: 1500, long: true, rows: 10, hint: "Ukáže se jednou, při první návštěvě webu. Prázdný řádek začne nový odstavec, řádky začínající pomlčkou jsou výčet. Když sem napíšete jen pomlčku -, okno se neukáže vůbec." },
+  { group: "Uvítací okno", key: "welcome_chat", label: "Věta o chatu", value: "Na cokoli se můžete zeptat přímo Drběny. Sedí vpravo dole a přežvykuje, dokud se nezeptáte.", max: 240, long: true, hint: "Jen když je chat s Drběnou zapnutý." },
+  { group: "Uvítací okno", key: "welcome_team", label: "Výzva k zapojení", value: "Čím víc sousedů, tím víc drbů. Píšete rádi, fotíte, nebo víte, co se kde chystá? Přidejte se do týmu Drbny!", max: 300, long: true },
+  { group: "Uvítací okno", key: "welcome_team_link", label: "Odkaz na O nás", value: "Kontakt najdete v O nás", max: 80 },
+  { group: "Uvítací okno", key: "welcome_beta", label: "Zkušební provoz", value: "Drbna je zatím ve zkušebním provozu. Když Drběna něco poplete nebo vám něco nepůjde, dejte jí vědět, ráda si to přežvýká a opraví.", max: 300, long: true },
+  { group: "Uvítací okno", key: "welcome_ok", label: "Tlačítko zavřít", value: "Rozumím", max: 40 },
+  { group: "Uvítací okno", key: "welcome_ask", label: "Tlačítko chatu", value: "Zeptat se Drběny", max: 40 },
+  { group: "Uvítací okno", key: "welcome_alt", label: "Popis obrázku", value: "Koza Drběna mává na pozdrav", max: 160 },
 ];
+
+// Verze uvítacího okna: když ji redakce zvedne („Ukázat okno znovu všem“), okno se ukáže i těm, kdo ho už viděli.
+// Ukládá se v tabulce copy, ale není to text, takže není v COPY. Výchozí "1" mají prohlížeče z první verze okna.
+export const WELCOME_VERSION = "welcome_version";
 
 const BY_KEY = new Map(COPY.map((item) => [item.key, item]));
 

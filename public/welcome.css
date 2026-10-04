@@ -1,0 +1,159 @@
+/* Uvítací okno s Drběnou (src/welcome.js, public/welcome.js). */
+.welcome {
+  width: min(100% - 2rem, 50rem);
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: 0 28px 80px rgb(74 36 27 / 0.28);
+  overflow: hidden;
+}
+
+.welcome:focus { outline: none; }
+
+.welcome[open] { animation: welcome-in 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+
+.welcome::backdrop {
+  background: rgb(74 36 27 / 0.45);
+  backdrop-filter: blur(3px);
+  animation: welcome-fade 0.3s ease-out;
+}
+
+@keyframes welcome-in {
+  from { opacity: 0; transform: translateY(1.5rem) scale(0.96); }
+}
+
+@keyframes welcome-fade {
+  from { opacity: 0; }
+}
+
+@keyframes welcome-wave {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-4deg); }
+  60% { transform: rotate(3deg); }
+}
+
+.welcome-box {
+  position: relative;
+  display: grid;
+  grid-template-columns: 15rem 1fr;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.welcome-side {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 2rem 1rem 1.5rem 1.5rem;
+  background:
+    radial-gradient(circle at 50% 55%, rgb(244 215 162 / 0.8), transparent 70%),
+    var(--paper-deep);
+}
+
+.welcome-side img {
+  width: 100%;
+  height: auto;
+  max-height: 26rem;
+  object-fit: contain;
+  transform-origin: 50% 90%;
+  animation: welcome-wave 1.2s ease-in-out 0.5s 2;
+}
+
+.welcome-text { padding: 2rem 2.25rem 1.75rem 2rem; }
+
+.welcome h2 {
+  margin: 0 2rem 0.75rem 0;
+  font-family: var(--display);
+  font-size: 1.85rem;
+  line-height: 1.1;
+  color: var(--brand-dark);
+}
+
+.welcome p, .welcome ul { margin: 0 0 0.8rem; line-height: 1.5; }
+
+.welcome ul { padding: 0; list-style: none; }
+
+.welcome li {
+  position: relative;
+  padding-left: 1.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.welcome li::before {
+  content: "";
+  position: absolute;
+  left: 0.3rem;
+  top: 0.6em;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.welcome-team a { color: var(--brand-dark); font-weight: 700; }
+
+.welcome-beta {
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.9rem;
+  background: var(--tape);
+  color: var(--tape-ink);
+  font-size: 0.92rem;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}
+
+.welcome-x {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.welcome-x:hover { background: var(--paper-deep); }
+
+/* Mobil: Drběna nahoře, text pod ní, tlačítka přes celou šířku. */
+@media (max-width: 640px) {
+  .welcome-box { grid-template-columns: 1fr; }
+
+  .welcome-side { padding: 1rem 0 0; }
+
+  .welcome-side img { width: auto; height: 8.5rem; }
+
+  .welcome-text { padding: 1.1rem 1.25rem 0; }
+
+  .welcome h2 { margin-right: 0; font-size: 1.45rem; }
+
+  .welcome p, .welcome ul { font-size: 0.95rem; line-height: 1.45; }
+
+  /* Tlačítka zůstanou vidět dole, i když se text musí posunout. */
+  .welcome-actions {
+    position: sticky;
+    bottom: 0;
+    margin: 0 -1.25rem;
+    padding: 0.75rem 1.25rem 1rem;
+    background: var(--card);
+    box-shadow: 0 -10px 16px -12px rgb(74 36 27 / 0.25);
+  }
+
+  .welcome-actions .btn { flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome[open], .welcome::backdrop, .welcome-side img { animation: none; }
+}

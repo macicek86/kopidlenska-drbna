@@ -1,5 +1,5 @@
 import { loadAdProposals, loadAds } from "./ads-db.js";
-import { COPY } from "./copy.js";
+import { COPY, WELCOME_VERSION } from "./copy.js";
 import { attachmentKeys, keptAttachments, readAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
 import { formImage, loadStock } from "./stock-db.js";
@@ -617,6 +617,7 @@ export async function removeRubric(env, request, id) {
 
 export async function loadCopy(env) {
   const copy = Object.fromEntries(COPY.map((item) => [item.key, item.value]));
+  copy[WELCOME_VERSION] = "1";
   try {
     const rows = (await env.DB.prepare("select key, value from copy").all()).results ?? [];
     for (const row of rows) {
@@ -647,10 +648,17 @@ export async function saveCopy(env, request) {
       ).bind(item.key, value),
     );
   }
+  if (form.get("welcome_again")) {
+    statements.push(
+      env.DB.prepare(
+        "insert into copy (key, value) values (?, ?) on conflict(key) do update set value = excluded.value",
+      ).bind(WELCOME_VERSION, String(Date.now())),
+    );
+  }
   try {
     await env.DB.batch(statements);
   } catch {
     return { ok: false, error: "Texty se neuložily. Spusťte znovu npm run nasadit, ať se v databázi doplní tabulka textů." };
   }
-  return { ok: true };
+  return { ok: true, welcomeAgain: Boolean(form.get("welcome_again")) };
 }
