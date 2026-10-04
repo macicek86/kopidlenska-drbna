@@ -22,8 +22,9 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureAssistTables } from "./assist/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
+import { ensureRequestTables } from "./hours-requests-db.js";
 
-export const SCHEMA_VERSION = 19;
+export const SCHEMA_VERSION = 20;
 
 let schemaReady = false;
 
@@ -420,6 +421,7 @@ async function migrateSchema(env) {
   await ensureAssistTables(env);
   await ensureMessageTables(env);
   await ensureNdicTables(env);
+  await ensureRequestTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();

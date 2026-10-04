@@ -33,6 +33,7 @@ import { loadSkolaItems, loadSkolaSettings } from "./skola/store.js";
 import { loadDrbena } from "./drbena-db.js";
 import { attachArticle, forgetArticle, loadEvents } from "./events-db.js";
 import { countNewMessages } from "./messages-db.js";
+import { canSeeHours, loadRequests } from "./hours-requests-db.js";
 import { loadUsers } from "./users-db.js";
 import { accessConfig } from "./access.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
@@ -378,6 +379,7 @@ export async function loadAdmin(env, request) {
     rubrics: [],
     stock: { topics: [], fallbackTopicId: null },
     newMessages: 0,
+    hoursRequests: {},
   };
   if (!user) return base;
   // Všechno najednou; co uživatel nesmí vidět, se nenačítá.
@@ -387,26 +389,27 @@ export async function loadAdmin(env, request) {
   const articleSql = chief
     ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
     : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where ${liveArticle()} order by a.created_at desc, a.id desc`;
-  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, botProposals, desk, stock, newMessages] = await Promise.all([
+  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, botProposals, desk, stock, newMessages, hoursRequests] = await Promise.all([
     loadRubrics(env),
     loadAds(env),
     chief ? loadAdProposals(env, "where p.status = 'pending' order by p.id asc") : loadAdProposals(env, ...mine),
     env.DB.prepare(articleSql).all(),
-    when(chief || userCan(user, "sberny_dvur"), () => loadYards(env, { publicOnly: !chief }), base.yards),
+    when(canSeeHours(user, "dvory"), () => loadYards(env, { publicOnly: !chief }), base.yards),
     when(
-      chief || userCan(user, "doktori"),
+      canSeeHours(user, "lekari"),
       () => loadDoctors(env, { publicOnly: !chief, today: pragueNow().date }),
       base.doctors,
     ),
-    when(chief || userCan(user, "oteviraci_doba"), () => loadPlaces(env, { publicOnly: !chief }), base.places),
+    when(canSeeHours(user, "oteviraci-doba"), () => loadPlaces(env, { publicOnly: !chief }), base.places),
     chief ? loadProposals(env, "where p.status = 'pending' order by p.id asc") : loadProposals(env, ...mine),
     // Hlavní redaktor má návrhy od Drběny mezi ostatními v `proposals`.
     when(!chief && userCan(user, "drbena_navrhy"), () => loadProposals(env, "where p.status = 'pending' and u.login = ? order by p.id asc", BOT_LOGIN), base.botProposals),
     when(chief, () => loadChiefDesk(env), null),
     loadStock(env),
     when(userCan(user, "vzkazy"), () => countNewMessages(env), 0),
+    loadRequests(env, user),
   ]);
-  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, botProposals, stock, newMessages });
+  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, botProposals, stock, newMessages, hoursRequests });
   if (desk) Object.assign(base, desk, { hasApiKey: Boolean(env.ANTHROPIC_API_KEY) });
   return base;
 }

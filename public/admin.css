@@ -123,6 +123,8 @@ html { font-size: 100%; }
 .adm .btn-danger { background: var(--bad-ink); color: #fff; border: 0; }
 .adm .btn-danger:hover { background: #7f2830; }
 .adm .btn-danger-text { color: var(--bad-ink); }
+/* Okno návrhu ke schválení: schválení nahoře, zamítnutí pod čarou. */
+.adm .form-split { border: 0; border-top: 1px solid var(--line); margin: 18px 0 14px; }
 .adm .btn-danger-text:hover { background: var(--bad-bg); }
 .adm .btn:disabled, .adm .btn[aria-busy="true"] { opacity: 0.6; cursor: progress; }
 .adm .btn:focus-visible, .adm-link:focus-visible, .adm-side-link:focus-visible { outline: 2px solid var(--tape); outline-offset: 2px; }

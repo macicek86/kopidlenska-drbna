@@ -1,5 +1,6 @@
 import { ACCESS_LOGOUT } from "../access.js";
 import { byline, userCan } from "../db.js";
+import { canSeeHours } from "../hours-requests-db.js";
 import { SCHOOL_LIST } from "../skola/sources.js";
 import { esc, FAVICON_TAGS, flashOf } from "../view.js";
 import { field, icon, input } from "./ui.js";
@@ -14,6 +15,8 @@ function nav(data) {
   const footballFailed = (data.footballItems ?? []).filter((item) => item.status === "chyba").length;
   const denikFailed = (data.denikItems ?? []).filter((item) => item.status === "chyba").length;
   const schoolFailed = (tag) => (data.schools?.[tag]?.items ?? []).filter((item) => item.status === "chyba").length;
+  // Hlavnímu redaktorovi návrhy ke schválení, žadateli zamítnuté.
+  const hoursWaiting = (section) => (data.hoursRequests?.[section] ?? []).filter((item) => chief || item.status === "rejected").length;
   const noticesWaiting = (data.notices ?? []).filter((item) => !item.published && item.sourceUrl).length;
   const groups = [
     {
@@ -42,9 +45,9 @@ function nav(data) {
       name: "Služby",
       links: [
         chief && ["svoz", "Popelnice", "bin"],
-        (chief || userCan(data.user, "sberny_dvur")) && ["dvory", "Sběrné dvory", "recycle"],
-        (chief || userCan(data.user, "doktori")) && ["lekari", "Lékaři", "cross"],
-        (chief || userCan(data.user, "oteviraci_doba")) && ["oteviraci-doba", "Otevírací doba", "clock"],
+        canSeeHours(data.user, "dvory") && ["dvory", "Sběrné dvory", "recycle", hoursWaiting("dvory")],
+        canSeeHours(data.user, "lekari") && ["lekari", "Lékaři", "cross", hoursWaiting("lekari")],
+        canSeeHours(data.user, "oteviraci-doba") && ["oteviraci-doba", "Otevírací doba", "clock", hoursWaiting("oteviraci-doba")],
         chief && ["odstavky", "Odstávky", "bolt", noticesWaiting],
       ],
     },

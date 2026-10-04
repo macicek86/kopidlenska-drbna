@@ -1,12 +1,13 @@
 // Otevírací doba v D1: místa, jejich běžný týden a změny (dočasné i nová otevírací doba).
 // Nová otevírací doba (`trvala`) se v den, kdy začne platit, propíše do běžných hodin místa (`settleNewHours`).
 import { changeSpan, normalizeWeek, parseHours } from "./doctors.js";
-import { asBool, clip, requireChief, requireUser, userCan } from "./db-core.js";
+import { asBool, clip, requireChief } from "./db-core.js";
+import { submitHours } from "./hours-requests-db.js";
 import { NEW_HOURS_DAYS, PLACE_SEEDS } from "./places.js";
 import { addDays, pragueNow } from "./waste.js";
 
 export const PLACE_KINDS = { docasna: "Dočasná změna", trvala: "Nová otevírací doba" };
-const PERMISSION = "oteviraci_doba";
+const SECTION = "oteviraci-doba";
 
 const TABLES = [
   `create table if not exists places (
@@ -111,15 +112,6 @@ export async function loadPlaces(env, { publicOnly = false, today = pragueNow().
   return places;
 }
 
-async function requireHours(env, request) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return gate;
-  if (!userCan(gate.user, PERMISSION)) {
-    return { ok: false, error: "Otevírací dobu mění hlavní redaktor, nebo člověk s oprávněním Otevírací doba." };
-  }
-  return gate;
-}
-
 function readPlace(input) {
   const name = clip(input.name, 120);
   const label = clip(input.label, 120);
@@ -161,18 +153,6 @@ export async function removePlace(env, request, id) {
   return { ok: true };
 }
 
-// Oprava běžných hodin bez upozornění na titulce.
-export async function savePlaceHours(env, request, input) {
-  const gate = await requireHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const place = await env.DB.prepare("select id from places where id = ?").bind(input.placeId).first();
-  if (!place) return { ok: false, error: "Tohle místo už tu není." };
-  const normalized = normalizeWeek(input.doctorWeek);
-  if (normalized.error) return { ok: false, error: normalized.error };
-  await env.DB.prepare("update places set hours = ? where id = ?").bind(JSON.stringify(normalized.week), place.id).run();
-  return { ok: true };
-}
-
 // Změnu zapíše redakce i Drběna. Stejnou změnu podruhé nezapíše a vrátí tu, co už je.
 export async function insertPlaceChange(env, { placeId, kind, startsOn, endsOn, note, week, sourceUrl = "", createdBy = null }) {
   const hours = JSON.stringify(week);
@@ -191,28 +171,65 @@ export async function insertPlaceChange(env, { placeId, kind, startsOn, endsOn, 
   return Number(result.meta.last_row_id);
 }
 
-export async function savePlaceChange(env, request, input) {
-  const gate = await requireHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const place = await env.DB.prepare("select id from places where id = ?").bind(input.placeId).first();
-  if (!place) return { ok: false, error: "Tohle místo už tu není." };
-  const kind = input.kind === "trvala" ? "trvala" : "docasna";
-  const span = changeSpan(input.startsOn, kind === "trvala" ? "" : input.endsOn);
-  if (span.error) return { ok: false, error: span.error };
-  const note = clip(input.changeNote, 400);
-  if (kind === "docasna" && note.length < 3) return { ok: false, error: "Napište poznámku k dočasné změně." };
-  const normalized = normalizeWeek(input.doctorWeek);
-  if (normalized.error) return { ok: false, error: normalized.error };
-  await insertPlaceChange(env, { placeId: place.id, kind, startsOn: span.startsOn, endsOn: span.endsOn, note, week: normalized.week, createdBy: gate.user.id });
-  return { ok: true, kind };
+async function placeExists(env, id) {
+  return Boolean(await env.DB.prepare("select id from places where id = ?").bind(id).first());
 }
 
-export async function removePlaceChange(env, request, id) {
-  const gate = await requireHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from place_changes where id = ?").bind(id).run();
-  return { ok: true };
+function readPlaceHours(input) {
+  const normalized = normalizeWeek(input.doctorWeek);
+  return normalized.error ? normalized : { week: normalized.week };
 }
+
+function readPlaceChange(input) {
+  const kind = input.kind === "trvala" ? "trvala" : "docasna";
+  const span = changeSpan(input.startsOn, kind === "trvala" ? "" : input.endsOn);
+  if (span.error) return span;
+  const note = clip(input.changeNote, 400);
+  if (kind === "docasna" && note.length < 3) return { error: "Napište poznámku k dočasné změně." };
+  const normalized = normalizeWeek(input.doctorWeek);
+  if (normalized.error) return normalized;
+  return { kind, startsOn: span.startsOn, endsOn: span.endsOn, note, week: normalized.week };
+}
+
+// Co jde u místa změnit rovnou nebo poslat ke schválení (src/hours-requests-db.js).
+export const PLACE_ACTIONS = {
+  // Oprava běžných hodin bez upozornění na titulce.
+  hodiny: {
+    read: readPlaceHours,
+    target: placeExists,
+    missing: "Tohle místo už tu není.",
+    apply: async (env, placeId, value) => {
+      await env.DB.prepare("update places set hours = ? where id = ?").bind(JSON.stringify(value.week), placeId).run();
+      return { ok: true };
+    },
+  },
+  zmena: {
+    read: readPlaceChange,
+    target: placeExists,
+    missing: "Tohle místo už tu není.",
+    apply: async (env, placeId, value, userId) => {
+      await insertPlaceChange(env, { placeId, ...value, createdBy: userId });
+      return { ok: true };
+    },
+  },
+  zrusit: {
+    fields: false,
+    read: () => ({}),
+    target: async (env, id) => Boolean(await env.DB.prepare("select id from place_changes where id = ?").bind(id).first()),
+    missing: "Tahle změna už tu není.",
+    apply: async (env, changeId) => {
+      await env.DB.prepare("delete from place_changes where id = ?").bind(changeId).run();
+      return { ok: true };
+    },
+  },
+};
+
+const submit = (env, request, action, targetId, input = {}) =>
+  submitHours(env, request, { section: SECTION, actions: PLACE_ACTIONS, action, targetId, input });
+
+export const savePlaceHours = (env, request, input) => submit(env, request, "hodiny", input.placeId, input);
+export const savePlaceChange = (env, request, input) => submit(env, request, "zmena", input.placeId, input);
+export const removePlaceChange = (env, request, id) => submit(env, request, "zrusit", id);
 
 // Místo podle názvu (bez ohledu na velikost písmen), nebo nové. Pro Drběnu, když zpráva mluví o místě, které drbna nezná.
 export async function placeByName(env, name, label = "") {

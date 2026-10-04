@@ -1,6 +1,7 @@
-import { userCan } from "../db.js";
+import { hoursMode, REQUEST_SECTIONS } from "../hours-requests-db.js";
 import { formatLong } from "../format.js";
 import { credit, esc } from "../view.js";
+import { requestItems } from "./hours-requests.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, icon, item, list, modalLink, pageHead, panel } from "./ui.js";
 
@@ -39,6 +40,7 @@ export function adminOverview(ctx, data, message) {
         stat("/redakce/zpravy", "news", (data.articles ?? []).filter((row) => row.authorId === data.user?.id).length, "mých zpráv na webu"),
       ];
 
+  const hoursItems = Object.keys(REQUEST_SECTIONS).flatMap((section) => requestItems(section, data, chief));
   const queueItems = chief
     ? [
         ...pending.map((row) =>
@@ -57,6 +59,7 @@ export function adminOverview(ctx, data, message) {
             actions: modalLink(`/redakce/reklamy?navrh=${row.id}`, "Posoudit", "btn-primary"),
           }),
         ),
+        ...hoursItems,
       ]
     : [
         ...(data.botProposals ?? []).map((row) =>
@@ -83,6 +86,7 @@ export function adminOverview(ctx, data, message) {
             actions: modalLink(`/redakce/reklamy?navrh=${row.id}`, "Otevřít"),
           }),
         ),
+        ...hoursItems,
       ];
 
   const soon = [
@@ -101,7 +105,7 @@ export function adminOverview(ctx, data, message) {
     quick("/redakce/zpravy?novy=1", chief ? "Nová zpráva" : "Nový příspěvek"),
     chief ? quick("/redakce/akce?novy=1", "Nová akce") : "",
     quick("/redakce/reklamy?novy=1", "Nová nabídka"),
-    userCan(data.user, "sberny_dvur") || chief ? `<a class="btn btn-line" href="/redakce/dvory">${icon("recycle")}<span>Uzavření dvora</span></a>` : "",
+    hoursMode(data.user, "dvory") ? `<a class="btn btn-line" href="/redakce/dvory">${icon("recycle")}<span>Uzavření dvora</span></a>` : "",
   ].join("");
 
   const fresh = data.newMessages ?? 0;

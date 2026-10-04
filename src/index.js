@@ -10,18 +10,9 @@ import {
   loadPublic,
   login,
   logout,
-  removeClosure,
-  removeDoctor,
-  removeDoctorChange,
-  removeYard,
-  saveClosure,
   saveCopy,
-  saveDoctor,
-  saveDoctorChange,
-  saveDoctorHours,
   saveProfile,
   saveSite,
-  saveYard,
   loadOutageBoard,
   refreshOutages,
   removeRubric,
@@ -88,6 +79,10 @@ import { robotsTxt, sitemapXml } from "./seo.js";
 import { loadSitemap } from "./seo-db.js";
 import { OUTAGE_OK, outagePost } from "./post-outages.js";
 import { PLACES_OK, placesPost } from "./post-places.js";
+import { YARDS_OK, yardsPost } from "./post-yards.js";
+import { DOCTORS_OK, doctorsPost } from "./post-doctors.js";
+import { REQUESTS_OK } from "./post-requests.js";
+import { canSeeHours } from "./hours-requests-db.js";
 import { STOCK_OK, stockPost } from "./post-stock.js";
 import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
 import { DRBENA_OK, drbenaPost } from "./post-drbena.js";
@@ -133,17 +128,6 @@ const OK = {
   uvitani: "Texty jsou uložené. Uvítací okno se ukáže znovu všem, i těm, kdo ho už viděli.",
   heslo: "Heslo je změněné.",
   jmeno: "Údaje jsou uložené.",
-  dvur: "Sběrný dvůr je uložený.",
-  "dvur-upraven": "Sběrný dvůr je upravený.",
-  "dvur-smazan": "Sběrný dvůr je smazaný.",
-  uzavreni: "Mimořádné uzavření je zapsané.",
-  "uzavreni-smazane": "Mimořádné uzavření je zrušené.",
-  lekar: "Ordinace je uložená.",
-  "lekar-upraven": "Ordinace je upravená.",
-  "lekar-smazan": "Ordinace je smazaná.",
-  "lekar-hodiny": "Ordinační hodiny jsou uložené.",
-  "lekar-zmena": "Dočasná změna je zapsaná.",
-  "lekar-zmena-smazana": "Dočasná změna je zrušená.",
   rubrika: "Rubrika je uložená.",
   "rubrika-upravena": "Rubrika je upravená.",
   "rubrika-smazana": "Rubrika je smazaná.",
@@ -154,6 +138,9 @@ const OK = {
   "clovek-udaje": "Údaje přispěvatele jsou uložené.",
   ...OUTAGE_OK,
   ...PLACES_OK,
+  ...YARDS_OK,
+  ...DOCTORS_OK,
+  ...REQUESTS_OK,
   ...STOCK_OK,
   ...IMPORT_OK,
   ...DRBENA_OK,
@@ -325,13 +312,13 @@ async function renderGet(request, env, url, execution) {
     if (tab === "texty") return html(adminTexts(ctx, data, message));
     if (tab === "svoz") return html(adminSite(ctx, data, message));
     if (tab === "dvory") {
-      if (data.signedIn && !userCan(data.user, "sberny_dvur")) {
+      if (data.signedIn && !canSeeHours(data.user, "dvory")) {
         return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na sběrné dvory potřebuješ oprávnění.")}`);
       }
       return html(adminYards(ctx, data, message, query));
     }
     if (tab === "lekari") {
-      if (data.signedIn && !userCan(data.user, "doktori")) {
+      if (data.signedIn && !canSeeHours(data.user, "lekari")) {
         return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
       }
       return html(adminDoctors(ctx, data, message, query));
@@ -352,7 +339,7 @@ async function renderGet(request, env, url, execution) {
       return html(adminStats(ctx, data, message));
     }
     if (tab === "oteviraci-doba") {
-      if (data.signedIn && !userCan(data.user, "oteviraci_doba")) {
+      if (data.signedIn && !canSeeHours(data.user, "oteviraci-doba")) {
         return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na otevírací dobu potřebuješ oprávnění.")}`);
       }
       return html(adminPlaces(ctx, data, message, query));
@@ -470,67 +457,14 @@ async function renderPost(request, env, url, execution) {
     if (!result.ok) return redirect(`/redakce/svoz?chyba=${encodeURIComponent(result.error)}`);
     return redirect("/redakce/svoz?ok=web");
   }
-  if (path === "/redakce/dvory/ulozit") {
-    const result = await saveYard(env, request, fields);
-    if (!result.ok) {
-      const back = fields.id ? `/redakce/dvory?id=${fields.id}` : "/redakce/dvory";
-      return redirect(withError(back, result.error));
-    }
-    return redirect(`/redakce/dvory?ok=${result.updated ? "dvur-upraven" : "dvur"}`);
-  }
-  if (path === "/redakce/dvory/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/dvory");
-    const result = await removeYard(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/dvory?ok=dvur-smazan");
-  }
-  if (path === "/redakce/dvory/uzavreni") {
-    const result = await saveClosure(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/dvory?ok=uzavreni");
-  }
-  if (path === "/redakce/dvory/uzavreni/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/dvory");
-    const result = await removeClosure(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/dvory?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/dvory?ok=uzavreni-smazane");
-  }
-  if (path === "/redakce/lekari/ulozit") {
-    const result = await saveDoctor(env, request, fields);
-    if (!result.ok) {
-      const back = fields.id ? `/redakce/lekari?id=${fields.id}` : "/redakce/lekari";
-      return redirect(withError(back, result.error));
-    }
-    return redirect(`/redakce/lekari?ok=${result.updated ? "lekar-upraven" : "lekar"}`);
-  }
-  if (path === "/redakce/lekari/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/lekari");
-    const result = await removeDoctor(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lekari?ok=lekar-smazan");
-  }
-  if (path === "/redakce/lekari/hodiny") {
-    const result = await saveDoctorHours(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lekari?ok=lekar-hodiny");
-  }
-  if (path === "/redakce/lekari/zmena") {
-    const result = await saveDoctorChange(env, request, fields);
-    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lekari?ok=lekar-zmena");
-  }
-  if (path === "/redakce/lekari/zmena/smazat") {
-    if (!fields.confirm || !fields.id) return redirect("/redakce/lekari");
-    const result = await removeDoctorChange(env, request, fields.id);
-    if (!result.ok) return redirect(`/redakce/lekari?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/lekari?ok=lekar-zmena-smazana");
-  }
   const section =
     (await articlesPost(path, request, env, fields)) ??
     (await adsPost(path, request, env, fields)) ??
     (await eventsPost(path, request, env, fields)) ??
     (await outagePost(path, request, env, fields, execution)) ??
     (await placesPost(path, request, env, fields)) ??
+    (await yardsPost(path, request, env, fields)) ??
+    (await doctorsPost(path, request, env, fields)) ??
     (await stockPost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
     (await footballPost(path, request, env, fields, execution)) ??

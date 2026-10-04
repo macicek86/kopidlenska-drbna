@@ -1,5 +1,6 @@
 // Sběrné dvory v D1: dvory, jejich otevírací doba a mimořádná uzavření.
-import { asBool, clip, requireChief, requireUser, userCan } from "./db-core.js";
+import { asBool, clip, requireChief } from "./db-core.js";
+import { submitHours } from "./hours-requests-db.js";
 import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
 
 function mapYard(row) {
@@ -102,35 +103,41 @@ export async function removeYard(env, request, id) {
   return { ok: true };
 }
 
-async function requireClosure(env, request) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return gate;
-  if (!userCan(gate.user, "sberny_dvur")) {
-    return { ok: false, error: "Mimořádné uzavření zapíše hlavní redaktor, nebo člověk s oprávněním na sběrný dvůr." };
-  }
-  return gate;
-}
-
-export async function saveClosure(env, request, input) {
-  const gate = await requireClosure(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const yard = await env.DB.prepare("select id from yards where id = ?").bind(input.yardId).first();
-  if (!yard) return { ok: false, error: "Tenhle sběrný dvůr už tu není." };
+function readClosure(input) {
   const span = closureSpan(input.startsOn, input.endsOn);
-  if (span.error) return { ok: false, error: span.error };
+  if (span.error) return span;
   const reason = clip(input.reason, 400);
-  if (reason.length < 3) return { ok: false, error: "Napište důvod uzavření." };
-  await env.DB.prepare(
-    "insert into yard_closures (yard_id, starts_on, ends_on, reason, created_by) values (?, ?, ?, ?, ?)",
-  )
-    .bind(yard.id, span.startsOn, span.endsOn, reason, gate.user.id)
-    .run();
-  return { ok: true };
+  if (reason.length < 3) return { error: "Napište důvod uzavření." };
+  return { startsOn: span.startsOn, endsOn: span.endsOn, reason };
 }
 
-export async function removeClosure(env, request, id) {
-  const gate = await requireClosure(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from yard_closures where id = ?").bind(id).run();
-  return { ok: true };
-}
+// Co jde u dvora zapsat rovnou nebo poslat ke schválení (src/hours-requests-db.js).
+export const YARD_ACTIONS = {
+  uzavreni: {
+    read: readClosure,
+    target: async (env, id) => Boolean(await env.DB.prepare("select id from yards where id = ?").bind(id).first()),
+    missing: "Tenhle sběrný dvůr už tu není.",
+    apply: async (env, yardId, value, userId) => {
+      await env.DB.prepare("insert into yard_closures (yard_id, starts_on, ends_on, reason, created_by) values (?, ?, ?, ?, ?)")
+        .bind(yardId, value.startsOn, value.endsOn, value.reason, userId)
+        .run();
+      return { ok: true };
+    },
+  },
+  zrusit: {
+    fields: false,
+    read: () => ({}),
+    target: async (env, id) => Boolean(await env.DB.prepare("select id from yard_closures where id = ?").bind(id).first()),
+    missing: "Tohle uzavření už tu není.",
+    apply: async (env, closureId) => {
+      await env.DB.prepare("delete from yard_closures where id = ?").bind(closureId).run();
+      return { ok: true };
+    },
+  },
+};
+
+const submit = (env, request, action, targetId, input = {}) =>
+  submitHours(env, request, { section: "dvory", actions: YARD_ACTIONS, action, targetId, input });
+
+export const saveClosure = (env, request, input) => submit(env, request, "uzavreni", input.yardId, input);
+export const removeClosure = (env, request, id) => submit(env, request, "zrusit", id);

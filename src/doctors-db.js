@@ -1,5 +1,6 @@
 // Lékaři v D1: ordinace, ordinační hodiny a dočasné změny.
-import { asBool, clip, requireChief, requireUser, userCan } from "./db-core.js";
+import { asBool, clip, requireChief } from "./db-core.js";
+import { submitHours } from "./hours-requests-db.js";
 import { changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 
 function mapDoctor(row) {
@@ -110,48 +111,64 @@ export async function removeDoctor(env, request, id) {
   return { ok: true };
 }
 
-async function requireDoctorHours(env, request) {
-  const gate = await requireUser(env, request);
-  if (!gate.ok) return gate;
-  if (!userCan(gate.user, "doktori")) {
-    return { ok: false, error: "Ordinační hodiny mění hlavní redaktor, nebo člověk s oprávněním Lékaři." };
-  }
-  return gate;
+async function doctorExists(env, id) {
+  return Boolean(await env.DB.prepare("select id from doctors where id = ?").bind(id).first());
 }
 
-export async function saveDoctorHours(env, request, input) {
-  const gate = await requireDoctorHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const doctor = await env.DB.prepare("select id from doctors where id = ?").bind(input.doctorId).first();
-  if (!doctor) return { ok: false, error: "Tahle ordinace už tu není." };
+function readDoctorHours(input) {
   const normalized = normalizeDoctorWeek(input.doctorWeek);
-  if (normalized.error) return { ok: false, error: normalized.error };
-  await env.DB.prepare("update doctors set hours = ? where id = ?").bind(JSON.stringify(normalized.week), doctor.id).run();
-  return { ok: true };
+  return normalized.error ? normalized : { week: normalized.week };
 }
 
-export async function saveDoctorChange(env, request, input) {
-  const gate = await requireDoctorHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const doctor = await env.DB.prepare("select id from doctors where id = ?").bind(input.doctorId).first();
-  if (!doctor) return { ok: false, error: "Tahle ordinace už tu není." };
+function readDoctorChange(input) {
   const span = changeSpan(input.startsOn, input.endsOn);
-  if (span.error) return { ok: false, error: span.error };
+  if (span.error) return span;
   const note = clip(input.changeNote, 400);
-  if (note.length < 3) return { ok: false, error: "Napište poznámku k dočasné změně." };
+  if (note.length < 3) return { error: "Napište poznámku k dočasné změně." };
   const normalized = normalizeDoctorWeek(input.doctorWeek);
-  if (normalized.error) return { ok: false, error: normalized.error };
-  await env.DB.prepare(
-    "insert into doctor_changes (doctor_id, starts_on, ends_on, note, hours, created_by) values (?, ?, ?, ?, ?, ?)",
-  )
-    .bind(doctor.id, span.startsOn, span.endsOn, note, JSON.stringify(normalized.week), gate.user.id)
-    .run();
-  return { ok: true };
+  if (normalized.error) return normalized;
+  return { startsOn: span.startsOn, endsOn: span.endsOn, note, week: normalized.week };
 }
 
-export async function removeDoctorChange(env, request, id) {
-  const gate = await requireDoctorHours(env, request);
-  if (!gate.ok) return { ok: false, error: gate.error };
-  await env.DB.prepare("delete from doctor_changes where id = ?").bind(id).run();
-  return { ok: true };
-}
+// Co jde u ordinace změnit rovnou nebo poslat ke schválení (src/hours-requests-db.js).
+export const DOCTOR_ACTIONS = {
+  hodiny: {
+    read: readDoctorHours,
+    target: doctorExists,
+    missing: "Tahle ordinace už tu není.",
+    apply: async (env, doctorId, value) => {
+      await env.DB.prepare("update doctors set hours = ? where id = ?").bind(JSON.stringify(value.week), doctorId).run();
+      return { ok: true };
+    },
+  },
+  zmena: {
+    read: readDoctorChange,
+    target: doctorExists,
+    missing: "Tahle ordinace už tu není.",
+    apply: async (env, doctorId, value, userId) => {
+      await env.DB.prepare(
+        "insert into doctor_changes (doctor_id, starts_on, ends_on, note, hours, created_by) values (?, ?, ?, ?, ?, ?)",
+      )
+        .bind(doctorId, value.startsOn, value.endsOn, value.note, JSON.stringify(value.week), userId)
+        .run();
+      return { ok: true };
+    },
+  },
+  zrusit: {
+    fields: false,
+    read: () => ({}),
+    target: async (env, id) => Boolean(await env.DB.prepare("select id from doctor_changes where id = ?").bind(id).first()),
+    missing: "Tahle změna už tu není.",
+    apply: async (env, changeId) => {
+      await env.DB.prepare("delete from doctor_changes where id = ?").bind(changeId).run();
+      return { ok: true };
+    },
+  },
+};
+
+const submit = (env, request, action, targetId, input = {}) =>
+  submitHours(env, request, { section: "lekari", actions: DOCTOR_ACTIONS, action, targetId, input });
+
+export const saveDoctorHours = (env, request, input) => submit(env, request, "hodiny", input.doctorId, input);
+export const saveDoctorChange = (env, request, input) => submit(env, request, "zmena", input.doctorId, input);
+export const removeDoctorChange = (env, request, id) => submit(env, request, "zrusit", id);

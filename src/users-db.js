@@ -11,14 +11,29 @@ export const PERMISSIONS = [
     detail: "Může zapsat mimořádné uzavření a důvod. Dvůr samotný pořád mění hlavní redaktor.",
   },
   {
+    code: "sberny_dvur_navrh",
+    label: "Sběrný dvůr ke schválení",
+    detail: "Může navrhnout mimořádné uzavření nebo jeho zrušení. Na web jde, až to schválí hlavní redaktor.",
+  },
+  {
     code: "doktori",
     label: "Lékaři",
     detail: "Může měnit ordinační hodiny a dočasnou změnu. Ordinaci samotnou pořád zakládá hlavní redaktor.",
   },
   {
+    code: "doktori_navrh",
+    label: "Lékaři ke schválení",
+    detail: "Může navrhnout ordinační hodiny, dočasnou změnu nebo její zrušení. Na web jde, až to schválí hlavní redaktor.",
+  },
+  {
     code: "oteviraci_doba",
     label: "Otevírací doba",
     detail: "Může měnit otevírací dobu míst, dočasné změny a novou otevírací dobu. Místa samotná zakládá hlavní redaktor.",
+  },
+  {
+    code: "oteviraci_doba_navrh",
+    label: "Otevírací doba ke schválení",
+    detail: "Může navrhnout opravu otevírací doby, dočasnou změnu, novou dobu nebo zrušení změny. Na web jde, až to schválí hlavní redaktor.",
   },
   {
     code: "drbena_navrhy",

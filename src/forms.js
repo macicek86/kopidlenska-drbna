@@ -37,6 +37,7 @@ export function adminQuery(url) {
     freshTopic: url.searchParams.has("nove-tema"),
     clearChat: url.searchParams.has("smazat-otazky"),
     eventId: positiveParam(url, "akce"),
+    requestId: positiveParam(url, "zadost"),
   };
 }
 
@@ -139,6 +140,9 @@ export async function formFields(request) {
     permissions: form.getAll("permission").map((item) => String(item)),
     confirm: text("confirm") === "1",
     kind: text("kind"),
+    // Návrh ke schválení (sběrné dvory, lékaři, otevírací doba) a důvod zamítnutí.
+    requestId: positive("zadost"),
+    reply: text("reply"),
     endsTime: text("endsTime"),
     places: text("places"),
     sourceUrl: text("sourceUrl"),

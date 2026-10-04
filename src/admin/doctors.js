@@ -2,6 +2,7 @@ import { blankWeek, HOME_LEAD_DAYS, hoursSummary, periodClosed, spanSummary } fr
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
+import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
   badge,
   callout,
@@ -22,6 +23,7 @@ import {
 } from "./ui.js";
 
 const BASE = "/redakce/lekari";
+const SECTION = "lekari";
 
 function doctorForm(editing) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
@@ -44,27 +46,37 @@ function doctorForm(editing) {
   </form>`;
 }
 
-function hoursForm(doctor) {
-  return `<form class="form" method="post" action="${BASE}/hodiny">
-    ${hidden("doctorId", doctor.id)}
-    ${doctorHoursFields(doctor.week)}
-    ${formFoot("Uložit hodiny", cancelLink(BASE))}
+// `opts`: kam formulář poslat a čím předvyplnit (návrh ke schválení), jinak běžné uložení.
+function hoursForm(doctor, opts = {}) {
+  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/hodiny`}">
+    ${hidden("doctorId", doctor.id)}${opts.extra ?? ""}
+    ${doctorHoursFields(opts.value?.week ?? doctor.week)}
+    ${formFoot(opts.submit ?? "Uložit hodiny", cancelLink(BASE))}
   </form>`;
 }
 
-function changeForm(doctor) {
-  return `<form class="form" method="post" action="${BASE}/zmena">
-    ${hidden("doctorId", doctor.id)}
+function changeForm(doctor, opts = {}) {
+  const value = opts.value ?? {};
+  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/zmena`}">
+    ${hidden("doctorId", doctor.id)}${opts.extra ?? ""}
     ${callout(`Dočasná změna pro <b>${esc(doctor.name)}</b>. Na titulce se ukáže ${HOME_LEAD_DAYS} dní předem a po dobu, kdy platí. Na stránce Lékaři je vidět hned.`)}
     <div class="pair">
-      ${field("Od", `<input class="control" type="date" name="startsOn" required>`)}
-      ${field("Do", `<input class="control" type="date" name="endsOn">`, "Když jde o jeden den, nechte prázdné.")}
+      ${field("Od", `<input class="control" type="date" name="startsOn" required value="${esc(value.startsOn ?? "")}">`)}
+      ${field("Do", `<input class="control" type="date" name="endsOn" value="${esc(value.endsOn && value.endsOn !== value.startsOn ? value.endsOn : "")}">`, "Když jde o jeden den, nechte prázdné.")}
     </div>
-    ${field("Poznámka", `<textarea class="${input}" name="changeNote" required maxlength="400" rows="2" placeholder="Třeba: sestra přítomna, zastupuje MUDr. Novák. Nebo: akutní případy ošetří ordinace v Jičíně."></textarea>`)}
-    ${doctorHoursFields(blankWeek(), "Hodiny v tom období")}
+    ${field("Poznámka", `<textarea class="${input}" name="changeNote" required maxlength="400" rows="2" placeholder="Třeba: sestra přítomna, zastupuje MUDr. Novák. Nebo: akutní případy ošetří ordinace v Jičíně.">${esc(value.note ?? "")}</textarea>`)}
+    ${doctorHoursFields(value.week ?? blankWeek(), "Hodiny v tom období")}
     <span class="hint">Bez zaškrtnutého času je ordinace v tom období zavřená a na webu zůstane poznámka.</span>
-    ${formFoot("Zapsat změnu", cancelLink(BASE))}
+    ${formFoot(opts.submit ?? "Zapsat změnu", cancelLink(BASE))}
   </form>`;
+}
+
+// Formulář návrhu v okně schválení.
+function requestForm(doctors) {
+  return (request, opts) => {
+    const doctor = doctors.find((row) => row.id === request.targetId) ?? { id: request.targetId, name: "", week: [] };
+    return request.action === "hodiny" ? hoursForm(doctor, opts) : changeForm(doctor, opts);
+  };
 }
 
 function changeChips(doctor) {
@@ -83,6 +95,9 @@ function changeChips(doctor) {
 export function adminDoctors(ctx, data, message, query = {}) {
   const chief = data.user?.role === "hlavni";
   const doctors = data.doctors ?? [];
+  const requests = data.hoursRequests?.[SECTION] ?? [];
+  const mode = requestMode(SECTION, data);
+  const reviewing = requestDialog(SECTION, data, query.requestId, requestForm(doctors));
   const editing = chief ? (doctors.find((row) => row.id === query.editingId) ?? null) : null;
   const removing = chief && !editing ? (doctors.find((row) => row.id === query.confirmId) ?? null) : null;
   const hours = doctors.find((row) => row.id === query.hoursId) ?? null;
@@ -97,7 +112,7 @@ export function adminDoctors(ctx, data, message, query = {}) {
     item({
       title: doctor.name,
       meta: [doctor.specialty, doctor.place, doctor.phone].filter(Boolean).map(esc).join(" · "),
-      badges: `${doctor.published ? "" : badge("Skrytá", "off")}${doctor.changes.length ? badge(`Změny: ${doctor.changes.length}`, "warn") : ""}<span class="item-sub">${esc(hoursSummary(doctor))}</span>`,
+      badges: `${doctor.published ? "" : badge("Skrytá", "off")}${doctor.changes.length ? badge(`Změny: ${doctor.changes.length}`, "warn") : ""}${waitingBadge(SECTION, doctor, requests)}<span class="item-sub">${esc(hoursSummary(doctor))}</span>`,
       actions: `${chief ? modalLink(`${BASE}?id=${doctor.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${doctor.id}`, "Hodiny")}
         ${modalLink(`${BASE}?zmena=${doctor.id}`, "Dočasná změna")}
         ${chief ? modalLink(`${BASE}?smazat=${doctor.id}`, "Smazat", "btn-ghost btn-danger-text") : ""}`,
@@ -113,14 +128,15 @@ export function adminDoctors(ctx, data, message, query = {}) {
         title: "Nová ordinace",
         size: "wide",
         close: BASE,
-        open: Boolean(query.fresh) && !editing && !removing && !hours && !changing && !cancelling,
+        open: Boolean(query.fresh) && !editing && !removing && !hours && !changing && !cancelling && !reviewing,
         body: doctorForm(null),
       }),
     );
   }
-  if (editing) dialogs.push(modal({ id: "okno", title: "Upravit ordinaci", size: "wide", close: BASE, open: true, body: doctorForm(editing) }));
-  else if (hours) dialogs.push(modal({ id: "okno", title: `Hodiny: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours) }));
-  else if (changing) dialogs.push(modal({ id: "okno", title: "Dočasná změna", size: "wide", close: BASE, open: true, body: changeForm(changing) }));
+  if (reviewing) dialogs.push(reviewing);
+  else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit ordinaci", size: "wide", close: BASE, open: true, body: doctorForm(editing) }));
+  else if (hours) dialogs.push(modal({ id: "okno", title: `Hodiny: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit hodiny") }) }));
+  else if (changing) dialogs.push(modal({ id: "okno", title: "Dočasná změna", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
   else if (cancelling) {
     dialogs.push(
       modal({
@@ -131,8 +147,8 @@ export function adminDoctors(ctx, data, message, query = {}) {
         body: confirmForm({
           action: `${BASE}/zmena/smazat`,
           id: cancelling.change.id,
-          text: `Zrušit dočasnou změnu <b>${esc(cancelling.doctor.name)}</b>, ${esc(closureLabel(cancelling.change))}?`,
-          submit: "Opravdu zrušit",
+          text: `Zrušit dočasnou změnu <b>${esc(cancelling.doctor.name)}</b>, ${esc(closureLabel(cancelling.change))}?${mode.asking ? " Zruší se, až to schválí hlavní redaktor." : ""}`,
+          submit: mode.asking ? "Navrhnout zrušení" : "Opravdu zrušit",
           close: BASE,
         }),
       }),
@@ -156,8 +172,9 @@ export function adminDoctors(ctx, data, message, query = {}) {
   }
   const lede = chief
     ? "Ordinace, běžné hodiny a dočasné změny. Hodiny a změny může měnit i člověk s oprávněním Lékaři."
-    : "Jméno, obor a místo nastavuje hlavní redaktor. Vy tu měníte běžné hodiny a dočasné změny.";
+    : `Jméno, obor a místo nastavuje hlavní redaktor. Vy tu měníte běžné hodiny a dočasné změny.${mode.note}`;
   const body = `${pageHead("Lékaři", lede, chief ? openButton("nova-ordinace", `${BASE}?novy=1`, "Nová ordinace") : "")}
+    ${requestsPanel(SECTION, data)}
     ${panel({ id: "ordinace", title: "Ordinace", count: doctors.length, filter: doctors.length > 4 ? "Hledat ordinaci…" : "", body: list(rows, "Zatím žádná ordinace.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "lekari", message, body, { title: "Lékaři" });
