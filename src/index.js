@@ -33,6 +33,8 @@ import {
   userCan,
 } from "./db.js";
 import { loadAd, loadAds } from "./ads-db.js";
+import { notFoundPage } from "./notfound-view.js";
+import { text as tx } from "./copy.js";
 import { ACCESS_LOGOUT, accessConfig } from "./access.js";
 import {
   adPage,
@@ -44,7 +46,6 @@ import {
   homePage,
   outagesPage,
   missingAdPage,
-  missingPage,
   yardsPage,
 } from "./view.js";
 import { binsPage } from "./bins-view.js";
@@ -182,9 +183,15 @@ function chooseAd(request, ads) {
   return pickAd(ads, { avoidId: readSeenAd(request.headers.get("cookie")) });
 }
 
-function htmlAd(request, body, ad) {
+function htmlAd(request, body, ad, status = 200) {
   const cookie = ad?.id != null ? seenAdCookie(ad.id, secure(request)) : undefined;
-  return html(body, 200, cookie);
+  return html(body, status, cookie);
+}
+
+// Stránka 404 s Drběnou a jednou reklamou.
+async function notFound(request, env, ctx, { heading, ads } = {}) {
+  const ad = ctx.minimal ? null : chooseAd(request, ads ?? (await loadAds(env, { enabledOnly: true })));
+  return htmlAd(request, notFoundPage(ctx, { heading, ad }), ad, 404);
 }
 
 function ctxFor(request, path) {
@@ -269,7 +276,7 @@ async function renderGet(request, env, url, execution) {
   }
   if (path.startsWith("/zpravy/")) {
     const { article, ads, views: counted, more } = story;
-    if (!article) return html(missingPage(ctx), 404);
+    if (!article) return notFound(request, env, ctx, { heading: tx(copy, "missing_heading"), ads });
     const ad = chooseAd(request, ads);
     // Počet i s tímhle přečtením, když se započítá.
     const views = counted + (visitTarget(request) ? 1 : 0);
@@ -385,7 +392,7 @@ async function renderGet(request, env, url, execution) {
     if (tab === "lide") return html(adminPeople(ctx, data, message, query));
     if (tab === "heslo") return html(adminPassword(ctx, data, message));
   }
-  return html(missingPage({ ...ctx, path: "/" }), 404);
+  return notFound(request, env, { ...ctx, path: "/" });
 }
 
 async function renderPost(request, env, url, execution) {

@@ -289,16 +289,6 @@ export function missingAdPage(ctx) {
   });
 }
 
-export function missingPage(ctx) {
-  return layout({
-    ...ctx,
-    noindex: true,
-    title: `${tx(ctx.copy, "missing_heading")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "missing_description"),
-    body: `<h1>${esc(tx(ctx.copy, "missing_heading"))}</h1><a class="back" href="/zpravy">${esc(tx(ctx.copy, "article_back"))}</a>`,
-  });
-}
-
 export function clockOf(data) {
   return data.now ?? { date: data.waste.today, time: "12:00" };
 }

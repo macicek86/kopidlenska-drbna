@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { articlePage } from "../src/news.js";
 import { jsonLdTag, pragueOffset, robotsTxt, sitemapXml } from "../src/seo.js";
-import { eventsPage, homePage, missingPage } from "../src/view.js";
+import { eventsPage, homePage } from "../src/view.js";
+import { notFoundPage } from "../src/notfound-view.js";
 
 const ctx = { path: "/", copy: {}, minimal: false, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
 
@@ -96,7 +97,11 @@ test("akce odkazuje na svou zprávu a na odkaz jinam", () => {
 });
 
 test("chybějící stránka se nemá indexovat", () => {
-  const html = missingPage(ctx);
+  const html = notFoundPage(ctx, { ad: { id: 1, title: "Pekárna", body: "Rohlíky", slug: "pekarna" } });
   assert.match(html, /<meta name="robots" content="noindex">/);
+  assert.match(html, /drbena-404\.webp/);
+  assert.match(html, /<a class="btn btn-primary" href="\/">/);
+  assert.match(html, /<a href="\/akce">/);
+  assert.match(html, /class="ad-panel/);
   assert.equal(html.includes('rel="canonical"'), false);
 });

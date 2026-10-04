@@ -1,0 +1,70 @@
+/* Stránka 404: Drběna u nápisu, vedle vysvětlení a tlačítko domů, pod tím rozcestník a reklama. */
+
+.notfound-hero {
+  display: grid;
+  gap: 0.5rem;
+  align-items: center;
+  overflow: hidden;
+}
+
+.notfound-copy h1 {
+  margin: 0.7rem 0 0.6rem;
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  line-height: 1.05;
+}
+
+.notfound-text {
+  margin: 0 0 1.2rem;
+  max-width: 34rem;
+  font-size: 1.1rem;
+  line-height: 1.5;
+}
+
+.notfound-drbena { display: flex; justify-content: center; }
+
+.notfound-drbena img {
+  display: block;
+  width: min(80%, 18rem);
+  height: auto;
+  filter: drop-shadow(0 14px 14px rgb(61 38 27 / 0.16));
+}
+
+.notfound-more { margin-top: 0.9rem; }
+
+.notfound-more h2 { margin: 0 0 0.8rem; }
+
+.notfound-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.notfound-links a {
+  display: block;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.notfound-links a:hover { border-color: var(--brand); color: var(--brand); }
+
+@media (min-width: 720px) {
+  .notfound-links { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+  .notfound-hero {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+    padding: 2rem 2.2rem;
+  }
+  .notfound-drbena img { width: 22rem; max-width: 100%; }
+}
+
+.notfound-more .place-ask { margin: 1rem 0 0; }
