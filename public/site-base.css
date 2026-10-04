@@ -650,6 +650,10 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .week-list .is-off { color: var(--muted); }
 
+.week-list .is-closure s { color: var(--muted); font-weight: 400; }
+
+.week-list .is-closure em { color: var(--brand); font-style: normal; }
+
 .hours-grid { display: grid; gap: 0.45rem; }
 
 .hours-grid > span:first-child { font-weight: 700; font-size: 0.92rem; }

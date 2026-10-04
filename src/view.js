@@ -4,8 +4,8 @@ import { esc, mediaUrl } from "./html.js";
 import { facebookUrl, text as tx } from "./copy.js";
 import { formatLong } from "./format.js";
 import { focusClass } from "./photo.js";
-import { civilWeekday } from "./waste.js";
-import { homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
+import { addDays, civilWeekday } from "./waste.js";
+import { coversDay, homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
@@ -292,16 +292,31 @@ export function dayLabel(day) {
   return WEEK_DAYS.find((item) => item.day === day)?.label ?? "";
 }
 
-function weekList(week, today) {
+// Běžný týden od pondělí. Den, jehož nejbližší výskyt (dnes až za 6 dní) padne do mimořádného
+// uzavření, má hodiny přeškrtnuté.
+function weekList(week, today, closures = []) {
   const todayDay = civilWeekday(today);
   return `<ul class="week-list">${week
     .map((slot) => {
-      const mark = slot.day === todayDay ? " is-today" : "";
-      const off = slot.open ? "" : " is-off";
-      const when = slot.open ? `${slot.from}–${slot.to}` : "zavřeno";
-      return `<li class="${mark}${off}"><span>${esc(dayLabel(slot.day))}</span><strong>${esc(when)}</strong></li>`;
+      const date = addDays(today, (slot.day - todayDay + 7) % 7);
+      const closed = slot.open && closures.some((closure) => coversDay(closure, date));
+      const classes = [slot.day === todayDay ? "is-today" : "", slot.open ? "" : "is-off", closed ? "is-closure" : ""]
+        .filter(Boolean)
+        .join(" ");
+      const hours = esc(`${slot.from}–${slot.to}`);
+      const when = closed
+        ? `<em>zavřeno ${shortDay(date)}</em> <s>${hours}</s>`
+        : slot.open
+          ? hours
+          : "zavřeno";
+      return `<li${classes ? ` class="${classes}"` : ""}><span>${esc(dayLabel(slot.day))}</span><strong>${when}</strong></li>`;
     })
     .join("")}</ul>`;
+}
+
+function shortDay(iso) {
+  const [, month, day] = iso.split("-").map(Number);
+  return `${day}.&nbsp;${month}.`;
 }
 
 function yardStatusHtml(yard, now) {
@@ -343,7 +358,7 @@ export function yardsPage(data, ctx) {
             : "";
           const hours = yard.legacy
             ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
-            : weekList(yard.week, today);
+            : weekList(yard.week, today, yard.closures);
           // Víc dvorů: stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
           return `<article class="card yard${several ? " place-card" : ""}">
             <div class="place-head">
