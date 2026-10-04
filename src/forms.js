@@ -21,6 +21,7 @@ export function adminQuery(url) {
     hoursId: positiveParam(url, "hodiny"),
     changeId: positiveParam(url, "zmena"),
     newHoursId: positiveParam(url, "nova-doba"),
+    offersId: positiveParam(url, "nabidka"),
     accessId: positiveParam(url, "upravit"),
     passwordId: positiveParam(url, "heslo"),
     disableId: positiveParam(url, "vypnout"),
@@ -87,6 +88,7 @@ export async function formFields(request) {
     weekParity: text("weekParity"),
     stepDays: text("stepDays"),
     accepts: text("accepts"),
+    offers: text("offers"),
     week: WEEK_DAYS.map(({ day }) => ({
       day,
       open: form.get(`open-${day}`) === "1",

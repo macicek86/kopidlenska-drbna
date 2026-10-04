@@ -7,6 +7,8 @@ import { outputSchema, readDecision } from "../src/munipolis/ai.js";
 import { placesPage, homePage } from "../src/view.js";
 import { adminPlaces } from "../src/admin/index.js";
 import { refLink } from "../src/admin/imports.js";
+import { offerLines } from "../src/places-db.js";
+import { offerSection } from "../src/chat/context.js";
 
 const SLUGS = ["zpravy", "prakticke"];
 const knihovna = PLACE_SEEDS.find((seed) => seed.name === "Knihovna");
@@ -122,4 +124,25 @@ test("stránka, titulka a redakce otevírací doby", () => {
   const admin = adminPlaces({ path: "/redakce/oteviraci-doba", copy: {} }, { signedIn: true, user: { id: 1, role: "hlavni", name: "R" }, places }, { text: "", kind: "ok" }, { newHoursId: 1 });
   assert.match(admin, /Nová otevírací doba/);
   assert.match(admin, /name="kind" value="trvala"/);
+});
+
+test("co tu najdete: řádky, okno na webu, redakce a Drběna v chatu", () => {
+  assert.deepEqual(offerLines("- Czech POINT\n\n • Ověřování  podpisů\r\n"), ["Czech POINT", "Ověřování podpisů"]);
+  assert.deepEqual(offerLines(""), []);
+  const places = [
+    { ...place(1, knihovna), offers: ["Půjčování knih", "Kopírování"] },
+    { ...place(2, { ...knihovna, name: "Pošta" }), offers: [] },
+  ];
+  const data = { places, waste: { today: "2026-10-02" }, now: { date: "2026-10-02", time: "10:00" } };
+  const page = placesPage(data, { path: "/oteviraci-doba", copy: {} });
+  assert.match(page, /popovertarget="nabidka-misto-1">Co tu najdete<\/button>/);
+  assert.match(page, /<ul class="offer-list"><li>Půjčování knih<\/li><li>Kopírování<\/li><\/ul>/);
+  assert.doesNotMatch(page, /nabidka-misto-2/);
+  // Chat: seznam zvlášť, ať ho neořízne délka stránky.
+  assert.equal(offerSection(places), "## Co se kde dá najít a vyřídit (u míst z /oteviraci-doba, otevírací dobu najdeš výš)\n- Knihovna (Městská knihovna), /oteviraci-doba#misto-1: Půjčování knih; Kopírování");
+  assert.equal(offerSection([places[1]]), "");
+  const user = { signedIn: true, user: { id: 2, role: "prispevatel", name: "P", permissions: ["oteviraci_doba"] }, places };
+  const admin = adminPlaces({ path: "/redakce/oteviraci-doba", copy: {} }, user, { text: "", kind: "ok" }, { offersId: 1 });
+  assert.match(admin, /action="\/redakce\/oteviraci-doba\/nabidka"/);
+  assert.match(admin, /Půjčování knih\nKopírování<\/textarea>/);
 });

@@ -23,15 +23,28 @@ function clipText(text, max) {
 export function sitePages(data, ctx) {
   const bare = { ...data, ads: [], ad: null };
   const page = { ...ctx, chat: null };
-  return [
+  // Seznamy, co místa nabízí, jdou zvlášť (offerSection), ať je neořízne PAGE_MAX.
+  const withoutOffers = { ...bare, places: (data.places ?? []).map((place) => ({ ...place, offers: [] })) };
+  const pages = [
     ["Svoz odpadu (/popelnice)", binsPage(data.waste, { ...page, path: "/popelnice" })],
     ["Sběrné dvory (/sberne-dvory)", yardsPage(bare, { ...page, path: "/sberne-dvory" })],
     ["Lékaři (/lekari)", doctorsPage(bare, { ...page, path: "/lekari" })],
-    ["Otevírací doba (/oteviraci-doba)", placesPage(bare, { ...page, path: "/oteviraci-doba" })],
+    ["Otevírací doba (/oteviraci-doba)", placesPage(withoutOffers, { ...page, path: "/oteviraci-doba" })],
     ["Odstávky vody a elektřiny (/odstavky)", outagesPage(bare, { ...page, path: "/odstavky" })],
     ["Akce (/akce)", eventsPage(bare, { ...page, path: "/akce" })],
     ["O nás a kontakt na redakci (/o-nas)", aboutPage(bare, { ...page, path: "/o-nas" })],
   ].map(([title, html]) => `## ${title}\n${clipText(htmlText(html), PAGE_MAX)}`);
+  const offers = offerSection(data.places);
+  return offers ? [...pages, offers] : pages;
+}
+
+// Co se kde dá najít a vyřídit (seznamy u míst z otevírací doby).
+export function offerSection(places) {
+  const lines = (places ?? [])
+    .filter((place) => place.offers?.length)
+    .map((place) => `- ${place.name}${place.label ? ` (${place.label})` : ""}, /oteviraci-doba#misto-${place.id}: ${place.offers.join("; ")}`);
+  if (!lines.length) return "";
+  return `## Co se kde dá najít a vyřídit (u míst z /oteviraci-doba, otevírací dobu najdeš výš)\n${lines.join("\n")}`;
 }
 
 function articleLine(article) {

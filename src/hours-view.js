@@ -77,6 +77,15 @@ export function doctorsPage(data, ctx) {
   });
 }
 
+// Co místo nabízí, v okně. Bez seznamu nic.
+function offersBlock(place, ctx) {
+  if (!place.offers?.length) return "";
+  const id = `nabidka-misto-${place.id}`;
+  const label = tx(ctx.copy, "places_offers");
+  const list = `<ul class="offer-list">${place.offers.map((offer) => `<li>${esc(offer)}</li>`).join("")}</ul>`;
+  return `<p class="place-offers">${popoverButton(id, label)}</p>${popover(id, place.name, label, list)}`;
+}
+
 function placeCard(place, today, ctx) {
   // Nová doba, která už platí, má nahoře upozornění (titulka o ní mluví ještě 14 dní).
   const banners = placeNotices(place, today)
@@ -96,7 +105,7 @@ function placeCard(place, today, ctx) {
     </div>
     <p class="kicker">${esc(tx(ctx.copy, "places_hours"))}</p>
     ${days}
-    <div class="place-more">${more}</div>
+    <div class="place-more">${offersBlock(place, ctx)}${more}</div>
   </article>`;
 }
 

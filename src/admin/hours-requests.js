@@ -31,6 +31,9 @@ export function describeRequest(section, request, data) {
   }
   const name = rows.find((row) => row.id === request.targetId)?.name ?? "Už není";
   if (section === "dvory") return { name, text: `Uzavření ${closureLabel(value)}: ${value.reason}` };
+  if (request.action === "nabidka") {
+    return { name, text: value.offers?.length ? `Co tu najdete: ${value.offers.join(", ")}` : "Smazat seznam, co tu najdete" };
+  }
   if (request.action === "hodiny") {
     return { name, text: section === "lekari" ? `Ordinační hodiny: ${hoursSummary(value)}` : `Oprava otevírací doby: ${placeSummary(value)}` };
   }

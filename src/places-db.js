@@ -1,7 +1,7 @@
 // Otevírací doba v D1: místa, jejich běžný týden a změny (dočasné i nová otevírací doba).
 // Nová otevírací doba (`trvala`) se v den, kdy začne platit, propíše do běžných hodin místa (`settleNewHours`).
 import { changeSpan, normalizeWeek, parseHours } from "./doctors.js";
-import { asBool, clip, requireChief } from "./db-core.js";
+import { addColumn, asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
 import { NEW_HOURS_DAYS, PLACE_SEEDS } from "./places.js";
 import { addDays, pragueNow } from "./waste.js";
@@ -18,7 +18,8 @@ const TABLES = [
     phone text not null default '',
     hours text not null,
     sort_order integer not null default 0,
-    published integer not null default 1
+    published integer not null default 1,
+    offers text not null default ''
   )`,
   `create table if not exists place_changes (
     id integer primary key autoincrement,
@@ -39,12 +40,27 @@ const TABLES = [
 export async function ensurePlaceTables(env) {
   const exists = await env.DB.prepare("select 1 as ok from sqlite_master where type = 'table' and name = 'places'").first();
   for (const sql of TABLES) await env.DB.prepare(sql).run();
+  const info = await env.DB.prepare("pragma table_info(places)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "offers", "alter table places add column offers text not null default ''");
   if (exists) return;
   for (const seed of PLACE_SEEDS) {
     await env.DB.prepare("insert into places (name, label, place, phone, hours, sort_order, published) values (?, ?, ?, ?, ?, ?, ?)")
       .bind(seed.name, seed.label, seed.place, seed.phone, JSON.stringify(seed.week), seed.sortOrder, seed.published)
       .run();
   }
+}
+
+const OFFERS_MAX = 40;
+const OFFER_MAX = 160;
+
+// Co místo nabízí: jedna věc na řádek, odrážky na začátku se zahodí. Prázdné nevadí.
+export function offerLines(text) {
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-–•*·]\s*/, "").replace(/\s+/g, " ").trim().slice(0, OFFER_MAX))
+    .filter(Boolean)
+    .slice(0, OFFERS_MAX);
 }
 
 function mapPlace(row) {
@@ -57,6 +73,7 @@ function mapPlace(row) {
     week: parseHours(row.hours),
     sortOrder: Number(row.sort_order ?? 0),
     published: asBool(row.published),
+    offers: offerLines(row.offers),
     changes: [],
   };
 }
@@ -92,7 +109,7 @@ export async function settleNewHours(env, today = pragueNow().date) {
 export async function loadPlaces(env, { publicOnly = false, today = pragueNow().date } = {}) {
   await settleNewHours(env, today);
   const rows = await env.DB.prepare(
-    `select id, name, label, place, phone, hours, sort_order, published from places
+    `select id, name, label, place, phone, hours, sort_order, published, offers from places
      ${publicOnly ? "where published = 1" : ""} order by sort_order asc, id asc`,
   ).all();
   const places = (rows.results ?? []).map(mapPlace);
@@ -122,7 +139,8 @@ function readPlace(input) {
   const sortOrder = Number(input.sortOrder);
   if (name.length < 2) return { error: "Doplňte název místa." };
   if (!Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 999) return { error: "Pořadí musí být číslo od 0 do 999." };
-  return { name, label, place, phone, hours: JSON.stringify(normalized.week), sortOrder, published: input.published ? 1 : 0 };
+  const offers = offerLines(input.offers).join("\n");
+  return { name, label, place, phone, hours: JSON.stringify(normalized.week), sortOrder, published: input.published ? 1 : 0, offers };
 }
 
 export async function savePlace(env, request, input) {
@@ -130,16 +148,16 @@ export async function savePlace(env, request, input) {
   if (!gate.ok) return { ok: false, error: gate.error };
   const parsed = readPlace(input);
   if (parsed.error) return { ok: false, error: parsed.error };
-  const values = [parsed.name, parsed.label, parsed.place, parsed.phone, parsed.hours, parsed.sortOrder, parsed.published];
+  const values = [parsed.name, parsed.label, parsed.place, parsed.phone, parsed.hours, parsed.sortOrder, parsed.published, parsed.offers];
   if (input.id) {
     const current = await env.DB.prepare("select id from places where id = ?").bind(input.id).first();
     if (!current) return { ok: false, error: "Tohle místo už tu není." };
-    await env.DB.prepare("update places set name = ?, label = ?, place = ?, phone = ?, hours = ?, sort_order = ?, published = ? where id = ?")
+    await env.DB.prepare("update places set name = ?, label = ?, place = ?, phone = ?, hours = ?, sort_order = ?, published = ?, offers = ? where id = ?")
       .bind(...values, input.id)
       .run();
     return { ok: true, updated: true };
   }
-  await env.DB.prepare("insert into places (name, label, place, phone, hours, sort_order, published) values (?, ?, ?, ?, ?, ?, ?)")
+  await env.DB.prepare("insert into places (name, label, place, phone, hours, sort_order, published, offers) values (?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(...values)
     .run();
   return { ok: true, updated: false };
@@ -180,6 +198,10 @@ function readPlaceHours(input) {
   return normalized.error ? normalized : { week: normalized.week };
 }
 
+function readPlaceOffers(input) {
+  return { offers: offerLines(input.offers) };
+}
+
 function readPlaceChange(input) {
   const kind = input.kind === "trvala" ? "trvala" : "docasna";
   const span = changeSpan(input.startsOn, kind === "trvala" ? "" : input.endsOn);
@@ -200,6 +222,16 @@ export const PLACE_ACTIONS = {
     missing: "Tohle místo už tu není.",
     apply: async (env, placeId, value) => {
       await env.DB.prepare("update places set hours = ? where id = ?").bind(JSON.stringify(value.week), placeId).run();
+      return { ok: true };
+    },
+  },
+  // Co místo nabízí (seznam v okně na webu, ví o něm i Drběna v chatu).
+  nabidka: {
+    read: readPlaceOffers,
+    target: placeExists,
+    missing: "Tohle místo už tu není.",
+    apply: async (env, placeId, value) => {
+      await env.DB.prepare("update places set offers = ? where id = ?").bind(value.offers.join("\n"), placeId).run();
       return { ok: true };
     },
   },
@@ -228,6 +260,7 @@ const submit = (env, request, action, targetId, input = {}) =>
   submitHours(env, request, { section: SECTION, actions: PLACE_ACTIONS, action, targetId, input });
 
 export const savePlaceHours = (env, request, input) => submit(env, request, "hodiny", input.placeId, input);
+export const savePlaceOffers = (env, request, input) => submit(env, request, "nabidka", input.placeId, input);
 export const savePlaceChange = (env, request, input) => submit(env, request, "zmena", input.placeId, input);
 export const removePlaceChange = (env, request, id) => submit(env, request, "zrusit", id);
 

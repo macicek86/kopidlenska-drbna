@@ -1,5 +1,5 @@
 // Formuláře sekce Otevírací doba: místa, oprava doby, dočasné změny, nová otevírací doba a návrhy ke schválení.
-import { PLACE_ACTIONS, removePlace, removePlaceChange, savePlace, savePlaceChange, savePlaceHours } from "./places-db.js";
+import { PLACE_ACTIONS, removePlace, removePlaceChange, savePlace, savePlaceChange, savePlaceHours, savePlaceOffers } from "./places-db.js";
 import { redirect, withError } from "./http.js";
 import { requestPost, submitted } from "./post-requests.js";
 
@@ -10,6 +10,7 @@ export const PLACES_OK = {
   "misto-upraveno": "Místo je upravené.",
   "misto-smazano": "Místo je smazané.",
   "misto-doba": "Otevírací doba je opravená.",
+  "misto-nabidka": "Seznam, co tu najdete, je uložený.",
   "misto-zmena": "Dočasná změna je zapsaná.",
   "misto-nova-doba": "Nová otevírací doba je zapsaná.",
   "misto-zmena-smazana": "Změna je zrušená.",
@@ -29,6 +30,7 @@ export async function placesPost(path, request, env, fields) {
     return redirect(`${BASE}?ok=misto-smazano`);
   }
   if (path === `${BASE}/hodiny`) return submitted(BASE, await savePlaceHours(env, request, fields), "misto-doba");
+  if (path === `${BASE}/nabidka`) return submitted(BASE, await savePlaceOffers(env, request, fields), "misto-nabidka");
   if (path === `${BASE}/zmena`) {
     const result = await savePlaceChange(env, request, fields);
     return submitted(BASE, result, result.value?.kind === "trvala" ? "misto-nova-doba" : "misto-zmena");

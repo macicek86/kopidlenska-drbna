@@ -125,6 +125,7 @@ export const COPY = [
   { group: "Otevírací doba", key: "places_empty", label: "Když není žádné místo", value: "Zatím tu není žádné místo. Až ho redakce doplní, objeví se tady.", max: 240, long: true },
   { group: "Otevírací doba", key: "places_hours", label: "Nadpis otevírací doby", value: "Otevírací doba", max: 40 },
   { group: "Otevírací doba", key: "places_regular", label: "Tlačítko a okno s běžnou dobou", value: "Běžná otevírací doba", max: 40 },
+  { group: "Otevírací doba", key: "places_offers", label: "Tlačítko a okno se seznamem, co místo nabízí", value: "Co tu najdete", max: 40 },
   { group: "Otevírací doba", key: "places_changes", label: "Nadpis změn za víc než 7 dní", value: "Další změny", max: 80 },
   { group: "Otevírací doba", key: "places_missing_hours", label: "Když doba ještě není", value: "Otevírací doba zatím není doplněná.", max: 160 },
 
