@@ -118,7 +118,7 @@ function assistBar(user) {
     </div>`;
 }
 
-export function articleFields(source, data, { publish, date } = {}) {
+export function articleFields(source, data, { publish, date, sign } = {}) {
   return `<div class="form-cols">
     <div class="form-col-main">
       ${assistBar(data.user)}
@@ -131,6 +131,7 @@ export function articleFields(source, data, { publish, date } = {}) {
       ${photoControl(source, data.stock)}
       ${attachmentsControl(source)}
       ${publish ? `<div class="field"><span>Viditelnost</span>${check("published", "1", publish.checked, "Zveřejnit na webu")}</div>` : ""}
+      ${sign ? `<div class="field"><span>Podpis</span>${check("signed_drbena", "1", sign.checked, "Podepsat jako Koza Drběna", "Na webu bude pod zprávou Drběna místo vás.")}</div>` : ""}
       ${publish ? dateField(source?.createdOn || publish.today) : ""}
       ${date ? dateField(date.value, date.hint) : ""}
     </div>

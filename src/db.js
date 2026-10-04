@@ -25,7 +25,7 @@ import {
 import { loadNoticeBoard, loadNotices } from "./notices-db.js";
 import { loadClosures, loadNdicSettings } from "./ndic/store.js";
 import { pushConfig } from "./ndic/push.js";
-import { BOT_LOGIN, loadImportItems, loadImportSettings } from "./munipolis/store.js";
+import { BOT_LOGIN, BOT_NAME, loadImportItems, loadImportSettings } from "./munipolis/store.js";
 import { loadFootballItems, loadFootballSettings } from "./fotbal/store.js";
 import { loadDenikItems, loadDenikSettings } from "./denik/store.js";
 import { SCHOOL_LIST } from "./skola/sources.js";
@@ -59,7 +59,7 @@ export { ensureSchema } from "./schema.js";
 export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
 export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.author_id, a.author_name, a.redacted, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 // Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
 const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "").replace("a.attachments, ", "");
 const ARTICLE_FROM =
@@ -105,7 +105,9 @@ function mapArticle(row) {
     createdOn: String(row.created_at ?? "").slice(0, 10),
     authorId: row.author_id == null || row.author_id === "" ? null : Number(row.author_id),
     authorName: String(row.author_name ?? ""),
-    authorAlias: String(row.author_alias ?? "").trim(),
+    // Podpis „Koza Drběna“ jde přes přezdívku: web ukáže Drběnu, redakce i skutečného autora (`credit`).
+    authorAlias: asBool(row.signed_drbena) ? BOT_NAME : String(row.author_alias ?? "").trim(),
+    signedDrbena: asBool(row.signed_drbena),
     redacted: asBool(row.redacted),
   };
 }
@@ -459,9 +461,10 @@ export async function saveArticle(env, request, input) {
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
          image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = case when ? then '' else keywords end,
-         created_at = case when ? is null or substr(created_at, 1, 10) = ? then created_at else ? end where id = ?`,
+         created_at = case when ? is null or substr(created_at, 1, 10) = ? then created_at else ? end,
+         signed_drbena = case when author_id = ? then ? else signed_drbena end where id = ?`,
     )
-      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, redacted, edited ? 1 : 0, createdOn.date, createdOn.date, createdOn.date, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, redacted, edited ? 1 : 0, createdOn.date, createdOn.date, createdOn.date, gate.user.id, input.signedDrbena ? 1 : 0, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     for (const key of attachments.removed) await releaseImage(env, key);
@@ -475,10 +478,10 @@ export async function saveArticle(env, request, input) {
   }
   const slug = await uniqueSlug(env, slugify(title));
   const inserted = await env.DB.prepare(
-    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted, signed_drbena)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
   )
-    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, attachments.json, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name)
+    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, attachments.json, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name, input.signedDrbena ? 1 : 0)
     .run();
   // Zpráva psaná k akci (z redakce akcí) se k ní rovnou připojí.
   await attachArticle(env, input.eventId, Number(inserted.meta?.last_row_id));

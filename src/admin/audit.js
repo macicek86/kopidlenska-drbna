@@ -89,6 +89,7 @@ const FIELD_LABELS = {
   attachments: "Přílohy",
   status: "Stav",
   author_name: "Autor",
+  signed_drbena: "Podpis Koza Drběna",
   summary: "Shrnutí",
   text: "Text",
   contact: "Kontakt",

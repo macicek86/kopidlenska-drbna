@@ -15,12 +15,17 @@ function articleForm(data, editing, close, event = null) {
     : credit(editing) && editing.authorId !== data.user?.id
       ? `Autor zůstává ${esc(credit(editing))}. Když změníte text, na webu se objeví nanejvýš slovo Redigováno.`
       : "Úprava jde na web hned.";
+  // Podpis Drběnou jde měnit jen u vlastní zprávy, cizí autor zůstává.
+  const own = !editing || editing.authorId === data.user?.id;
   const forEvent = event ? `<br>Zpráva k akci <b>${esc(event.title)}</b>. V kalendáři u ní bude odkaz.` : "";
   return `<form class="form" method="post" action="${BASE}/ulozit" enctype="multipart/form-data">
     ${callout(`${help}${forEvent}`)}
     ${editing ? hidden("id", editing.id) : ""}
     ${event ? hidden("akce", event.id) : ""}
-    ${articleFields(editing ?? eventDraft(event), data, { publish: { checked: editing ? editing.published : true, today: pragueNow().date } })}
+    ${articleFields(editing ?? eventDraft(event), data, {
+      publish: { checked: editing ? editing.published : true, today: pragueNow().date },
+      sign: own ? { checked: Boolean(editing?.signedDrbena) } : null,
+    })}
     ${formFoot("Uložit", cancelLink(close))}
   </form>`;
 }

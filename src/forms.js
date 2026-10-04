@@ -53,6 +53,7 @@ export async function formFields(request) {
     body: text("body"),
     category: text("category"),
     published: form.get("published") === "1",
+    signedDrbena: form.get("signed_drbena") === "1",
     createdOn: text("created_on"),
     image: form.get("image"),
     imageFocus: text("image_focus"),

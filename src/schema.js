@@ -26,7 +26,7 @@ import { ensureRequestTables } from "./hours-requests-db.js";
 import { ensureAuditTables } from "./audit-db.js";
 import { ensureLoginTables } from "./login-db.js";
 
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 let schemaReady = false;
 
@@ -194,6 +194,8 @@ async function ensureArticleColumns(env) {
   await addColumn(env, names, "follows_id", "alter table articles add column follows_id integer");
   // Přílohy ze zdroje (jízdní řády, mapy), JSON podle src/attachments.js.
   await addColumn(env, names, "attachments", "alter table articles add column attachments text not null default ''");
+  // Hlavní redaktor může svou zprávu podepsat jako koza Drběna; v redakci zůstává vidět, kdo ji napsal.
+  await addColumn(env, names, "signed_drbena", "alter table articles add column signed_drbena integer not null default 0");
 }
 
 async function ensureProposalColumns(env) {
