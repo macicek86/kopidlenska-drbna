@@ -32,6 +32,7 @@ const TABS = [
   "drbena",
   "chat",
   "lide",
+  "historie",
   "heslo",
   // Otevřená okna. Název souboru je adresa bez lomítek.
   "chat?nastaveni=1",
@@ -58,6 +59,7 @@ const TABS = [
   "odstavky?nove-oznameni=1",
   "odstavky?oznameni=1",
   "zpravy?navrh=1",
+  "historie?zaznam=5",
 ];
 
 function chromePath() {

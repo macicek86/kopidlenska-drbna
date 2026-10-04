@@ -3,8 +3,8 @@ import {
   clearCookie,
   createContributor,
   ensureSchema,
-  loadAdmin,
   loadArticle,
+  loadAdmin,
   loadMoreArticles,
   loadCopy,
   loadPublic,
@@ -21,12 +21,12 @@ import {
   saveContributorAccess,
   setContributorActive,
   setContributorPassword,
-  userCan,
 } from "./db.js";
 import { loadAd, loadAds } from "./ads-db.js";
 import { notFoundPage } from "./notfound-view.js";
 import { text as tx } from "./copy.js";
 import { ACCESS_LOGOUT, accessConfig } from "./access.js";
+import { currentUser } from "./db-core.js";
 import {
   adPage,
   adsPage,
@@ -43,74 +43,45 @@ import { binsPage } from "./bins-view.js";
 import { aboutPage } from "./about.js";
 import { media } from "./images.js";
 import { articlePage, newsPage } from "./news.js";
-import {
-  adminAds,
-  adminArticles,
-  adminChat,
-  adminDoctors,
-  adminDrbena,
-  adminEvents,
-  adminMessages,
-  adminMunipolis,
-  adminFootball,
-  adminDenik,
-  adminSkola,
-  adminOutages,
-  adminPlaces,
-  adminOverview,
-  adminPassword,
-  adminPeople,
-  adminRubrics,
-  adminSite,
-  adminStats,
-  adminStock,
-  adminTexts,
-  adminYards,
-} from "./admin/index.js";
+import { renderAdmin } from "./admin-get.js";
+import { auditAccessLogin, auditFinish, auditLogin, auditLogout, auditStart } from "./audit.js";
+import { pruneAudit } from "./audit-db.js";
+import { OK } from "./ok-messages.js";
 import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
-import { adminQuery, formFields } from "./forms.js";
+import { formFields } from "./forms.js";
 import { NDIC_PUSH_PATH, ndicPush } from "./ndic/push.js";
 import { runNdic } from "./ndic/run.js";
 import { visitPath, visitTarget } from "./visits.js";
-import { loadStats, pathViews, recordVisit, STAT_PERIODS } from "./visits-db.js";
+import { pathViews, recordVisit } from "./visits-db.js";
 import { html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
 import { robotsTxt, sitemapXml } from "./seo.js";
 import { loadSitemap } from "./seo-db.js";
-import { OUTAGE_OK, outagePost } from "./post-outages.js";
-import { PLACES_OK, placesPost } from "./post-places.js";
-import { YARDS_OK, yardsPost } from "./post-yards.js";
-import { DOCTORS_OK, doctorsPost } from "./post-doctors.js";
-import { REQUESTS_OK } from "./post-requests.js";
-import { canSeeHours } from "./hours-requests-db.js";
-import { STOCK_OK, stockPost } from "./post-stock.js";
-import { IMPORT_OK, munipolisPost } from "./post-munipolis.js";
-import { DRBENA_OK, drbenaPost } from "./post-drbena.js";
+import { outagePost } from "./post-outages.js";
+import { placesPost } from "./post-places.js";
+import { yardsPost } from "./post-yards.js";
+import { doctorsPost } from "./post-doctors.js";
+import { stockPost } from "./post-stock.js";
+import { munipolisPost } from "./post-munipolis.js";
+import { drbenaPost } from "./post-drbena.js";
 import { fillKeywords } from "./keywords.js";
-import { continueImport, runImport } from "./munipolis/run.js";
-import { loadImportSettings } from "./munipolis/store.js";
-import { FOOTBALL_OK, footballPost } from "./post-fotbal.js";
-import { DENIK_OK, denikPost } from "./post-denik.js";
-import { continueDenik, runDenik } from "./denik/run.js";
-import { loadDenikSettings } from "./denik/store.js";
-import { SKOLA_OK, skolaPost } from "./post-skola.js";
-import { continueSkola, runSkola } from "./skola/run.js";
-import { SCHOOL_LIST, SCHOOLS } from "./skola/sources.js";
-import { loadSkolaSettings } from "./skola/store.js";
-import { continueFootball, runFootball } from "./fotbal/run.js";
-import { loadFootballSettings } from "./fotbal/store.js";
+import { runImport } from "./munipolis/run.js";
+import { footballPost } from "./post-fotbal.js";
+import { denikPost } from "./post-denik.js";
+import { runDenik } from "./denik/run.js";
+import { skolaPost } from "./post-skola.js";
+import { runSkola } from "./skola/run.js";
+import { SCHOOL_LIST } from "./skola/sources.js";
+import { runFootball } from "./fotbal/run.js";
 import { chatPost } from "./chat/run.js";
 import { assistPost } from "./assist/run.js";
-import { loadAssistAdmin } from "./assist/store.js";
-import { pragueNow } from "./waste.js";
-import { chatEnabled, loadChatAdmin } from "./chat/store.js";
+import { chatEnabled } from "./chat/store.js";
 import { turnstileConfig } from "./chat/pass.js";
-import { CHAT_OK, chatAdminPost } from "./post-chat.js";
-import { MESSAGES_OK, messagesPost } from "./post-messages.js";
-import { loadMessages } from "./messages-db.js";
-import { ARTICLES_OK, articlesPost } from "./post-articles.js";
-import { ADS_OK, adsPost } from "./post-ads.js";
-import { EVENTS_OK, eventsPost } from "./post-events.js";
+import { chatAdminPost } from "./post-chat.js";
+import { messagesPost } from "./post-messages.js";
+import { articlesPost } from "./post-articles.js";
+import { adsPost } from "./post-ads.js";
+import { eventsPost } from "./post-events.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
@@ -119,37 +90,6 @@ export function wantsPage(request) {
   return /text\/html/i.test(request.headers.get("accept") ?? "");
 }
 
-const OK = {
-  ...ARTICLES_OK,
-  ...ADS_OK,
-  ...EVENTS_OK,
-  web: "Svoz a kontakt jsou uložené.",
-  texty: "Texty jsou uložené.",
-  uvitani: "Texty jsou uložené. Uvítací okno se ukáže znovu všem, i těm, kdo ho už viděli.",
-  heslo: "Heslo je změněné.",
-  jmeno: "Údaje jsou uložené.",
-  rubrika: "Rubrika je uložená.",
-  "rubrika-upravena": "Rubrika je upravená.",
-  "rubrika-smazana": "Rubrika je smazaná.",
-  clovek: "Přispěvatel má účet.",
-  "clovek-vypnut": "Účet je vypnutý.",
-  "clovek-zapnut": "Účet je zase aktivní.",
-  "clovek-heslo": "Heslo přispěvatele je nastavené.",
-  "clovek-udaje": "Údaje přispěvatele jsou uložené.",
-  ...OUTAGE_OK,
-  ...PLACES_OK,
-  ...YARDS_OK,
-  ...DOCTORS_OK,
-  ...REQUESTS_OK,
-  ...STOCK_OK,
-  ...IMPORT_OK,
-  ...DRBENA_OK,
-  ...FOOTBALL_OK,
-  ...DENIK_OK,
-  ...SKOLA_OK,
-  ...CHAT_OK,
-  ...MESSAGES_OK,
-};
 
 // Stránky, které berou data z loadPublic.
 const PUBLIC_PAGES = new Set([
@@ -195,17 +135,18 @@ function ctxFor(request, path) {
   return { path, mainOrigin: url.origin, origin: url.origin };
 }
 
-function messageFrom(url) {
-  const chyba = url.searchParams.get("chyba");
-  if (chyba) return { text: chyba, kind: "bad" };
-  const ok = url.searchParams.get("ok");
-  if (ok && OK[ok]) return { text: OK[ok], kind: "ok" };
-  return { text: "", kind: "ok" };
-}
 
 function kickOutageRefresh(env, ctx, board) {
   if (!ctx?.waitUntil || !feedIsStale(board)) return;
   ctx.waitUntil(refreshOutages(env).catch(() => {}));
+}
+
+// S Cloudflare Access: první stránka redakce v okně prohlížeče jde do historie jako přihlášení.
+async function withAccessLogin(env, request, data, response) {
+  if (!accessConfig(env) || !data?.user) return response;
+  const cookie = await auditAccessLogin(env, request, data.user, secure(request)).catch(() => null);
+  if (cookie) response.headers.append("set-cookie", cookie);
+  return response;
 }
 
 async function renderGet(request, env, url, execution) {
@@ -296,91 +237,8 @@ async function renderGet(request, env, url, execution) {
   }
   if (path === "/redakce") return redirect("/redakce/prehled");
   if (path.startsWith("/redakce/")) {
-    const data = admin;
-    const tab = path.slice("/redakce/".length);
-    const message = messageFrom(url);
-    const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "drbena", "chat"]);
-    if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
-      return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
-    }
-    const query = adminQuery(url);
-    if (tab === "prehled") return html(adminOverview(ctx, data, message));
-    if (tab === "reklamy") return html(adminAds(ctx, data, message, query));
-    if (tab === "zpravy") return html(adminArticles(ctx, data, message, query));
-    if (tab === "rubriky") return html(adminRubrics(ctx, data, message, query));
-    if (tab === "akce") return html(adminEvents(ctx, data, message, query));
-    if (tab === "texty") return html(adminTexts(ctx, data, message));
-    if (tab === "svoz") return html(adminSite(ctx, data, message));
-    if (tab === "dvory") {
-      if (data.signedIn && !canSeeHours(data.user, "dvory")) {
-        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na sběrné dvory potřebuješ oprávnění.")}`);
-      }
-      return html(adminYards(ctx, data, message, query));
-    }
-    if (tab === "lekari") {
-      if (data.signedIn && !canSeeHours(data.user, "lekari")) {
-        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na lékaře potřebuješ oprávnění.")}`);
-      }
-      return html(adminDoctors(ctx, data, message, query));
-    }
-    if (tab === "vzkazy") {
-      if (data.signedIn && !userCan(data.user, "vzkazy")) {
-        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na vzkazy potřebuješ oprávnění.")}`);
-      }
-      if (data.signedIn) [data.messages, data.chatOff] = await Promise.all([loadMessages(env), chatEnabled(env).then((on) => !on)]);
-      return html(adminMessages(ctx, data, message, { remove: Number(url.searchParams.get("smazat")) || 0 }));
-    }
-    if (tab === "statistiky") {
-      if (data.signedIn && !userCan(data.user, "statistiky")) {
-        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na statistiky potřebuješ oprávnění.")}`);
-      }
-      const period = Number(url.searchParams.get("obdobi"));
-      if (data.signedIn) data.stats = await loadStats(env, STAT_PERIODS.includes(period) ? period : 30);
-      return html(adminStats(ctx, data, message));
-    }
-    if (tab === "oteviraci-doba") {
-      if (data.signedIn && !canSeeHours(data.user, "oteviraci-doba")) {
-        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na otevírací dobu potřebuješ oprávnění.")}`);
-      }
-      return html(adminPlaces(ctx, data, message, query));
-    }
-    if (tab === "obrazky") {
-      if (data.signedIn && !userCan(data.user, "obrazky")) {
-        return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Na knihovnu obrázků potřebuješ oprávnění.")}`);
-      }
-      return html(adminStock(ctx, data, message, query));
-    }
-    if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
-    if (tab === "munipolis") {
-      // Otevřená stránka dopisuje, co redakce vybrala (na pozadí, po krátkých dávkách).
-      if (data.signedIn && (await continueImport(env, { ctx: execution })).background) data.importSettings = await loadImportSettings(env);
-      return html(adminMunipolis(ctx, data, message, query));
-    }
-    if (tab === "fotbal") {
-      if (data.signedIn && (await continueFootball(env, { ctx: execution })).background) data.footballSettings = await loadFootballSettings(env);
-      return html(adminFootball(ctx, data, message, query));
-    }
-    if (tab === "denik") {
-      if (data.signedIn && (await continueDenik(env, { ctx: execution })).background) data.denikSettings = await loadDenikSettings(env);
-      return html(adminDenik(ctx, data, message, query));
-    }
-    if (Object.hasOwn(SCHOOLS, tab)) {
-      const source = SCHOOLS[tab];
-      if (data.signedIn && (await continueSkola(env, source, { ctx: execution })).background) {
-        data.schools = { ...data.schools, [tab]: { ...data.schools?.[tab], settings: await loadSkolaSettings(env, source) } };
-      }
-      return html(adminSkola(ctx, data, message, query, source));
-    }
-    if (tab === "drbena") {
-      if (data.signedIn) data.assist = await loadAssistAdmin(env, pragueNow().date);
-      return html(adminDrbena(ctx, data, message));
-    }
-    if (tab === "chat") {
-      if (data.signedIn) data.chat = await loadChatAdmin(env);
-      return html(adminChat(ctx, data, message, query));
-    }
-    if (tab === "lide") return html(adminPeople(ctx, data, message, query));
-    if (tab === "heslo") return html(adminPassword(ctx, data, message));
+    const page = await renderAdmin(env, url, ctx, admin, execution);
+    if (page) return withAccessLogin(env, request, admin, page);
   }
   return notFound(request, env, { ...ctx, path: "/" });
 }
@@ -396,23 +254,35 @@ async function renderPost(request, env, url, execution) {
   const assist = await assistPost(path, request, env);
   if (assist) return assist;
 
+  if (path === "/redakce/prihlasit") {
+    const fields = await formFields(request);
+    const result = await login(env, fields.login, fields.password);
+    await auditLogin(env, result, fields.login).catch(() => {});
+    if (!result.ok) return redirect(`/redakce/prehled?chyba=${encodeURIComponent(result.error)}`);
+    return redirect("/redakce/prehled", sessionCookie(result.token, https));
+  }
+  if (path === "/redakce/odhlasit") {
+    await auditLogout(env, await currentUser(env, request)).catch(() => {});
+    await logout(env, request);
+    return redirect(accessConfig(env) ? ACCESS_LOGOUT : "/redakce/prehled", clearCookie(https));
+  }
+
+  // Texty webu čtou formulář samy (pole podle seznamu textů).
+  const fields = path === "/redakce/texty/ulozit" ? {} : await formFields(request);
+  // Historie změn: snímek dotčených záznamů před uložením a po něm.
+  const watch = path.startsWith("/redakce/") ? await auditStart(env, path, fields, () => currentUser(env, request)).catch(() => null) : null;
+  const response = await handlePost(request, env, path, https, fields, execution);
+  await auditFinish(env, watch, response, OK).catch(() => {});
+  return response;
+}
+
+async function handlePost(request, env, path, https, fields, execution) {
   if (path === "/redakce/texty/ulozit") {
     const result = await saveCopy(env, request);
     if (!result.ok) return redirect(`/redakce/texty?chyba=${encodeURIComponent(result.error)}`);
     return redirect(`/redakce/texty?ok=${result.welcomeAgain ? "uvitani" : "texty"}`);
   }
 
-  const fields = await formFields(request);
-
-  if (path === "/redakce/prihlasit") {
-    const result = await login(env, fields.login, fields.password);
-    if (!result.ok) return redirect(`/redakce/prehled?chyba=${encodeURIComponent(result.error)}`);
-    return redirect("/redakce/prehled", sessionCookie(result.token, https));
-  }
-  if (path === "/redakce/odhlasit") {
-    await logout(env, request);
-    return redirect(accessConfig(env) ? ACCESS_LOGOUT : "/redakce/prehled", clearCookie(https));
-  }
   if (path === "/redakce/lide/ulozit") {
     const result = await createContributor(env, request, fields);
     if (!result.ok) return redirect(`/redakce/lide?chyba=${encodeURIComponent(result.error)}`);
@@ -482,8 +352,6 @@ async function renderPost(request, env, url, execution) {
   return new Response("Tahle akce tu není.", { status: 404 });
 }
 
-
-
 export default {
   async fetch(request, env, execution) {
     const url = new URL(request.url);
@@ -523,5 +391,6 @@ export default {
     for (const source of SCHOOL_LIST) ctx.waitUntil(runSkola(env, source).catch(() => {}));
     ctx.waitUntil(runNdic(env).catch(() => {}));
     ctx.waitUntil(fillKeywords(env).catch(() => {}));
+    ctx.waitUntil(pruneAudit(env).catch(() => {}));
   },
 };

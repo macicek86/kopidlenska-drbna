@@ -107,13 +107,13 @@ export async function login(env, loginName, password) {
   if (accessConfig(env)) return { ok: false, error: ACCESS_ON };
   const name = normalizeLogin(loginName);
   if (!name || !String(password ?? "")) return { ok: false, error: "Doplňte jméno a heslo." };
-  const row = await env.DB.prepare("select id, password_hash, active from users where login = ?").bind(name).first();
+  const row = await env.DB.prepare("select id, name, password_hash, active from users where login = ?").bind(name).first();
   if (!row || !asBool(row.active) || !(await verifyPassword(password, row.password_hash))) {
     return { ok: false, error: "Jméno nebo heslo nesedí." };
   }
   const next = token();
   await env.DB.prepare("update users set session_token = ? where id = ?").bind(next, row.id).run();
-  return { ok: true, token: next };
+  return { ok: true, token: next, user: { id: Number(row.id), name: String(row.name) } };
 }
 
 export async function logout(env, request) {

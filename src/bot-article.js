@@ -9,6 +9,7 @@ import { ensureBot } from "./munipolis/store.js";
 import { prepareArticleBody } from "./rich.js";
 import { attachmentsJson } from "./attachments.js";
 import { markRecalled } from "./drbena-memory.js";
+import { auditBot } from "./audit.js";
 
 export async function saveBotArticle(env, { article, image, attachments = [], sourceHtml, autoPublish, rubric, publishOn = "", followsId = null }) {
   const bot = await ensureBot(env);
@@ -28,6 +29,7 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
     )
       .bind(slug, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached, publishOn, bot.id, bot.name, keywords, followsId)
       .run();
+    await auditBot(env, bot, { title: article.title, published: true }).catch(() => {});
     return { articleId: Number(result.meta.last_row_id) };
   }
   const result = await env.DB.prepare(
@@ -41,5 +43,6 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
       article.title, article.excerpt, body, rubric.name, publishOn, keywords, followsId,
     )
     .run();
+  await auditBot(env, bot, { title: article.title, published: false }).catch(() => {});
   return { proposalId: Number(result.meta.last_row_id) };
 }
