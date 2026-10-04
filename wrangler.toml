@@ -9,8 +9,10 @@ routes = [
   { pattern = "kopidlenskadrbna.org", custom_domain = true },
   { pattern = "www.kopidlenskadrbna.org", custom_domain = true }
 ]
-# Až Cloudflare Access hlídá redakci i na kopidlenskadrbna.org, přidat nahoru k name workers_dev = false
-# a preview_urls = false, ať redakce nejde obejít kolem Accessu.
+# Stará adresa *.workers.dev zatím jen přesměruje na www (hostRedirect). Až nebude potřeba, dát workers_dev = false.
+# Náhledy verzí (preview_urls) jsou vypnuté, ať redakce nejde obejít, až ji bude hlídat Cloudflare Access.
+workers_dev = true
+preview_urls = false
 
 # Cloudflare Access: ACCESS_TEAM (název týmu, třeba „drbna“ z drbna.cloudflareaccess.com) a ACCESS_AUD
 # (Application Audience tag) se nastavují jako tajemství: npx wrangler secret put ACCESS_TEAM

@@ -49,7 +49,7 @@ Cloudflare Worker (D1 + R2), bez frameworku. HTML skládají funkce v `src/`, v 
 
 Na produkci hlídá redakci Cloudflare Access (Zero Trust). Worker ověří token z hlavičky `Cf-Access-Jwt-Assertion` (podpis, AUD, vydavatel, platnost; `src/access.js`) a podle e-mailu najde účet v `users.email`. Hesla jsou pak vypnutá, odhlášení vede na `/cdn-cgi/access/logout`.
 Zapíná se to tajemstvími `ACCESS_TEAM` a `ACCESS_AUD` (`npx wrangler secret put …`). Bez nich (místně, náhled, smoke test) se redakce přihlašuje heslem jako dřív.
-Drbna běží na `www.kopidlenskadrbna.org` (`routes` ve `wrangler.toml`), `kopidlenskadrbna.org` a zatím zapnutá `*.workers.dev` na ni přesměrují i s cestou (`hostRedirect` v `src/http.js`; `/ndic/uzavirky` ne, NDIC přesměrování nesleduje). `popelnice.kopidlenskadrbna.org` zatím zůstává u starého webu; až ji přidáme do `routes`, přesměruje na `/popelnice`, Access nepotřebuje. Až Access hlídá redakci i na `www.kopidlenskadrbna.org`, vypnout `workers_dev` a `preview_urls` (návod je ve `wrangler.toml`).
+Drbna běží na `www.kopidlenskadrbna.org` (`routes` ve `wrangler.toml`), `kopidlenskadrbna.org` a zatím zapnutá `*.workers.dev` na ni přesměrují i s cestou (`hostRedirect` v `src/http.js`; `/ndic/uzavirky` ne, NDIC přesměrování nesleduje). `popelnice.kopidlenskadrbna.org` zatím zůstává u starého webu; až ji přidáme do `routes`, přesměruje na `/popelnice`, Access nepotřebuje. Až přesměrování z workers.dev nebude potřeba, dát ve `wrangler.toml` `workers_dev = false`; `preview_urls` jsou vypnuté.
 
 ## Redakce: jak fungují okna
 
