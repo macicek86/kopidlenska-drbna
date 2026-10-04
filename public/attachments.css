@@ -47,7 +47,11 @@
   padding: 0.6rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
 }
 
-.attachment-bar p { flex: 1; margin: 0; font-size: 0.95rem; line-height: 1.35; }
+.attachment-text { flex: 1; min-width: 0; }
+.attachment-text p { margin: 0; font-size: 0.95rem; line-height: 1.35; }
+.attachment-text p:empty { display: none; }
+.attachment-hint { display: block; margin-top: 0.15rem; font-size: 0.82rem; opacity: 0.7; }
+.attachment-hint::before { content: "🔍 "; }
 .attachment-count { flex: none; font-size: 0.9rem; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .attachment-viewer.is-single .attachment-prev,
 .attachment-viewer.is-single .attachment-next { display: none; }

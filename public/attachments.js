@@ -1,5 +1,5 @@
 // Přílohy pod zprávou (src/attachments.js): ťuknutím se obrázek otevře v okně na stránce,
-// šipkami (nebo tlačítky) se listuje mezi přílohami, ťuknutím na obrázek se zvětší na plnou velikost.
+// šipkami (nebo tlačítky) se listuje mezi přílohami, ťuknutím na obrázek se zvětší na plnou velikost (nápověda pod popiskem).
 // Bez JS odkaz otevře obrázek samotný.
 const links = [...document.querySelectorAll(".article-attachments a[href]")];
 
@@ -23,21 +23,30 @@ function build() {
   frame.append(image);
   const bar = document.createElement("div");
   bar.className = "attachment-bar";
+  const text = document.createElement("div");
+  text.className = "attachment-text";
   const caption = document.createElement("p");
+  const hint = document.createElement("small");
+  hint.className = "attachment-hint";
+  text.append(caption, hint);
   const count = document.createElement("span");
   count.className = "attachment-count";
   const prev = button("attachment-prev", "Předchozí příloha", "‹");
   const next = button("attachment-next", "Další příloha", "›");
   const close = button("attachment-close", "Zavřít", "×");
-  bar.append(prev, count, caption, next);
+  bar.append(prev, count, text, next);
   dialog.append(close, frame, bar);
   document.body.append(dialog);
 
   let index = 0;
+  const zoom = (on) => {
+    frame.classList.toggle("is-zoomed", on);
+    hint.textContent = on ? "Posuňte prstem, ťuknutím zmenšíte" : "Ťuknutím na obrázek ho zvětšíte";
+  };
   const show = (to) => {
     index = (to + links.length) % links.length;
     const link = links[index];
-    frame.classList.remove("is-zoomed");
+    zoom(false);
     frame.scrollTo(0, 0);
     image.src = link.href;
     image.alt = link.querySelector("img")?.alt ?? "";
@@ -49,7 +58,7 @@ function build() {
   prev.addEventListener("click", () => show(index - 1));
   next.addEventListener("click", () => show(index + 1));
   close.addEventListener("click", () => dialog.close());
-  image.addEventListener("click", () => frame.classList.toggle("is-zoomed"));
+  image.addEventListener("click", () => zoom(!frame.classList.contains("is-zoomed")));
   // Klik vedle obrázku (na ztmavené pozadí) okno zavře.
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog || event.target === frame) dialog.close();
