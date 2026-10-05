@@ -32,6 +32,18 @@ test("stejné dny po sobě jsou jeden řádek, dnešek zvlášť, běžně zavř
     ["2026-10-08", "2026-10-08", null],
     ["2026-10-09", "2026-10-09", null],
   ]);
+  // Dlouhé zavření je jeden řádek od začátku do konce, i když začalo dnes a trvá přes víkend a za 7 dní.
+  const long = dayGroups({ ...kvc, changes: [closure("2026-10-07", "2026-10-20")] }, "2026-10-07");
+  // Pod ním je první den, kdy se zase otevře.
+  assert.deepEqual(long.map((group) => [group.from, group.to, group.change?.id ?? null]), [
+    ["2026-10-07", "2026-10-20", 9],
+    ["2026-10-21", "2026-10-21", null],
+  ]);
+  // V sobotu uprostřed zavření nemá dnešek vlastní řádek.
+  assert.deepEqual(dayGroups({ ...kvc, changes: [closure("2026-10-07", "2026-10-20")] }, "2026-10-10").map((group) => group.from), ["2026-10-07", "2026-10-21"]);
+  // Zavření do pátku: další otevřený den je až pondělí za 7 dní.
+  const friday = dayGroups({ ...kvc, changes: [closure("2026-10-05", "2026-10-09")] }, "2026-10-05");
+  assert.deepEqual(friday.map((group) => group.from), ["2026-10-05", "2026-10-12"]);
 });
 
 test("kdo má teď otevřeno: otevřeno, pauza, později a další otevření", () => {
@@ -46,12 +58,19 @@ test("kdo má teď otevřeno: otevřeno, pauza, později a další otevření", 
   assert.deepEqual(state, { open: false, text: "Zavřeno, ve středu od 9:00", note: "dovolená" });
 });
 
-test("stránka: přehled nahoře vede na karty, sloučené dny mají časy na jednom řádku", () => {
-  const data = { places: [knihovna, kvc], waste: { today: "2026-10-05" }, now: { date: "2026-10-05", time: "10:30" } };
+test("stránka: přehled nahoře vede na karty, se změnou sloučené dny mají časy na jednom řádku", () => {
+  const closed = { ...kvc, changes: [closure("2026-10-09", "2026-10-09")] };
+  const data = { places: [knihovna, closed], waste: { today: "2026-10-05" }, now: { date: "2026-10-05", time: "10:30" } };
   const page = placesPage(data, { path: "/oteviraci-doba", copy: {} });
   assert.match(page, /Kdo má teď otevřeno <span class="now-time">10:30<\/span>/);
   assert.match(page, /<li class="is-soon"><a href="#misto-1">Knihovna<\/a><span class="now-state">Dnes od 13:00<\/span><\/li>/);
   assert.match(page, /<li class="is-open"><a href="#misto-2">Komunitní a vzdělávací centrum<\/a><span class="now-state">Otevřeno do 12:00<\/span><\/li>/);
   assert.match(page, /<span class="day">Úterý–čtvrtek 6\.–8\.&nbsp;10\.<\/span><p class="parts one-line"><strong>09:00–12:00<\/strong>, <strong>13:00–17:00<\/strong><\/p>/);
   assert.doesNotMatch(page, /place-jump/);
+  // Knihovna se tento týden nemění: sloučený běžný týden od pondělí s daty, bez zavřených dnů, bez okna s běžnou dobou.
+  const card = page.slice(page.indexOf('id="misto-1"'), page.indexOf('id="misto-2"'));
+  assert.match(card, /<li class="is-today"><span class="day">Pondělí 5\.&nbsp;10\.<span class="today-mark">dnes<\/span><\/span>/);
+  assert.match(card, /<span class="day">Úterý 6\.&nbsp;10\.<\/span>/);
+  assert.doesNotMatch(card, /Středa|zavřeno|bezne-misto/);
+  assert.match(page, /bezne-misto-2/);
 });

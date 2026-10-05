@@ -1,9 +1,9 @@
-// Výpis hodin lékařů a míst: příštích 7 dní (stejné dny po sobě sloučené, změny přepíšou běžné hodiny a jsou zvýrazněné),
+// Výpis hodin lékařů a míst: běžný týden od pondělí, a když se v příštích 7 dnech něco mění, příštích 7 dní (stejné dny po sobě sloučené, změny přepíšou běžné hodiny a jsou zvýrazněné),
 // běžný týden v okně a stručné dlaždice změn, které do 7 dní celé nespadají.
 import { periodClosed } from "./doctors.js";
 import { addDays, civilWeekday, daysBetween } from "./waste.js";
 import { esc } from "./html.js";
-import { dayGroups, laterChanges } from "./hours-days.js";
+import { dayGroups, laterChanges, weekGroups } from "./hours-days.js";
 import { closureLabel, dayLabel } from "./view.js";
 import { formatLong } from "./format.js";
 
@@ -51,18 +51,41 @@ function groupLabel(from, to) {
   return `${esc(first)}–${esc(last)} ${start}–${shortDate(to)}`;
 }
 
+// Běžný týden sloučený s daty tohoto týdne („Pondělí–čtvrtek 5.–8. 10.“), od pondělí do neděle.
+// Řádek s dneškem je zvýrazněný.
+export function weekGroupsList(week, today) {
+  const offset = (day) => (day + 6) % 7;
+  const monday = addDays(today, -offset(civilWeekday(today)));
+  return `<ul class="week-list doctor-week next-days">${weekGroups(week)
+    .map(({ from, to, slot }) => {
+      const first = addDays(monday, offset(from));
+      const last = addDays(monday, offset(to));
+      const isToday = first <= today && today <= last;
+      const mark = isToday ? `<span class="today-mark">dnes</span>` : "";
+      return `<li${isToday ? ` class="is-today"` : ""}><span class="day">${groupLabel(first, last)}${mark}</span>${groupBody(slot)}</li>`;
+    })
+    .join("")}</ul>`;
+}
+
+// Zavření přes víc než týden: „Středa 7. 10. – úterý 20. 10.“ (kratší jako ostatní řádky).
+function rangeLabel(from, to) {
+  if (daysBetween(from, to) < 7) return groupLabel(from, to);
+  return `${esc(dayLabel(civilWeekday(from)))} ${shortDate(from)} – ${esc(dayLabel(civilWeekday(to)).toLowerCase())} ${shortDate(to)}`;
+}
+
 // Příštích 7 dní od dneška. Den se změnou má štítek a důvod změny.
 export function nextDaysList(entity, today) {
   return `<ul class="week-list doctor-week next-days">${dayGroups(entity, today)
-    .map(({ from, to, slot, change, kind }) => {
+    .map(({ from, to, slot, change, kind, whole }) => {
       const open = Boolean(slot.morning?.open || slot.afternoon?.open);
-      const classes = [from === today ? "is-today" : "", change ? "is-change" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
-      const mark = from === today ? `<span class="today-mark">dnes</span>` : "";
+      const isToday = from <= today && today <= to;
+      const classes = [isToday ? "is-today" : "", change ? "is-change" : "", open ? "" : "is-off"].filter(Boolean).join(" ");
+      const mark = isToday ? `<span class="today-mark">dnes</span>` : "";
       const label = kind === "nova" ? "nová doba" : "změna";
       const note = change
         ? `<p class="change-note"><span class="change-mark">${label}</span>${change.note ? ` ${esc(change.note)}` : ""}</p>`
         : "";
-      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${groupLabel(from, to)}${mark}</span>${groupBody(slot)}${note}</li>`;
+      return `<li${classes ? ` class="${classes}"` : ""}><span class="day">${whole ? rangeLabel(from, to) : groupLabel(from, to)}${mark}</span>${groupBody(slot)}${note}</li>`;
     })
     .join("")}</ul>`;
 }

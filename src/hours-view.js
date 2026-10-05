@@ -3,8 +3,9 @@ import { text as tx } from "./copy.js";
 import { hasOpenSlot } from "./doctors.js";
 import { esc } from "./html.js";
 import { nowOverview } from "./hours-now.js";
-import { laterChangeTiles, nextDaysList, popover, popoverButton, regularWeekList } from "./hours-week-view.js";
+import { laterChangeTiles, nextDaysList, popover, popoverButton, regularWeekList, weekGroupsList } from "./hours-week-view.js";
 import { placeNotices } from "./places.js";
+import { changesSoon } from "./hours-days.js";
 import { doctorLd, placeLd } from "./hours-ld.js";
 import { askLine, layout, siteOrigin } from "./view.js";
 
@@ -30,19 +31,22 @@ function noticeBanner(notice, extraClass = "") {
   return `<div class="banner doctor-notice${extraClass}"><p>${glueDates(lead)}</p>${notice.note ? `<p class="banner-note">${glueDates(notice.note)}</p>` : ""}</div>`;
 }
 
-// Hodiny jednoho lékaře nebo místa: příštích 7 dní, pod nimi běžný týden v okně a změny, které do 7 dní nespadají.
+// Hodiny jednoho lékaře nebo místa. Bez změny v příštích 7 dnech sloučený běžný týden od pondělí; se změnou příštích 7 dní s datem
+// a běžný týden v okně. Pod tím změny, které do 7 dní nespadají.
 function hoursBlock(entity, today, ctx, keys) {
   if (!hasOpenSlot(entity.week) && !(entity.changes ?? []).length) {
     return { days: `<p class="muted">${esc(tx(ctx.copy, keys.missing))}</p>`, more: "" };
   }
+  const soon = changesSoon(entity, today);
   const id = `bezne-${keys.prefix}-${entity.id}`;
   const label = tx(ctx.copy, keys.regular);
-  const regular = hasOpenSlot(entity.week)
+  const regular = soon && hasOpenSlot(entity.week)
     ? `<p class="regular-hours">${popoverButton(id, label)}</p>${popover(id, entity.name, label, regularWeekList(entity.week))}`
     : "";
   const tiles = laterChangeTiles(entity, today, keys.prefix);
   const later = tiles ? `<p class="kicker">${esc(tx(ctx.copy, keys.changes))}</p><div class="dates compact">${tiles}</div>` : "";
-  return { days: nextDaysList(entity, today), more: `${regular}${later}` };
+  const days = soon ? nextDaysList(entity, today) : weekGroupsList(entity.week, today);
+  return { days, more: `${regular}${later}` };
 }
 
 // Změny hodin lékařů, míst i sběrných dvorů jsou v jednom feedu.

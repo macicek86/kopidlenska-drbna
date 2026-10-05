@@ -138,6 +138,7 @@
    Svislá čára vede od dne k jeho časům; u dne se změnou je červená a časy tučně. */
 :is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.35rem; align-items: start; }
 :is(.doctor-grid, .place-grid) .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+:is(.doctor-grid, .place-grid) .doctor-week li.is-off .day { white-space: normal; }
 
 :is(.doctor-grid, .place-grid) .doctor-week .day,
 :is(.doctor-grid, .place-grid) .doctor-week li.is-today .day { font-size: 1.02rem; }
