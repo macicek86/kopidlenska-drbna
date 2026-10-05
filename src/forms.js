@@ -164,6 +164,8 @@ export async function formFields(request) {
     archive: text("archive"),
     football: text("football"),
     articleText: text("text"),
+    memory: form.get("memory") === "1",
+    auto: form.get("auto") === "1",
     autoPublish: form.get("autoPublish") === "1",
     followupPublish: form.get("followupPublish") === "1",
     clubUrl: text("clubUrl"),
