@@ -5,7 +5,8 @@ import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { HOURS_RULES, hoursSchema, readHours } from "./hours.js";
-import { contextText } from "../import-overview.js";
+import { contentText, importContent } from "../import-overview.js";
+import { importLookup, withLookups } from "../import-tools.js";
 import { topicsText } from "../stock.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
@@ -173,24 +174,30 @@ export function itemText(item) {
   ].join("\n\n");
 }
 
+// Dotaz na jednu zprávu: přehled (cache), obrázky a nakonec zpráva sama.
+export function userContent(item, known, { today, force = false, topics = [], images = [] }) {
+  const media = images.flatMap((image, index) => [
+    { type: "text", text: `Obrázek ${index + 1}:` },
+    { type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } },
+  ]);
+  return importContent(known, {
+    today,
+    topics: topicsText(topics),
+    media,
+    tail: [itemText(item), images.length ? `Přiložené obrázky: ${images.length}.` : "Bez přiloženého obrázku.", force ? FORCE : ""],
+  });
+}
+
 export function userText(item, known, { today, force = false, topics = [], images = 0 }) {
-  return [
-    `Dnes je ${today}.`,
-    contextText(known),
-    topicsText(topics),
-    itemText(item),
-    images ? `Přiložené obrázky: ${images}.` : "Bez přiloženého obrázku.",
-    force ? FORCE : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const fake = Array.from({ length: images }, () => ({ type: "image/png", bytes: new Uint8Array() }));
+  return contentText(userContent(item, known, { today, force, topics, images: fake }));
 }
 
 function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|misto|lekar):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|webmesta|misto|lekar):\d+$/;
 
 // Článek z odpovědi Claude, nebo null, když ho nechtěl napsat nebo v něm něco chybí. Sdílí ho i Deník a NDIC.
 export function readArticle(raw, rubricSlugs) {
@@ -307,20 +314,14 @@ export function visibleImages(images) {
 // Jedno volání Claude. `images` jsou už stažené obrázky ({ bytes, type }), `topics` témata knihovny obrázků.
 export async function askClaude(env, { item, known, images = [], topics = [], rubricSlugs, voice, today, force = false }) {
   const shown = visibleImages(images);
-  const content = [
-    ...shown.flatMap((image, index) => [
-      { type: "text", text: `Obrázek ${index + 1}:` },
-      { type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } },
-    ]),
-    { type: "text", text: userText(item, known, { today, force, topics, images: shown.length }) },
-  ];
+  const content = userContent(item, known, { today, force, topics, images: shown });
   const schema = outputSchema(rubricSlugs, { hours: true, topics: topics.map((topic) => topic.slug), followup: true, attachments: true });
   const system = systemPrompt(voice, { rubricSlugs });
-  const answer = await callClaude(env, { system, content, schema });
+  const answer = await callClaude(env, { system, content, schema, lookup: importLookup(env) });
   if (!answer.ok) return answer;
-  const decision = readDecision(answer.raw, { rubricSlugs, force });
+  const decision = withLookups(readDecision(answer.raw, { rubricSlugs, force }), answer);
   if (!decision.ok || decision.decision !== "doplneni") return decision;
-  return writeFollowup(env, decision, {
+  const written = await writeFollowup(env, decision, {
     system,
     sourceText: itemText(item),
     articleSchema: outputSchema(rubricSlugs, { topics: topics.map((topic) => topic.slug), ownImage: false }).properties.article,
@@ -328,4 +329,5 @@ export async function askClaude(env, { item, known, images = [], topics = [], ru
     topics,
     today,
   });
+  return withLookups(written, decision);
 }

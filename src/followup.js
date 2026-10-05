@@ -3,7 +3,7 @@
 // zprávu a napíše novou, která na ni navazuje. Jde jako návrh, rovnou na web jen se zapnutým nastavením na stránce Koza Drběna.
 import { saveBotArticle } from "./bot-article.js";
 import { pragueNow } from "./waste.js";
-import { callClaude } from "./claude.js";
+import { addUsage, callClaude } from "./claude.js";
 import { loadDrbena } from "./drbena-db.js";
 import { prepareArticleBody } from "./rich.js";
 import { MAX_FOLLOWUPS } from "./followup-rules.js";
@@ -87,23 +87,25 @@ export async function writeFollowup(env, decision, { system, sourceText, article
   if (target.followups >= MAX_FOLLOWUPS) return DOUBLE(`${decision.reason} Ke zprávě už je doplnění dost.`, ref);
   let retry = "";
   let problem = "";
+  let usage = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const answer = await callClaude(env, {
       system: `${system}\n\n${WRITE_RULES}`,
       content: [{ type: "text", text: followupText(target, sourceText, { today, topics, retry }) }],
       schema: followupSchema(articleSchema),
     });
-    if (!answer.ok) return answer;
+    if (!answer.ok) return { ...answer, usage };
+    usage = addUsage(usage, answer.usage);
     const reason = String(answer.raw?.reason ?? "").replace(/\s+/g, " ").trim().slice(0, 400) || decision.reason;
-    if (answer.raw?.decision === "duplicita") return DOUBLE(reason, ref);
+    if (answer.raw?.decision === "duplicita") return { ...DOUBLE(reason, ref), usage };
     const article = readArticle({ ...answer.raw?.article, include: true });
     if (!article) return { ok: false, error: "Claude chtěl napsat doplnění, ale nevrátil článek, který by šel uložit." };
-    const written = { ok: true, decision: "doplneni", reason, duplicateOf: ref, article, target, event: null, notice: null, hours: [] };
+    const written = { ok: true, decision: "doplneni", reason, duplicateOf: ref, article, target, event: null, notice: null, hours: [], usage };
     problem = check(written);
     if (!problem) return written;
     retry = `Minulý pokus nešel použít: ${problem} Napiš to znovu, úplně vlastními slovy a bez zmínky o zdroji.`;
   }
-  return { ok: false, error: `${problem} Zkusí to znovu příště.` };
+  return { ok: false, error: `${problem} Zkusí to znovu příště.`, usage };
 }
 
 function attr(value) {

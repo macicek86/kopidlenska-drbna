@@ -1,4 +1,4 @@
-// Jeden průchod webu školy: stáhnout články, nové dát Claudovi a výsledek uložit jako zprávu (návrh) nebo akci.
+// Jeden průchod webu školy nebo města: stáhnout články, nové dát Claudovi a výsledek uložit jako zprávu (návrh) nebo akci.
 // Všechny funkce berou školu ze `sources.js` (bez ní ZŠ a MŠ).
 import { saveBotEvent } from "../events-db.js";
 import {
@@ -18,6 +18,7 @@ import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { memoryOn, withMemory } from "../drbena-memory.js";
 import { fetchImage, storeImageBytes } from "../images.js";
+import { noteReads } from "../import-tools.js";
 import { importSourceDate, importSummary, knownContent, rubricMap } from "../import-context.js";
 import { visibleImages } from "../munipolis/ai.js";
 import { pragueNow } from "../waste.js";
@@ -38,7 +39,7 @@ import {
 
 export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
-const BUSY = "Drběna už web školy čte. Počkejte, stránka se sama obnoví.";
+const BUSY = "Drběna už ten web čte. Počkejte, stránka se sama obnoví.";
 
 export function skolaSource(link, source = SCHOOLS.skola) {
   if (!link) return `<p><em>Zdroj: web ${source.name}</em></p>`;
@@ -46,7 +47,7 @@ export function skolaSource(link, source = SCHOOLS.skola) {
   return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">web ${source.name}</a></em></p>`;
 }
 
-// Fotka je z webu školy, i když ji škole dal někdo jiný (autora uvede Drběna v popisku, když ho škola zmíní).
+// Fotka je z webu zdroje, i když ji škole (městu) dal někdo jiný (autora uvede Drběna v popisku, když ho škola zmíní).
 export function photoCaption(caption, source = SCHOOLS.skola) {
   const credit = `foto: web ${source.name}`;
   return caption ? `${caption} (${credit})` : `F${credit.slice(1)}`;
@@ -61,7 +62,7 @@ async function downloadImages(env, urls, fetchImpl) {
   return images;
 }
 
-// Fotku ze školního webu jen se zapnutým nastavením a když ji Drběna vybrala (i pěkný plakát, ořízne se jako fotka), jinak ilustrační z knihovny.
+// Fotku z webu zdroje jen se zapnutým nastavením a když ji Drběna vybrala (i pěkný plakát, ořízne se jako fotka), jinak ilustrační z knihovny.
 export async function skolaImage(env, article, images, ownPhotos, source = SCHOOLS.skola) {
   const [own] = visibleImages(images);
   if (ownPhotos && article.imageUse !== "knihovna" && own) {
@@ -91,7 +92,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   });
   if (!answer.ok) {
     await finishSkolaItem(env, source, item.id, { status: "chyba", reason: answer.error });
-    return { ok: false, error: answer.error };
+    return { ok: false, error: answer.error, usage: answer.usage };
   }
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
@@ -103,17 +104,17 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
     });
     await finishSkolaItem(env, source, item.id, {
       status: "hotovo",
-      reason: followupReason(answer),
+      reason: noteReads(followupReason(answer), answer),
       duplicateOf: answer.duplicateOf,
       eventId: item.eventId,
       ...made,
     });
-    return { ok: true, status: "hotovo" };
+    return { ok: true, status: "hotovo", usage: answer.usage };
   }
   if (answer.decision !== "vytvorit") {
     const status = answer.decision === "duplicita" ? "duplicita" : "preskoceno";
-    await finishSkolaItem(env, source, item.id, { status, reason: answer.reason, duplicateOf: answer.duplicateOf });
-    return { ok: true, status };
+    await finishSkolaItem(env, source, item.id, { status, reason: noteReads(answer.reason, answer), duplicateOf: answer.duplicateOf });
+    return { ok: true, status, usage: answer.usage };
   }
 
   const made = {};
@@ -140,8 +141,8 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
       proposalId: made.proposalId,
     });
   }
-  await finishSkolaItem(env, source, item.id, { status: "hotovo", reason: answer.reason, ...made });
-  return { ok: true, status: "hotovo" };
+  await finishSkolaItem(env, source, item.id, { status: "hotovo", reason: noteReads(answer.reason, answer), ...made });
+  return { ok: true, status: "hotovo", usage: answer.usage };
 }
 
 // Stáhne RSS a nové články si zapamatuje. Rychlé, takže běží i přímo po kliknutí.

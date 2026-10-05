@@ -56,6 +56,7 @@ const DUPLICATE_OF = {
   denik: "stejné už přišlo z Deníku",
   skola: "stejné už přišlo z webu školy",
   zahradka: "stejné už přišlo z webu zahradnické školy",
+  webmesta: "stejné už přišlo z webu města",
 };
 
 function duplicateLabel(ref) {

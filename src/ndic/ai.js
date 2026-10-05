@@ -2,7 +2,8 @@
 import { callClaude } from "../claude.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { KEYWORDS_RULE } from "../keywords.js";
-import { contextText, outputSchema, readArticle } from "../munipolis/ai.js";
+import { contentText, importContent } from "../import-overview.js";
+import { outputSchema, readArticle } from "../munipolis/ai.js";
 import { noticeSpan, placeLines } from "../notices.js";
 import { topicsText } from "../stock.js";
 import { closureNotice } from "./closures.js";
@@ -94,25 +95,29 @@ function daysText(days) {
   return `${days} ${days >= 2 && days <= 4 ? "dny" : "dní"}`;
 }
 
-export function ndicText(row, known, { today, settings, wantArticle, topics = [] }) {
-  return [
-    `Dnes je ${today}.`,
-    contextText(known),
-    topicsText(topics),
-    `Uzavírka z NDIC:\n${closureText(row, settings)}`,
-    wantArticle
-      ? `Uzavírka je delší (${daysText(settings.articleDays)} a víc): napiš k ní i článek (article include true), pokud nejde o duplicitu.`
-      : "Uzavírka je krátká: článek nepiš (article include false), stačí oznámení.",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+// Uzavírky přicházejí po dávkách, přehled jde napřed kvůli cache (importContent).
+export function ndicContent(row, known, { today, settings, wantArticle, topics = [] }) {
+  return importContent(known, {
+    today,
+    topics: topicsText(topics),
+    tail: [
+      `Uzavírka z NDIC:\n${closureText(row, settings)}`,
+      wantArticle
+        ? `Uzavírka je delší (${daysText(settings.articleDays)} a víc): napiš k ní i článek (article include true), pokud nejde o duplicitu.`
+        : "Uzavírka je krátká: článek nepiš (article include false), stačí oznámení.",
+    ],
+  });
+}
+
+export function ndicText(row, known, options) {
+  return contentText(ndicContent(row, known, options));
 }
 
 function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|webmesta):\d+$/;
 
 // Ověří odpověď. U duplicity stačí značka, jinak musí být aspoň nadpis oznámení.
 export function readNdicDecision(raw, { rubricSlugs, wantArticle }) {
@@ -140,7 +145,7 @@ export async function askNdic(env, { row, known, settings, wantArticle, topics =
   const schema = ndicSchema(rubricSlugs, topics.map((topic) => topic.slug));
   const answer = await callClaude(env, {
     system: ndicPrompt(voice),
-    content: [{ type: "text", text: ndicText(row, known, { today, settings, wantArticle, topics }) }],
+    content: ndicContent(row, known, { today, settings, wantArticle, topics }),
     schema,
   });
   if (!answer.ok) return answer;

@@ -1,4 +1,4 @@
-// Přehled toho, co už na drbně je, jako text pro Claude (Munipolis, Deník, školy, NDIC; zprávy a návrhy i fotbal).
+// Přehled toho, co už na drbně je, jako text pro Claude (Munipolis, Deník, školy, web města, NDIC; zprávy a návrhy i fotbal).
 // Značky v hranatých závorkách vrací Claude v duplicate_of. Data skládá `knownContent` v import-context.js.
 import { hoursContext } from "./munipolis/hours.js";
 
@@ -32,11 +32,12 @@ export function addArticles(add, known) {
   add("Návrhy, které čekají na schválení", (known.proposals ?? []).map((row) => articleLine(row, "navrh")));
 }
 
-// Přehled toho, co už na drbně je. Značky v hranatých závorkách vrací Claude v duplicate_of.
-export function contextText(known) {
-  const parts = [];
-  const add = (heading, rows) => parts.push(`${heading}:\n${rows.length ? rows.join("\n") : "(nic)"}`);
-  addArticles(add, known);
+// Přehled toho, co už na drbně je, ve třech dílech podle toho, jak často se mění. Mezi články jedné dávky
+// se nemění `fixed` (akce, odstávky, otevírací doba), `articles` jen když Drběna něco napíše a `imports` po každém článku.
+export function contextSections(known) {
+  const section = (heading, rows) => `${heading}:\n${rows.length ? rows.join("\n") : "(nic)"}`;
+  const fixed = [];
+  const add = (heading, rows) => fixed.push(section(heading, rows));
   add(
     "Akce v kalendáři",
     (known.events ?? []).map(
@@ -63,10 +64,43 @@ export function contextText(known) {
       return `[ndic:${ref}] ${notice.startsOn}${notice.endsOn ? ` až ${notice.endsOn}` : notice.openEnded ? " do odvolání" : ""} · ${line(notice.title, 100)} · ${line(notice.places.join(", "))}${written ? ` · článek ${written}` : ""}`;
     }),
   );
-  add(
-    "Dřívější převzaté zprávy (Munipolis, Deník, školy)",
+  fixed.push(hoursContext(known));
+  const articles = [];
+  addArticles((heading, rows) => articles.push(section(heading, rows)), known);
+  const imports = section(
+    "Dřívější převzaté zprávy (Munipolis, Deník, školy, web města)",
     (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
   );
-  parts.push(hoursContext(known));
-  return parts.join("\n\n");
+  return { fixed: fixed.join("\n\n"), articles: articles.join("\n\n"), imports };
+}
+
+// Přehled toho, co už na drbně je. Značky v hranatých závorkách vrací Claude v duplicate_of.
+export function contextText(known) {
+  const { fixed, articles, imports } = contextSections(known);
+  return [fixed, articles, imports].join("\n\n");
+}
+
+const CACHED = { type: "ephemeral" };
+
+// Dotaz importu po blocích. Napřed to, co mají články jedné dávky společné, se značkami pro cache
+// (další článek pak tuhle část platí za zlomek ceny), potom převzaté zprávy, obrázky a nakonec věci jen pro tuhle položku.
+// `media` jsou hotové bloky obrázků, `tail` texty položky (prázdné se vynechají).
+export function importContent(known, { today, topics = "", media = [], tail = [] }) {
+  const { fixed, articles, imports } = contextSections(known);
+  const head = [`Dnes je ${today}.`, topics, fixed].filter(Boolean).join("\n\n");
+  return [
+    { type: "text", text: head, cache_control: CACHED },
+    { type: "text", text: articles, cache_control: CACHED },
+    { type: "text", text: imports },
+    ...media,
+    { type: "text", text: tail.filter(Boolean).join("\n\n") },
+  ];
+}
+
+// Text dotazu bez obrázků (testy, ukázka v redakci).
+export function contentText(content) {
+  return content
+    .filter((block) => block.type === "text")
+    .map((block) => block.text)
+    .join("\n\n");
 }

@@ -1,4 +1,4 @@
-// Zkouška povahy: Drběna napíše z vloženého textu ukázku stejně jako při importu. Nic se neukládá.
+// Zkouška povahy: Drběna napíše z vloženého textu ukázku stejně jako při importu (i s nástroji na čtení zpráv). Nic se neukládá.
 // Zpráva města dostane skutečný přehled toho, co na drbně je, a s pamětí i pravidlo src/drbena-memory.js.
 import { askFootball } from "./fotbal/ai.js";
 import { ownFootball, ownPersona, voiceFor } from "./drbena.js";
@@ -47,6 +47,7 @@ export function readTry(fields) {
     persona: String(fields.persona ?? ""),
     football: String(fields.football ?? ""),
     memory: Boolean(fields.memory),
+    auto: Boolean(fields.auto),
   };
 }
 
@@ -71,7 +72,8 @@ export async function tryVoice(env, input, { askCity = askClaude, askBall = askF
       rubricSlugs: [...rubrics.keys()],
       voice: withMemory(voiceFor(drbena), input.memory),
       today,
-      force: true,
+      // Jako automatika smí Drběna zprávu přeskočit nebo ji mít za duplicitu, jinak ji napsat musí (jako ruční výběr).
+      force: !input.auto,
     });
     return answer.ok ? { ...answer, recalled: recalledEvent(answer.article, known) } : answer;
   }

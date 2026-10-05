@@ -1,4 +1,4 @@
-// Společné kousky importů zpráv (Munipolis, Deník, školy): co už na drbně je, rubriky, datum ze zdroje a souhrn průchodu.
+// Společné kousky importů zpráv (Munipolis, Deník, školy, web města): co už na drbně je, rubriky, datum ze zdroje a souhrn průchodu.
 import { loadDoctors } from "./db.js";
 import { loadNotices } from "./notices-db.js";
 import { knownClosures } from "./ndic/store.js";
@@ -47,6 +47,7 @@ export const IMPORT_SOURCES = [
   { table: "denik_items", tag: "denik" },
   { table: "skola_items", tag: "skola" },
   { table: "zahradka_items", tag: "zahradka" },
+  { table: "webmesta_items", tag: "webmesta" },
 ];
 
 async function pastImports(env, { table, tag }, itemTable, itemId, since) {
@@ -159,6 +160,19 @@ export function importSourceDate(item, today) {
   return day <= today ? day : "";
 }
 
+function thousands(value) {
+  return Math.round(value).toLocaleString("cs-CZ").replace(/\s/g, " ");
+}
+
+// Tokeny z cache za průchod: kolik se jich zapsalo a kolik přečetlo za desetinu ceny. Prázdné, když cache nic neudělala.
+export function cacheNote(results) {
+  const sum = (key) => results.reduce((total, result) => total + Number(result.usage?.[key] ?? 0), 0);
+  const read = sum("cache_read_input_tokens");
+  const written = sum("cache_creation_input_tokens");
+  if (!read && !written) return "";
+  return `Cache: přečteno ${thousands(read)} tokenů, zapsáno ${thousands(written)}.`;
+}
+
 export function importSummary(results, added, waiting) {
   const done = results.filter((result) => result.ok).length;
   const failed = results.filter((result) => !result.ok);
@@ -168,5 +182,7 @@ export function importSummary(results, added, waiting) {
   if (failed.length) parts.push(`Nepovedlo se: ${failed.length} (${failed[0].error})`);
   if (waiting) parts.push(`Na zpracování čeká ještě ${waiting}.`);
   if (!parts.length) parts.push("Nic nového.");
+  const cache = cacheNote(results);
+  if (cache) parts.push(cache);
   return { status: failed.length ? (done ? "partial" : "error") : "ok", note: parts.join(" ") };
 }

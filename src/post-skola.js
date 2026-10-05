@@ -1,13 +1,13 @@
-// Formuláře stránek škol (ZŠ a MŠ, zahradnická): nastavení importu, ruční načtení a zpracování vybraných článků.
+// Formuláře stránek škol (ZŠ a MŠ, zahradnická) a webu města: nastavení importu, ruční načtení a zpracování vybraných článků.
 import { redirect, withError } from "./http.js";
 import { checkSkolaNow, selectSkola } from "./skola/run.js";
 import { SCHOOL_LIST } from "./skola/sources.js";
 import { saveSkolaSettings } from "./skola/store.js";
 
 export const SKOLA_OK = {
-  "skola-nastaveni": "Nastavení školy je uložené.",
+  "skola-nastaveni": "Nastavení je uložené.",
   "skola-nacteno": "Články jsou načtené. Zaškrtněte, které má Drběna zpracovat.",
-  "skola-nic": "Na webu školy teď není nic nového.",
+  "skola-nic": "Na webu teď není nic nového.",
   "skola-bezi": "Drběna čte vybrané. Stránka se sama obnoví, až bude hotovo.",
 };
 

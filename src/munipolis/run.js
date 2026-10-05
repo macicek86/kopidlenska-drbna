@@ -17,6 +17,7 @@ import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { memoryOn, withMemory } from "../drbena-memory.js";
 import { fetchImage, storeImageBytes } from "../images.js";
+import { noteReads } from "../import-tools.js";
 import { importSourceDate, importSummary, knownContent, outcomeOf, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
@@ -103,7 +104,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   });
   if (!answer.ok) {
     await finishItem(env, item.id, { status: "chyba", reason: answer.error });
-    return { ok: false, error: answer.error };
+    return { ok: false, error: answer.error, usage: answer.usage };
   }
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
@@ -113,13 +114,13 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
     });
-    await finishItem(env, item.id, { status: "hotovo", reason: followupReason(answer), duplicateOf: answer.duplicateOf, eventId: item.eventId, ...made });
-    return { ok: true, status: "hotovo" };
+    await finishItem(env, item.id, { status: "hotovo", reason: noteReads(followupReason(answer), answer), duplicateOf: answer.duplicateOf, eventId: item.eventId, ...made });
+    return { ok: true, status: "hotovo", usage: answer.usage };
   }
   if (answer.decision !== "vytvorit") {
     const status = answer.decision === "duplicita" ? "duplicita" : "preskoceno";
-    await finishItem(env, item.id, { status, reason: answer.reason, duplicateOf: answer.duplicateOf });
-    return { ok: true, status };
+    await finishItem(env, item.id, { status, reason: noteReads(answer.reason, answer), duplicateOf: answer.duplicateOf });
+    return { ok: true, status, usage: answer.usage };
   }
 
   const made = {};
@@ -154,8 +155,8 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
     const bot = await ensureBot(env);
     made.hoursIds = await saveHoursChanges(env, answer.hours, { sourceUrl: item.link, createdBy: bot.id });
   }
-  await finishItem(env, item.id, { status: "hotovo", reason: answer.reason, ...made });
-  return { ok: true, status: "hotovo" };
+  await finishItem(env, item.id, { status: "hotovo", reason: noteReads(answer.reason, answer), ...made });
+  return { ok: true, status: "hotovo", usage: answer.usage };
 }
 
 // Stáhne RSS a nové zprávy si zapamatuje. Rychlé, takže běží i přímo po kliknutí.

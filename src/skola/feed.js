@@ -1,4 +1,4 @@
-// Web ZŠ a MŠ Kopidlno (Antee): RSS rubrik s celým textem, fotkou a termínem akce. Bez sítě, ať jde testovat.
+// Web ZŠ a MŠ Kopidlno a web města (Antee): RSS rubrik s celým textem, fotkou a termínem akce. Bez sítě, ať jde testovat.
 // Klíč článku (`schoolKey`) a adresy kanálů používá i web na WordPressu (`wordpress.js`).
 import { decodeEntities, htmlToText, imagesIn, readFeedUrl, tag, USER_AGENT } from "../munipolis/feed.js";
 
@@ -82,9 +82,9 @@ async function fetchOne(url, fetchImpl) {
       redirect: "follow",
     });
   } catch {
-    return { ok: false, error: "Web školy neodpověděl.", items: [] };
+    return { ok: false, error: "Web neodpověděl.", items: [] };
   }
-  if (!response.ok) return { ok: false, error: `Web školy odpověděl ${response.status}.`, items: [] };
+  if (!response.ok) return { ok: false, error: `Web odpověděl ${response.status}.`, items: [] };
   const parsed = parseSchoolFeed(await response.text());
   return parsed.ok ? parsed : { ok: false, error: "Na adrese není RSS.", items: [] };
 }

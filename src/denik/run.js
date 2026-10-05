@@ -16,6 +16,7 @@ import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { memoryOn, withMemory } from "../drbena-memory.js";
+import { noteReads } from "../import-tools.js";
 import { importSourceDate, importSummary, knownContent, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
@@ -71,7 +72,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
   });
   if (!answer.ok) {
     await finishDenikItem(env, item.id, { status: "chyba", reason: answer.error });
-    return { ok: false, error: answer.error };
+    return { ok: false, error: answer.error, usage: answer.usage };
   }
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
@@ -81,13 +82,13 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
     });
-    await finishDenikItem(env, item.id, { status: "hotovo", reason: followupReason(answer), duplicateOf: answer.duplicateOf, eventId: item.eventId, ...made });
-    return { ok: true, status: "hotovo" };
+    await finishDenikItem(env, item.id, { status: "hotovo", reason: noteReads(followupReason(answer), answer), duplicateOf: answer.duplicateOf, eventId: item.eventId, ...made });
+    return { ok: true, status: "hotovo", usage: answer.usage };
   }
   if (answer.decision !== "vytvorit") {
     const status = answer.decision === "duplicita" ? "duplicita" : "preskoceno";
-    await finishDenikItem(env, item.id, { status, reason: answer.reason, duplicateOf: answer.duplicateOf });
-    return { ok: true, status };
+    await finishDenikItem(env, item.id, { status, reason: noteReads(answer.reason, answer), duplicateOf: answer.duplicateOf });
+    return { ok: true, status, usage: answer.usage };
   }
 
   const made = {};
@@ -121,8 +122,8 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
       published: settings.autoPublish,
     });
   }
-  await finishDenikItem(env, item.id, { status: "hotovo", reason: answer.reason, ...made });
-  return { ok: true, status: "hotovo" };
+  await finishDenikItem(env, item.id, { status: "hotovo", reason: noteReads(answer.reason, answer), ...made });
+  return { ok: true, status: "hotovo", usage: answer.usage };
 }
 
 async function collect(env, settings, fetchImpl, { manual = false } = {}) {

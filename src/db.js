@@ -295,7 +295,7 @@ export async function loadMoreArticles(env, slug, limit = 5) {
   return results.map(mapArticle);
 }
 
-// Nastavení a články všech škol podle značky (skola, zahradka).
+// Nastavení a články všech škol podle značky (skola, zahradka, webmesta).
 async function loadSchools(env) {
   const entries = await Promise.all(
     SCHOOL_LIST.map(async (source) => [source.tag, { settings: await loadSkolaSettings(env, source), items: await loadSkolaItems(env, source) }]),

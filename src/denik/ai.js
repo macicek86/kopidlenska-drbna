@@ -6,7 +6,9 @@ import { DEFAULT_VOICE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE } from "../keywords.js";
-import { contextText, outputSchema, readArticle, readDecision } from "../munipolis/ai.js";
+import { contentText, importContent } from "../import-overview.js";
+import { importLookup, withLookups } from "../import-tools.js";
+import { outputSchema, readArticle, readDecision } from "../munipolis/ai.js";
 import { topicsText } from "../stock.js";
 
 const RULES = `Dostaneš jeden článek z Jičínského deníku, který zmiňuje Kopidlno nebo jeho části (Drahoraz, Mlýnec, Pševes, Ledkov), a přehled toho, co už na webu Kopidlenská drbna je.
@@ -57,17 +59,12 @@ export function denikItemText(item) {
   ].join("\n\n");
 }
 
-export function denikText(item, known, { today, force = false, retry = "", topics = [] }) {
-  return [
-    `Dnes je ${today}.`,
-    contextText(known),
-    topicsText(topics),
-    denikItemText(item),
-    force ? FORCE : "",
-    retry,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+export function denikContent(item, known, { today, force = false, retry = "", topics = [] }) {
+  return importContent(known, { today, topics: topicsText(topics), tail: [denikItemText(item), force ? FORCE : "", retry] });
+}
+
+export function denikText(item, known, options) {
+  return contentText(denikContent(item, known, options));
 }
 
 // Zmínky o Deníku nebo jiných médiích, které podmínky Deníku zakazují.
@@ -123,27 +120,31 @@ export async function askDenik(env, { item, known, topics = [], rubricSlugs, voi
   const system = denikPrompt(voice, { rubricSlugs });
   let retry = "";
   let problem = "";
+  // Co si Drběna přečetla a kolik to stálo, za oba pokusy.
+  let spent = {};
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    const content = [{ type: "text", text: denikText(item, known, { today, force, retry, topics }) }];
-    const answer = await callClaude(env, { system, content, schema });
-    if (!answer.ok) return answer;
-    const decision = readDecision(answer.raw, { rubricSlugs, force });
+    const content = denikContent(item, known, { today, force, retry, topics });
+    const answer = await callClaude(env, { system, content, schema, lookup: importLookup(env) });
+    if (!answer.ok) return withLookups(answer, spent);
+    const decision = withLookups(readDecision(answer.raw, { rubricSlugs, force }), withLookups(answer, spent));
+    spent = decision;
     if (decision.ok && decision.decision === "doplneni") {
       // I navazující zpráva musí dodržet podmínky Deníku.
-      return writeFollowup(env, decision, {
+      const written = await writeFollowup(env, decision, {
         system,
         sourceText: denikItemText(item),
         articleSchema: outputSchema(rubricSlugs, { topics: slugs, ownImage: false }).properties.article,
         readArticle: (raw) => readArticle(raw, rubricSlugs),
         topics,
         today,
-        check: (written) => denikProblem(written, item),
+        check: (result) => denikProblem(result, item),
       });
+      return withLookups(written, decision);
     }
     if (!decision.ok || decision.decision !== "vytvorit") return decision;
     problem = denikProblem(decision, item);
     if (!problem) return decision;
     retry = `Minulý pokus nešel použít: ${problem} Napiš to znovu, úplně vlastními slovy a bez zmínky o zdroji.`;
   }
-  return { ok: false, error: `${problem} Zkusí to znovu příště.` };
+  return withLookups({ ok: false, error: `${problem} Zkusí to znovu příště.` }, spent);
 }

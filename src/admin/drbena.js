@@ -4,6 +4,7 @@ import { ASSIST_BOUNDS } from "../assist/store.js";
 import { TRY_DEMO, TRY_KINDS, TRY_TEXT_MAX } from "../drbena-try.js";
 import { NOTICE_KINDS } from "../notices.js";
 import { esc } from "../view.js";
+import { refLink } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, check, field, input, pageHead } from "./ui.js";
 
@@ -82,12 +83,18 @@ function tryPanel(values = TRY_DEMO) {
       ${field("Text článku", `<textarea class="${input}" name="text" form="${FORM}" rows="10" maxlength="${TRY_TEXT_MAX}">${esc(values.text)}</textarea>`)}
       <label class="check"><input type="checkbox" name="memory" value="1" form="${FORM}"${values.memory ? " checked" : ""}> <span>S pamětí</span></label>
       <span class="hint check-hint">Jen u zprávy města. Drběna může navázat na zprávy, odstávky a akce, které na drbně opravdu jsou. Zkouška akci neoznačí, ve skutečném článku na ni Drběna vzpomenout může.</span>
+      <label class="check"><input type="checkbox" name="auto" value="1" form="${FORM}"${values.auto ? " checked" : ""}> <span>Jako automatika</span></label>
+      <span class="hint check-hint">Jen u zprávy města. Drběna se rozhodne jako při automatickém importu: když o věci na drbně už něco je, nebo ji nezajímá, článek nenapíše. Bez zaškrtnutí ho napsat musí, jako když ho vyberete ručně.</span>
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-line" type="submit" form="${FORM}" formaction="${BASE}/zkusit#ukazka" data-busy="Drběna píše…">Napsat ukázku</button></div>
     </section>`;
 }
 
+const DECISIONS = { vytvorit: "napsat", preskocit: "přeskočit", duplicita: "duplicita", doplneni: "navazující zpráva" };
+
 function extras(result) {
   const rows = [];
+  if (result.reason) rows.push(`<li><b>Rozhodla (${esc(DECISIONS[result.decision] ?? result.decision)}):</b> ${esc(result.reason)}</li>`);
+  if (result.read?.length) rows.push(`<li><b>Přečetla si:</b> ${result.read.map((ref) => refLink(ref) || esc(ref)).join(", ")}</li>`);
   if (result.recalled) {
     rows.push(`<li><b>Vzpomněla na akci:</b> ${esc(result.recalled.title)} · ${esc(result.recalled.startsOn)}</li>`);
   }

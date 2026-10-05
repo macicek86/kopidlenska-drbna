@@ -130,6 +130,7 @@ const SOURCES = {
   fotbal: { table: "football_items", date: "published_on", label: "web FK Kopidlno" },
   skola: { table: "skola_items", date: "published_at", label: "web ZŠ a MŠ Kopidlno" },
   zahradka: { table: "zahradka_items", date: "published_at", label: "web zahradnické školy Kopidlno" },
+  webmesta: { table: "webmesta_items", date: "published_at", label: "web města Kopidlna (kopidlno.cz)" },
 };
 const SOURCE_POOL = 200;
 
@@ -194,7 +195,7 @@ export async function searchArticles(env, query) {
 }
 
 export async function readSource(env, ref) {
-  const [, tag, id] = String(ref ?? "").trim().match(/^\[?(mesto|fotbal|skola|zahradka)-(\d+)\]?$/) ?? [];
+  const [, tag, id] = String(ref ?? "").trim().match(/^\[?(mesto|fotbal|skola|zahradka|webmesta)-(\d+)\]?$/) ?? [];
   if (!tag) return "Takový zdroj neznám. Označení vypadá třeba jako mesto-12.";
   const source = SOURCES[tag];
   const row = await env.DB.prepare(`select title, text, ${source.date} as day from ${source.table} where id = ?`).bind(Number(id)).first();

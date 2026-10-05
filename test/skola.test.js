@@ -85,7 +85,7 @@ test("pokyny: vlastní fotka jen se zapnutým nastavením, termín jde Claudovi"
   assert.match(skolaPrompt("", { ownPhotos: true }), /image_use: "vlastni"/);
   const stock = skolaPrompt("");
   assert.doesNotMatch(stock, /image_use/);
-  assert.match(stock, /Fotky ze školního webu se neberou/);
+  assert.match(stock, /Fotky z webu zdroje se neberou/);
   assert.match(stock, /rubriky "skola"/);
   assert.match(stock, /koza Drběna/);
   const text = skolaText(
@@ -138,7 +138,7 @@ test("redakce má stránku Škola s nastavením fotek a detailem článku", () =
     null,
     { importId: 4 },
   );
-  assert.match(page, /Články školy/);
+  assert.match(page, /Články z webu školy/);
   assert.match(page, /Máme mistra republiky!/);
   assert.match(page, /name="ownPhotos"/);
   assert.match(page, /aktuality-ms\?action=atom<\/textarea>/);
