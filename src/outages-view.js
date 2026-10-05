@@ -1,4 +1,5 @@
 // Odstávky a uzavírky na webu: elektřina z widgetu ČEZ, voda a uzavírky silnic z oznámení města.
+import { withoutTracking } from "./rich.js";
 import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
 import { askLine, layout } from "./view.js";
@@ -75,7 +76,7 @@ function placeList(item) {
 export function outageCard(item, { showArea, copy }) {
   const parcels = item.parcelLine ? `<p class="meta">${esc(item.parcelLine)}</p>` : "";
   const pdf = item.announcementUrl
-    ? `<p><a href="${esc(item.announcementUrl)}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "outages_announcement"))}</a></p>`
+    ? `<p><a href="${esc(withoutTracking(item.announcementUrl))}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "outages_announcement"))}</a></p>`
     : "";
   return `<article class="card yard">
     ${showArea ? `<p class="kicker">${esc(item.areaName)}</p>` : ""}
@@ -89,7 +90,7 @@ export function outageCard(item, { showArea, copy }) {
 
 export function noticeCard(item, { copy }) {
   const source = item.sourceUrl
-    ? `<p><a href="${esc(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "water_source"))}</a></p>`
+    ? `<p><a href="${esc(withoutTracking(item.sourceUrl))}" target="_blank" rel="noopener noreferrer">${esc(tx(copy, "water_source"))}</a></p>`
     : "";
   return `<article class="card yard">
     <p class="kicker">${esc(item.title)}</p>

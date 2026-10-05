@@ -70,12 +70,29 @@ function plainToHtml(value) {
     .join("");
 }
 
+// Sledovací parametry cizích služeb (Google, Facebook, Microsoft, Mailchimp…), které lidé kopírují s odkazy.
+const TRACKING = /^(?:utm_.*|fbclid|gclid|gbraid|wbraid|dclid|msclkid|igshid|mc_cid|mc_eid|yclid|_hsenc|_hsmi)$/i;
+
+// Odkaz bez sledovacích parametrů. Když žádné nemá, vrátí ho beze změny (ať se nepřekóduje).
+export function withoutTracking(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return value;
+  }
+  const names = [...url.searchParams.keys()].filter((name) => TRACKING.test(name));
+  if (!names.length) return value;
+  for (const name of names) url.searchParams.delete(name);
+  return url.toString().replace(/\?(?=#|$)/, "");
+}
+
 function safeHref(raw) {
   let value = String(raw ?? "").trim();
   for (let pass = 0; pass < 3; pass += 1) value = decodeEntities(value);
   value = value.replace(/[\u0000-\u001F\u007F]/g, "").trim();
   if (!value || /\s/.test(value)) return "";
-  if (/^https:\/\//i.test(value) || /^http:\/\//i.test(value)) return value;
+  if (/^https:\/\//i.test(value) || /^http:\/\//i.test(value)) return withoutTracking(value);
   if (/^mailto:/i.test(value) && !/[<>"]/.test(value)) return value;
   if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !value.includes(":")) return value;
   return "";

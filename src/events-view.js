@@ -1,4 +1,5 @@
 // Kalendář akcí: stránka /akce (Drběna, dnešní akce, měsíční kalendář z `events-calendar.js`, seznamy) a odkazy pod akcí (zpráva na drbně, odkaz jinam), které má i titulka.
+import { withoutTracking } from "./rich.js";
 import { pageAds, weaveAds } from "./ad-weave.js";
 import { text as tx } from "./copy.js";
 import { calendarHtml, monthShort } from "./events-calendar.js";
@@ -27,7 +28,7 @@ export function eventLinks(event, ctx) {
     links.push(`<a href="/zpravy/${esc(event.articleSlug)}">${esc(tx(ctx.copy, "events_article"))} ›</a>`);
   }
   const host = event.link ? linkHost(event.link) : "";
-  if (host) links.push(`<a href="${esc(event.link)}" target="_blank" rel="noopener nofollow">${esc(host)} ↗</a>`);
+  if (host) links.push(`<a href="${esc(withoutTracking(event.link))}" target="_blank" rel="noopener nofollow">${esc(host)} ↗</a>`);
   return links.length ? `<p class="event-links">${links.join("")}</p>` : "";
 }
 
