@@ -37,6 +37,7 @@ export function articleEntry(base, article) {
   if (article.category) categories.push({ term: article.rubricSlug || article.category, label: article.category });
   return {
     id: `${TAG}zprava-${article.id}`,
+    seq: article.id,
     title: article.title,
     url: articleUrl(base, article),
     updated: article.createdOn,

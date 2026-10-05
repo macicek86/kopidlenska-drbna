@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { absoluteHtml, atomDate, atomFeed, xmlText } from "../src/feeds/atom.js";
+import { absoluteHtml, atomDate, atomFeed, uniqueStamps, xmlText } from "../src/feeds/atom.js";
 import { eventsCalendar, eventsFeed } from "../src/feeds/events.js";
 import { describeChange, hoursFeed } from "../src/feeds/hours.js";
 import { hoursJson } from "../src/feeds/hours-json.js";
@@ -271,4 +271,17 @@ test("vypnutý feed zmizí z hlavičky, patičky i ze stránky odběru", () => {
   const places = { places: [{ id: 1, name: "Úřad", label: "", place: "Kopidlno", phone: "", week: week([1]), changes: [], offers: [] }], waste: { today: "2026-10-05" } };
   assert.match(placesPage(places, { ...ctx, path: "/oteviraci-doba", feedOn: null }), /CivicStructure/);
   assert.equal(placesPage(places, { ...ctx, path: "/oteviraci-doba", feedOn: { ...none } }).includes("CivicStructure"), false);
+});
+
+test("položky se stejným časem dostanou každá jiný updated, starší zůstanou", () => {
+  const day = (id) => ({ id: `z${id}`, seq: id, title: `Zpráva ${id}`, url: `${BASE}/${id}`, updated: "2026-09-30", published: "2026-09-30" });
+  const xml = atomFeed({ id: "x", title: "T", self: "s", alternate: "a", author: "A", entries: [day(5), day(9), day(7), { ...day(3), updated: "2026-09-29", published: "2026-09-29" }] });
+  const stamps = [...xml.matchAll(/<updated>([^<]+)<\/updated>/g)].map((m) => m[1]);
+  assert.deepEqual(stamps, ["2026-09-30T00:00:02+02:00", "2026-09-30T00:00:02+02:00", "2026-09-30T00:00:01+02:00", "2026-09-30T00:00:00+02:00", "2026-09-29T00:00:00+02:00"]);
+  assert.ok(xml.indexOf("Zpráva 9") < xml.indexOf("Zpráva 7"));
+  assert.match(xml, /<id>z9<\/id>[\s\S]*?<published>2026-09-30T00:00:02\+02:00<\/published>/);
+  // Nová zpráva téhož dne starším čas nezmění.
+  const more = uniqueStamps([day(5), day(9), day(7), day(12)]);
+  assert.deepEqual(more.map((entry) => entry.stamp.slice(11, 19)), ["00:00:00", "00:00:02", "00:00:01", "00:00:03"]);
+  assert.equal(new Set(uniqueStamps([1, 2, 3].map((id) => ({ seq: id, updated: "2026-10-01 08:00:00" }))).map((entry) => entry.stamp)).size, 3);
 });

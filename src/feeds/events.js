@@ -47,6 +47,7 @@ export function eventsFeed(base, events, copy, today) {
     icon: `${base}/icon-192.png`,
     entries: fresh.map((event) => ({
       id: `${TAG}akce-${event.id}`,
+      seq: event.id,
       title: `${event.title} (${eventWhen(event)})`,
       url: eventUrl(base, event),
       updated: event.createdAt,

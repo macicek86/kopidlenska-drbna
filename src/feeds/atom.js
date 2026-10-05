@@ -38,8 +38,8 @@ export function imageType(key) {
 }
 
 function entryXml(entry) {
-  const updated = atomDate(entry.updated);
-  const published = entry.published ? atomDate(entry.published) : "";
+  const updated = entry.stamp;
+  const published = entry.published ? (entry.published === entry.updated ? entry.stamp : atomDate(entry.published)) : "";
   const authors = (entry.authors ?? []).filter(Boolean).map((name) => `<author><name>${xmlText(name)}</name></author>`);
   const categories = (entry.categories ?? []).map(
     (item) => `<category term="${xmlText(item.term)}"${item.label ? ` label="${xmlText(item.label)}"` : ""}/>`,
@@ -68,10 +68,41 @@ function entryXml(entry) {
   </entry>`;
 }
 
+function plusSeconds(value, seconds) {
+  if (!seconds) return value;
+  const match = /^(.*T)(\d{2}):(\d{2}):(\d{2})(.*)$/.exec(value);
+  if (!match) return value;
+  const total = Number(match[2]) * 3600 + Number(match[3]) * 60 + Number(match[4]) + seconds;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${match[1]}${pad(Math.floor(total / 3600) % 24)}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}${match[5]}`;
+}
+
+// Zprávy a změny mají jen den, akce z doby před sloupcem stejný čas přidání. Atom chce u každé položky jiný
+// `updated`: položky se stejným časem dostanou postupně o sekundu víc, nejstarší (nejnižší `seq`, obvykle id) nic.
+// Nová položka téhož dne se zařadí na konec skupiny, dřívějším se čas nezmění.
+export function uniqueStamps(entries) {
+  const groups = new Map();
+  entries.forEach((entry, index) => {
+    const base = atomDate(entry.updated);
+    if (!groups.has(base)) groups.set(base, []);
+    groups.get(base).push({ entry, index });
+  });
+  const out = entries.map((entry) => ({ ...entry }));
+  for (const [base, list] of groups) {
+    list
+      .sort((a, b) => (Number(a.entry.seq) || 0) - (Number(b.entry.seq) || 0) || b.index - a.index)
+      .forEach((item, step) => {
+        out[item.index].stamp = plusSeconds(base, step);
+      });
+  }
+  return out;
+}
+
 // feed: { id, title, subtitle, self, alternate, author, icon, logo, entries }. Položky se seřadí od nejnovější.
+// `seq` u položky určí pořadí mezi položkami se stejným časem (vyšší = novější).
 export function atomFeed(feed) {
-  const entries = [...(feed.entries ?? [])].sort((a, b) => stamp(atomDate(b.updated)) - stamp(atomDate(a.updated)));
-  const updated = entries.length ? atomDate(entries[0].updated) : EMPTY_UPDATED;
+  const entries = uniqueStamps(feed.entries ?? []).sort((a, b) => stamp(b.stamp) - stamp(a.stamp));
+  const updated = entries.length ? entries[0].stamp : EMPTY_UPDATED;
   return `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/" xml:lang="cs">
   <id>${xmlText(feed.id)}</id>

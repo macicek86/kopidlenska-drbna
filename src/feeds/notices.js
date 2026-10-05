@@ -21,6 +21,7 @@ function noticeEntry(base, item, fallbackAt) {
   const credit = item.source === "ndic" ? `<p><small>${esc(NDIC_CREDIT)}</small></p>` : "";
   return {
     id: `${TAG}oznameni-${item.id}`,
+    seq: Number(item.id) || 0,
     title: `${item.title}: ${item.when}`,
     url: `${base}/odstavky`,
     updated: item.addedAt || fallbackAt,

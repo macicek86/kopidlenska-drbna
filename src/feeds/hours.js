@@ -95,6 +95,8 @@ export function hoursFeed(base, changes, copy) {
     const text = lines.filter(Boolean);
     return {
       id: `${TAG}zmena-${change.section}-${change.id}`,
+      // Místa, lékaři a dvory mají vlastní řady id.
+      seq: change.id * 3 + ["misto", "lekar", "dvur"].indexOf(change.section),
       title,
       url: changeUrl(base, change),
       updated: change.createdAt,
