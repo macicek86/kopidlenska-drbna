@@ -54,7 +54,7 @@ function nav(data) {
     },
     {
       name: "Nastavení",
-      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["historie", "Historie změn", "clock"], ["ucet", "Můj účet", "user"]],
+      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["odber", "Odběr a data", "rss"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["historie", "Historie změn", "clock"], ["ucet", "Můj účet", "user"]],
     },
   ];
   return groups
@@ -78,7 +78,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "texty", "lide", "historie", "ucet"];
+export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
 
 function toastHtml(flash) {
   if (!flash.text) return "";

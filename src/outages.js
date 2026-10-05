@@ -323,9 +323,14 @@ function dedupeById(outages) {
   return unique;
 }
 
-export function mergeFresh(previous, results) {
+// `seenAt`: kdy drbna odstávku uviděla poprvé (feed odstávek), u známé zůstává z minula.
+export function mergeFresh(previous, results, now = new Date()) {
   const failed = new Set(results.filter((result) => !result.ok).map((result) => result.code));
-  const fresh = results.filter((result) => result.ok).flatMap((result) => result.outages);
+  const seen = new Map((previous ?? []).filter((item) => item?.id && item.seenAt).map((item) => [item.id, item.seenAt]));
+  const fresh = results
+    .filter((result) => result.ok)
+    .flatMap((result) => result.outages)
+    .map((item) => ({ ...item, seenAt: seen.get(item.id) ?? now.toISOString() }));
   const kept = (previous ?? []).filter((item) => item && failed.has(item.areaCode));
   return dedupeById([...fresh, ...kept]);
 }

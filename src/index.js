@@ -49,6 +49,8 @@ import { pathViews, recordVisit } from "./visits-db.js";
 import { hostRedirect, html, json, plain, redirect, sameOrigin, secure, withError } from "./http.js";
 import { robotsTxt, sitemapXml } from "./seo.js";
 import { loadSitemap } from "./seo-db.js";
+import { feedGet, feedsPageHtml } from "./feeds/routes.js";
+import { anyFeedOn, loadFeedSettings } from "./feeds/settings.js";
 import { outagePost } from "./post-outages.js";
 import { placesPost } from "./post-places.js";
 import { yardsPost } from "./post-yards.js";
@@ -74,6 +76,7 @@ import { messagesPost } from "./post-messages.js";
 import { articlesPost } from "./post-articles.js";
 import { adsPost } from "./post-ads.js";
 import { eventsPost } from "./post-events.js";
+import { feedsPost } from "./post-feeds.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
@@ -154,18 +157,23 @@ async function renderGet(request, env, url, execution) {
   if (path === "/sitemap.xml") {
     return plain(sitemapXml(url.origin, await loadSitemap(env)), "application/xml");
   }
+  // Feedy (Atom), kalendář akcí (iCalendar) a otevírací doba jako data.
+  const feed = await feedGet(path, request, env, url);
+  if (feed) return feed;
 
   // Texty a data stránky najednou: na sobě nezávisí.
   const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
-  const [copy, data, admin, story, chat] = await Promise.all([
+  const [copy, data, admin, story, chat, feedOn] = await Promise.all([
     loadCopy(env),
     PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
     path.startsWith("/redakce/") ? loadAdmin(env, request) : null,
     slug == null ? null : loadStory(env, slug, path),
     path.startsWith("/redakce") ? false : chatEnabled(env),
+    path.startsWith("/redakce") ? null : loadFeedSettings(env),
   ]);
   // Okénko chatu s Drběnou: jen na hlavním webu, když ho redakce zapnula.
-  const ctx = { ...base, copy, chat: chat ? { siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
+  // feedOn: které feedy redakce nechala zapnuté (odkazy v hlavičce, na stránkách a strukturovaná data hodin).
+  const ctx = { ...base, copy, feedOn, chat: chat ? { siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
   if (path === "/popelnice") return html(binsPage(data.waste, ctx));
   if (path === "/") {
@@ -207,6 +215,7 @@ async function renderGet(request, env, url, execution) {
     const ad = chooseAd(request, data.ads);
     return htmlAd(request, eventsPage({ ...data, ad }, ctx, { month: url.searchParams.get("mesic") }), ad);
   }
+  if (path === "/odber") return anyFeedOn(feedOn) ? html(await feedsPageHtml(env, ctx)) : notFound(request, env, ctx);
   if (path === "/o-nas") {
     return html(aboutPage(data, ctx));
   }
@@ -295,6 +304,7 @@ async function handlePost(request, env, path, fields, execution) {
     (await skolaPost(path, request, env, fields, execution)) ??
     (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena"))) ??
     (await chatAdminPost(path, request, env, fields)) ??
+    (await feedsPost(path, request, env, fields)) ??
     (await messagesPost(path, request, env, fields));
   if (section) return section;
   return new Response("Tahle akce tu není.", { status: 404 });

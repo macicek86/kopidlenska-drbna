@@ -120,6 +120,7 @@ export function closureNotice(row, { radiusKm = DEFAULT_RADIUS_KM, enabled = tru
     published: Boolean(enabled && row.manual !== "skryt" && (row.manual === "ukazat" || (near && !duplicate))),
     // Přepsaný text už není „beze změny“: podle podmínek ŘSD u něj NDIC jako zdroj uvádět nesmíme.
     source: rewritten ? "ndic-prepis" : "ndic",
+    addedAt: row.receivedAt ?? "",
   };
 }
 

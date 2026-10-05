@@ -5,6 +5,7 @@ import {
   adminArticles,
   adminAudit,
   adminChat,
+  adminFeeds,
   adminDoctors,
   adminDrbena,
   adminEvents,
@@ -46,12 +47,13 @@ import { loadSkolaSettings } from "./skola/store.js";
 import { loadAssistAdmin } from "./assist/store.js";
 import { chatEnabled, loadChatAdmin } from "./chat/store.js";
 import { pragueNow } from "./waste.js";
+import { loadFeedSettings } from "./feeds/settings.js";
 
 // `data` je loadAdmin, `execution` kontext Workeru (importy dopisují vybrané na pozadí). Neznámá stránka: null.
 export async function renderAdmin(env, url, ctx, data, execution) {
   const tab = url.pathname.replace(/\/+$/, "").slice("/redakce/".length);
   const message = messageFrom(url);
-  const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "drbena", "chat", "historie"]);
+  const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "drbena", "chat", "odber", "historie"]);
   if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
     return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
   }
@@ -130,6 +132,10 @@ export async function renderAdmin(env, url, ctx, data, execution) {
   if (tab === "chat") {
     if (data.signedIn) data.chat = await loadChatAdmin(env);
     return html(adminChat(ctx, data, message, query));
+  }
+  if (tab === "odber") {
+    if (data.signedIn) data.feedSettings = await loadFeedSettings(env);
+    return html(adminFeeds(ctx, data, message));
   }
   if (tab === "historie") {
     if (data.signedIn) data.audit = await loadAudit(env, auditQuery(url));

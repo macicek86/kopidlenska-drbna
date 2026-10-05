@@ -33,9 +33,11 @@ test("znovu zpracovaná položka importu nezaloží druhou akci, jen k ní přip
   });
   const env = { DB: { prepare: (sql) => statement(sql) } };
   db.exec(`create table events (id integer primary key, title text, place text, starts_on text, starts_time text, description text,
-    published integer, article_id integer, proposal_id integer)`);
+    published integer, article_id integer, proposal_id integer, created_at text not null default '')`);
   const event = { title: "Trhy", place: "Zámek", startsOn: "2026-10-10", startsTime: "", description: "" };
   const first = await saveBotEvent(env, event, { published: true, articleId: 4 });
+  // Čas přidání pro feed nových akcí.
+  assert.match(db.prepare("select created_at from events").get().created_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   db.exec("update events set article_id = null");
   assert.equal(await saveBotEvent(env, event, { existingId: first, published: true, proposalId: 9 }), first);
   assert.equal(await saveBotEvent(env, null, { existingId: first, published: true, articleId: 5 }), first);

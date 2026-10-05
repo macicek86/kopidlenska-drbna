@@ -32,6 +32,7 @@ const TABS = [
   "odstavky",
   "drbena",
   "chat",
+  "odber",
   "lide",
   "historie",
   "ucet",

@@ -56,6 +56,7 @@ export function newsPage(data, ctx, rubrika) {
     title: `${title} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "news_description"),
     canonical: selected ? rubricHref(selected.slug) : "/zpravy",
+    feeds: selected ? [[`/feed.xml?rubrika=${encodeURIComponent(selected.slug)}`, title]] : [],
     script: SCRIPT,
     body: `<header class="news-head">
         ${newsCrumbs(rubrics, selected, ctx.copy)}

@@ -35,10 +35,12 @@ function mapNotice(row) {
     note: String(row.note ?? ""),
     sourceUrl: String(row.source_url ?? ""),
     published: asBool(row.published),
+    // Kdy oznámení přibylo (feed odstávek).
+    addedAt: String(row.created_at ?? ""),
   };
 }
 
-const FIELDS = "id, kind, title, starts_on, starts_time, ends_on, ends_time, places, note, source_url, published";
+const FIELDS = "id, kind, title, starts_on, starts_time, ends_on, ends_time, places, note, source_url, published, created_at";
 
 export async function loadNotices(env, { publishedOnly = false } = {}) {
   const where = publishedOnly ? "where published = 1" : "";

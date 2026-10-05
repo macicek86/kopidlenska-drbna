@@ -151,6 +151,7 @@ export function outagesPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "outages_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "outages_description"),
+    feeds: [["/odstavky/feed.xml", tx(ctx.copy, "outages_heading")]],
     body: `
       <p class="eyebrow">${esc(tx(ctx.copy, "outages_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "outages_heading"))}</h1>

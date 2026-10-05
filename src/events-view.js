@@ -9,6 +9,7 @@ import { eventLd } from "./seo.js";
 import { escTie } from "./typo.js";
 import { civilWeekday } from "./waste.js";
 import { adPanel, askLine, layout, siteOrigin } from "./view.js";
+import { googleCalendarUrl, webcalUrl } from "./feeds/page.js";
 
 // Akce se čtou méně často než zprávy, reklama v seznamu jen po každých deseti.
 const AD_SPACING = { first: 10, every: 10 };
@@ -61,6 +62,15 @@ function eventList(title, items, empty, ctx, ads, { today, className = "" } = {}
   return `<section class="block events-list${className}"><h2>${esc(title)}</h2>${body}</section>`;
 }
 
+// Odběr akcí do kalendáře v telefonu, víc možností na stránce /odber.
+function subscribeLine(ctx) {
+  const base = siteOrigin(ctx.origin, ctx.mainOrigin);
+  return `<p class="events-subscribe">${esc(tx(ctx.copy, "events_subscribe"))}
+            <a href="${esc(googleCalendarUrl(base, "/akce.ics"))}" target="_blank" rel="noopener">Google</a> ·
+            <a href="${esc(webcalUrl(base, "/akce.ics"))}">iPhone a Outlook</a> ·
+            <a href="/odber">další možnosti</a></p>`;
+}
+
 function monthCount(count, copy) {
   if (!count) return tx(copy, "events_month_empty");
   return `Tenhle měsíc: ${count} ${count < 5 ? "akce" : "akcí"}`;
@@ -84,6 +94,7 @@ export function eventsPage(data, ctx, { month = "" } = {}) {
     description: tx(ctx.copy, "events_description"),
     canonical: "/akce",
     jsonLd: [...todays, ...upcoming].map((event) => eventLd(siteOrigin(ctx.origin, ctx.mainOrigin), event)),
+    feeds: [["/akce/feed.xml", "Nové akce"]],
     script: `<script src="/events.js" defer></script>`,
     body: `
       <section class="card events-hero">
@@ -92,6 +103,7 @@ export function eventsPage(data, ctx, { month = "" } = {}) {
           <h1>${esc(tx(ctx.copy, "events_heading"))}</h1>
           <p class="lede">${esc(tx(ctx.copy, "events_lede"))}</p>
           ${askLine(ctx, "events", "K akcím: ")}
+          ${ctx.feedOn?.calendar === false ? "" : subscribeLine(ctx)}
         </div>
         <div class="events-drbena">
           <span class="events-sun" aria-hidden="true"></span>

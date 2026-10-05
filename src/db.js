@@ -295,6 +295,23 @@ export async function loadMoreArticles(env, slug, limit = 5) {
   return results.map(mapArticle);
 }
 
+// Zprávy pro feed (src/feeds/news.js): i s textem, nejnovější. `rubricIds` omezí na rubriku a její podrubriky,
+// zprávy bez rubriky podle názvu kategorie (jako articleInRubric).
+export async function loadFeedArticles(env, { rubricIds = [], rubricNames = [], limit = 30 } = {}) {
+  const ids = rubricIds.map(Number).filter((id) => id > 0);
+  const marks = (list) => list.map(() => "?").join(", ");
+  const scope = ids.length
+    ? `and (a.rubric_id in (${marks(ids)})${rubricNames.length ? ` or (a.rubric_id is null and a.category in (${marks(rubricNames)}))` : ""})`
+    : "";
+  const { results } = await env.DB.prepare(
+    `select ${ARTICLE_FIELDS}
+     from ${ARTICLE_FROM} where ${liveArticle()} ${scope} order by a.created_at desc, a.id desc limit ?`,
+  )
+    .bind(...(ids.length ? [...ids, ...rubricNames] : []), limit)
+    .all();
+  return (results ?? []).map(mapArticle);
+}
+
 // Nastavení a články všech škol podle značky (skola, zahradka, webmesta).
 async function loadSchools(env) {
   const entries = await Promise.all(

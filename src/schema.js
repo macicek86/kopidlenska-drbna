@@ -22,11 +22,12 @@ import { ensureChatTables, linkApprovedImports } from "./chat/store.js";
 import { ensureAssistTables } from "./assist/store.js";
 import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
+import { ensureFeedTables } from "./feeds/settings.js";
 import { ensureRequestTables } from "./hours-requests-db.js";
 import { ensureAuditTables } from "./audit-db.js";
 import { ensureLoginTables } from "./login-db.js";
 
-export const SCHEMA_VERSION = 26;
+export const SCHEMA_VERSION = 28;
 
 let schemaReady = false;
 
@@ -413,6 +414,7 @@ async function migrateSchema(env) {
   await ensureAssistTables(env);
   await ensureMessageTables(env);
   await ensureNdicTables(env);
+  await ensureFeedTables(env);
   await ensureRequestTables(env);
   await ensureAuditTables(env);
   await ensureLoginTables(env);

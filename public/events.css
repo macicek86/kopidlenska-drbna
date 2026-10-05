@@ -21,6 +21,8 @@
 }
 
 .events-copy h1 { margin: 0.7rem 0 0.6rem; }
+/* Slunce za Drběnou na mobilu sahá až do textu: text nad ním, ať jdou odkazy přečíst i ťuknout. */
+.events-copy { position: relative; z-index: 2; }
 .events-copy .lede { margin: 0 0 0.6rem; }
 
 .events-drbena {

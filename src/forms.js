@@ -75,6 +75,8 @@ export async function formFields(request) {
     writeArticle: text("potom") === "zprava",
     // Přihlášení kódem z e-mailu (src/login.js); `next` je stránka, kam se po přihlášení vrátit.
     loginCode: text("kod"),
+    // Odběr a data: zaškrtnuté vypínače feedů (src/feeds/settings.js).
+    feedSwitches: form.getAll("feed").map(String),
     token: text("token"),
     turnstile: text("cf-turnstile-response"),
     email: text("email"),

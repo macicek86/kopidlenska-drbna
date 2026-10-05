@@ -7,6 +7,7 @@ export { adminDenik } from "./denik.js";
 export { adminSkola } from "./skola.js";
 export { adminDrbena } from "./drbena.js";
 export { adminEvents } from "./events.js";
+export { adminFeeds } from "./feeds.js";
 export { adminFootball } from "./fotbal.js";
 export { adminMessages } from "./messages.js";
 export { adminMunipolis } from "./munipolis.js";

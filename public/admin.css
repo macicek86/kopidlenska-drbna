@@ -611,3 +611,6 @@ html { font-size: 100%; }
   .audit-table th[scope="row"] { grid-column: 1 / -1; padding: 0; }
   .audit-table td::before { content: attr(data-label); display: block; margin-bottom: 0.15rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 }
+.feed-switch { padding: 0.55rem 0; border-bottom: 1px solid var(--line-2); }
+.feed-switch:has(+ .form-foot) { border-bottom: 0; }
+.feed-switch .check-hint a { overflow-wrap: anywhere; }

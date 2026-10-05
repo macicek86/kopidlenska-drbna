@@ -17,6 +17,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "footer_copy", label: "Patička, první řádek", value: "© 2026 Kopidlenská drbna", max: 120 },
   { group: "Hlavička a patička", key: "footer_fine", label: "Patička, upřesnění", value: "Neoficiální informační stránka — není provozována Městem Kopidlno.", max: 240, long: true },
   { group: "Hlavička a patička", key: "footer_admin", label: "Odkaz do redakce", value: "Redakce", max: 40 },
+  { group: "Hlavička a patička", key: "footer_feeds", label: "Odkaz na odběr (RSS a kalendář)", value: "Odebírat zprávy a akce (RSS, kalendář)", max: 80 },
 
   { group: "Titulka", key: "home_description", label: "Popis titulky pro vyhledávače", value: "Místní zprávy a pozvánky pro Kopidlno a jeho části.", max: 240, long: true },
   { group: "Titulka", key: "hero_pill", label: "Štítek nad nadpisem", value: "Kopidlno a jeho části", max: 80 },
@@ -178,6 +179,12 @@ export const COPY = [
   { group: "Reklamy", key: "ads_sample", label: "Označení ukázky", value: "ukázka", max: 40 },
   { group: "Reklamy", key: "ads_more", label: "Text odkazu na panelu", value: "Víc", max: 40 },
   { group: "Reklamy", key: "ads_missing", label: "Chybějící reklama", value: "Tahle reklama tu není", max: 80 },
+  { group: "Odběr", key: "feeds_eyebrow", label: "Malý nadpis stránky odběru", value: "RSS a kalendář", max: 40 },
+  { group: "Odběr", key: "feeds_heading", label: "Nadpis stránky odběru", value: "Odebírat drbnu", max: 60 },
+  { group: "Odběr", key: "feeds_description", label: "Popis stránky odběru", value: "Zprávy, akce a změny z Kopidlna do čtečky nebo do kalendáře v telefonu.", max: 240, long: true },
+  { group: "Odběr", key: "feeds_lede", label: "Úvod stránky odběru", value: "Drbnu nemusíte pořád otevírat. Akce si můžete dát rovnou do kalendáře v telefonu a zprávy nechat chodit do čtečky.", max: 400, long: true },
+  { group: "Odběr", key: "events_subscribe", label: "Akce: věta u odkazů do kalendáře", value: "Akce do kalendáře v telefonu:", max: 80 },
+
   { group: "Facebook", key: "facebook_url", label: "Adresa skupiny na Facebooku", value: "https://www.facebook.com/groups/kopidlenskadrbna", max: 200, url: true, hint: "Začíná https://. Když sem napíšete jen pomlčku -, odkazy na Facebook z webu i z chatu zmizí." },
   { group: "Facebook", key: "footer_facebook", label: "Odkaz v patičce", value: "Přidejte se ke skupině na Facebooku", max: 80 },
   { group: "Facebook", key: "article_facebook", label: "Věta pod zprávou", value: "Chcete to probrat se sousedy?", max: 120 },

@@ -9,6 +9,7 @@
 @import url("/hours.css");
 @import url("/notfound.css");
 @import url("/welcome.css");
+@import url("/feeds.css");
 
 @media (min-width: 900px) {
   .hero {

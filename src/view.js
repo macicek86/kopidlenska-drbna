@@ -8,6 +8,8 @@ import { addDays, civilWeekday } from "./waste.js";
 import { coversDay, homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
 import { welcomeTemplate } from "./welcome.js";
+import { yardLd } from "./hours-ld.js";
+import { anyFeedOn, feedOn } from "./feeds/settings.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
 export const FAVICON_TAGS = `<link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -40,6 +42,16 @@ export function siteOrigin(origin, mainOrigin) {
 
 export { esc, mediaUrl } from "./html.js";
 
+// Feed zpráv je v hlavičce každé stránky, ať ho čtečka najde odkudkoli. Stránka může přidat svůj ([cesta, název]).
+const SITE_FEED = ["/feed.xml", "Zprávy"];
+
+function feedLinks(feeds, siteName, base, withSite) {
+  const list = [...feeds, ...(withSite ? [SITE_FEED] : [])].filter(([href], index, all) => all.findIndex(([other]) => other === href) === index);
+  return list
+    .map(([href, label]) => `<link rel="alternate" type="application/atom+xml" title="${esc(`${siteName}: ${label}`)}" href="${esc(`${base}${href}`)}">`)
+    .join("\n  ");
+}
+
 function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
@@ -61,6 +73,8 @@ export function layout({
   image = "",
   published = "",
   jsonLd = [],
+  feeds = [],
+  feedOn: switches = null,
   chat = null,
 }) {
   const base = siteOrigin(origin, mainOrigin);
@@ -119,6 +133,7 @@ export function layout({
   <meta name="twitter:description" content="${esc(description)}">
   <meta name="twitter:image" content="${esc(ogImage)}">
   ${jsonLdTag(jsonLd)}
+  ${feedLinks(feeds.filter(([href]) => feedOn(switches, href)), siteName, base, feedOn(switches, SITE_FEED[0]))}
   ${FAVICON_TAGS}
   <link rel="manifest" href="/site.webmanifest">
   <meta name="theme-color" content="#fffaf5">
@@ -143,6 +158,7 @@ export function layout({
     <footer>
       <p>${esc(tx(copy, "footer_copy"))}</p>
       ${facebook ? `<p><a href="${esc(facebook)}" rel="noopener">${esc(tx(copy, "footer_facebook"))}</a></p>` : ""}
+      ${anyFeedOn(switches) ? `<p><a href="/odber">${esc(tx(copy, "footer_feeds"))}</a></p>` : ""}
       <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
       <a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>
     </footer>
@@ -364,7 +380,7 @@ export function yardsPage(data, ctx) {
             ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
             : weekList(yard.week, today, yard.closures);
           // Víc dvorů: stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
-          return `<article class="card yard${several ? " place-card" : ""}">
+          return `<article class="card yard${several ? " place-card" : ""}" id="dvur-${yard.id}">
             <div class="place-head">
               <p class="kicker">${esc(yard.place)}</p>
               <h2>${esc(yard.name)}</h2>
@@ -383,6 +399,8 @@ export function yardsPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "yards_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "yards_description"),
+    jsonLd: ctx.feedOn?.hoursLd === false ? [] : yards.map((yard) => yardLd(siteOrigin(ctx.origin, ctx.mainOrigin), yard)),
+    feeds: [["/oteviraci-doba/feed.xml", "Změny otevírací doby"]],
     body: `
       <p class="eyebrow">${esc(tx(ctx.copy, "yards_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>

@@ -134,6 +134,7 @@ const ROUTES = {
   "/redakce/ucet/odhlasit-ostatni": "always",
 
   "/redakce/svoz/ulozit": [single("settings", "nastavení")],
+  "/redakce/odber/ulozit": [single("feed_settings", "nastavení odběru")],
   "/redakce/texty/ulozit": [copyTexts, single("settings", "nastavení")],
 
   ...hoursRoutes("/redakce/dvory", "yards", "yardId", "yard_closures"),

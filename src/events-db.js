@@ -4,7 +4,7 @@ import { addColumn, asBool, clip, liveArticle, requireChief } from "./db-core.js
 
 const eventFields = () => `e.id, e.title, e.place, e.starts_on, e.starts_time, e.description, e.published, e.link,
   e.article_id, a.slug as article_slug, a.title as article_title, (${liveArticle()}) as article_published,
-  e.proposal_id, p.title as proposal_title, p.status as proposal_status`;
+  e.proposal_id, p.title as proposal_title, p.status as proposal_status, e.created_at`;
 const EVENT_FROM = "events e left join articles a on a.id = e.article_id left join proposals p on p.id = e.proposal_id";
 const EVENT_ORDER = "order by e.starts_on asc, e.starts_time asc, e.id asc";
 
@@ -16,6 +16,11 @@ export async function ensureEventColumns(env) {
   await addColumn(env, names, "link", "alter table events add column link text not null default ''");
   // Drběna už na akci v článku vzpomněla (src/drbena-memory.js), podruhé ne.
   await addColumn(env, names, "recalled", "alter table events add column recalled integer not null default 0");
+  // Kdy akce přibyla (UTC), pro feed nových akcí. Akce, které už v kalendáři byly, dostanou čas přidání sloupce.
+  if (!names.has("created_at")) {
+    await addColumn(env, names, "created_at", "alter table events add column created_at text not null default ''");
+    await env.DB.prepare("update events set created_at = datetime('now') where created_at = ''").run();
+  }
 }
 
 function optionalId(value) {
@@ -40,6 +45,7 @@ export function mapEvent(row) {
     articlePublished,
     proposalId: row.proposal_status === "pending" ? optionalId(row.proposal_id) : null,
     proposalTitle: row.proposal_status === "pending" ? String(row.proposal_title ?? "") : "",
+    createdAt: String(row.created_at ?? ""),
   };
 }
 
@@ -95,7 +101,7 @@ export async function saveEvent(env, request, input) {
     return { ok: true, id: input.id };
   }
   const result = await env.DB.prepare(
-    "insert into events (title, place, starts_on, starts_time, description, published, link, article_id) values (?, ?, ?, ?, ?, ?, ?, ?)",
+    "insert into events (title, place, starts_on, starts_time, description, published, link, article_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
   )
     .bind(title, place, startsOn, startsTime, description, published, link.link, articleId)
     .run();
@@ -112,8 +118,8 @@ export async function removeEvent(env, request, id) {
 // Akce od Drběny z importu. Odkaz jinam nepřidává, jen zprávu (nebo návrh), kterou k ní napsala.
 export async function insertBotEvent(env, event, { published, articleId = null, proposalId = null }) {
   const result = await env.DB.prepare(
-    `insert into events (title, place, starts_on, starts_time, description, published, article_id, proposal_id)
-     values (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `insert into events (title, place, starts_on, starts_time, description, published, article_id, proposal_id, created_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
   )
     .bind(event.title, event.place, event.startsOn, event.startsTime, event.description, published ? 1 : 0, articleId ?? null, proposalId ?? null)
     .run();

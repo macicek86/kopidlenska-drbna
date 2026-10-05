@@ -5,7 +5,8 @@ import { esc } from "./html.js";
 import { nowOverview } from "./hours-now.js";
 import { laterChangeTiles, nextDaysList, popover, popoverButton, regularWeekList } from "./hours-week-view.js";
 import { placeNotices } from "./places.js";
-import { askLine, layout } from "./view.js";
+import { doctorLd, placeLd } from "./hours-ld.js";
+import { askLine, layout, siteOrigin } from "./view.js";
 
 function phoneLink(phone) {
   const text = String(phone ?? "").trim();
@@ -44,6 +45,9 @@ function hoursBlock(entity, today, ctx, keys) {
   return { days: nextDaysList(entity, today), more: `${regular}${later}` };
 }
 
+// Změny hodin lékařů, míst i sběrných dvorů jsou v jednom feedu.
+export const HOURS_FEEDS = [["/oteviraci-doba/feed.xml", "Změny otevírací doby"]];
+
 const DOCTOR_KEYS = { prefix: "lekar", missing: "doctors_missing_hours", regular: "doctors_regular", changes: "doctors_changes" };
 const PLACE_KEYS = { prefix: "misto", missing: "places_missing_hours", regular: "places_regular", changes: "places_changes" };
 
@@ -54,7 +58,7 @@ export function doctorsPage(data, ctx) {
         .map((doctor) => {
           const phone = phoneLink(doctor.phone);
           const { days, more } = hoursBlock(doctor, today, ctx, DOCTOR_KEYS);
-          return `<article class="card yard">
+          return `<article class="card yard" id="lekar-${doctor.id}">
             <p class="kicker">${esc(doctor.specialty)}</p>
             <h2>${esc(doctor.name)}</h2>
             <p class="meta">${esc(doctor.place)}${phone ? ` · ${phone}` : ""}</p>
@@ -69,6 +73,8 @@ export function doctorsPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "doctors_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "doctors_description"),
+    jsonLd: ctx.feedOn?.hoursLd === false ? [] : (data.doctors ?? []).map((doctor) => doctorLd(siteOrigin(ctx.origin, ctx.mainOrigin), doctor)),
+    feeds: HOURS_FEEDS,
     body: `
       <p class="eyebrow">${esc(tx(ctx.copy, "doctors_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "doctors_heading"))}</h1>
@@ -128,6 +134,8 @@ export function placesPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "places_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "places_description"),
+    jsonLd: ctx.feedOn?.hoursLd === false ? [] : places.map((place) => placeLd(siteOrigin(ctx.origin, ctx.mainOrigin), place, today)),
+    feeds: HOURS_FEEDS,
     body: `
       <p class="eyebrow">${esc(tx(ctx.copy, "places_eyebrow"))}</p>
       <h1>${esc(tx(ctx.copy, "places_heading"))}</h1>
