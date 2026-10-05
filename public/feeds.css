@@ -10,6 +10,8 @@
 .feed-rubrics { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0; margin: 0.6rem 0 0; list-style: none; }
 .feed-rubrics a { display: inline-block; padding: 0.35rem 0.8rem; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink); text-decoration: none; font-size: 0.9rem; }
 .feed-rubrics a:hover { border-color: var(--brand); color: var(--brand); }
-.events-subscribe { margin: 0.6rem 0 0; font-size: 0.92rem; }
-.events-subscribe a { color: var(--brand); font-weight: 700; }
+/* Nenápadný řádek: kdo hledá, najde, úvodu a Drběně nekonkuruje. */
+.events-subscribe { margin: 0.6rem 0 0; color: var(--muted); font-size: 0.85rem; }
+.events-subscribe a { color: inherit; font-weight: 600; text-decoration-color: rgb(113 101 96 / 0.45); text-underline-offset: 0.15em; }
+.events-subscribe a:hover { color: var(--brand); text-decoration-color: currentColor; }
 .feed-list + h3 { margin: 1.6rem 0 0; }

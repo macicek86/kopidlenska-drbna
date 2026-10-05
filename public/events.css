@@ -31,6 +31,8 @@
   justify-content: center;
   align-items: flex-end;
   min-height: 13rem;
+  /* Slunce přesahuje nad Drběnu a s šířkou roste: místo nad ní, ať nesahá na řádek s odkazy do kalendáře. */
+  margin-top: clamp(2rem, 8vw, 3.25rem);
 }
 
 .events-sun {
@@ -256,7 +258,7 @@
     padding: 2rem 2.2rem 0;
   }
   .events-copy { padding-bottom: 1.8rem; }
-  .events-drbena { min-height: 19rem; }
+  .events-drbena { min-height: 19rem; margin-top: 0; }
   .events-sun { bottom: 14%; width: 15rem; }
   .events-drbena img { width: 14rem; }
 }
