@@ -187,3 +187,9 @@ export async function uniqueSlug(env, base) {
 export function wrote(result) {
   return Number(result?.meta?.changes ?? result?.changes ?? 0) > 0;
 }
+
+// datetime('now') z SQLite je UTC bez zóny ("2026-10-05 08:15:53"), stamp() potřebuje ISO.
+export function sqliteStamp(value) {
+  const text = String(value ?? "");
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text) ? `${text.replace(" ", "T")}Z` : text;
+}

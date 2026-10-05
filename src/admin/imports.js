@@ -117,13 +117,24 @@ export function madeLinks(entry) {
   ].filter(Boolean);
 }
 
+// Kdy drbna položku stáhla a kdy vyšla ve zdroji (`source` je už naformátované datum zdroje).
+export function entryDates(entry, source = stamp(entry.publishedAt)) {
+  const fetched = stamp(entry.fetchedAt);
+  return [fetched && `staženo ${fetched}`, source && `ve zdroji ${source}`].filter(Boolean);
+}
+
+export function entryDatesLine(entry, source) {
+  const dates = entryDates(entry, source);
+  return dates.length ? `<span class="item-sub">${esc(dates.join(" · "))}</span>` : "";
+}
+
 // Řádek převzaté zprávy v seznamu (Munipolis, Deník).
 export function importEntryItem(entry, base, formId) {
   const made = madeLinks(entry);
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
   return item({
     title: entry.title,
-    meta: [stamp(entry.publishedAt), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
+    meta: [...entryDates(entry).map(esc), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
     badges: `${statusBadge(entry)}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
     actions: `${pickBox(entry, formId)}${modalLink(`${base}?zprava=${entry.id}`, "Detail")}`,
     search: `${entry.title} ${entry.reason}`,

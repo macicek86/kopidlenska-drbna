@@ -1,6 +1,6 @@
 // Fotbal v D1: nastavení, zapamatované aktuality z webu klubu a zámek, ať neběží dva průchody naráz.
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, unlockRow } from "../background.js";
-import { addColumn, asBool, clip, requireChief } from "../db-core.js";
+import { addColumn, asBool, clip, requireChief, sqliteStamp } from "../db-core.js";
 import { DEFAULT_CLUB_URL, readClubUrl } from "./club.js";
 import { DEFAULT_TRUTH_URL, readTruthUrl } from "./fotbalunas.js";
 
@@ -141,11 +141,12 @@ export function mapFootballItem(row) {
     manual: asBool(row.manual),
     attempts: Number(row.attempts ?? 0),
     processedAt: row.processed_at ? String(row.processed_at) : "",
+    fetchedAt: sqliteStamp(row.created_at),
   };
 }
 
 const ITEM_FIELDS =
-  "id, guid, kind, link, title, text, extra, images, cover, published_on, status, reason, duplicate_of, article_id, proposal_id, manual, attempts, processed_at";
+  "id, guid, kind, link, title, text, extra, images, cover, published_on, status, reason, duplicate_of, article_id, proposal_id, manual, attempts, processed_at, created_at";
 
 export async function loadFootballItems(env, limit = 40) {
   const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from football_items order by id desc limit ?`).bind(limit).all();

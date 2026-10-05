@@ -1,6 +1,6 @@
 // Import z Munipolisu v D1: nastavení, zapamatované zprávy a autorka Koza Drběna.
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
-import { addColumn, asBool, clip, requireChief } from "../db-core.js";
+import { addColumn, asBool, clip, requireChief, sqliteStamp } from "../db-core.js";
 import { splitRefs } from "../import-context.js";
 import { DEFAULT_FEED_URL, readFeedUrl } from "./feed.js";
 
@@ -120,11 +120,12 @@ export function mapImportItem(row) {
     manual: asBool(row.manual),
     attempts: Number(row.attempts ?? 0),
     processedAt: row.processed_at ? String(row.processed_at) : "",
+    fetchedAt: sqliteStamp(row.created_at),
   };
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, hours_ids, manual, attempts, processed_at";
+  "id, guid, link, title, text, images, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, hours_ids, manual, attempts, processed_at, created_at";
 
 export async function loadImportItems(env, limit = 40) {
   const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from import_items order by published_at desc, id desc limit ?`)

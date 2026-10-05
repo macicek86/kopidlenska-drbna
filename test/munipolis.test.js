@@ -7,7 +7,8 @@ import { isFresh, readFreshDays } from "../src/background.js";
 import { noticeBoard, noticePhase, noticeSpan, parseNoticeInput } from "../src/notices.js";
 import { outagesPage, homePage } from "../src/view.js";
 import { adminDrbena, adminMunipolis, adminOutages } from "../src/admin/index.js";
-import { refLink } from "../src/admin/imports.js";
+import { entryDates, refLink } from "../src/admin/imports.js";
+import { sqliteStamp } from "../src/db-core.js";
 import { DEFAULT_FOOTBALL, DEFAULT_FOOTBALL_VOICE, DEFAULT_PERSONA, ownFootball, ownPersona, voiceFor } from "../src/drbena.js";
 import { readTry, tryVoice } from "../src/drbena-try.js";
 
@@ -408,4 +409,12 @@ test("zkouška povahy napíše ukázku podle neuložené povahy a nic neuloží"
   assert.match(fresh, /value="Pozvánka na Drakiádu 2026"/);
   assert.match(fresh, /name="text"[^>]*>Město Kopidlno a Sbor/);
   assert.doesNotMatch(page, /Drakiád/);
+});
+
+test("položka importu ukáže, kdy ji drbna stáhla a kdy vyšla ve zdroji", () => {
+  assert.equal(sqliteStamp("2026-10-05 08:15:53"), "2026-10-05T08:15:53Z");
+  assert.equal(sqliteStamp(null), "");
+  const entry = { fetchedAt: sqliteStamp("2026-10-05 08:15:53"), publishedAt: "2026-09-30T06:00:00Z" };
+  assert.deepEqual(entryDates(entry), ["staženo 5. 10. 2026 v 10:15", "ve zdroji 30. 9. 2026 v 08:00"]);
+  assert.deepEqual(entryDates({ fetchedAt: "" }, "30. 9. 2026"), ["ve zdroji 30. 9. 2026"]);
 });

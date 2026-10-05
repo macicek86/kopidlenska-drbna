@@ -3,7 +3,7 @@ import { MODEL } from "../munipolis/ai.js";
 import { DEFAULT_FEED_URL } from "../munipolis/feed.js";
 import { DEFAULT_FRESH_DAYS, importRunning } from "../munipolis/store.js";
 import { esc } from "../view.js";
-import { importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDatesLine, importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
@@ -16,7 +16,7 @@ function entryDetail(entry) {
   const images = entry.images.map((url, index) => `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">Obrázek ${index + 1}</a>`).join(" · ");
   const source = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Původní zpráva</a>` : "";
   return `<div class="import-detail">
-    <p class="item-badges">${statusBadge(entry)}<span class="item-sub">${esc(stamp(entry.publishedAt))}</span></p>
+    <p class="item-badges">${statusBadge(entry)}${entryDatesLine(entry)}</p>
     ${entry.reason ? callout(`<b>Drběna:</b> ${esc(entry.reason)}`, entry.status === "chyba" ? "bad" : "info") : ""}
     ${made.length ? `<p>Vzniklo: ${made.join(" · ")}</p>` : ""}
     ${duplicate ? `<p>Stejná věc už je tady: ${duplicate}</p>` : ""}

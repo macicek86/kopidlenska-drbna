@@ -3,7 +3,7 @@ import { MODEL } from "../claude.js";
 import { DEFAULT_FEED_URL } from "../denik/feed.js";
 import { DEFAULT_FRESH_DAYS, denikRunning } from "../denik/store.js";
 import { esc } from "../view.js";
-import { importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDatesLine, importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
@@ -15,7 +15,7 @@ function entryDetail(entry) {
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
   const source = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Článek na Deníku</a>` : "";
   return `<div class="import-detail">
-    <p class="item-badges">${statusBadge(entry)}<span class="item-sub">${esc(stamp(entry.publishedAt))}</span></p>
+    <p class="item-badges">${statusBadge(entry)}${entryDatesLine(entry)}</p>
     ${entry.reason ? callout(`<b>Drběna:</b> ${esc(entry.reason)}`, entry.status === "chyba" ? "bad" : "info") : ""}
     ${made.length ? `<p>Vzniklo: ${made.join(" · ")}</p>` : ""}
     ${duplicate ? `<p>Stejná věc už je tady: ${duplicate}</p>` : ""}

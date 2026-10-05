@@ -3,7 +3,7 @@ import { MODEL } from "../claude.js";
 import { SCHOOLS } from "../skola/sources.js";
 import { skolaRunning } from "../skola/store.js";
 import { esc } from "../view.js";
-import { importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDatesLine, importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
@@ -16,7 +16,7 @@ function entryDetail(source, entry) {
   const original = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Článek na ${esc(source.siteOf)}</a>` : "";
   const facts = [entry.section, entry.term && `termín ${entry.term}`].filter(Boolean).join(" · ");
   return `<div class="import-detail">
-    <p class="item-badges">${statusBadge(entry)}<span class="item-sub">${esc(stamp(entry.publishedAt))}</span>${facts ? `<span class="item-sub">${esc(facts)}</span>` : ""}</p>
+    <p class="item-badges">${statusBadge(entry)}${entryDatesLine(entry)}${facts ? `<span class="item-sub">${esc(facts)}</span>` : ""}</p>
     ${entry.reason ? callout(`<b>Drběna:</b> ${esc(entry.reason)}`, entry.status === "chyba" ? "bad" : "info") : ""}
     ${made.length ? `<p>Vzniklo: ${made.join(" · ")}</p>` : ""}
     ${duplicate ? `<p>Stejná věc už je tady: ${duplicate}</p>` : ""}

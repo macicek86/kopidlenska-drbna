@@ -6,7 +6,7 @@ import { DEFAULT_TRUTH_URL } from "../fotbal/fotbalunas.js";
 import { DEFAULT_FRESH_DAYS, footballRunning, INTERVALS } from "../fotbal/store.js";
 import { esc } from "../view.js";
 import { rubricOptions } from "./article-form.js";
-import { pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDates, entryDatesLine, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
@@ -33,7 +33,7 @@ function statusBadges(entry) {
 function entryItem(entry) {
   return item({
     title: entry.title,
-    meta: [day(entry.publishedOn), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
+    meta: [...entryDates(entry, day(entry.publishedOn)).map(esc), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
     badges: statusBadges(entry),
     actions: `${pickBox(entry, PICK)}${modalLink(`${BASE}?zprava=${entry.id}`, "Detail")}`,
     search: `${entry.title} ${entry.reason}`,
@@ -43,7 +43,7 @@ function entryItem(entry) {
 function entryDetail(entry) {
   const source = entry.link ? `<a href="${esc(entry.link)}" target="_blank" rel="noopener noreferrer">Aktualita na webu klubu</a>` : "";
   return `<div class="import-detail">
-    <p class="item-badges">${statusBadges(entry)}<span class="item-sub">${esc(day(entry.publishedOn))}</span></p>
+    <p class="item-badges">${statusBadges(entry)}${entryDatesLine(entry, day(entry.publishedOn))}</p>
     ${entry.reason ? callout(`<b>Drběna:</b> ${esc(entry.reason)}`, entry.status === "chyba" ? "bad" : "info") : ""}
     <div class="import-source">${textBlock(entry.text)}</div>
     ${entry.extra ? `<p class="item-sub">Doplněno z rozpisu a tabulky:</p><div class="import-source">${textBlock(entry.extra)}</div>` : ""}

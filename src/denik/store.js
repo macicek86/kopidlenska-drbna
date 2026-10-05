@@ -74,7 +74,7 @@ export async function loadDenikSettings(env) {
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at";
+  "id, guid, link, title, text, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at, created_at";
 
 export async function loadDenikItems(env, limit = 40) {
   const rows = await env.DB.prepare(`select ${ITEM_FIELDS} from denik_items order by published_at desc, id desc limit ?`).bind(limit).all();

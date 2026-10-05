@@ -78,7 +78,7 @@ export async function loadSkolaSettings(env, source) {
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at";
+  "id, guid, link, title, text, images, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at, created_at";
 
 function mapSkolaItem(row) {
   return { ...mapImportItem(row), section: String(row.section ?? ""), term: String(row.term ?? "") };
