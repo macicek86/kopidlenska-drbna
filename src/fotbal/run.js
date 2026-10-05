@@ -53,12 +53,12 @@ async function targetRubric(env, settings) {
 
 // Fotka z aktuality, jinak obrázek, který klub dává k aktualitám (znak). Ten se do R2 ukládá jen jednou a pak se sdílí.
 async function articleImage(env, item, settings, fetchImpl) {
-  const photo = item.images[0] ? await fetchImage(item.images[0], { fetchImpl }) : null;
+  const photo = item.images[0] ? await fetchImage(env, item.images[0], { fetchImpl }) : null;
   if (photo) return storeImageBytes(env, photo);
   const url = item.cover;
   if (!url || !settings.useCrest) return null;
   if (url === settings.crestUrl && settings.crestKey && (await env.BUCKET.head(settings.crestKey))) return settings.crestKey;
-  const image = await fetchImage(url, { fetchImpl });
+  const image = await fetchImage(env, url, { fetchImpl });
   if (!image) return null;
   const key = await storeImageBytes(env, image);
   await saveCrest(env, url, key);
@@ -200,7 +200,7 @@ export async function runFootball(env, { fetchImpl = fetch, ask = askFootball } 
     let added = 0;
     const checked = footballDue(settings);
     if (checked) {
-      const collected = await collectNews(env, settings, { fetchImpl });
+      const collected = await collectNews(env, settings, { fetchImpl, env });
       if (!collected.ok) {
         await writeFootballStatus(env, { status: "error", note: collected.error });
         return { ok: false, error: collected.error };

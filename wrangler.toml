@@ -41,5 +41,10 @@ name = "EMAIL"
 binding = "BUCKET"
 bucket_name = "kopidlenska-drbna"
 
+# Zmenšení obrázků stažených z Munipolisu, škol a fotbalu před uložením do R2 (shrinkImage v src/images.js).
+# Cloudflare Images: 5 000 transformací měsíčně zdarma, za překročení nic neúčtuje, jen vrátí chybu a uloží se originál.
+[images]
+binding = "IMAGES"
+
 [triggers]
 crons = ["15 */4 * * *"]

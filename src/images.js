@@ -7,9 +7,15 @@ const IMAGE_TYPES = {
   "image/gif": "gif",
 };
 
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024;
+// Stejně jako prohlížeč u nahrané fotky (public/editor.js): 2400 px stačí i na jízdní řád v příloze.
+const MAX_SIDE = 2400;
+const SMALL_BYTES = 500 * 1024;
+
 export async function storeImage(env, file, folder = "clanky") {
   if (!(file instanceof File) || file.size === 0) return { key: null };
-  if (file.size > 4 * 1024 * 1024) return { error: "Fotka může mít nejvýš 4 MB." };
+  if (file.size > MAX_IMAGE_BYTES) return { error: "Fotka může mít nejvýš 4 MB." };
   const ext = IMAGE_TYPES[file.type];
   if (!ext) return { error: "Fotka musí být JPG, PNG, WEBP nebo GIF." };
   const prefix = ["reklamy", "knihovna", "prilohy"].includes(folder) ? folder : "clanky";
@@ -21,7 +27,8 @@ export async function storeImage(env, file, folder = "clanky") {
 }
 
 // Obrázek z cizího webu (třeba z Munipolisu). Vrací bajty a typ, nebo null, když to není rozumná fotka.
-export async function fetchImage(url, { fetchImpl = fetch } = {}) {
+// Každý zdroj stahuje obrázky jen tudy: rovnou se zmenší (shrinkImage), takže Claude i R2 dostanou už menší.
+export async function fetchImage(env, url, { fetchImpl = fetch } = {}) {
   if (!/^https:\/\//i.test(String(url ?? ""))) return null;
   let response;
   try {
@@ -33,8 +40,29 @@ export async function fetchImage(url, { fetchImpl = fetch } = {}) {
   const type = String(response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
   if (!IMAGE_TYPES[type]) return null;
   const bytes = await response.arrayBuffer();
-  if (!bytes.byteLength || bytes.byteLength > 4 * 1024 * 1024) return null;
-  return { bytes, type };
+  if (!bytes.byteLength || bytes.byteLength > MAX_DOWNLOAD_BYTES) return null;
+  const image = await shrinkImage(env, { bytes, type });
+  return image.bytes.byteLength > MAX_IMAGE_BYTES ? null : image;
+}
+
+// Zmenší obrázek přes Cloudflare Images (binding IMAGES) na nejvýš MAX_SIDE px a WEBP. Malý obrázek, GIF (může být
+// animovaný) a cokoli, co se nepovede (třeba vyčerpaný měsíční limit transformací), zůstane, jak je.
+export async function shrinkImage(env, image) {
+  if (!env?.IMAGES || image.type === "image/gif") return image;
+  try {
+    const info = await env.IMAGES.info(new Response(image.bytes).body);
+    const big = Math.max(Number(info?.width) || 0, Number(info?.height) || 0) > MAX_SIDE;
+    if (!big && image.bytes.byteLength <= SMALL_BYTES) return image;
+    const result = await env.IMAGES.input(new Response(image.bytes).body)
+      .transform({ width: MAX_SIDE, height: MAX_SIDE, fit: "scale-down" })
+      .output({ format: "image/webp", quality: 82 });
+    const bytes = await result.response().arrayBuffer();
+    if (!bytes.byteLength || (!big && bytes.byteLength >= image.bytes.byteLength)) return image;
+    return { bytes, type: "image/webp" };
+  } catch (error) {
+    console.warn("Obrázek se nepovedlo zmenšit:", error?.message ?? error);
+    return image;
+  }
 }
 
 export async function storeImageBytes(env, image, folder = "clanky") {

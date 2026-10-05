@@ -52,10 +52,10 @@ export function photoCaption(caption, source = SCHOOLS.skola) {
   return caption ? `${caption} (${credit})` : `F${credit.slice(1)}`;
 }
 
-async function downloadImages(urls, fetchImpl) {
+async function downloadImages(env, urls, fetchImpl) {
   const images = [];
   for (const url of urls.slice(0, 2)) {
-    const image = await fetchImage(url, { fetchImpl });
+    const image = await fetchImage(env, url, { fetchImpl });
     if (image) images.push(image);
   }
   return images;
@@ -74,7 +74,7 @@ export async function skolaImage(env, article, images, ownPhotos, source = SCHOO
 export async function processSkolaItem(env, source, item, settings, { fetchImpl = fetch, ask = askSkola } = {}) {
   const today = pragueNow().date;
   const rubrics = await rubricMap(env);
-  const images = await downloadImages(item.images, fetchImpl);
+  const images = await downloadImages(env, item.images, fetchImpl);
   const drbena = await loadDrbena(env);
   const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {

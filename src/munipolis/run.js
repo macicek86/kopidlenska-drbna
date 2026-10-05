@@ -52,11 +52,11 @@ export function sourceParagraph(link) {
 export { importSourceDate, outcomeOf };
 
 // Obrázky z RSS a ze stránky zprávy (galerie s jízdními řády, mapami…). Claude jich uvidí nejvýš tolik, kolik pustí visibleImages.
-async function downloadImages(item, fetchImpl) {
+async function downloadImages(env, item, fetchImpl) {
   const urls = mergeImageUrls(item.images, await fetchPageImages(item.link, { fetchImpl }));
   const images = [];
   for (const url of urls.slice(0, 8)) {
-    const image = await fetchImage(url, { fetchImpl });
+    const image = await fetchImage(env, url, { fetchImpl });
     if (image) images.push(image);
   }
   return images;
@@ -88,7 +88,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   const today = pragueNow().date;
   const force = item.manual;
   const rubrics = await rubricMap(env);
-  const images = await downloadImages(item, fetchImpl);
+  const images = await downloadImages(env, item, fetchImpl);
   const drbena = await loadDrbena(env);
   const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
