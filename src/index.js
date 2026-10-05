@@ -69,7 +69,7 @@ import { SCHOOL_LIST } from "./skola/sources.js";
 import { runFootball } from "./fotbal/run.js";
 import { chatPost } from "./chat/run.js";
 import { assistPost } from "./assist/run.js";
-import { chatEnabled } from "./chat/store.js";
+import { chatPublic } from "./chat/store.js";
 import { turnstileConfig } from "./chat/pass.js";
 import { chatAdminPost } from "./post-chat.js";
 import { messagesPost } from "./post-messages.js";
@@ -168,12 +168,12 @@ async function renderGet(request, env, url, execution) {
     PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
     path.startsWith("/redakce/") ? loadAdmin(env, request) : null,
     slug == null ? null : loadStory(env, slug, path),
-    path.startsWith("/redakce") ? false : chatEnabled(env),
+    path.startsWith("/redakce") ? null : chatPublic(env),
     path.startsWith("/redakce") ? null : loadFeedSettings(env),
   ]);
   // Okénko chatu s Drběnou: jen na hlavním webu, když ho redakce zapnula.
   // feedOn: které feedy redakce nechala zapnuté (odkazy v hlavičce, na stránkách a strukturovaná data hodin).
-  const ctx = { ...base, copy, feedOn, chat: chat ? { siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
+  const ctx = { ...base, copy, feedOn, chat: chat ? { ...chat, siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
   if (path === "/popelnice") return html(binsPage(data.waste, ctx));
   if (path === "/") {

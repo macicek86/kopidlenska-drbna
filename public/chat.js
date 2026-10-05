@@ -8,7 +8,6 @@ const HISTORY = 8;
 const HINT = "drbna-chat-napoveda";
 const MOBILE = "(max-width: 540px), (pointer: coarse) and (max-height: 540px)";
 const TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-const IDEAS = ["Kdy jede popelář?", "Co se chystá o víkendu?", "Kdy má otevřeno knihovna?"];
 const GREETING = "Ahoj, já jsem Drběna. Zeptejte se mě na cokoli z Kopidlna: kdy jede popelář, kdo má dnes otevřeno nebo co se chystá.";
 
 function load() {
@@ -159,8 +158,19 @@ async function post(url, body) {
   return { status: response.status, data };
 }
 
+// Rychlé otázky pod pozdravem nastavuje redakce (stránka Chat s Drběnou).
+function readIdeas() {
+  try {
+    const list = JSON.parse(root.dataset.ideas || "[]");
+    return Array.isArray(list) ? list.filter((idea) => typeof idea === "string" && idea.trim()) : [];
+  } catch {
+    return [];
+  }
+}
+
 function setup() {
   const sitekey = root.dataset.sitekey || "";
+  const ideaList = readIdeas();
   const state = load();
   let busy = false;
 
@@ -234,9 +244,9 @@ function setup() {
     log.textContent = "";
     bubble("assistant", GREETING);
     for (const message of state.messages) bubble(message.role, message.text);
-    if (!state.messages.length) {
+    if (!state.messages.length && ideaList.length) {
       const ideas = el("div", "chat-ideas");
-      for (const idea of IDEAS) {
+      for (const idea of ideaList) {
         const chip = el("button", "chat-idea", idea);
         chip.type = "button";
         chip.addEventListener("click", () => ask(idea));

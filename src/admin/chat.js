@@ -1,6 +1,7 @@
 // Redakce: Chat s Drběnou. Zapnutí, model, limity a rozpočet, povaha v chatu, statistiky a uložené otázky.
 import { CHAT_MODELS, USD_CZK } from "../chat/ai.js";
 import { CHAT_PERSONA_MAX, DEFAULT_CHAT_PERSONA } from "../chat/prompt.js";
+import { DEFAULT_CHAT_IDEAS, IDEA_LENGTH, IDEAS_MAX } from "../chat/store.js";
 import { formatDayMonth } from "../format.js";
 import { esc } from "../view.js";
 import { adminShell } from "./shell.js";
@@ -79,6 +80,11 @@ function settingsForm(settings) {
       ${numberField("Otázky uchovávat dní", "keepDays", settings.keepDays, 1, 365, "Starší se samy smažou.")}
     </div>
     ${numberField("Starších zpráv v rejstříku", "archive", settings.archive, 0, 1000, "Kromě 30 nejnovějších vidí Drběna i tolik starších, každou jen s nadpisem a klíčovými slovy, a o čem drbna psala, si dohledá. Každých 100 zpráv přidá k rozhovoru asi 0,20 Kč se Sonnetem a 0,10 Kč s Haiku. 0 rejstřík vypne, starší zprávy pak najde jen hledáním.")}
+    ${field(
+      `Rychlé otázky ${settings.ideas ? badge("Vlastní", "info") : badge("Výchozí")}`,
+      `<textarea class="${input}" name="ideas" rows="4">${esc(settings.ideas || DEFAULT_CHAT_IDEAS.join("\n"))}</textarea>`,
+      `Tlačítka pod pozdravem, ťuknutím se Drběny rovnou zeptají. Jedna otázka na řádek, nejvýš ${IDEAS_MAX}, každá do ${IDEA_LENGTH} znaků. Řádek smažete a otázka zmizí. Prázdné pole vrátí výchozí otázky, pomlčka (-) je schová všechny.`,
+    )}
     ${check("chatAds", "1", settings.ads, "Drběna vidí reklamy", "Nabídku sousedů zmíní, jen když se hodí k otázce, a řekne, že jde o reklamu.")}
     ${field(
       `Jak se Drběna chová v chatu ${settings.persona ? badge("Vlastní text", "info") : badge("Výchozí text")}`,
@@ -99,6 +105,7 @@ function toggleButton(settings) {
     keepDays: settings.keepDays,
     archive: settings.archive,
     persona: settings.persona,
+    ideas: settings.ideas,
   };
   if (settings.ads) fields.chatAds = "1";
   if (!settings.enabled) fields.enabled = "1";

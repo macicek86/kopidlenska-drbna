@@ -28,7 +28,7 @@ import { ensureAuditTables } from "./audit-db.js";
 import { ensureLoginTables } from "./login-db.js";
 import { ensureNotifyTables } from "./notify.js";
 
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 let schemaReady = false;
 

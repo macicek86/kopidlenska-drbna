@@ -21,7 +21,8 @@ export const CHAT_TABLES = [
     persona text not null default '',
     secret text not null default '',
     ads integer not null default 1,
-    archive integer not null default 200
+    archive integer not null default 200,
+    ideas text not null default ''
   )`,
   `create table if not exists chat_days (
     day text primary key,
@@ -64,6 +65,8 @@ export async function ensureChatTables(env) {
   await addColumn(env, names, "ads", "alter table chat_settings add column ads integer not null default 1");
   // Kolik starších zpráv vidí Drběna v rejstříku (src/chat/archive.js).
   await addColumn(env, names, "archive", "alter table chat_settings add column archive integer not null default 200");
+  // Rychlé otázky pod pozdravem v okénku: prázdné = výchozí, pomlčka = žádné.
+  await addColumn(env, names, "ideas", "alter table chat_settings add column ideas text not null default ''");
   await env.DB.prepare("insert into chat_settings (id, secret) select 1, ? where not exists (select 1 from chat_settings where id = 1)")
     .bind(randomSecret())
     .run();
@@ -79,6 +82,31 @@ export async function linkApprovedImports(env) {
        where article_id is null and proposal_id is not null`,
     ).run();
   }
+}
+
+// Rychlé otázky v okénku chatu, jedna na řádek. Výchozí se neukládají, ať změna v kódu platí všude.
+export const DEFAULT_CHAT_IDEAS = ["Kdy jede popelář?", "Co se chystá o víkendu?", "Kdy má otevřeno knihovna?"];
+export const IDEAS_MAX = 8;
+export const IDEA_LENGTH = 80;
+
+function ideaLines(text) {
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim().slice(0, IDEA_LENGTH))
+    .filter(Boolean)
+    .slice(0, IDEAS_MAX);
+}
+
+// Co uložit: "" pro výchozí otázky, "-" pro žádné, jinak otázky po řádcích.
+export function ownChatIdeas(text) {
+  if (String(text ?? "").trim() === "-") return "-";
+  const lines = ideaLines(text);
+  return lines.join("\n") === DEFAULT_CHAT_IDEAS.join("\n") ? "" : lines.join("\n");
+}
+
+export function chatIdeas(saved) {
+  const own = ownChatIdeas(saved);
+  return own === "-" ? [] : own ? ideaLines(own) : [...DEFAULT_CHAT_IDEAS];
 }
 
 function bounded(value, [min, max], fallback) {
@@ -97,6 +125,7 @@ function mapSettings(row) {
     archive: bounded(row?.archive, BOUNDS.archive, CHAT_DEFAULTS.archive),
     persona: ownChatPersona(row?.persona),
     ads: row?.ads == null ? true : asBool(row.ads),
+    ideas: ownChatIdeas(row?.ideas),
     secret: String(row?.secret ?? ""),
   };
 }
@@ -105,10 +134,14 @@ export async function loadChatSettings(env) {
   return mapSettings(await env.DB.prepare("select * from chat_settings where id = 1").first());
 }
 
-// Co z nastavení potřebuje každá veřejná stránka: jestli ukázat okénko.
 export async function chatEnabled(env) {
-  const row = await env.DB.prepare("select enabled from chat_settings where id = 1").first();
-  return asBool(row?.enabled);
+  return Boolean(await chatPublic(env));
+}
+
+// Co z nastavení potřebuje každá veřejná stránka: null (okénko neukázat), nebo rychlé otázky.
+export async function chatPublic(env) {
+  const row = await env.DB.prepare("select enabled, ideas from chat_settings where id = 1").first();
+  return asBool(row?.enabled) ? { ideas: chatIdeas(row?.ideas) } : null;
 }
 
 export function readChatSettings(fields) {
@@ -122,6 +155,7 @@ export function readChatSettings(fields) {
     archive: bounded(fields.archive, BOUNDS.archive, CHAT_DEFAULTS.archive),
     persona: ownChatPersona(fields.persona),
     ads: Boolean(fields.chatAds),
+    ideas: ownChatIdeas(fields.ideas),
   };
 }
 
@@ -131,9 +165,9 @@ export async function saveChatSettings(env, request, fields) {
   const value = readChatSettings(fields);
   await env.DB.prepare(
     `update chat_settings set enabled = ?, model = ?, per_visitor = ?, per_day = ?, budget_czk = ?, keep_days = ?, persona = ?, ads = ?,
-       archive = ? where id = 1`,
+       archive = ?, ideas = ? where id = 1`,
   )
-    .bind(value.enabled ? 1 : 0, value.model, value.perVisitor, value.perDay, value.budget, value.keepDays, value.persona, value.ads ? 1 : 0, value.archive)
+    .bind(value.enabled ? 1 : 0, value.model, value.perVisitor, value.perDay, value.budget, value.keepDays, value.persona, value.ads ? 1 : 0, value.archive, value.ideas)
     .run();
   return { ok: true, enabled: value.enabled };
 }

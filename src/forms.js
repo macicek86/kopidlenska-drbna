@@ -160,6 +160,7 @@ export async function formFields(request) {
     feedUrls: text("feedUrls"),
     persona: text("persona"),
     chatAds: form.get("chatAds") === "1",
+    ideas: text("ideas"),
     model: text("model"),
     perVisitor: text("perVisitor"),
     perDay: text("perDay"),

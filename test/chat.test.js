@@ -7,7 +7,7 @@ import { adLines, articleWhen, fold, scoreArticle, searchStems, slugFrom } from 
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "../src/chat/pass.js";
 import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, ownChatPersona } from "../src/chat/prompt.js";
 import { readHistory } from "../src/chat/run.js";
-import { readChatSettings } from "../src/chat/store.js";
+import { chatIdeas, DEFAULT_CHAT_IDEAS, readChatSettings } from "../src/chat/store.js";
 import { czk, questionChart } from "../src/admin/chat.js";
 
 test("stránka na text: jen obsah, odkazy s adresou, odrážky a entity", () => {
@@ -89,9 +89,18 @@ test("historie z prohlížeče: začíná otázkou, je krátká a oříznutá", 
   assert.equal(readHistory(Array.from({ length: 20 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: `z${i}` }))).length, 8);
 });
 
+test("rychlé otázky chatu: výchozí se neukládají, pomlčka je schová", () => {
+  assert.deepEqual(chatIdeas(""), DEFAULT_CHAT_IDEAS);
+  assert.equal(readChatSettings({ ideas: `${DEFAULT_CHAT_IDEAS.join("\r\n")}\n\n` }).ideas, "");
+  assert.equal(readChatSettings({ ideas: " - " }).ideas, "-");
+  assert.deepEqual(chatIdeas("-"), []);
+  assert.deepEqual(chatIdeas("  Kdy   je pouť? \n\nKde je pošta?"), ["Kdy je pouť?", "Kde je pošta?"]);
+  assert.equal(chatIdeas(Array.from({ length: 12 }, (_, i) => `Otázka ${i}`).join("\n")).length, 8);
+});
+
 test("nastavení chatu: meze a výchozí hodnoty", () => {
   const value = readChatSettings({ enabled: true, model: "opus", perVisitor: "9999", perDay: "", budget: "-5", keepDays: "14", persona: DEFAULT_CHAT_PERSONA });
-  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, archive: 200, persona: "", ads: false });
+  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, archive: 200, persona: "", ads: false, ideas: "" });
   assert.equal(readChatSettings({ model: "haiku" }).model, "haiku");
   assert.equal(readChatSettings({ archive: "0" }).archive, 0);
   assert.equal(readChatSettings({ archive: "5000" }).archive, 1000);

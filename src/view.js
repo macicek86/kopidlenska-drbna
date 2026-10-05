@@ -166,7 +166,7 @@ export function layout({
   ${script}
   <script src="/nav.js" defer></script>
   ${welcome ? `${welcome}<script src="/welcome.js" defer></script>` : ""}
-  ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
+  ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}" data-ideas="${esc(JSON.stringify(chat.ideas ?? []))}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>
 </html>`;
 }
