@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { askDrbena, usageCost } from "../src/chat/ai.js";
 import { archiveLine, archiveText } from "../src/chat/archive.js";
-import { adLines, fold, scoreArticle, searchStems, slugFrom } from "../src/chat/context.js";
+import { adLines, articleWhen, fold, scoreArticle, searchStems, slugFrom } from "../src/chat/context.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "../src/chat/pass.js";
 import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, ownChatPersona } from "../src/chat/prompt.js";
 import { readHistory } from "../src/chat/run.js";
@@ -196,4 +196,10 @@ test("rejstřík starších zpráv: jeden řádek s nadpisem, adresou a klíčov
   assert.equal(archiveLine(old), "- 12. 3. 2026 · Spolky · Modeláři létali (/zpravy/modelari-letali) · lmk kopidlno, letecké modely");
   assert.equal(archiveLine({ ...old, keywords: "", createdOn: "" }), "- bez data · Spolky · Modeláři létali (/zpravy/modelari-letali)");
   assert.equal(archiveText([]), "");
+});
+
+test("Drběna v chatu vidí u nových zpráv i čas zveřejnění", () => {
+  assert.equal(articleWhen({ createdOn: "2026-10-05", publishedAt: "2026-10-05 07:05:00" }), "5. 10. 2026 v 9:05");
+  assert.equal(articleWhen({ createdOn: "2026-12-05", publishedAt: "2026-12-05 13:40:00" }), "5. 12. 2026 v 14:40");
+  assert.equal(articleWhen({ createdOn: "2026-10-04", publishedAt: "" }), "4. 10. 2026");
 });

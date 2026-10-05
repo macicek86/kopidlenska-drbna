@@ -2,6 +2,7 @@
 import { aboutPage } from "../about.js";
 import { liveArticle } from "../db-core.js";
 import { formatShort } from "../format.js";
+import { pragueNow } from "../waste.js";
 import { addMessageContact, MESSAGE_KINDS, saveChatMessage } from "../messages-db.js";
 import { binsPage } from "../bins-view.js";
 import { doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
@@ -47,9 +48,18 @@ export function offerSection(places) {
   return `## Co se kde dá najít a vyřídit (u míst z /oteviraci-doba, otevírací dobu najdeš výš)\n${lines.join("\n")}`;
 }
 
+// Den zprávy, u novějších zpráv i čas, kdy vyšla (pražský), ať Drběna může říct „dnes ráno jsem psala“.
+export function articleWhen(article) {
+  const day = formatShort(article.createdOn);
+  const at = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/.exec(article.publishedAt ?? "");
+  if (!at) return day;
+  const time = pragueNow(new Date(`${at[1]}T${at[2]}Z`)).time.replace(/^0/, "");
+  return `${day} v ${time}`;
+}
+
 function articleLine(article) {
   const rubric = article.parentName ? `${article.parentName} / ${article.category}` : article.category;
-  return `- ${formatShort(article.createdOn)} · ${rubric} · ${article.title} (/zpravy/${article.slug}): ${article.excerpt}`;
+  return `- ${articleWhen(article)} · ${rubric} · ${article.title} (/zpravy/${article.slug}): ${article.excerpt}`;
 }
 
 // Zapnuté reklamy (nabídky sousedů). Ukázkové ne, ty nikdo nenabízí doopravdy.
