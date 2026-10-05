@@ -87,6 +87,12 @@ export function articleImage(base, article) {
   return article.imageKey ? absolute(base, mediaUrl(article.imageKey)) : "";
 }
 
+// Kdy zpráva vyšla: s časem (ISO v UTC), u starších zpráv jen den.
+export function articlePublished(article) {
+  const at = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})$/.exec(article.publishedAt ?? "");
+  return at ? `${at[1]}T${at[2]}Z` : article.createdOn;
+}
+
 export function articleLd(base, article, copy) {
   const url = absolute(base, `/zpravy/${encodeURIComponent(article.slug)}`);
   const name = byline(article);
@@ -99,8 +105,8 @@ export function articleLd(base, article, copy) {
     url,
     mainEntityOfPage: url,
     inLanguage: "cs",
-    datePublished: article.createdOn,
-    dateModified: article.createdOn,
+    datePublished: articlePublished(article),
+    dateModified: articlePublished(article),
     ...(article.category ? { articleSection: article.category } : {}),
     ...(image ? { image: [image] } : {}),
     author: name ? { "@type": "Person", name } : { "@id": absolute(base, "/#drbna") },

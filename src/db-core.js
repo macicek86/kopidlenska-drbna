@@ -32,6 +32,23 @@ export function liveArticle(alias = "a", today = pragueNow().date) {
   return `${alias}.published = 1 and substr(${alias}.created_at, 1, 10) <= '${today}'`;
 }
 
+function sqlStamp(date) {
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+// Okamžik, kdy zpráva vyšla na web (`articles.published_at`, UTC „YYYY-MM-DD HH:MM:SS“): s dnešním datem teď,
+// s jiným půlnoc toho dne v Praze (naplánovaná zpráva se tehdy objeví, starší datum zvolila redakce).
+export function publishMoment(day, now = new Date()) {
+  if (!day || day === pragueNow(now).date) return sqlStamp(now);
+  const [y, m, d] = day.split("-").map(Number);
+  for (const hours of [1, 2]) {
+    const candidate = new Date(Date.UTC(y, m - 1, d) - hours * 3_600_000);
+    const local = pragueNow(candidate);
+    if (local.date === day && local.time === "00:00") return sqlStamp(candidate);
+  }
+  return sqlStamp(new Date(Date.UTC(y, m - 1, d)));
+}
+
 export function clip(value, max) {
   return String(value ?? "")
     .replace(/\r\n/g, "\n")

@@ -14,6 +14,8 @@ import { changeSpec, hoursSpec, placeLd, yardLd } from "../src/hours-ld.js";
 import { mergeFresh } from "../src/outages.js";
 import { NDIC_CREDIT } from "../src/outages-view.js";
 import { layout, placesPage } from "../src/view.js";
+import { publishMoment } from "../src/db-core.js";
+import { articlePublished } from "../src/seo.js";
 import { FEED_SWITCHES, anyFeedOn, feedOn, mapFeedSettings } from "../src/feeds/settings.js";
 
 const BASE = "https://drbna.test";
@@ -284,4 +286,19 @@ test("položky se stejným časem dostanou každá jiný updated, starší zůst
   const more = uniqueStamps([day(5), day(9), day(7), day(12)]);
   assert.deepEqual(more.map((entry) => entry.stamp.slice(11, 19)), ["00:00:00", "00:00:02", "00:00:01", "00:00:03"]);
   assert.equal(new Set(uniqueStamps([1, 2, 3].map((id) => ({ seq: id, updated: "2026-10-01 08:00:00" }))).map((entry) => entry.stamp)).size, 3);
+});
+
+test("čas zveřejnění: dnes teď, jiný den půlnoc v Praze; feed a JSON-LD ho berou", () => {
+  const now = new Date("2026-10-05T12:34:56.789Z");
+  assert.equal(publishMoment("2026-10-05", now), "2026-10-05 12:34:56");
+  assert.equal(publishMoment("", now), "2026-10-05 12:34:56");
+  // Půlnoc v Praze: v létě 22:00 UTC předchozího dne, v zimě 23:00.
+  assert.equal(publishMoment("2026-10-10", now), "2026-10-09 22:00:00");
+  assert.equal(publishMoment("2026-12-01", now), "2026-11-30 23:00:00");
+  assert.equal(publishMoment("2026-10-25", now), "2026-10-24 22:00:00");
+  assert.equal(publishMoment("2026-10-26", now), "2026-10-25 23:00:00");
+  const fresh = { ...article, publishedAt: "2026-10-05 12:34:56" };
+  assert.match(newsFeed(BASE, [fresh], {}), /<updated>2026-10-05T12:34:56Z<\/updated>/);
+  assert.equal(articlePublished(fresh), "2026-10-05T12:34:56Z");
+  assert.equal(articlePublished({ ...article, publishedAt: "" }), "2026-10-05");
 });

@@ -1,6 +1,6 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
 // Návrhy od Drběny smí schválit i přispěvatel s oprávněním `drbena_navrhy`.
-import { asBool, clip, IMPORT_ITEM_TABLES, reopenImports, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
+import { asBool, clip, IMPORT_ITEM_TABLES, publishMoment, reopenImports, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
 import { readArticle, readCreatedOn, redactedFlag, textWasEdited } from "./db.js";
 import { pragueNow } from "./waste.js";
 import { forgetProposal, linkEventsToArticle } from "./events-db.js";
@@ -213,7 +213,8 @@ export async function approveProposal(env, request, input) {
     const redacted = redactedFlag(article.redacted, submitted, finalText) ? 1 : 0;
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, attachments = ?, published = 1, redacted = ?, keywords = '' where id = ?`,
+         image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = '',
+         published_at = case when published = 0 and published_at = '' then ? else published_at end, published = 1 where id = ?`,
     )
       .bind(
         parsed.title,
@@ -226,6 +227,8 @@ export async function approveProposal(env, request, input) {
         parsed.imageCaption,
         attachments.json,
         redacted,
+        // Skrytá zpráva bez času zveřejnění vyjde teď (schválením úpravy se zveřejní).
+        publishMoment(pragueNow().date),
         article.id,
       )
       .run();
@@ -235,8 +238,8 @@ export async function approveProposal(env, request, input) {
     const edited = textWasEdited(submitted, finalText);
     const inserted = await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted,
-         keywords, follows_id)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+         keywords, follows_id, published_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -256,6 +259,7 @@ export async function approveProposal(env, request, input) {
         // Upravený text dostane nová klíčová slova z cronu, neupravený si nechá ta od Drběny.
         edited ? "" : String(proposal.keywords ?? ""),
         proposal.follows_id ?? null,
+        publishMoment(createdOn),
       )
       .run();
     await linkImports(env, proposal.id, Number(inserted.meta?.last_row_id));

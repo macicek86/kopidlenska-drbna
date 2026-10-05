@@ -9,7 +9,7 @@ import { articleFigure, storyPhoto } from "./photo.js";
 import { renderArticleHtml } from "./rich.js";
 import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
 import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } from "./rubrics.js";
-import { articleCrumbsLd, articleImage, articleLd } from "./seo.js";
+import { articleCrumbsLd, articleImage, articleLd, articlePublished } from "./seo.js";
 import { escTie, tieHtml } from "./typo.js";
 import { adPanel, layout, signedWhen, siteOrigin } from "./view.js";
 import { readCount } from "./visits.js";
@@ -110,7 +110,7 @@ export function articlePage(article, ctx, extras = {}) {
     description: article.excerpt,
     ogType: "article",
     image: articleImage(base, article),
-    published: article.createdOn,
+    published: articlePublished(article),
     jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
     script: [
       article.imageKey ? `<script src="/article.js" defer></script>` : "",

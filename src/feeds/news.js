@@ -40,8 +40,9 @@ export function articleEntry(base, article) {
     seq: article.id,
     title: article.title,
     url: articleUrl(base, article),
-    updated: article.createdOn,
-    published: article.createdOn,
+    // Starší zprávy znají jen den (atomFeed je v rámci dne rozliší po sekundách).
+    updated: article.publishedAt || article.createdOn,
+    published: article.publishedAt || article.createdOn,
     authors: [byline(article)],
     categories,
     image: article.imageKey ? `${base}${mediaUrl(article.imageKey)}` : "",
