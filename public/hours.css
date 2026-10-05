@@ -5,29 +5,29 @@
   background: none;
   border-radius: 0;
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 3px 0 0 var(--brand);
+  box-shadow: inset 3px 0 0 var(--soon);
 }
 
 .next-days .today-mark {
   background: none;
-  color: var(--brand);
+  color: var(--soon);
   border: 1px solid currentColor;
 }
 
 .next-days li.is-change {
   border-radius: 0;
   border-bottom: 1px solid var(--line);
-  box-shadow: inset 3px 0 0 var(--soon);
+  box-shadow: inset 3px 0 0 var(--brand);
 }
 
-.next-days li.is-change.is-today { box-shadow: inset 3px 0 0 var(--brand); }
+.next-days li.is-change.is-today { box-shadow: inset 3px 0 0 var(--soon); }
 
 .next-days li.is-change.is-off { color: var(--ink); }
 
 .next-days li > .change-note {
   grid-column: 1 / -1;
   margin: 0.1rem 0 0;
-  color: var(--soon);
+  color: var(--brand);
   font-size: 0.92rem;
   font-weight: 600;
   line-height: 1.35;
@@ -135,7 +135,7 @@
 .hours-pop .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 
 /* Lékaři i místa: den nahoře, pod ním každý čas na vlastním řádku a poznámka k němu hned vedle.
-   Svislá čára vede od dne k jeho časům; u dne se změnou je hnědá a časy tučně. */
+   Svislá čára vede od dne k jeho časům; u dne se změnou je červená a časy tučně. */
 :is(.doctor-grid, .place-grid) .doctor-week li:not(.is-off) { grid-template-columns: 1fr; gap: 0.35rem; align-items: start; }
 :is(.doctor-grid, .place-grid) .doctor-week li.is-off { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
 
@@ -161,7 +161,7 @@
 :is(.doctor-grid, .place-grid) .doctor-week .hint { grid-column: 2; margin: 0; }
 :is(.doctor-grid, .place-grid) .doctor-week .part strong { font-weight: 500; }
 
-:is(.doctor-grid, .place-grid) .next-days li.is-change .parts { border-left-color: var(--soon); }
+:is(.doctor-grid, .place-grid) .next-days li.is-change .parts { border-left-color: var(--brand); }
 :is(.doctor-grid, .place-grid) .next-days li.is-change .part strong { font-weight: 700; }
 
 /* Časy bez poznámek na jednom řádku (sloučené dny). */
