@@ -36,6 +36,7 @@ test("stejné zavření víc míst je na titulce jeden řádek", () => {
   const notices = groupedNotices(places, "2026-10-01");
   assert.equal(notices.length, 1);
   assert.deepEqual(notices[0].names, ["Knihovna", "Komunitní a vzdělávací centrum"]);
+  assert.deepEqual(notices[0].ids, [1, 2]);
   assert.equal(notices[0].state, "Má 2. 10. zavřeno.");
   assert.deepEqual(groupedNotices(places, "2026-10-03"), []);
 });

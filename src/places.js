@@ -65,8 +65,10 @@ export function groupedNotices(places, today) {
     for (const notice of placeNotices(place, today)) {
       const key = [notice.kind, notice.state, notice.note, notice.detail].join("|");
       const group = groups.get(key);
-      if (group) group.names.push(notice.name);
-      else groups.set(key, { ...notice, names: [notice.name] });
+      if (group) {
+        group.names.push(notice.name);
+        group.ids.push(place.id);
+      } else groups.set(key, { ...notice, names: [notice.name], ids: [place.id] });
     }
   }
   return [...groups.values()];

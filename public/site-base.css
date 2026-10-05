@@ -875,3 +875,13 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+.yard-home-name .notice-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.18em;
+}
+.yard-home-name .notice-link:hover { text-decoration-color: var(--brand); }
+.yard-home-name .notice-link::after { content: "›"; display: inline-block; margin-left: 0.3em; color: var(--brand); text-decoration: none; }

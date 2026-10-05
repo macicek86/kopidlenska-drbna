@@ -48,6 +48,11 @@ function yardsTeaser(data, ctx) {
   </div>`;
 }
 
+// Název v upozornění vede rovnou na kartu místa či lékaře.
+function cardLink(href, name) {
+  return `<a class="notice-link" href="${esc(href)}">${esc(name)}</a>`;
+}
+
 function doctorsTeaser(data, ctx) {
   const today = clockOf(data).date;
   const lines = (data.doctors ?? [])
@@ -55,7 +60,7 @@ function doctorsTeaser(data, ctx) {
       const item = homeNotice(doctor, today);
       if (!item) return "";
       return `<li class="is-change">
-        <p class="yard-home-name">${esc(item.name)}</p>
+        <p class="yard-home-name">${cardLink(`/lekari#lekar-${doctor.id}`, item.name)}</p>
         <p class="yard-home-detail">${esc(item.specialty)}</p>
         <p class="yard-home-state">${esc(item.state)}</p>
         ${item.note ? `<p class="yard-home-detail">${esc(item.note)}</p>` : ""}
@@ -78,7 +83,7 @@ function placesTeaser(data, ctx) {
   const lines = notices
     .map(
       (item) => `<li class="is-change">
-        <p class="yard-home-name">${esc(item.names.join(", "))}</p>
+        <p class="yard-home-name">${item.names.map((name, i) => cardLink(`/oteviraci-doba#misto-${item.ids[i]}`, name)).join(", ")}</p>
         <p class="yard-home-state">${esc(item.state)}</p>
         ${item.note ? `<p class="yard-home-detail">${esc(item.note)}</p>` : ""}
       </li>`,
