@@ -102,14 +102,6 @@
 .event-card.is-today { border-color: var(--brand); box-shadow: 0 0 0 2px rgb(199 67 77 / 0.18), var(--shadow); }
 .events-list:not(.events-today) .event-card.is-today .kicker { color: var(--brand-dark); }
 
-/* Akce, na kterou se ťuklo v kalendáři, krátce zasvítí. */
-.event-card:target { animation: event-flash 1.6s ease-out; }
-
-@keyframes event-flash {
-  from { background: var(--tape); }
-  to { background: var(--card); }
-}
-
 
 /* Měsíční kalendář */
 .cal { margin-top: 2rem; scroll-margin-top: 1rem; }
@@ -261,8 +253,4 @@
   .events-drbena { min-height: 19rem; margin-top: 0; }
   .events-sun { bottom: 14%; width: 15rem; }
   .events-drbena img { width: 14rem; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .event-card:target { animation: none; }
 }

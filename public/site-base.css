@@ -772,7 +772,7 @@ a.card { display: block; text-decoration: none; color: inherit; }
 
 .place-jump { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
 .place-jump .chip { color: var(--ink); }
-.place-card { scroll-margin-top: 1rem; }
+.yard[id] { scroll-margin-top: 1rem; }
 .place-head > .count, .place-head > .soon { margin-bottom: 1rem; }
 
 /* Lékaři: den vždy nad časy, ať dlouhé poznámky mají celou šířku karty (na mobilu to platí pro všechny týdny) */
@@ -872,8 +872,24 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 
 .row > form { display: flex; }
 
+/* Karta, na kterou vede odkaz (místo, lékař, dvůr, akce), krátce zasvítí; znovu i po dalším ťuknutí
+   na stejný odkaz (třída is-flash z nav.js, jiné jméno animace ji spustí od začátku). */
+:is(.yard, .event-card):target { animation: card-flash 1.6s ease-out; }
+:is(.yard, .event-card).is-flash { animation: card-flash-again 1.6s ease-out; }
+
+@keyframes card-flash {
+  from { background: var(--tape); }
+  to { background: var(--card); }
+}
+
+@keyframes card-flash-again {
+  from { background: var(--tape); }
+  to { background: var(--card); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
+  :is(.yard, .event-card):is(:target, .is-flash) { animation: none; }
 }
 
 .yard-home-name .notice-link {

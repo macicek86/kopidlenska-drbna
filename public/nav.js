@@ -72,3 +72,15 @@ if (back && target) {
     }
   });
 }
+
+// Karta, na kterou vede odkaz, zasvítí přes :target. Ťuknutí na stejný odkaz podruhé adresu nezmění,
+// proto ji rozsvítí znovu třída is-flash.
+document.addEventListener("click", (event) => {
+  const link = event.target.closest?.('a[href*="#"]');
+  if (!link || link.pathname !== location.pathname || link.search !== location.search || link.hash !== location.hash) return;
+  const card = link.hash.length > 1 && document.getElementById(decodeURIComponent(link.hash.slice(1)));
+  if (!card) return;
+  card.classList.remove("is-flash");
+  void card.offsetWidth;
+  card.classList.add("is-flash");
+});
