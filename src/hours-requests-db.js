@@ -4,6 +4,7 @@
 //
 // Každá sekce dává `actions`: { [akce]: { read(input) → hodnota | {error}, target(env, id) → bool, apply(env, id, hodnota, userId) } }.
 import { clip, requireChief, requireUser, userCan } from "./db-core.js";
+import { notifyEditors } from "./notify.js";
 
 // Klíč je adresa sekce v redakci.
 export const REQUEST_SECTIONS = {
@@ -26,6 +27,32 @@ export const REQUEST_SECTIONS = {
     denied: "Otevírací dobu mění hlavní redaktor, nebo člověk s oprávněním Otevírací doba.",
   },
 };
+
+// Co žádost chce, pro e-mail hlavnímu redaktorovi, a z jaké tabulky je jméno řádku (zrušení míří na změnu, ne na řádek).
+const REQUEST_ACTIONS = {
+  uzavreni: "mimořádné uzavření",
+  hodiny: "oprava běžných hodin",
+  zmena: "změna hodin",
+  nabidka: "seznam „Co tu najdete“",
+  zrusit: "zrušení zapsané změny",
+};
+const REQUEST_ROWS = { dvory: "yards", lekari: "doctors", "oteviraci-doba": "places" };
+
+async function requestNotice(env, user, { section, action, targetId, id }) {
+  const row =
+    action === "zrusit" ? null : await env.DB.prepare(`select name from ${REQUEST_ROWS[section]} where id = ?`).bind(targetId).first();
+  return notifyEditors(env, "hodiny", {
+    subject: `Ke schválení: ${REQUEST_SECTIONS[section].label}${row?.name ? `, ${row.name}` : ""}`,
+    intro: "Přišel návrh změny, čeká na schválení.",
+    fields: [
+      ["Od", user.name],
+      ["Sekce", REQUEST_SECTIONS[section].label],
+      ["Kde", row?.name ?? ""],
+      ["Co", REQUEST_ACTIONS[action] ?? action],
+    ],
+    path: `/redakce/${section}?zadost=${id}`,
+  });
+}
 
 // Zamítnuté žádosti žadatel vidí, dokud je nesmaže, nejdéle tolik dní.
 const KEEP_REJECTED_DAYS = 30;
@@ -119,9 +146,10 @@ export async function submitHours(env, request, { section, actions, action, targ
   await env.DB.prepare(
     `delete from hours_requests where status = 'rejected' and created_at < datetime('now', '-${KEEP_REJECTED_DAYS} days')`,
   ).run();
-  await env.DB.prepare("insert into hours_requests (section, action, target_id, payload, created_by) values (?, ?, ?, ?, ?)")
+  const created = await env.DB.prepare("insert into hours_requests (section, action, target_id, payload, created_by) values (?, ?, ?, ?, ?)")
     .bind(section, action, targetId, JSON.stringify(value), gate.user.id)
     .run();
+  await requestNotice(env, gate.user, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0) });
   return { ok: true, requested: true, value };
 }
 

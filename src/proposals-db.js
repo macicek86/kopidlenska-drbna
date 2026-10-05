@@ -8,12 +8,29 @@ import { attachmentKeys, formAttachments } from "./attachments.js";
 import { releaseImage } from "./images.js";
 import { BOT_LOGIN } from "./munipolis/store.js";
 import { formImage } from "./stock-db.js";
+import { notifyEditors } from "./notify.js";
 
 // Návrh úpravy zprávy drží celý seznam příloh, jak má po schválení být. Prázdný seznam ukládá jako „[]“,
 // prázdný sloupec znamená návrh z doby před přílohami od lidí a platí přílohy zprávy.
 function proposalAttachments(proposal, article) {
   const own = String(proposal?.attachments ?? "");
   return own !== "" || !article ? own : String(article.attachments ?? "");
+}
+
+// E-mail hlavnímu redaktorovi: přispěvatel poslal (nebo upravil) návrh ke schválení.
+function proposalNotice(env, user, parsed, id, { again, edit }) {
+  const what = edit ? "návrh úpravy zprávy" : "návrh zprávy";
+  return notifyEditors(env, "navrh", {
+    subject: `${again ? "Upravený n" : "N"}${what.slice(1)}: ${parsed.title}`,
+    intro: `${again ? "Přispěvatel upravil" : "Přišel"} ${what}, čeká na schválení.`,
+    fields: [
+      ["Od", user.name],
+      ["Nadpis", parsed.title],
+      ["Rubrika", parsed.category],
+    ],
+    body: parsed.excerpt,
+    path: `/redakce/zpravy?navrh=${id}`,
+  });
 }
 
 export async function saveProposal(env, request, input) {
@@ -93,10 +110,11 @@ export async function saveProposal(env, request, input) {
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     for (const key of attachments.removed) await releaseImage(env, key);
+    await proposalNotice(env, gate.user, parsed, Number(existing.id), { again: true, edit: Boolean(articleId) });
     return { ok: true, updated: true };
   }
 
-  await env.DB.prepare(
+  const created = await env.DB.prepare(
     `insert into proposals (
        article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments,
        submitted_title, submitted_excerpt, submitted_body, submitted_category, status
@@ -121,6 +139,7 @@ export async function saveProposal(env, request, input) {
       parsed.category,
     )
     .run();
+  await proposalNotice(env, gate.user, parsed, Number(created.meta?.last_row_id ?? 0), { again: false, edit: Boolean(articleId) });
   return { ok: true, updated: false };
 }
 

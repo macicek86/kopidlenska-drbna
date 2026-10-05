@@ -28,6 +28,7 @@ export const OK = {
   zarizeni: "Zařízení je odhlášené.",
   "zarizeni-ostatni": "Ostatní zařízení jsou odhlášená.",
   jmeno: "Údaje jsou uložené.",
+  upozorneni: "Upozornění jsou uložená.",
   rubrika: "Rubrika je uložená.",
   "rubrika-upravena": "Rubrika je upravená.",
   "rubrika-smazana": "Rubrika je smazaná.",

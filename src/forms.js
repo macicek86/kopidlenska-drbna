@@ -77,6 +77,8 @@ export async function formFields(request) {
     loginCode: text("kod"),
     // Odběr a data: zaškrtnuté vypínače feedů (src/feeds/settings.js).
     feedSwitches: form.getAll("feed").map(String),
+    // Můj účet: zaškrtnutá upozornění e-mailem (src/notify.js).
+    notifySwitches: form.getAll("notify").map(String),
     token: text("token"),
     turnstile: text("cf-turnstile-response"),
     email: text("email"),

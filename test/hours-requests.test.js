@@ -7,6 +7,7 @@ import { ensurePlaceTables, PLACE_ACTIONS, removePlaceChange, savePlaceChange } 
 import { removeClosure, saveClosure, YARD_ACTIONS } from "../src/yards-db.js";
 import { approveRequest, ensureRequestTables, hoursMode, loadRequests, rejectRequest, withdrawRequest } from "../src/hours-requests-db.js";
 import { adminPlaces } from "../src/admin/index.js";
+import { ensureNotifyTables } from "../src/notify.js";
 
 // Malá náhrada D1 nad SQLite v paměti.
 function d1() {
@@ -129,6 +130,22 @@ test("uzavření dvora: návrh, schválení zrušení bez formuláře", async ()
   const [cancel] = (await loadRequests(env, { id: 1, role: "hlavni", permissions: [] })).dvory;
   assert.equal((await approveRequest(env, as("chief"), { section: "dvory", actions: YARD_ACTIONS, id: cancel.id, input: {} })).ok, true);
   assert.equal(await env.DB.prepare("select id from yard_closures").first(), null);
+});
+
+test("o návrhu změny přijde hlavnímu redaktorovi e-mail, o zápisu rovnou ne", async () => {
+  const env = await freshEnv();
+  await ensureNotifyTables(env);
+  const sent = [];
+  env.EMAIL = { send: async (mail) => sent.push(mail) };
+  await env.DB.prepare("update users set email = 'hlavni@example.cz' where id = 1").run();
+  await saveClosure(env, as("jana"), { yardId: 1, startsOn: "2026-10-20", endsOn: "", reason: "inventura" });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, "hlavni@example.cz");
+  assert.equal(sent[0].subject, "Ke schválení: Sběrné dvory, Dvůr");
+  assert.match(sent[0].text, /Od: Jana\n.*\nKde: Dvůr\nCo: mimořádné uzavření/s);
+  assert.match(sent[0].text, /https:\/\/www\.kopidlenskadrbna\.org\/redakce\/dvory\?zadost=1/);
+  await savePlaceChange(env, as("petr"), change);
+  assert.equal(sent.length, 1);
 });
 
 test("redakce: žadatel posílá ke schválení, hlavní redaktor má okno s předvyplněným návrhem", () => {

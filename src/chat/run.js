@@ -114,7 +114,12 @@ export async function chatPost(path, request, env, execution) {
   const left = await countQuestion(env, settings, who);
   const history = [...readHistory(body.history), { role: "user", text: question }];
   // Vzkazy redakci potřebují vědět, kdo píše a z jaké stránky.
-  const writer = { ...who, page: messagePage(body.page) };
+  // E-mail o vzkazu odchází na pozadí, ať Drběna s odpovědí nečeká.
+  const writer = {
+    ...who,
+    page: messagePage(body.page),
+    defer: execution?.waitUntil ? (promise) => execution.waitUntil(promise) : null,
+  };
   const result = await askDrbena(
     env,
     { modelKey: settings.model, system: await chatSystem(env, request), history },

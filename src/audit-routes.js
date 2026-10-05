@@ -45,6 +45,14 @@ const permissions = {
   },
 };
 
+const notifyOff = {
+  label: "upozornění e-mailem",
+  async read({ env, user }) {
+    const rows = (await env.DB.prepare("select topic from notify_off where user_id = ? order by topic").bind(user.id).all()).results ?? [];
+    return { vypnuto: rows.map((row) => row.topic).join(", ") };
+  },
+};
+
 const copyTexts = {
   label: "texty webu",
   async read({ env }) {
@@ -130,6 +138,7 @@ const ROUTES = {
   "/redakce/lide/udaje": [existing("users", "id"), permissions],
   "/redakce/lide/prihlaseni": [single("login_settings", "nastavení přihlášení")],
   "/redakce/ucet/ulozit": [{ table: "users", label: "users", id: ({ user }) => user.id }],
+  "/redakce/ucet/upozorneni": [notifyOff],
   "/redakce/ucet/odhlasit-zarizeni": "always",
   "/redakce/ucet/odhlasit-ostatni": "always",
 

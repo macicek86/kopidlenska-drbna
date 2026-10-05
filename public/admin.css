@@ -246,6 +246,8 @@ html { font-size: 100%; }
 
 .cards-2 { display: grid; gap: 1rem; align-items: start; }
 .cards-2 > .panel { margin-bottom: 0; }
+.cards-col { display: grid; gap: 1rem; align-content: start; }
+.cards-col > .panel { margin-bottom: 0; }
 
 /* --- Formuláře --------------------------------------------------------- */
 

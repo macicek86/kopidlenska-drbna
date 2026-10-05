@@ -2,6 +2,7 @@
 import { readAdFields } from "./ads.js";
 import { asBool, clip, requireChief, requireUser, slugify } from "./db-core.js";
 import { releaseImage, storeImage } from "./images.js";
+import { notifyEditors } from "./notify.js";
 
 const AD_FIELDS =
   "a.id, a.slug, a.title, a.body, a.place, a.link, a.image_key, a.image_focus, a.enabled, a.sample, a.author_id, a.author_name, a.created_at, u.alias as author_alias";
@@ -168,6 +169,20 @@ export async function loadAdProposals(env, whereSql, ...binds) {
   return (rows.results ?? []).map(mapAdProposal);
 }
 
+// E-mail hlavnímu redaktorovi: přispěvatel poslal (nebo upravil) návrh nabídky.
+function adNotice(env, user, parsed, id, again) {
+  return notifyEditors(env, "navrh", {
+    subject: `${again ? "Upravený návrh" : "Návrh"} nabídky: ${parsed.title}`,
+    intro: `${again ? "Přispěvatel upravil" : "Přišel"} návrh nabídky, čeká na schválení.`,
+    fields: [
+      ["Od", user.name],
+      ["Nabídka", parsed.title],
+      ["Místo", parsed.place],
+    ],
+    path: `/redakce/reklamy?navrh=${id}`,
+  });
+}
+
 export async function saveAdProposal(env, request, input) {
   const gate = await requireUser(env, request);
   if (!gate.ok) return gate;
@@ -221,6 +236,7 @@ export async function saveAdProposal(env, request, input) {
       .bind(parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.imageFocus, parsed.enabled ? 1 : 0, gate.user.name, existing.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
+    await adNotice(env, gate.user, parsed, Number(existing.id), true);
     return { ok: true, updated: true };
   }
 
@@ -229,13 +245,14 @@ export async function saveAdProposal(env, request, input) {
     const ad = await env.DB.prepare("select image_key from ads where id = ?").bind(adId).first();
     imageKey = ad?.image_key ? String(ad.image_key) : null;
   }
-  await env.DB.prepare(
+  const created = await env.DB.prepare(
     `insert into ad_proposals (
        ad_id, author_id, author_name, title, body, place, link, image_key, image_focus, enabled, status
      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
   )
     .bind(adId, gate.user.id, gate.user.name, parsed.title, parsed.body, parsed.place, parsed.link, imageKey, parsed.imageFocus, parsed.enabled ? 1 : 0)
     .run();
+  await adNotice(env, gate.user, parsed, Number(created.meta?.last_row_id ?? 0), false);
   return { ok: true, updated: false };
 }
 

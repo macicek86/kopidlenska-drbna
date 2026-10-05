@@ -2,7 +2,7 @@
 import { byline } from "../db.js";
 import { esc } from "../view.js";
 import { adminShell } from "./shell.js";
-import { badge, callout, field, input, item, list, pageHead, panel, postButton } from "./ui.js";
+import { badge, callout, check, field, input, item, list, pageHead, panel, postButton } from "./ui.js";
 
 const BASE = "/redakce/ucet";
 
@@ -42,10 +42,22 @@ function devicesPanel(sessions, currentId) {
   });
 }
 
+// Upozornění e-mailem (src/notify.js): jen druhy, které člověku patří.
+function notifyPanel(switches, email) {
+  if (!switches.length) return "";
+  return `<form class="panel form" method="post" action="${BASE}/upozorneni">
+        <header class="panel-head"><h2>Upozornění e-mailem</h2></header>
+        ${callout(`Když v redakci něco přibude, přijde vám e-mail na <b>${esc(email)}</b>.`)}
+        ${switches.map((topic) => check("notify", topic.key, topic.on, esc(topic.label))).join("")}
+        <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
+      </form>`;
+}
+
 export function adminAccount(ctx, data, message) {
   const shown = byline(data.user);
   const body = `${pageHead("Můj účet", `Přihlášen jako <b>${esc(data.user?.email ?? "")}</b>.`)}
     <div class="cards-2">
+      <div class="cards-col">
       <form class="panel form" method="post" action="${BASE}/ulozit">
         <header class="panel-head"><h2>Jméno a alias</h2></header>
         ${callout(`Na webu se teď ukáže: <b>${esc(shown)}</b>. Alias je dobrovolný. Když ho používáte, na webu se u vašich zpráv ukáže on. Když alias smažete, znovu se ukáže jméno.`)}
@@ -54,6 +66,8 @@ export function adminAccount(ctx, data, message) {
         ${emailPart(data.user)}
         <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
       </form>
+      ${notifyPanel(data.notifySwitches ?? [], data.user?.email ?? "")}
+      </div>
       ${devicesPanel(data.sessions ?? [], data.sessionId)}
     </div>`;
   return adminShell(ctx, data, "ucet", message, body, { title: "Můj účet" });

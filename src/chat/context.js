@@ -3,7 +3,8 @@ import { aboutPage } from "../about.js";
 import { liveArticle } from "../db-core.js";
 import { formatShort } from "../format.js";
 import { pragueNow } from "../waste.js";
-import { addMessageContact, MESSAGE_KINDS, saveChatMessage } from "../messages-db.js";
+import { addMessageContact, MESSAGE_KINDS, messageKind, messagePage, saveChatMessage } from "../messages-db.js";
+import { notifyEditors } from "../notify.js";
 import { binsPage } from "../bins-view.js";
 import { doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
 import { archiveText } from "./archive.js";
@@ -316,20 +317,43 @@ const MESSAGE_SAYS = {
   missing: "Kontakt nejde připsat, v tomhle rozhovoru zatím žádný vzkaz předaný není. Předej nejdřív vzkaz nástrojem predat_redakci i s kontaktem.",
 };
 
-// Nástroje na vzkazy potřebují vědět, kdo píše (who: day, visitor, conversation, page); bez něj nic neuloží.
+// E-mail hlavnímu redaktorovi o novém vzkazu.
+function messageMail(message) {
+  const summary = String(message.summary ?? "").trim();
+  return {
+    subject: `Vzkaz z chatu: ${summary}`.slice(0, 150),
+    intro: "Drběna vám z chatu předala vzkaz od návštěvníka.",
+    fields: [
+      ["Druh", MESSAGE_KINDS[messageKind(message.kind)]],
+      ["O co jde", summary],
+      ["Kontakt", String(message.contact ?? "").trim()],
+      ["Stránka", messagePage(message.page)],
+    ],
+    body: String(message.text ?? "").trim(),
+  };
+}
+
+// Nástroje na vzkazy potřebují vědět, kdo píše (who: day, visitor, conversation, page;
+// defer nechá e-mail redakci odejít na pozadí); bez něj nic neuloží.
 async function messageTool(env, name, input, who) {
   if (!who) return "Vzkazy teď předat nejde.";
   if (name === "doplnit_kontakt") {
     const result = await addMessageContact(env, who, input?.kontakt);
     return result.ok ? "Kontakt je připsaný ke vzkazu." : MESSAGE_SAYS[result.reason];
   }
-  const result = await saveChatMessage(env, who, {
+  const message = {
     kind: input?.druh,
     summary: input?.shrnuti,
     text: input?.text,
     contact: input?.kontakt,
     page: who.page,
-  });
+  };
+  const result = await saveChatMessage(env, who, message);
+  if (result.ok) {
+    const sending = notifyEditors(env, "vzkaz", messageMail(message));
+    if (who.defer) who.defer(sending);
+    else await sending;
+  }
   return result.ok ? "Předáno redakci. Uvidí to v redakci mezi vzkazy." : MESSAGE_SAYS[result.reason];
 }
 

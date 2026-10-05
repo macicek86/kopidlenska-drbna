@@ -26,8 +26,9 @@ import { ensureFeedTables } from "./feeds/settings.js";
 import { ensureRequestTables } from "./hours-requests-db.js";
 import { ensureAuditTables } from "./audit-db.js";
 import { ensureLoginTables } from "./login-db.js";
+import { ensureNotifyTables } from "./notify.js";
 
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 let schemaReady = false;
 
@@ -420,6 +421,7 @@ async function migrateSchema(env) {
   await ensureRequestTables(env);
   await ensureAuditTables(env);
   await ensureLoginTables(env);
+  await ensureNotifyTables(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();

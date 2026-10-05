@@ -34,6 +34,7 @@ import { html, redirect } from "./http.js";
 import { messageFrom } from "./ok-messages.js";
 import { loadMessages } from "./messages-db.js";
 import { listSessions, loginSettings } from "./login-db.js";
+import { loadNotifySwitches } from "./notify.js";
 import { loadStats, STAT_PERIODS } from "./visits-db.js";
 import { continueImport } from "./munipolis/run.js";
 import { loadImportSettings } from "./munipolis/store.js";
@@ -146,7 +147,9 @@ export async function renderAdmin(env, url, ctx, data, execution) {
     return html(adminPeople(ctx, data, message, query));
   }
   if (tab === "ucet") {
-    if (data.signedIn) data.sessions = await listSessions(env, data.user.id);
+    if (data.signedIn) {
+      [data.sessions, data.notifySwitches] = await Promise.all([listSessions(env, data.user.id), loadNotifySwitches(env, data.user)]);
+    }
     return html(adminAccount(ctx, data, message));
   }
   return null;

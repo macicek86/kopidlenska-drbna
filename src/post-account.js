@@ -1,6 +1,7 @@
 // Formuláře Můj účet a Lidé: jméno a e-mail, přihlášená zařízení, přispěvatelé a nastavení přihlášení.
 import { identify, requireChief } from "./db-core.js";
 import { endOtherSessions, endSessionById, saveLoginSettings } from "./login-db.js";
+import { saveNotifySwitches } from "./notify.js";
 import { redirect, withError } from "./http.js";
 import { createContributor, saveContributorAccess, saveProfile, setContributorActive } from "./users-db.js";
 
@@ -17,6 +18,12 @@ export async function accountPost(path, request, env, fields) {
     const result = await saveProfile(env, request, fields);
     if (!result.ok) return redirect(withError(ACCOUNT, result.error));
     return redirect(`${ACCOUNT}?ok=jmeno`);
+  }
+  if (path === `${ACCOUNT}/upozorneni`) {
+    const me = await signedIn(env, request);
+    if (!me) return redirect(withError(ACCOUNT, "Přihlaste se do redakce."));
+    await saveNotifySwitches(env, me.user, fields.notifySwitches);
+    return redirect(`${ACCOUNT}?ok=upozorneni`);
   }
   if (path === `${ACCOUNT}/odhlasit-zarizeni`) {
     const me = await signedIn(env, request);

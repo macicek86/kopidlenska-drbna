@@ -11,6 +11,7 @@ import { prepareArticleBody } from "./rich.js";
 import { attachmentsJson } from "./attachments.js";
 import { markRecalled } from "./drbena-memory.js";
 import { auditBot } from "./audit.js";
+import { notifyEditors } from "./notify.js";
 
 export async function saveBotArticle(env, { article, image, attachments = [], sourceHtml, autoPublish, rubric, publishOn = "", followsId = null }) {
   const bot = await ensureBot(env);
@@ -45,5 +46,16 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
     )
     .run();
   await auditBot(env, bot, { title: article.title, published: false }).catch(() => {});
-  return { proposalId: Number(result.meta.last_row_id) };
+  const proposalId = Number(result.meta.last_row_id);
+  await notifyEditors(env, "drbena", {
+    subject: `Návrh od Drběny: ${article.title}`,
+    intro: "Drběna napsala návrh zprávy, čeká na schválení.",
+    fields: [
+      ["Nadpis", article.title],
+      ["Rubrika", rubric.name],
+    ],
+    body: article.excerpt,
+    path: `/redakce/zpravy?navrh=${proposalId}`,
+  });
+  return { proposalId };
 }
