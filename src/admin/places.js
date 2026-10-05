@@ -8,6 +8,7 @@ import { pragueNow } from "../waste.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
 import { linksButton, linksDialog } from "./hours-links.js";
+import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
   badge,
@@ -189,7 +190,8 @@ export function adminPlaces(ctx, data, message, query = {}) {
       title: place.name,
       meta: [place.label, place.place, place.phone].filter(Boolean).map(esc).join(" · "),
       badges: `${place.published ? "" : badge("Skryté", "off")}${place.offers?.length ? badge(`Co tu najdete: ${place.offers.length}`) : ""}${place.changes.length ? badge(`Změny: ${place.changes.length}`, "warn") : ""}${waitingBadge(SECTION, place, requests)}<span class="item-sub">${esc(placeSummary(place))}</span>`,
-      actions: `${linksButton(data, SECTION, BASE, place)}
+      actions: `${shareButton(BASE, place)}
+        ${linksButton(data, SECTION, BASE, place)}
         ${chief ? moveButtons(place, index, places.length) : ""}
         ${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
         ${modalLink(`${BASE}?zmena=${place.id}`, "Dočasná změna")}
@@ -211,8 +213,10 @@ export function adminPlaces(ctx, data, message, query = {}) {
     );
   }
   const sharing = linksDialog(ctx, data, { section: SECTION, base: BASE, row: places.find((row) => row.id === query.linksId), what: "otevírací dobu" });
+  const preview = shareDialog(ctx, { kind: "misto", base: BASE, row: places.find((row) => row.id === query.shareId) });
   if (reviewing) dialogs.push(reviewing);
   else if (sharing) dialogs.push(sharing);
+  else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit místo", size: "wide", close: BASE, open: true, body: placeForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));
   else if (changing) dialogs.push(modal({ id: "okno", title: "Dočasná změna", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));

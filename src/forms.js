@@ -24,6 +24,7 @@ export function adminQuery(url) {
     offersId: positiveParam(url, "nabidka"),
     detailsId: positiveParam(url, "udaje"),
     linksId: positiveParam(url, "odkazy"),
+    shareId: positiveParam(url, "sdilet"),
     accessId: positiveParam(url, "upravit"),
     disableId: positiveParam(url, "vypnout"),
     noticeId: positiveParam(url, "oznameni"),

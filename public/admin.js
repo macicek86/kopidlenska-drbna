@@ -277,7 +277,22 @@ document.addEventListener("click", (event) => {
   if (copy) copyMonday(copy.closest("[data-week]"));
   const share = event.target.closest("[data-copy-field]");
   if (share) copyField(share);
+  const send = event.target.closest("[data-share-field]");
+  if (send) shareField(send);
 });
+
+// Tlačítko Sdílet… (systémové sdílení na mobilu). Kde ho prohlížeč neumí, zůstane schované.
+function showShareButtons(root) {
+  if (!navigator.share) return;
+  for (const button of root.querySelectorAll("[data-share-field]")) button.hidden = false;
+}
+showShareButtons(document);
+document.addEventListener("drbna:mount", (event) => showShareButtons(event.target));
+
+function shareField(button) {
+  const field = document.getElementById(button.dataset.shareField);
+  if (field && navigator.share) navigator.share({ title: button.dataset.shareTitle, url: field.value }).catch(() => {});
+}
 
 // Tlačítko Kopírovat vedle pole s odkazem (odkaz pro správce). Bez schránky aspoň označí text.
 function copyField(button) {

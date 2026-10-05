@@ -7,6 +7,7 @@ import { laterChangeTiles, nextDaysList, popover, popoverButton, regularWeekList
 import { placeNotices } from "./places.js";
 import { changesSoon } from "./hours-days.js";
 import { doctorLd, placeLd } from "./hours-ld.js";
+import { shareLayout, sharedRow } from "./hours-share.js";
 import { askLine, layout, siteOrigin } from "./view.js";
 
 function phoneLink(phone) {
@@ -55,7 +56,7 @@ export const HOURS_FEEDS = [["/oteviraci-doba/feed.xml", "Změny otevírací dob
 const DOCTOR_KEYS = { prefix: "lekar", missing: "doctors_missing_hours", regular: "doctors_regular", changes: "doctors_changes" };
 const PLACE_KEYS = { prefix: "misto", missing: "places_missing_hours", regular: "places_regular", changes: "places_changes" };
 
-export function doctorsPage(data, ctx) {
+export function doctorsPage(data, ctx, params) {
   const today = data.waste.today;
   const cards = (data.doctors ?? []).length
     ? (data.doctors ?? [])
@@ -77,6 +78,7 @@ export function doctorsPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "doctors_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "doctors_description"),
+    ...shareLayout("lekar", sharedRow("lekar", data.doctors, params), today, tx(ctx.copy, "site_name")),
     jsonLd: ctx.feedOn?.hoursLd === false ? [] : (data.doctors ?? []).map((doctor) => doctorLd(siteOrigin(ctx.origin, ctx.mainOrigin), doctor)),
     feeds: HOURS_FEEDS,
     body: `
@@ -119,7 +121,7 @@ function placeCard(place, today, ctx) {
   </article>`;
 }
 
-export function placesPage(data, ctx) {
+export function placesPage(data, ctx, params) {
   const today = data.waste.today;
   const places = data.places ?? [];
   const cards = places.length
@@ -138,6 +140,7 @@ export function placesPage(data, ctx) {
     ...ctx,
     title: `${tx(ctx.copy, "places_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "places_description"),
+    ...shareLayout("misto", sharedRow("misto", places, params), today, tx(ctx.copy, "site_name")),
     jsonLd: ctx.feedOn?.hoursLd === false ? [] : places.map((place) => placeLd(siteOrigin(ctx.origin, ctx.mainOrigin), place, today)),
     feeds: HOURS_FEEDS,
     body: `

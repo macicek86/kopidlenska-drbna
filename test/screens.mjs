@@ -52,6 +52,7 @@ const TABS = [
   "lekari?zmena=1",
   "oteviraci-doba?zmena=1",
   "oteviraci-doba?nova-doba=1",
+  "oteviraci-doba?sdilet=1",
   "lide?novy=1",
   "rubriky?smazat=1",
   "munipolis?nastaveni=1",

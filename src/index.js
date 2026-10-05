@@ -225,13 +225,13 @@ async function renderGet(request, env, url, execution) {
     return html(aboutPage(data, ctx));
   }
   if (path === "/sberne-dvory") {
-    return html(yardsPage(data, ctx));
+    return html(yardsPage(data, ctx, url.searchParams));
   }
   if (path === "/lekari") {
-    return html(doctorsPage(data, ctx));
+    return html(doctorsPage(data, ctx, url.searchParams));
   }
   if (path === "/oteviraci-doba") {
-    return html(placesPage(data, ctx));
+    return html(placesPage(data, ctx, url.searchParams));
   }
   if (path === "/redakce") return redirect("/redakce/prehled");
   if (path.startsWith("/redakce/")) {

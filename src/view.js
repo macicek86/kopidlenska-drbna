@@ -4,11 +4,9 @@ import { esc, mediaUrl } from "./html.js";
 import { facebookUrl, text as tx } from "./copy.js";
 import { formatLong } from "./format.js";
 import { focusClass } from "./photo.js";
-import { addDays, civilWeekday } from "./waste.js";
-import { coversDay, homeStatus, hoursSummary, statusLine, WEEK_DAYS } from "./yards.js";
+import { WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
 import { welcomeTemplate } from "./welcome.js";
-import { yardLd } from "./hours-ld.js";
 import { anyFeedOn, feedOn } from "./feeds/settings.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
@@ -20,6 +18,7 @@ export { outageCard, outageEmpty, outagesPage } from "./outages-view.js";
 export { homePage } from "./home.js";
 export { eventsPage } from "./events-view.js";
 export { doctorsPage, placesPage } from "./hours-view.js";
+export { yardsPage } from "./yards-view.js";
 
 // Služby jsou v menu pod jednou rozbalovací položkou, ať se menu na počítači vejde vedle loga.
 const PRACTICAL = [
@@ -56,7 +55,8 @@ function active(path, href) {
   return path === href || path.startsWith(`${href}/`) ? " is-on" : "";
 }
 
-// canonical: cesta i s dotazem, když se liší od path (rubrika). image: absolutní adresa fotky místo výchozí.
+// canonical: cesta i s dotazem, když se liší od path (rubrika). image: absolutní adresa fotky (nebo cesta na webu) místo výchozí,
+// imageSize: obrázek má rozměr výchozího. shareUrl: og:url jiná než canonical (sdílení jednoho místa, src/hours-share.js).
 export function layout({
   title,
   description,
@@ -71,6 +71,8 @@ export function layout({
   noindex = false,
   ogType = "website",
   image = "",
+  imageSize = false,
+  shareUrl = "",
   published = "",
   jsonLd = [],
   feeds = [],
@@ -82,7 +84,8 @@ export function layout({
     ? canonical
     : typeof path === "string" && path.startsWith("/") ? path : "/";
   const pageUrl = base ? `${base}${pagePath}` : "";
-  const ogImage = image || (base ? `${base}${OG_IMAGE}` : OG_IMAGE);
+  const ogUrl = shareUrl && base ? `${base}${shareUrl}` : pageUrl;
+  const ogImage = image.startsWith("/") ? `${base}${image}` : image || `${base}${OG_IMAGE}`;
   const defaultImage = !image;
   const siteName = tx(copy, "site_name");
   const facebook = facebookUrl(copy);
@@ -117,14 +120,14 @@ export function layout({
   <meta property="og:site_name" content="${esc(siteName)}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="${esc(description)}">
-  ${pageUrl ? `<meta property="og:url" content="${esc(pageUrl)}">` : ""}
+  ${ogUrl ? `<meta property="og:url" content="${esc(ogUrl)}">` : ""}
   <meta property="og:image" content="${esc(ogImage)}">
   ${
-    defaultImage
+    defaultImage || imageSize
       ? `<meta property="og:image:type" content="image/webp">
   <meta property="og:image:width" content="${OG_WIDTH}">
   <meta property="og:image:height" content="${OG_HEIGHT}">
-  <meta property="og:image:alt" content="${esc(siteName)}">`
+  <meta property="og:image:alt" content="${esc(defaultImage ? siteName : title)}">`
       : ""
   }
   ${published ? `<meta property="article:published_time" content="${esc(published)}">` : ""}
@@ -312,42 +315,6 @@ export function dayLabel(day) {
   return WEEK_DAYS.find((item) => item.day === day)?.label ?? "";
 }
 
-// Běžný týden od pondělí. Den, jehož nejbližší výskyt (dnes až za 6 dní) padne do mimořádného
-// uzavření, má hodiny přeškrtnuté.
-function weekList(week, today, closures = []) {
-  const todayDay = civilWeekday(today);
-  return `<ul class="week-list">${week
-    .map((slot) => {
-      const date = addDays(today, (slot.day - todayDay + 7) % 7);
-      const closed = slot.open && closures.some((closure) => coversDay(closure, date));
-      const classes = [slot.day === todayDay ? "is-today" : "", slot.open ? "" : "is-off", closed ? "is-closure" : ""]
-        .filter(Boolean)
-        .join(" ");
-      const hours = esc(`${slot.from}–${slot.to}`);
-      const when = closed
-        ? `<em>zavřeno ${shortDay(date)}</em> <s>${hours}</s>`
-        : slot.open
-          ? hours
-          : "zavřeno";
-      return `<li${classes ? ` class="${classes}"` : ""}><span>${esc(dayLabel(slot.day))}</span><strong>${when}</strong></li>`;
-    })
-    .join("")}</ul>`;
-}
-
-function shortDay(iso) {
-  const [, month, day] = iso.split("-").map(Number);
-  return `${day}.&nbsp;${month}.`;
-}
-
-function yardStatusHtml(yard, now) {
-  const item = homeStatus(yard, now.date, now.time);
-  const line = esc(statusLine(yard, now.date, now.time));
-  if (item.kind === "closure") return `<p class="banner">${line}</p>`;
-  if (item.kind === "open") return `<p class="count">${line}</p>`;
-  if (item.kind === "later") return `<p class="soon">${line}</p>`;
-  return `<p class="meta">${line}</p>`;
-}
-
 // Řádek pod úvodem: s chatem otevře Drběnu s předvyplněnou větou, bez něj vede na kontakt.
 export function askLine(ctx, prefix, prefill) {
   return `<p class="place-ask">${esc(tx(ctx.copy, `${prefix}_ask`))} ${
@@ -355,59 +322,6 @@ export function askLine(ctx, prefix, prefill) {
       ? `<a href="/o-nas" data-chat-open="${esc(prefill)}">${esc(tx(ctx.copy, `${prefix}_ask_chat`))}</a>`
       : `<a href="/o-nas">${esc(tx(ctx.copy, `${prefix}_ask_mail`))}</a>`
   }</p>`;
-}
-
-export function yardsPage(data, ctx) {
-  const today = data.waste.today;
-  const now = clockOf(data);
-  const yards = data.yards ?? [];
-  // Jeden dvůr přes celou šířku jako dřív, dva vedle sebe, víc po třech.
-  const several = yards.length > 1;
-  const grid = several ? ` place-grid ${yards.length === 2 ? "yard-grid-2" : "yard-grid-3"}` : "";
-  const cards = yards.length
-    ? yards
-        .map((yard) => {
-          const later = yard.closures.filter((closure) => closure.startsOn > today);
-          const planned = later.length
-            ? `<p class="kicker">${esc(tx(ctx.copy, "yards_upcoming"))}</p><div class="dates compact">${later
-                .map(
-                  (closure) =>
-                    `<article class="date-tile"><strong>${esc(closureLabel(closure))}</strong><span>${esc(closure.reason)}</span></article>`,
-                )
-                .join("")}</div>`
-            : "";
-          const hours = yard.legacy
-            ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
-            : weekList(yard.week, today, yard.closures);
-          // Víc dvorů: stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
-          return `<article class="card yard${several ? " place-card" : ""}" id="dvur-${yard.id}">
-            <div class="place-head">
-              <p class="kicker">${esc(yard.place)}</p>
-              <h2>${esc(yard.name)}</h2>
-              ${yardStatusHtml(yard, now)}
-              <p class="kicker">${esc(tx(ctx.copy, "yards_accepts"))}</p>
-              <p class="keep-lines">${esc(yard.accepts)}</p>
-            </div>
-            <p class="kicker">${esc(tx(ctx.copy, "yards_hours"))}</p>
-            ${hours}
-            <div class="place-more">${planned}</div>
-          </article>`;
-        })
-        .join("")
-    : `<p class="card dashed muted">${esc(tx(ctx.copy, "yards_empty"))}</p>`;
-  return layout({
-    ...ctx,
-    title: `${tx(ctx.copy, "yards_heading")} | ${tx(ctx.copy, "site_name")}`,
-    description: tx(ctx.copy, "yards_description"),
-    jsonLd: ctx.feedOn?.hoursLd === false ? [] : yards.map((yard) => yardLd(siteOrigin(ctx.origin, ctx.mainOrigin), yard)),
-    feeds: [["/oteviraci-doba/feed.xml", "Změny otevírací doby"]],
-    body: `
-      <p class="eyebrow">${esc(tx(ctx.copy, "yards_eyebrow"))}</p>
-      <h1>${esc(tx(ctx.copy, "yards_heading"))}</h1>
-      <p class="lede">${esc(tx(ctx.copy, "yards_lede"))}</p>
-      ${askLine(ctx, "yards", "U sběrných dvorů je něco špatně: ")}
-      <div class="stack${grid}">${cards}</div>`,
-  });
 }
 
 export function brokenPage(message) {

@@ -3,6 +3,7 @@ import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { yardHoursFields } from "./hours.js";
 import { linksButton, linksDialog } from "./hours-links.js";
+import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
   badge,
@@ -123,7 +124,8 @@ export function adminYards(ctx, data, message, query = {}) {
       title: yard.name,
       meta: `${esc(yard.place)} · ${esc(hoursSummary(yard))}`,
       badges: `${yard.published ? "" : badge("Skrytý", "off")}${yard.closures.length ? badge(`Uzavření: ${yard.closures.length}`, "warn") : ""}${waitingBadge(SECTION, yard, requests)}`,
-      actions: `${linksButton(data, SECTION, BASE, yard)}
+      actions: `${shareButton(BASE, yard)}
+        ${linksButton(data, SECTION, BASE, yard)}
         ${modalLink(`${BASE}?uzavreni=${yard.id}`, "Zapsat uzavření")}
         ${chief ? modalLink(`${BASE}?id=${yard.id}`, "Upravit") : `${modalLink(`${BASE}?hodiny=${yard.id}`, "Otevírací doba")}${modalLink(`${BASE}?udaje=${yard.id}`, "Údaje")}`}
         ${chief ? modalLink(`${BASE}?smazat=${yard.id}`, "Smazat", "btn-ghost btn-danger-text") : ""}`,
@@ -138,8 +140,10 @@ export function adminYards(ctx, data, message, query = {}) {
     );
   }
   const sharing = linksDialog(ctx, data, { section: SECTION, base: BASE, row: yards.find((row) => row.id === query.linksId), what: "otevírací dobu a uzavření" });
+  const preview = shareDialog(ctx, { kind: "dvur", base: BASE, row: yards.find((row) => row.id === query.shareId) });
   if (reviewing) dialogs.push(reviewing);
   else if (sharing) dialogs.push(sharing);
+  else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit sběrný dvůr", size: "wide", close: BASE, open: true, body: yardForm(editing) }));
   else if (closing) dialogs.push(modal({ id: "okno", title: "Mimořádné uzavření", close: BASE, open: true, body: closureForm(closing, { submit: mode.submit("Zapsat uzavření") }) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));
