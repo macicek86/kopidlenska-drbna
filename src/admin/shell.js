@@ -80,7 +80,7 @@ function navHtml(data, tab) {
 
 export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
 
-function toastHtml(flash) {
+export function toastHtml(flash) {
   if (!flash.text) return "";
   return `<div class="toast toast-${flash.kind}" role="${flash.kind === "bad" ? "alert" : "status"}" data-toast>
     ${icon(flash.kind === "bad" ? "x" : "check")}<span>${esc(flash.text)}</span>

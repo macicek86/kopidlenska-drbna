@@ -8,6 +8,7 @@ import { removeClosure, saveClosure, YARD_ACTIONS } from "../src/yards-db.js";
 import { approveRequest, ensureRequestTables, hoursMode, loadRequests, rejectRequest, withdrawRequest } from "../src/hours-requests-db.js";
 import { adminPlaces } from "../src/admin/index.js";
 import { ensureNotifyTables } from "../src/notify.js";
+import { ensureLinkTables } from "../src/hours-links-db.js";
 
 // Malá náhrada D1 nad SQLite v paměti.
 function d1() {
@@ -47,6 +48,7 @@ async function freshEnv() {
   await run("create table yard_closures (id integer primary key autoincrement, yard_id integer, starts_on text, ends_on text, reason text, created_by integer)");
   await ensurePlaceTables(env);
   await ensureRequestTables(env);
+  await ensureLinkTables(env);
   await ensureLoginTables(env);
   await run("insert into users (id, login, name, role) values (1, 'hlavni', 'Hlavní', 'hlavni')");
   await signIn(env, 1, TOKENS.chief);

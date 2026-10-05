@@ -3,6 +3,7 @@
 import { changeSpan, normalizeWeek, parseHours } from "./doctors.js";
 import { addColumn, asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
+import { removeLinksOf } from "./hours-links-db.js";
 import { NEW_HOURS_DAYS, PLACE_SEEDS } from "./places.js";
 import { addDays, pragueNow } from "./waste.js";
 
@@ -167,6 +168,7 @@ export async function removePlace(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from place_changes where place_id = ?").bind(id).run();
+  await removeLinksOf(env, "oteviraci-doba", id);
   await env.DB.prepare("delete from places where id = ?").bind(id).run();
   return { ok: true };
 }
@@ -217,6 +219,11 @@ function readPlaceOffers(input) {
   return { offers: offerLines(input.offers) };
 }
 
+// Údaje, které vidí čtenář: popisek, adresa a telefon. Název mění jen hlavní redaktor (věty na webu s ním počítají).
+function readPlaceDetails(input) {
+  return { label: clip(input.label, 120), place: clip(input.place, 160), phone: clip(input.phone, 40) };
+}
+
 function readPlaceChange(input) {
   const kind = input.kind === "trvala" ? "trvala" : "docasna";
   const span = changeSpan(input.startsOn, kind === "trvala" ? "" : input.endsOn);
@@ -250,6 +257,15 @@ export const PLACE_ACTIONS = {
       return { ok: true };
     },
   },
+  udaje: {
+    read: readPlaceDetails,
+    target: placeExists,
+    missing: "Tohle místo už tu není.",
+    apply: async (env, placeId, value) => {
+      await env.DB.prepare("update places set label = ?, place = ?, phone = ? where id = ?").bind(value.label, value.place, value.phone, placeId).run();
+      return { ok: true };
+    },
+  },
   zmena: {
     read: readPlaceChange,
     target: placeExists,
@@ -276,6 +292,7 @@ const submit = (env, request, action, targetId, input = {}) =>
 
 export const savePlaceHours = (env, request, input) => submit(env, request, "hodiny", input.placeId, input);
 export const savePlaceOffers = (env, request, input) => submit(env, request, "nabidka", input.placeId, input);
+export const savePlaceDetails = (env, request, input) => submit(env, request, "udaje", input.placeId, input);
 export const savePlaceChange = (env, request, input) => submit(env, request, "zmena", input.placeId, input);
 export const removePlaceChange = (env, request, id) => submit(env, request, "zrusit", id);
 

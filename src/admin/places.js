@@ -7,6 +7,7 @@ import { closureLabel, esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
+import { linksButton, linksDialog } from "./hours-links.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
   badge,
@@ -61,25 +62,39 @@ function offersField(offers) {
   );
 }
 
-function offersForm(place, opts = {}) {
+export function offersForm(place, opts = {}) {
   return `<form class="form" method="post" action="${opts.action ?? `${BASE}/nabidka`}">
     ${hidden("placeId", place.id)}${opts.extra ?? ""}
     ${offersField(opts.value?.offers ?? place.offers ?? [])}
-    ${formFoot(opts.submit ?? "Uložit", cancelLink(BASE))}
+    ${formFoot(opts.submit ?? "Uložit", cancelLink(opts.cancel ?? BASE))}
   </form>`;
 }
 
-// `opts`: kam formulář poslat a čím předvyplnit (návrh ke schválení), jinak běžné uložení.
-function hoursForm(place, opts = {}) {
+// Popisek, adresa a telefon. Název mění jen hlavní redaktor v úpravě místa.
+export function detailsForm(place, opts = {}) {
+  const value = opts.value ?? place;
+  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/udaje`}">
+    ${hidden("placeId", place.id)}${opts.extra ?? ""}
+    ${field("Popisek", `<input class="${input}" name="label" maxlength="120" value="${esc(value.label ?? "")}" placeholder="Městská knihovna">`, "Malý nadpis nad názvem. Nemusí být.")}
+    <div class="pair">
+      ${field("Adresa", `<input class="${input}" name="place" maxlength="160" value="${esc(value.place ?? "")}">`)}
+      ${field("Telefon", `<input class="${input}" name="phone" maxlength="40" value="${esc(value.phone ?? "")}" inputmode="tel">`)}
+    </div>
+    ${formFoot(opts.submit ?? "Uložit", cancelLink(opts.cancel ?? BASE))}
+  </form>`;
+}
+
+// `opts`: kam formulář poslat a čím předvyplnit (návrh ke schválení), jinak běžné uložení. `cancel`: kam vede Zrušit.
+export function hoursForm(place, opts = {}) {
   return `<form class="form" method="post" action="${opts.action ?? `${BASE}/hodiny`}">
     ${hidden("placeId", place.id)}${opts.extra ?? ""}
     ${callout("Oprava běžné otevírací doby, třeba překlep. Titulka o ní nic neřekne. Když se doba opravdu mění, použijte Nová otevírací doba.")}
     ${doctorHoursFields(opts.value?.week ?? place.week, "Otevírací doba")}
-    ${formFoot(opts.submit ?? "Uložit dobu", cancelLink(BASE))}
+    ${formFoot(opts.submit ?? "Uložit dobu", cancelLink(opts.cancel ?? BASE))}
   </form>`;
 }
 
-function changeForm(place, opts = {}) {
+export function changeForm(place, opts = {}) {
   const value = opts.value ?? {};
   return `<form class="form" method="post" action="${opts.action ?? `${BASE}/zmena`}">
     ${hidden("placeId", place.id)}${opts.extra ?? ""}
@@ -92,11 +107,11 @@ function changeForm(place, opts = {}) {
     ${field("Poznámka", `<textarea class="${input}" name="changeNote" required maxlength="400" rows="2" placeholder="Třeba: školení k volbám. Nebo: dovolená.">${esc(value.note ?? "")}</textarea>`)}
     ${doctorHoursFields(value.week ?? blankWeek(), "Otevřeno v tom období")}
     <span class="hint">Bez zaškrtnutého času má místo v tom období zavřeno.</span>
-    ${formFoot(opts.submit ?? "Zapsat změnu", cancelLink(BASE))}
+    ${formFoot(opts.submit ?? "Zapsat změnu", cancelLink(opts.cancel ?? BASE))}
   </form>`;
 }
 
-function newHoursForm(place, opts = {}) {
+export function newHoursForm(place, opts = {}) {
   const value = opts.value ?? {};
   return `<form class="form" method="post" action="${opts.action ?? `${BASE}/zmena`}">
     ${hidden("placeId", place.id)}${opts.extra ?? ""}
@@ -105,7 +120,7 @@ function newHoursForm(place, opts = {}) {
     ${field("Platí od", `<input class="control" type="date" name="startsOn" required value="${esc(value.startsOn ?? pragueNow().date)}">`)}
     ${field("Poznámka", `<textarea class="${input}" name="changeNote" maxlength="400" rows="2" placeholder="Nemusí být. Třeba: v pátek nově i odpoledne.">${esc(value.note ?? "")}</textarea>`)}
     ${doctorHoursFields(value.week ?? place.week, "Nová otevírací doba")}
-    ${formFoot(opts.submit ?? "Zapsat novou dobu", cancelLink(BASE))}
+    ${formFoot(opts.submit ?? "Zapsat novou dobu", cancelLink(opts.cancel ?? BASE))}
   </form>`;
 }
 
@@ -124,6 +139,7 @@ function requestForm(places) {
     const place = places.find((row) => row.id === request.targetId) ?? { id: request.targetId, name: "", week: [] };
     if (request.action === "hodiny") return hoursForm(place, opts);
     if (request.action === "nabidka") return offersForm(place, opts);
+    if (request.action === "udaje") return detailsForm(place, opts);
     return request.value.kind === "trvala" ? newHoursForm(place, opts) : changeForm(place, opts);
   };
 }
@@ -160,6 +176,7 @@ export function adminPlaces(ctx, data, message, query = {}) {
   const changing = places.find((row) => row.id === query.changeId) ?? null;
   const renewing = places.find((row) => row.id === query.newHoursId) ?? null;
   const offering = places.find((row) => row.id === query.offersId) ?? null;
+  const detailing = places.find((row) => row.id === query.detailsId) ?? null;
   let cancelling = null;
   for (const place of places) {
     const found = place.changes.find((change) => change.id === query.cancelId);
@@ -172,11 +189,13 @@ export function adminPlaces(ctx, data, message, query = {}) {
       title: place.name,
       meta: [place.label, place.place, place.phone].filter(Boolean).map(esc).join(" · "),
       badges: `${place.published ? "" : badge("Skryté", "off")}${place.offers?.length ? badge(`Co tu najdete: ${place.offers.length}`) : ""}${place.changes.length ? badge(`Změny: ${place.changes.length}`, "warn") : ""}${waitingBadge(SECTION, place, requests)}<span class="item-sub">${esc(placeSummary(place))}</span>`,
-      actions: `${chief ? moveButtons(place, index, places.length) : ""}
+      actions: `${linksButton(data, SECTION, BASE, place)}
+        ${chief ? moveButtons(place, index, places.length) : ""}
         ${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
         ${modalLink(`${BASE}?zmena=${place.id}`, "Dočasná změna")}
         ${modalLink(`${BASE}?nova-doba=${place.id}`, "Nová doba")}
         ${chief ? "" : modalLink(`${BASE}?nabidka=${place.id}`, "Co tu najdete")}
+        ${chief ? "" : modalLink(`${BASE}?udaje=${place.id}`, "Adresa a telefon")}
         ${chief ? modalLink(`${BASE}?smazat=${place.id}`, "Smazat", "btn-ghost btn-danger-text") : ""}`,
       extra: changeChips(place),
       search: `${place.name} ${place.label}`,
@@ -185,18 +204,21 @@ export function adminPlaces(ctx, data, message, query = {}) {
 
   const dialogs = [];
   const reviewing = requestDialog(SECTION, data, query.requestId, requestForm(places));
-  const anyOpen = editing || removing || hours || changing || renewing || offering || cancelling || reviewing;
+  const anyOpen = editing || removing || hours || changing || renewing || offering || detailing || cancelling || reviewing;
   if (chief) {
     dialogs.push(
       modal({ id: "nove-misto", title: "Nové místo", size: "wide", close: BASE, open: Boolean(query.fresh) && !anyOpen, body: placeForm(null) }),
     );
   }
+  const sharing = linksDialog(ctx, data, { section: SECTION, base: BASE, row: places.find((row) => row.id === query.linksId), what: "otevírací dobu" });
   if (reviewing) dialogs.push(reviewing);
+  else if (sharing) dialogs.push(sharing);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit místo", size: "wide", close: BASE, open: true, body: placeForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));
   else if (changing) dialogs.push(modal({ id: "okno", title: "Dočasná změna", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
   else if (renewing) dialogs.push(modal({ id: "okno", title: "Nová otevírací doba", size: "wide", close: BASE, open: true, body: newHoursForm(renewing, { submit: mode.submit("Zapsat novou dobu") }) }));
   else if (offering) dialogs.push(modal({ id: "okno", title: `Co tu najdete: ${offering.name}`, close: BASE, open: true, body: offersForm(offering, { submit: mode.submit("Uložit") }) }));
+  else if (detailing) dialogs.push(modal({ id: "okno", title: `Adresa a telefon: ${detailing.name}`, close: BASE, open: true, body: detailsForm(detailing, { submit: mode.submit("Uložit") }) }));
   else if (cancelling) {
     dialogs.push(
       modal({

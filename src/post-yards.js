@@ -1,5 +1,5 @@
 // Formuláře sekce Sběrné dvory: dvory, mimořádná uzavření a návrhy ke schválení.
-import { removeClosure, removeYard, saveClosure, saveYard, YARD_ACTIONS } from "./yards-db.js";
+import { removeClosure, removeYard, saveClosure, saveYard, saveYardDetails, saveYardHours, YARD_ACTIONS } from "./yards-db.js";
 import { redirect, withError } from "./http.js";
 import { requestPost, submitted } from "./post-requests.js";
 
@@ -10,6 +10,8 @@ export const YARDS_OK = {
   "dvur-upraven": "Sběrný dvůr je upravený.",
   "dvur-smazan": "Sběrný dvůr je smazaný.",
   uzavreni: "Mimořádné uzavření je zapsané.",
+  "dvur-hodiny": "Otevírací doba dvora je uložená.",
+  "dvur-udaje": "Údaje dvora jsou uložené.",
   "uzavreni-smazane": "Mimořádné uzavření je zrušené.",
 };
 
@@ -26,6 +28,8 @@ export async function yardsPost(path, request, env, fields) {
     if (!result.ok) return redirect(withError(BASE, result.error));
     return redirect(`${BASE}?ok=dvur-smazan`);
   }
+  if (path === `${BASE}/hodiny`) return submitted(BASE, await saveYardHours(env, request, fields), "dvur-hodiny");
+  if (path === `${BASE}/udaje`) return submitted(BASE, await saveYardDetails(env, request, fields), "dvur-udaje");
   if (path === `${BASE}/uzavreni`) return submitted(BASE, await saveClosure(env, request, fields), "uzavreni");
   if (path === `${BASE}/uzavreni/smazat`) {
     if (!fields.confirm || !fields.id) return redirect(BASE);

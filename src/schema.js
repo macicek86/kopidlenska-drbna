@@ -24,11 +24,12 @@ import { ensureMessageTables } from "./messages-db.js";
 import { ensureNdicTables } from "./ndic/store.js";
 import { ensureFeedTables } from "./feeds/settings.js";
 import { ensureRequestTables } from "./hours-requests-db.js";
+import { ensureLinkTables } from "./hours-links-db.js";
 import { ensureAuditTables } from "./audit-db.js";
 import { ensureLoginTables } from "./login-db.js";
 import { ensureNotifyTables } from "./notify.js";
 
-export const SCHEMA_VERSION = 31;
+export const SCHEMA_VERSION = 32;
 
 let schemaReady = false;
 
@@ -419,6 +420,7 @@ async function migrateSchema(env) {
   await ensureNdicTables(env);
   await ensureFeedTables(env);
   await ensureRequestTables(env);
+  await ensureLinkTables(env);
   await ensureAuditTables(env);
   await ensureLoginTables(env);
   await ensureNotifyTables(env);

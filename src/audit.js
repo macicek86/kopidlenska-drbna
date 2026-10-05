@@ -5,8 +5,8 @@ import { recordAudit } from "./audit-db.js";
 import { auditRoute } from "./audit-routes.js";
 
 // Sloupce, které se do historie nikdy nepíšou: tajné, nebo je dopočítá stroj.
-const OMIT = new Set(["id", "password_hash", "session_token", "token_hash", "keywords", "running_at", "checked_at"]);
-const TITLE_COLUMNS = ["title", "name", "summary", "caption", "reason", "note", "login", "code"];
+const OMIT = new Set(["id", "password_hash", "session_token", "token_hash", "token", "keywords", "running_at", "checked_at"]);
+const TITLE_COLUMNS = ["title", "name", "summary", "caption", "reason", "note", "login", "code", "label"];
 
 function same(a, b) {
   return String(a ?? "") === String(b ?? "");

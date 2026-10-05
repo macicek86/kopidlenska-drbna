@@ -1,6 +1,7 @@
 // Lékaři v D1: ordinace, ordinační hodiny a dočasné změny.
 import { asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
+import { removeLinksOf } from "./hours-links-db.js";
 import { changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 
 function mapDoctor(row) {
@@ -107,6 +108,7 @@ export async function removeDoctor(env, request, id) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from doctor_changes where doctor_id = ?").bind(id).run();
+  await removeLinksOf(env, "lekari", id);
   await env.DB.prepare("delete from doctors where id = ?").bind(id).run();
   return { ok: true };
 }
@@ -118,6 +120,15 @@ async function doctorExists(env, id) {
 function readDoctorHours(input) {
   const normalized = normalizeDoctorWeek(input.doctorWeek);
   return normalized.error ? normalized : { week: normalized.week };
+}
+
+// Obor, místo a telefon. Jméno mění jen hlavní redaktor.
+function readDoctorDetails(input) {
+  const specialty = clip(input.specialty, 120);
+  const place = clip(input.place, 160);
+  if (specialty.length < 2) return { error: "Doplňte obor." };
+  if (place.length < 2) return { error: "Doplňte místo." };
+  return { specialty, place, phone: clip(input.phone, 40) };
 }
 
 function readDoctorChange(input) {
@@ -138,6 +149,15 @@ export const DOCTOR_ACTIONS = {
     missing: "Tahle ordinace už tu není.",
     apply: async (env, doctorId, value) => {
       await env.DB.prepare("update doctors set hours = ? where id = ?").bind(JSON.stringify(value.week), doctorId).run();
+      return { ok: true };
+    },
+  },
+  udaje: {
+    read: readDoctorDetails,
+    target: doctorExists,
+    missing: "Tahle ordinace už tu není.",
+    apply: async (env, doctorId, value) => {
+      await env.DB.prepare("update doctors set specialty = ?, place = ?, phone = ? where id = ?").bind(value.specialty, value.place, value.phone, doctorId).run();
       return { ok: true };
     },
   },
@@ -170,5 +190,6 @@ const submit = (env, request, action, targetId, input = {}) =>
   submitHours(env, request, { section: "lekari", actions: DOCTOR_ACTIONS, action, targetId, input });
 
 export const saveDoctorHours = (env, request, input) => submit(env, request, "hodiny", input.doctorId, input);
+export const saveDoctorDetails = (env, request, input) => submit(env, request, "udaje", input.doctorId, input);
 export const saveDoctorChange = (env, request, input) => submit(env, request, "zmena", input.doctorId, input);
 export const removeDoctorChange = (env, request, id) => submit(env, request, "zrusit", id);

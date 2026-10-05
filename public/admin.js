@@ -275,7 +275,22 @@ document.addEventListener("click", (event) => {
   }
   const copy = event.target.closest("[data-copy-week]");
   if (copy) copyMonday(copy.closest("[data-week]"));
+  const share = event.target.closest("[data-copy-field]");
+  if (share) copyField(share);
 });
+
+// Tlačítko Kopírovat vedle pole s odkazem (odkaz pro správce). Bez schránky aspoň označí text.
+function copyField(button) {
+  const field = document.getElementById(button.dataset.copyField);
+  if (!field) return;
+  field.select();
+  const done = () => {
+    const label = button.textContent;
+    button.textContent = "Zkopírováno";
+    setTimeout(() => (button.textContent = label), 1600);
+  };
+  if (navigator.clipboard) navigator.clipboard.writeText(field.value).then(done, () => {});
+}
 
 function copyMonday(grid) {
   if (!grid) return;

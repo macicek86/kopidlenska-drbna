@@ -35,6 +35,7 @@ import { loadDrbena } from "./drbena-db.js";
 import { attachArticle, forgetArticle, loadEvents } from "./events-db.js";
 import { countNewMessages } from "./messages-db.js";
 import { canSeeHours, loadRequests } from "./hours-requests-db.js";
+import { loadLinks } from "./hours-links-db.js";
 import { loadUsers } from "./users-db.js";
 import { loginState } from "./login.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
@@ -396,6 +397,7 @@ export async function loadAdmin(env, request) {
     stock: { topics: [], fallbackTopicId: null },
     newMessages: 0,
     hoursRequests: {},
+    hoursLinks: {},
   };
   if (!user) return base;
   // Všechno najednou; co uživatel nesmí vidět, se nenačítá.
@@ -405,7 +407,7 @@ export async function loadAdmin(env, request) {
   const articleSql = chief
     ? `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} order by a.created_at desc, a.id desc`
     : `select ${ARTICLE_FIELDS} from ${ARTICLE_FROM} where ${liveArticle()} order by a.created_at desc, a.id desc`;
-  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, botProposals, desk, stock, newMessages, hoursRequests] = await Promise.all([
+  const [rubrics, ads, adProposals, articles, yards, doctors, places, proposals, botProposals, desk, stock, newMessages, hoursRequests, hoursLinks] = await Promise.all([
     loadRubrics(env),
     loadAds(env),
     chief ? loadAdProposals(env, "where p.status = 'pending' order by p.id asc") : loadAdProposals(env, ...mine),
@@ -424,8 +426,9 @@ export async function loadAdmin(env, request) {
     loadStock(env),
     when(userCan(user, "vzkazy"), () => countNewMessages(env), 0),
     loadRequests(env, user),
+    loadLinks(env, user),
   ]);
-  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, botProposals, stock, newMessages, hoursRequests });
+  Object.assign(base, { rubrics, ads, adProposals, articles: articles.results.map(mapArticle), yards, doctors, places, proposals, botProposals, stock, newMessages, hoursRequests, hoursLinks });
   if (desk) Object.assign(base, desk, { hasApiKey: Boolean(env.ANTHROPIC_API_KEY) });
   return base;
 }

@@ -13,6 +13,7 @@ export function robotsTxt(origin) {
   return `User-agent: *
 Allow: /
 Disallow: /redakce
+Disallow: /sprava/
 Disallow: /cdn-cgi/
 
 Sitemap: ${origin}/sitemap.xml

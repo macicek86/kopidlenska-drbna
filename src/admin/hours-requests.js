@@ -2,6 +2,7 @@
 // Žadatel je vidí v panelu Moje návrhy, hlavní redaktor v panelu Ke schválení a v okně `?zadost=ID` je schválí
 // (formulář je předvyplněný návrhem a jde upravit), nebo zamítne s důvodem.
 import { hoursSummary, periodClosed, spanSummary } from "../doctors.js";
+import { hoursSummary as yardHours } from "../yards.js";
 import { formatLong } from "../format.js";
 import { hoursMode, REQUEST_SECTIONS } from "../hours-requests-db.js";
 import { placeSummary } from "../places.js";
@@ -14,6 +15,12 @@ const CHANGES = { dvory: "closures", lekari: "changes", "oteviraci-doba": "chang
 
 function changeHours(change) {
   return periodClosed(change) ? "Zavřeno" : spanSummary(change);
+}
+
+function detailsText(section, value) {
+  if (section === "dvory") return `Místo: ${value.place} · Co se tam vozí: ${value.accepts}`;
+  const parts = section === "lekari" ? [value.specialty, value.place, value.phone] : [value.label, value.place, value.phone];
+  return `Údaje: ${parts.filter(Boolean).join(" · ") || "prázdné"}`;
 }
 
 // Komu nebo čemu návrh patří a co se má stát, jako text.
@@ -30,6 +37,8 @@ export function describeRequest(section, request, data) {
     return { name: "Už není", text: "Zrušit změnu, která už není zapsaná" };
   }
   const name = rows.find((row) => row.id === request.targetId)?.name ?? "Už není";
+  if (request.action === "udaje") return { name, text: detailsText(section, value) };
+  if (section === "dvory" && request.action === "hodiny") return { name, text: `Otevírací doba: ${yardHours(value)}` };
   if (section === "dvory") return { name, text: `Uzavření ${closureLabel(value)}: ${value.reason}` };
   if (request.action === "nabidka") {
     return { name, text: value.offers?.length ? `Co tu najdete: ${value.offers.join(", ")}` : "Smazat seznam, co tu najdete" };

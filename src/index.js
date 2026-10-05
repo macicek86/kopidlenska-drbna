@@ -33,6 +33,7 @@ import { aboutPage } from "./about.js";
 import { media } from "./images.js";
 import { articlePage, newsPage } from "./news.js";
 import { renderAdmin } from "./admin-get.js";
+import { manageGet, managePost } from "./manage/routes.js";
 import { auditFinish, auditStart } from "./audit.js";
 import { pruneAudit } from "./audit-db.js";
 import { echoEnabled, loginGet, loginPost } from "./login.js";
@@ -161,6 +162,10 @@ async function renderGet(request, env, url, execution) {
   const feed = await feedGet(path, request, env, url);
   if (feed) return feed;
 
+  // Odkaz pro správce místa, ordinace či dvora: vlastní stránka bez přihlášení.
+  const manage = await manageGet(path, request, env, url);
+  if (manage) return manage;
+
   // Texty a data stránky najednou: na sobě nezávisí.
   const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
   const [copy, data, admin, story, chat, feedOn] = await Promise.all([
@@ -255,6 +260,9 @@ async function renderPost(request, env, url, execution) {
   // Přihlášení a odhlášení: mimo historii změn, zapisují se samy (src/login.js).
   const login = await loginPost(path, request, env, url, fields);
   if (login) return login;
+  // Odkaz pro správce: do historie změn zapisuje sám, pod jménem, které správce napsal.
+  const manage = await managePost(path, request, env, fields);
+  if (manage) return manage;
   // Historie změn: snímek dotčených záznamů před uložením a po něm.
   const watch = path.startsWith("/redakce/") ? await auditStart(env, path, fields, () => currentUser(env, request)).catch(() => null) : null;
   const response = await handlePost(request, env, path, fields, execution);

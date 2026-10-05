@@ -3,7 +3,7 @@
 // stejnou cestou, jako by ji zapsal člověk s plným oprávněním, autorem změny zůstane žadatel.
 //
 // Každá sekce dává `actions`: { [akce]: { read(input) → hodnota | {error}, target(env, id) → bool, apply(env, id, hodnota, userId) } }.
-import { clip, requireChief, requireUser, userCan } from "./db-core.js";
+import { addColumn, clip, requireChief, requireUser, userCan } from "./db-core.js";
 import { notifyEditors } from "./notify.js";
 
 // Klíč je adresa sekce v redakci.
@@ -34,18 +34,19 @@ const REQUEST_ACTIONS = {
   hodiny: "oprava běžných hodin",
   zmena: "změna hodin",
   nabidka: "seznam „Co tu najdete“",
+  udaje: "údaje (adresa, telefon…)",
   zrusit: "zrušení zapsané změny",
 };
 const REQUEST_ROWS = { dvory: "yards", lekari: "doctors", "oteviraci-doba": "places" };
 
-async function requestNotice(env, user, { section, action, targetId, id }) {
+async function requestNotice(env, author, { section, action, targetId, id }) {
   const row =
     action === "zrusit" ? null : await env.DB.prepare(`select name from ${REQUEST_ROWS[section]} where id = ?`).bind(targetId).first();
   return notifyEditors(env, "hodiny", {
     subject: `Ke schválení: ${REQUEST_SECTIONS[section].label}${row?.name ? `, ${row.name}` : ""}`,
     intro: "Přišel návrh změny, čeká na schválení.",
     fields: [
-      ["Od", user.name],
+      ["Od", author],
       ["Sekce", REQUEST_SECTIONS[section].label],
       ["Kde", row?.name ?? ""],
       ["Co", REQUEST_ACTIONS[action] ?? action],
@@ -74,6 +75,17 @@ export const REQUEST_TABLES = [
 
 export async function ensureRequestTables(env) {
   for (const sql of REQUEST_TABLES) await env.DB.prepare(sql).run();
+  // Žádosti z odkazu pro správce (src/hours-links-db.js): created_by je 0, jméno napsal žadatel.
+  const info = await env.DB.prepare("pragma table_info(hours_requests)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "link_id", "alter table hours_requests add column link_id integer");
+  await addColumn(env, names, "author_name", "alter table hours_requests add column author_name text not null default ''");
+}
+
+// Kdo žádost z odkazu pro správce poslal, jak ho ukázat v redakci.
+export function linkAuthor(name, linkLabel) {
+  const who = clip(name, 80) || "Neznámý";
+  return linkLabel ? `${who} (odkaz: ${linkLabel})` : `${who} (přes odkaz)`;
 }
 
 // „direct“ zapisuje rovnou, „request“ posílá ke schválení, null sekci nevidí. Plné oprávnění má přednost.
@@ -107,8 +119,9 @@ function mapRequest(row) {
     value: parsePayload(row.payload),
     status: row.status === "rejected" ? "rejected" : "pending",
     reply: String(row.reply ?? ""),
-    createdBy: Number(row.created_by),
-    author: String(row.author ?? ""),
+    createdBy: Number(row.created_by) || null,
+    linkId: row.link_id == null ? null : Number(row.link_id),
+    author: row.link_id == null ? String(row.author ?? "") : linkAuthor(row.author_name, row.link_label),
     createdAt: String(row.created_at ?? ""),
   };
 }
@@ -119,8 +132,8 @@ export async function loadRequests(env, user) {
   if (!user) return out;
   const chief = user.role === "hlavni";
   const query = env.DB.prepare(
-    `select r.id, r.section, r.action, r.target_id, r.payload, r.status, r.reply, r.created_by, r.created_at, u.name as author
-     from hours_requests r left join users u on u.id = r.created_by
+    `select r.id, r.section, r.action, r.target_id, r.payload, r.status, r.reply, r.created_by, r.link_id, r.author_name, r.created_at, u.name as author, l.label as link_label
+     from hours_requests r left join users u on u.id = r.created_by left join hours_links l on l.id = r.link_id
      where ${chief ? "r.status = 'pending'" : "r.created_by = ?"} order by r.id asc`,
   );
   const rows = chief ? await query.all() : await query.bind(user.id).all();
@@ -138,18 +151,26 @@ export async function submitHours(env, request, { section, actions, action, targ
   if (!gate.ok) return { ok: false, error: gate.error };
   const mode = hoursMode(gate.user, section);
   if (!mode) return { ok: false, error: rules.denied };
+  return fileHours(env, { section, actions, action, targetId, input, mode, userId: gate.user.id, author: gate.user.name });
+}
+
+// Společné pro redakci i odkaz pro správce (`linkId`, `userId` je pak null a `author` je jméno, které žadatel napsal).
+export async function fileHours(env, { section, actions, action, targetId, input, mode, userId = null, author = "", linkId = null, linkLabel = "" }) {
   const spec = actions[action];
+  if (!spec) return { ok: false, error: "Tahle změna tu nejde." };
   const value = spec.read(input);
   if (value.error) return { ok: false, error: value.error };
   if (!targetId || !(await spec.target(env, targetId))) return { ok: false, error: spec.missing };
-  if (mode === "direct") return { ...(await spec.apply(env, targetId, value, gate.user.id)), value };
+  if (mode === "direct") return { ...(await spec.apply(env, targetId, value, userId)), value };
   await env.DB.prepare(
     `delete from hours_requests where status = 'rejected' and created_at < datetime('now', '-${KEEP_REJECTED_DAYS} days')`,
   ).run();
-  const created = await env.DB.prepare("insert into hours_requests (section, action, target_id, payload, created_by) values (?, ?, ?, ?, ?)")
-    .bind(section, action, targetId, JSON.stringify(value), gate.user.id)
+  const created = await env.DB.prepare(
+    "insert into hours_requests (section, action, target_id, payload, created_by, link_id, author_name) values (?, ?, ?, ?, ?, ?, ?)",
+  )
+    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, linkId ? clip(author, 160) : "")
     .run();
-  await requestNotice(env, gate.user, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0) });
+  await requestNotice(env, linkId ? linkAuthor(author, linkLabel) : author, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0) });
   return { ok: true, requested: true, value };
 }
 

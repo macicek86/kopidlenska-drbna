@@ -25,7 +25,7 @@ export function visitTarget(request) {
   if (request.method !== "GET") return null;
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
-  if (path === "/redakce" || path.startsWith("/redakce/")) return null;
+  if (path === "/redakce" || path.startsWith("/redakce/") || path.startsWith("/sprava/")) return null;
   const headers = request.headers;
   if (/prefetch|prerender/i.test(`${headers.get("purpose") ?? ""} ${headers.get("sec-purpose") ?? ""}`)) return null;
   if (isBot(headers.get("user-agent"))) return null;
