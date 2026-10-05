@@ -179,7 +179,7 @@
   .places-list .place-card .week-list { display: block; }
 }
 
-/* Kdo má teď otevřeno: jméno vlevo, stav vpravo; na počítači dva sloupce. */
+/* Kdo má teď otevřeno: jméno vlevo, stav vpravo (i když se zalomí pod jméno); na počítači dva sloupce. */
 .now-board { margin: 0 0 1rem; }
 .now-board h2 { margin: 0 0 0.5rem; font-family: var(--display); font-size: 1.35rem; }
 .now-time { color: var(--muted); font-family: inherit; font-size: 0.95rem; font-weight: 600; }
@@ -194,7 +194,7 @@
   break-inside: avoid;
 }
 .now-list a { color: var(--ink); font-weight: 700; }
-.now-state { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.now-state { margin-left: auto; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
 .now-list .is-open .now-state { color: var(--pine); }
 .now-list .is-soon .now-state { color: var(--soon); }
 .now-list .is-closed .now-state { color: var(--muted); }
