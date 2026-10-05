@@ -3,6 +3,7 @@
 // jen og:url, nadpis, popis a obrázek patří řádku. Facebook si náhled drží podle adresy, proto odkaz ke sdílení
 // nese i otisk textu (`v=`): změní se text, změní se adresa a náhled se stáhne znovu.
 import { homeNotice, numeric } from "./doctors.js";
+import { compactWeek } from "./hours-compact.js";
 import { HOME_LEAD_DAYS, placeNotices } from "./places.js";
 import { addDays } from "./waste.js";
 
@@ -43,33 +44,6 @@ function noticeText(notice) {
   const lead = sentence(`${notice.name} ${lowerFirst(notice.state)}`);
   const detail = notice.detail ? `${lead.slice(0, -1)}: ${notice.detail}.` : lead;
   return [detail, sentence(notice.note)].filter(Boolean).join(" ");
-}
-
-const SHORT = ["Ne", "Po", "Út", "St", "Čt", "Pá", "So"];
-
-function time(value) {
-  return String(value).replace(/^0/, "").replace(/:00$/, "");
-}
-
-// Úseky jednoho dne jako text: „8–12, 13–17“. Místa a lékaři mají dopoledne a odpoledne, dvory jeden úsek.
-function dayRanges(slot) {
-  const parts = "morning" in slot ? [slot.morning, slot.afternoon] : [slot];
-  return parts.filter((part) => part?.open).map((part) => `${time(part.from)}–${time(part.to)}`).join(", ");
-}
-
-// Běžný týden krátce do popisu: stejné dny po sobě sloučené, zavřené vynechané. „Po–Čt 9–12, 13–17; Pá 9–12“
-function compactWeek(week) {
-  const groups = [];
-  for (const slot of week ?? []) {
-    const text = dayRanges(slot);
-    const last = groups.at(-1);
-    if (last && last.text === text && last.to === (slot.day + 6) % 7) last.to = slot.day;
-    else groups.push({ text, from: slot.day, to: slot.day });
-  }
-  return groups
-    .filter((group) => group.text)
-    .map((group) => `${SHORT[group.from]}${group.to === group.from ? "" : `–${SHORT[group.to]}`} ${group.text}`)
-    .join("; ");
 }
 
 function regularText(label, row, hours) {

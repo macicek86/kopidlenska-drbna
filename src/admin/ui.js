@@ -88,17 +88,26 @@ export function postButton(action, fields, label, kind = "btn-line") {
   return `<form class="inline-form" method="post" action="${action}">${inputs}<button class="btn btn-sm ${kind}" type="submit">${label}</button></form>`;
 }
 
-export function item({ title, meta = "", badges = "", actions = "", extra = "", search = "", tone = "", id = "" }) {
+// tools: drobná tlačítka vedle nadpisu (šipky pořadí). grid: akce na mobilu ve dvou stejných sloupcích.
+export function item({ title, meta = "", badges = "", actions = "", extra = "", search = "", tone = "", id = "", tools = "", grid = false }) {
   const text = search || `${title} ${meta}`;
+  const heading = tools ? `<div class="item-title"><h3>${esc(title)}</h3><div class="item-tools">${tools}</div></div>` : `<h3>${esc(title)}</h3>`;
   return `<li class="item${tone ? ` item-${tone}` : ""}"${id ? ` id="${esc(id)}"` : ""} data-search="${esc(String(text).toLowerCase())}">
     <div class="item-main">
-      <h3>${esc(title)}</h3>
+      ${heading}
       ${meta ? `<p class="item-meta">${meta}</p>` : ""}
       ${badges ? `<p class="item-badges">${badges}</p>` : ""}
     </div>
-    ${actions ? `<div class="item-actions">${actions}</div>` : ""}
+    ${actions ? `<div class="item-actions${grid ? " is-grid" : ""}">${actions}</div>` : ""}
     ${extra ? `<div class="item-extra">${extra}</div>` : ""}
   </li>`;
+}
+
+// Méně častá tlačítka schovaná pod „Další“. Funguje i bez JS (details), prázdné nic.
+export function moreMenu(links) {
+  const body = links.filter(Boolean).join("");
+  if (!body) return "";
+  return `<details class="more-menu" data-more-menu><summary class="btn btn-line btn-sm">Další</summary><div class="more-list">${body}</div></details>`;
 }
 
 export function empty(text) {

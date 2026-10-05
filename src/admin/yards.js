@@ -1,4 +1,5 @@
-import { hoursSummary, WEEK_DAYS } from "../yards.js";
+import { compactWeek } from "../hours-compact.js";
+import { WEEK_DAYS } from "../yards.js";
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { yardHoursFields } from "./hours.js";
@@ -19,6 +20,7 @@ import {
   list,
   modal,
   modalLink,
+  moreMenu,
   openButton,
   pageHead,
   panel,
@@ -122,13 +124,17 @@ export function adminYards(ctx, data, message, query = {}) {
   const rows = yards.map((yard) =>
     item({
       title: yard.name,
-      meta: `${esc(yard.place)} · ${esc(hoursSummary(yard))}`,
-      badges: `${yard.published ? "" : badge("Skrytý", "off")}${yard.closures.length ? badge(`Uzavření: ${yard.closures.length}`, "warn") : ""}${waitingBadge(SECTION, yard, requests)}`,
-      actions: `${shareButton(BASE, yard)}
-        ${linksButton(data, SECTION, BASE, yard)}
-        ${modalLink(`${BASE}?uzavreni=${yard.id}`, "Zapsat uzavření")}
-        ${chief ? modalLink(`${BASE}?id=${yard.id}`, "Upravit") : `${modalLink(`${BASE}?hodiny=${yard.id}`, "Otevírací doba")}${modalLink(`${BASE}?udaje=${yard.id}`, "Údaje")}`}
-        ${chief ? modalLink(`${BASE}?smazat=${yard.id}`, "Smazat", "btn-ghost btn-danger-text") : ""}`,
+      meta: esc(yard.place),
+      badges: `${yard.published ? "" : badge("Skrytý", "off")}${yard.closures.length ? badge(`Uzavření: ${yard.closures.length}`, "warn") : ""}${waitingBadge(SECTION, yard, requests)}<span class="item-sub">${esc(compactWeek(yard.legacy ? [] : yard.week) || yard.legacy || "Bez otevřeného dne")}</span>`,
+      grid: true,
+      actions: `${modalLink(`${BASE}?uzavreni=${yard.id}`, "Zapsat uzavření")}
+        ${chief ? modalLink(`${BASE}?id=${yard.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${yard.id}`, "Otevírací doba")}
+        ${moreMenu([
+          shareButton(BASE, yard),
+          linksButton(data, SECTION, BASE, yard),
+          chief ? "" : modalLink(`${BASE}?udaje=${yard.id}`, "Údaje"),
+          chief ? modalLink(`${BASE}?smazat=${yard.id}`, "Smazat", "btn-ghost btn-danger-text") : "",
+        ])}`,
       extra: closureChips(yard),
     }),
   );

@@ -1,4 +1,5 @@
-import { blankWeek, HOME_LEAD_DAYS, hoursSummary, periodClosed, spanSummary } from "../doctors.js";
+import { blankWeek, HOME_LEAD_DAYS, periodClosed, spanSummary } from "../doctors.js";
+import { compactWeek } from "../hours-compact.js";
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
@@ -19,6 +20,7 @@ import {
   list,
   modal,
   modalLink,
+  moreMenu,
   openButton,
   pageHead,
   panel,
@@ -130,13 +132,16 @@ export function adminDoctors(ctx, data, message, query = {}) {
     item({
       title: doctor.name,
       meta: [doctor.specialty, doctor.place, doctor.phone].filter(Boolean).map(esc).join(" · "),
-      badges: `${doctor.published ? "" : badge("Skrytá", "off")}${doctor.changes.length ? badge(`Změny: ${doctor.changes.length}`, "warn") : ""}${waitingBadge(SECTION, doctor, requests)}<span class="item-sub">${esc(hoursSummary(doctor))}</span>`,
-      actions: `${shareButton(BASE, doctor)}
-        ${linksButton(data, SECTION, BASE, doctor)}
+      badges: `${doctor.published ? "" : badge("Skrytá", "off")}${doctor.changes.length ? badge(`Změny: ${doctor.changes.length}`, "warn") : ""}${waitingBadge(SECTION, doctor, requests)}<span class="item-sub">${esc(compactWeek(doctor.week) || "Ordinační hodiny zatím nejsou doplněné")}</span>`,
+      grid: true,
+      actions: `${modalLink(`${BASE}?zmena=${doctor.id}`, "Dočasná změna")}
         ${chief ? modalLink(`${BASE}?id=${doctor.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${doctor.id}`, "Hodiny")}
-        ${modalLink(`${BASE}?zmena=${doctor.id}`, "Dočasná změna")}
-        ${chief ? "" : modalLink(`${BASE}?udaje=${doctor.id}`, "Údaje")}
-        ${chief ? modalLink(`${BASE}?smazat=${doctor.id}`, "Smazat", "btn-ghost btn-danger-text") : ""}`,
+        ${moreMenu([
+          shareButton(BASE, doctor),
+          linksButton(data, SECTION, BASE, doctor),
+          chief ? "" : modalLink(`${BASE}?udaje=${doctor.id}`, "Údaje"),
+          chief ? modalLink(`${BASE}?smazat=${doctor.id}`, "Smazat", "btn-ghost btn-danger-text") : "",
+        ])}`,
       extra: changeChips(doctor),
     }),
   );

@@ -281,6 +281,14 @@ document.addEventListener("click", (event) => {
   if (send) shareField(send);
 });
 
+// Menu „Další“ u položky: zavře se kliknutím vedle nebo na odkaz v něm, otevřené je vždy jen jedno.
+document.addEventListener("click", (event) => {
+  const inside = event.target.closest("[data-more-menu]");
+  for (const menu of document.querySelectorAll("[data-more-menu][open]")) {
+    if (menu !== inside || event.target.closest(".more-list a, .more-list button")) menu.open = false;
+  }
+});
+
 // Tlačítko Sdílet… (systémové sdílení na mobilu). Kde ho prohlížeč neumí, zůstane schované.
 function showShareButtons(root) {
   if (!navigator.share) return;

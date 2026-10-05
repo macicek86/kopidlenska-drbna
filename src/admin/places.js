@@ -2,7 +2,8 @@
 // s oprávněním „ke schválení“ je posílá hlavnímu redaktorovi (src/admin/hours-requests.js).
 import { blankWeek, periodClosed, spanSummary } from "../doctors.js";
 import { formatLong } from "../format.js";
-import { HOME_LEAD_DAYS, NEW_HOURS_DAYS, placeSummary } from "../places.js";
+import { compactWeek } from "../hours-compact.js";
+import { HOME_LEAD_DAYS, NEW_HOURS_DAYS, PLACE_MISSING } from "../places.js";
 import { closureLabel, esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { adminShell } from "./shell.js";
@@ -25,6 +26,7 @@ import {
   list,
   modal,
   modalLink,
+  moreMenu,
   openButton,
   pageHead,
   panel,
@@ -154,7 +156,7 @@ function changeChips(place) {
   if (!place.changes.length) return "";
   return `<ul class="chips-list">${place.changes
     .map((change) => {
-      const hours = change.kind === "trvala" ? placeSummary(change) : periodClosed(change) ? "Zavřeno" : spanSummary(change);
+      const hours = change.kind === "trvala" ? compactWeek(change.week) || PLACE_MISSING : periodClosed(change) ? "Zavřeno" : spanSummary(change);
       const what = [change.kind === "trvala" ? "Nová otevírací doba" : "", change.note, hours].filter(Boolean).join(" · ");
       const source = change.sourceUrl ? ` · <a href="${esc(change.sourceUrl)}" target="_blank" rel="noopener noreferrer">zdroj</a>` : "";
       return `<li class="chip-row">
@@ -189,16 +191,19 @@ export function adminPlaces(ctx, data, message, query = {}) {
       id: `misto-${place.id}`,
       title: place.name,
       meta: [place.label, place.place, place.phone].filter(Boolean).map(esc).join(" · "),
-      badges: `${place.published ? "" : badge("Skryté", "off")}${place.offers?.length ? badge(`Co tu najdete: ${place.offers.length}`) : ""}${place.changes.length ? badge(`Změny: ${place.changes.length}`, "warn") : ""}${waitingBadge(SECTION, place, requests)}<span class="item-sub">${esc(placeSummary(place))}</span>`,
-      actions: `${shareButton(BASE, place)}
-        ${linksButton(data, SECTION, BASE, place)}
-        ${chief ? moveButtons(place, index, places.length) : ""}
-        ${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
-        ${modalLink(`${BASE}?zmena=${place.id}`, "Dočasná změna")}
+      badges: `${place.published ? "" : badge("Skryté", "off")}${place.offers?.length ? badge(`Co tu najdete: ${place.offers.length}`) : ""}${place.changes.length ? badge(`Změny: ${place.changes.length}`, "warn") : ""}${waitingBadge(SECTION, place, requests)}<span class="item-sub">${esc(compactWeek(place.week) || PLACE_MISSING)}</span>`,
+      tools: chief ? moveButtons(place, index, places.length) : "",
+      grid: true,
+      actions: `${modalLink(`${BASE}?zmena=${place.id}`, "Dočasná změna")}
         ${modalLink(`${BASE}?nova-doba=${place.id}`, "Nová doba")}
-        ${chief ? "" : modalLink(`${BASE}?nabidka=${place.id}`, "Co tu najdete")}
-        ${chief ? "" : modalLink(`${BASE}?udaje=${place.id}`, "Adresa a telefon")}
-        ${chief ? modalLink(`${BASE}?smazat=${place.id}`, "Smazat", "btn-ghost btn-danger-text") : ""}`,
+        ${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
+        ${moreMenu([
+          shareButton(BASE, place),
+          linksButton(data, SECTION, BASE, place),
+          chief ? "" : modalLink(`${BASE}?nabidka=${place.id}`, "Co tu najdete"),
+          chief ? "" : modalLink(`${BASE}?udaje=${place.id}`, "Adresa a telefon"),
+          chief ? modalLink(`${BASE}?smazat=${place.id}`, "Smazat", "btn-ghost btn-danger-text") : "",
+        ])}`,
       extra: changeChips(place),
       search: `${place.name} ${place.label}`,
     }),
