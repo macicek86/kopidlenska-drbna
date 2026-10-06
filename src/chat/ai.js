@@ -54,6 +54,16 @@ function request(key, { system, messages }) {
   };
 }
 
+// Značka cache na poslední zprávu: další kolo (po hledání či čtení) vezme rozhovor i výsledky nástrojů z cache.
+// Pokyny mají svou značku, tohle je druhá ze čtyř povolených. Pole zpráv se nemění, značka je jen v kopii.
+export function markLast(messages) {
+  if (!messages.length) return messages;
+  const last = messages.at(-1);
+  const blocks = typeof last.content === "string" ? [{ type: "text", text: last.content }] : last.content;
+  const marked = blocks.map((block, index) => (index === blocks.length - 1 ? { ...block, cache_control: { type: "ephemeral" } } : block));
+  return [...messages.slice(0, -1), { ...last, content: marked }];
+}
+
 function answerText(content) {
   return (content ?? [])
     .filter((block) => block.type === "text")
@@ -78,7 +88,7 @@ export async function askDrbena(env, { modelKey, system, history }, { runTool = 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     let response;
     try {
-      const params = wellFormed(request(key, { system, messages }));
+      const params = wellFormed(request(key, { system, messages: markLast(messages) }));
       response = key === "haiku" ? await client.messages.create(params) : await client.beta.messages.create(params);
     } catch (error) {
       if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "busy", usage };

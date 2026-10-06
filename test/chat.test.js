@@ -162,6 +162,12 @@ test("Drběna si sama dohledá zprávu nástrojem a odpoví", async () => {
     assert.equal(claude.requests[0].model, "claude-haiku-4-5");
     assert.equal(claude.requests[0].output_config, undefined);
     assert.deepEqual(claude.requests[0].tools.map((tool) => tool.name), ["hledat_zpravy", "precist_zpravu", "precist_zdroj", "predat_redakci", "doplnit_kontakt"]);
+    // Značka cache je vždy jen na poslední zprávě: napřed na otázce, ve druhém kole na výsledku nástroje.
+    const marks = (json) => json.messages.flatMap((item) => (Array.isArray(item.content) ? item.content : [])).filter((block) => block.cache_control).length;
+    assert.deepEqual(claude.requests[0].messages, [{ role: "user", content: [{ type: "text", text: "Kdy je drakiáda?", cache_control: { type: "ephemeral" } }] }]);
+    assert.equal(claude.requests[1].messages[0].content, "Kdy je drakiáda?");
+    assert.deepEqual(claude.requests[1].messages.at(-1).content[0].cache_control, { type: "ephemeral" });
+    assert.equal(marks(claude.requests[1]), 1);
   } finally {
     claude.close();
   }
