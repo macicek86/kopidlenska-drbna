@@ -45,7 +45,8 @@ function yardStatusHtml(yard, now) {
 
 export function yardsPage(data, ctx, params) {
   const today = data.waste.today;
-  const now = clockOf(data);
+  // Bez času (now: false, pokyny chatu v cache) stav „teď otevřeno“ chybí, jinak by se stránka měnila každou minutu.
+  const now = data.now === false ? null : clockOf(data);
   const yards = data.yards ?? [];
   // Jeden dvůr přes celou šířku jako dřív, dva vedle sebe, víc po třech.
   const several = yards.length > 1;
@@ -70,7 +71,7 @@ export function yardsPage(data, ctx, params) {
             <div class="place-head">
               <p class="kicker">${esc(yard.place)}</p>
               <h2>${esc(yard.name)}</h2>
-              ${yardStatusHtml(yard, now)}
+              ${now ? yardStatusHtml(yard, now) : ""}
               <p class="kicker">${esc(tx(ctx.copy, "yards_accepts"))}</p>
               <p class="keep-lines">${esc(yard.accepts)}</p>
             </div>

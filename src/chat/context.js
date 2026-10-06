@@ -22,9 +22,10 @@ function clipText(text, max) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-// Stránky vykreslí bez reklam, ať v textu nejsou.
+// Stránky vykreslí bez reklam, ať v textu nejsou, a bez aktuálního času (now: false): „Kdo má teď otevřeno“
+// by měnilo pokyny každou minutu a cache by se nevyužila. Čas Drběna dostává zvlášť na konci pokynů.
 export function sitePages(data, ctx) {
-  const bare = { ...data, ads: [], ad: null };
+  const bare = { ...data, ads: [], ad: null, now: false };
   const page = { ...ctx, chat: null };
   // Seznamy, co místa nabízí, jdou zvlášť (offerSection), ať je neořízne PAGE_MAX.
   const withoutOffers = { ...bare, places: (data.places ?? []).map((place) => ({ ...place, offers: [] })) };

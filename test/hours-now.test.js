@@ -74,3 +74,16 @@ test("stránka: přehled nahoře vede na karty, se změnou sloučené dny mají 
   assert.doesNotMatch(card, /Středa|zavřeno|bezne-misto/);
   assert.match(page, /bezne-misto-2/);
 });
+
+test("bez času (pokyny chatu) stránky neukazují, kdo má teď otevřeno, ať se nemění každou minutu", async () => {
+  const { yardsPage } = await import("../src/yards-view.js");
+  const timeless = { places: [knihovna, kvc], waste: { today: "2026-10-05" }, now: false };
+  const page = placesPage(timeless, { path: "/oteviraci-doba", copy: {} });
+  assert.doesNotMatch(page, /now-board|now-time/);
+  assert.match(page, /place-jump/);
+  const yard = { id: 1, name: "Sběrný dvůr", place: "Kopidlno", accepts: "", week: [{ day: 1, open: true, from: "08:00", to: "12:00" }], closures: [], legacy: "" };
+  const at = (now) => yardsPage({ yards: [yard], waste: { today: "2026-10-05" }, now }, { path: "/sberne-dvory", copy: {} });
+  assert.notEqual(at({ date: "2026-10-05", time: "09:00" }), at({ date: "2026-10-05", time: "13:00" }));
+  assert.match(at({ date: "2026-10-05", time: "09:00" }), /je teď otevřený/);
+  assert.doesNotMatch(at(false), /je teď/);
+});
