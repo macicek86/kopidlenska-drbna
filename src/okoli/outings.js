@@ -125,9 +125,10 @@ export function plannedOutings(settings, start, limit = 21) {
   return outingsFrom(start, limit, { volno: settings.autoVolno }).filter((period) => kindOn(settings, period.kind));
 }
 
-// Cron: článek se píše ráno v den `write` (od šesti do šesti večer) a jen jednou za období (`weekendOn` = jeho `key`).
+// Cron: článek se píše v den `write` hned první běh po půlnoci (do šesti večer, kdyby noční běhy selhaly)
+// a jen jednou za období (`weekendOn` = jeho `key`).
 export function outingDue(settings, now) {
-  if (now.time < "06:00" || now.time >= "18:00") return null;
+  if (now.time >= "18:00") return null;
   const period = plannedOutings(settings, now.date).find((each) => each.write === now.date);
   if (!period || settings.weekendOn === period.key) return null;
   return period;

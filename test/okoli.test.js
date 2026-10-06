@@ -108,8 +108,7 @@ test("období: víkend, volno se svátkem a samostatný svátek", () => {
 test("článek Kam vyrazit: cron ho píše v den období, ráno a jednou", () => {
   const on = { weekly: true, autoVolno: true, autoSvatek: true, weekendOn: "" };
   assert.equal(outingDue(on, { date: "2026-10-08", time: "10:15" }), null);
-  assert.equal(outingDue(on, { date: "2026-10-09", time: "02:15" }), null);
-  assert.equal(outingDue(on, { date: "2026-10-09", time: "06:15" }).key, "2026-10-09");
+  assert.equal(outingDue(on, { date: "2026-10-09", time: "02:15" }).key, "2026-10-09");
   assert.equal(outingDue(on, { date: "2026-10-09", time: "18:15" }), null);
   assert.equal(outingDue({ ...on, weekendOn: "2026-10-09" }, { date: "2026-10-09", time: "10:15" }), null);
   assert.equal(outingDue({ ...on, weekly: false }, { date: "2026-10-09", time: "10:15" }), null);
