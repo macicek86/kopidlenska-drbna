@@ -70,9 +70,16 @@ export const holidayName = (day) => holidaysOf(Number(day.slice(0, 4))).get(day)
 
 const isOff = (day) => weekday(day) === 0 || weekday(day) === 6 || Boolean(holidayName(day));
 
+const holidaysIn = (from, to) => {
+  const found = [];
+  for (let day = from; day <= to; day = shiftDay(day, 1)) if (holidayName(day)) found.push({ day, name: holidayName(day) });
+  return found;
+};
+
 // Období od `start` dál (nejvýš `limit` dní dopředu), seřazená podle začátku. Každé má:
 // { key (začátek, podle něj se pozná, že článek už je), from, to, write (den, kdy se článek píše), kind: "vikend" | "volno" | "svatek", holidays: [{ day, name }] }.
-export function outingsFrom(start, limit = 21) {
+// S `volno: false` (článek na volno je v redakci vypnutý) je volno se svátkem obyčejný víkend pátek až neděle.
+export function outingsFrom(start, limit = 21, { volno = true } = {}) {
   const periods = [];
   let day = shiftDay(start, -3);
   const end = shiftDay(start, limit);
@@ -87,7 +94,12 @@ export function outingsFrom(start, limit = 21) {
     for (let each = day; each <= last; each = shiftDay(each, 1)) days.push(each);
     const holidays = days.filter(holidayName).map((each) => ({ day: each, name: holidayName(each) }));
     const weekend = days.some((each) => weekday(each) === 6 || weekday(each) === 0);
-    if (weekend && weekday(day) === 6) {
+    if (weekend && !volno && holidays.length) {
+      const saturday = days.find((each) => weekday(each) === 6) ?? shiftDay(days.find((each) => weekday(each) === 0), -1);
+      const friday = shiftDay(saturday, -1);
+      const sunday = shiftDay(saturday, 1);
+      periods.push({ key: friday, from: friday, to: sunday, write: friday, kind: "vikend", holidays: holidaysIn(friday, sunday) });
+    } else if (weekend && weekday(day) === 6) {
       // Běžně od pátku: páteční večer patří k víkendu a článek se píše v pátek ráno.
       const friday = shiftDay(day, -1);
       periods.push({ key: friday, from: friday, to: last, write: friday, kind: holidays.length ? "volno" : "vikend", holidays });
@@ -105,10 +117,38 @@ export function outingFor(today) {
   return { ...period, from: period.from > today ? period.from : today };
 }
 
+// Které články se píšou samy (přepínače v redakci): víkendy, volno se svátkem, samostatné svátky.
+const kindOn = (settings, kind) => ({ vikend: settings.weekly, volno: settings.autoVolno, svatek: settings.autoSvatek })[kind] ?? false;
+
+// Plánovaná období podle přepínačů redakce.
+export function plannedOutings(settings, start, limit = 21) {
+  return outingsFrom(start, limit, { volno: settings.autoVolno }).filter((period) => kindOn(settings, period.kind));
+}
+
 // Cron: článek se píše ráno v den `write` (od šesti do šesti večer) a jen jednou za období (`weekendOn` = jeho `key`).
 export function outingDue(settings, now) {
-  if (!settings.weekly || now.time < "06:00" || now.time >= "18:00") return null;
-  const period = outingsFrom(now.date).find((each) => each.write === now.date);
+  if (now.time < "06:00" || now.time >= "18:00") return null;
+  const period = plannedOutings(settings, now.date).find((each) => each.write === now.date);
   if (!period || settings.weekendOn === period.key) return null;
   return period;
+}
+
+// Ruční článek nejvýš na tolik dní a nejpozději tolik dní dopředu.
+export const MANUAL_MAX_DAYS = 14;
+
+// Ruční článek na dny od–do: svátky v nich najde sám, druh podle nich a podle délky ("dny": jiný rozsah).
+export function periodBetween(from, to, today) {
+  const valid = /^\d{4}-\d{2}-\d{2}$/;
+  if (!valid.test(from) || !valid.test(to) || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to))) return { error: "Vyberte den od a do." };
+  if (from < today) return { error: "Článek jde napsat jen na dny, které ještě nebyly." };
+  if (to < from) return { error: "Den do musí být stejný nebo pozdější než den od." };
+  if (to > shiftDay(today, MANUAL_MAX_DAYS)) return { error: `Nejvýš ${MANUAL_MAX_DAYS} dní dopředu.` };
+  const holidays = holidaysIn(from, to);
+  const days = [];
+  for (let day = from; day <= to; day = shiftDay(day, 1)) days.push(day);
+  const weekendOnly = days.every((day) => [5, 6, 0].includes(weekday(day)));
+  const hasWeekend = days.some((day) => [6, 0].includes(weekday(day)));
+  const lonelyHoliday = days.length === 1 && holidays.length && !hasWeekend;
+  const kind = lonelyHoliday ? "svatek" : holidays.length && hasWeekend ? "volno" : !holidays.length && weekendOnly ? "vikend" : "dny";
+  return { key: from, from, to, write: today, kind, holidays, manual: true };
 }

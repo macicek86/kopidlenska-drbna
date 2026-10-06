@@ -3,7 +3,7 @@ import test from "node:test";
 import { adminOkoli } from "../src/admin/index.js";
 import { fetchKzmj, parseEventPage, parseKzmjPost } from "../src/okoli/kzmj.js";
 import { mapNearbyEvent } from "../src/okoli/store.js";
-import { easterSunday, holidayName, outingDue, outingFor, outingsFrom } from "../src/okoli/outings.js";
+import { easterSunday, holidayName, outingDue, outingFor, outingsFrom, periodBetween, plannedOutings } from "../src/okoli/outings.js";
 import { kopidlnoLink, readWeekend, weekendSchema, weekendSource, weekendText } from "../src/okoli/weekend.js";
 
 const weekendFor = outingFor;
@@ -106,7 +106,7 @@ test("období: víkend, volno se svátkem a samostatný svátek", () => {
 });
 
 test("článek Kam vyrazit: cron ho píše v den období, ráno a jednou", () => {
-  const on = { weekly: true, weekendOn: "" };
+  const on = { weekly: true, autoVolno: true, autoSvatek: true, weekendOn: "" };
   assert.equal(outingDue(on, { date: "2026-10-08", time: "10:15" }), null);
   assert.equal(outingDue(on, { date: "2026-10-09", time: "02:15" }), null);
   assert.equal(outingDue(on, { date: "2026-10-09", time: "06:15" }).key, "2026-10-09");
@@ -117,6 +117,28 @@ test("článek Kam vyrazit: cron ho píše v den období, ráno a jednou", () =>
   assert.equal(outingDue(on, { date: "2026-10-27", time: "06:15" }).kind, "svatek");
   assert.equal(outingDue(on, { date: "2026-04-02", time: "06:15" }).from, "2026-04-03");
   assert.equal(outingDue(on, { date: "2026-04-03", time: "06:15" }), null);
+  // Přepínače: bez samostatných svátků nic v úterý, bez volna jsou Velikonoce obyčejný víkend od pátku.
+  assert.equal(outingDue({ ...on, autoSvatek: false }, { date: "2026-10-27", time: "06:15" }), null);
+  assert.equal(outingDue({ ...on, autoVolno: false }, { date: "2026-04-02", time: "06:15" }), null);
+  const easter = outingDue({ ...on, autoVolno: false }, { date: "2026-04-03", time: "06:15" });
+  assert.deepEqual([easter.kind, easter.from, easter.to, easter.holidays.map((holiday) => holiday.name)], ["vikend", "2026-04-03", "2026-04-05", ["Velký pátek"]]);
+  // Bez víkendů zůstanou jen svátky a volna.
+  assert.deepEqual(plannedOutings({ ...on, weekly: false }, "2026-10-26").map((period) => period.kind), ["svatek"]);
+});
+
+test("ruční článek od–do: svátky najde sám a plánovaný nezablokuje", () => {
+  const holiday = periodBetween("2026-10-28", "2026-10-28", "2026-10-20");
+  assert.deepEqual([holiday.kind, holiday.manual, holiday.holidays[0].name], ["svatek", true, "Den vzniku samostatného československého státu"]);
+  assert.equal(periodBetween("2026-10-10", "2026-10-11", "2026-10-07").kind, "vikend");
+  assert.equal(periodBetween("2026-10-13", "2026-10-15", "2026-10-07").kind, "dny");
+  assert.equal(periodBetween("2026-10-27", "2026-10-28", "2026-10-20").kind, "dny");
+  assert.equal(periodBetween("2026-04-03", "2026-04-06", "2026-03-30").kind, "volno");
+  assert.match(periodBetween("2026-10-05", "2026-10-06", "2026-10-07").error, /ještě nebyly/);
+  assert.match(periodBetween("2026-10-12", "2026-10-10", "2026-10-07").error, /pozdější/);
+  assert.match(periodBetween("2026-10-08", "2026-10-30", "2026-10-07").error, /14 dní/);
+  assert.match(periodBetween("", "2026-10-10", "2026-10-07").error, /Vyberte/);
+  const text = weekendText({ today: "2026-10-07", weekend: periodBetween("2026-10-13", "2026-10-15", "2026-10-07"), home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.match(text, /dny, které vybrala redakce: úterý 13\. 10\. až čtvrtek 15\. 10\. 2026\./);
 });
 
 test("podklady na svátek: Drběna ví, jaký je", () => {
@@ -174,7 +196,9 @@ test("redakce: stránka Akce v okolí", () => {
   assert.match(page, /mimo okruh/);
   assert.match(page, /name="kind" value="ukazat"/);
   assert.match(page, /navrh=3|navrh:3/);
-  assert.match(page, /Psát článek Kam vyrazit na víkendy a svátky/);
+  assert.match(page, /Na samostatné svátky/);
+  assert.match(page, /name="autoVolno"/);
+  assert.match(page, /action="\/redakce\/okoli\/napsat"[\s\S]*name="od"[\s\S]*name="do"/);
   assert.match(page, /Příští článek: /);
 });
 

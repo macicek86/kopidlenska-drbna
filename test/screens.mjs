@@ -44,6 +44,7 @@ const TABS = [
   "zahradka?nastaveni=1",
   "webmesta?nastaveni=1",
   "okoli?nastaveni=1",
+  "okoli?napsat=1",
   "zpravy?novy=1",
   "zpravy?id=1",
   "reklamy?novy=1",

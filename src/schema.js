@@ -31,7 +31,7 @@ import { ensureLoginTables } from "./login-db.js";
 import { ensureNotifyTables } from "./notify.js";
 import { ensureSearchTables } from "./search/store.js";
 
-export const SCHEMA_VERSION = 37;
+export const SCHEMA_VERSION = 38;
 
 let schemaReady = false;
 

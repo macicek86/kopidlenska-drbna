@@ -4,7 +4,7 @@ import { requireChief } from "../db-core.js";
 import { pragueNow } from "../waste.js";
 import { NEARBY_SOURCES } from "./sources.js";
 import { knownStamps, loadOkoliSettings, lockOkoli, pruneNearby, rememberNearby, saveWeekendResult, unlockOkoli, writeOkoliStatus } from "./store.js";
-import { outingDue, outingFor } from "./outings.js";
+import { outingDue, periodBetween } from "./outings.js";
 import { writeWeekend } from "./weekend.js";
 
 const BUSY = "Drběna už s akcemi z okolí pracuje. Zkuste to za chvíli.";
@@ -42,7 +42,7 @@ async function finishWeekend(env, weekend, result) {
     await writeOkoliStatus(env, { status: "error", note: `Víkendový článek: ${result.error}` });
     return result;
   }
-  await saveWeekendResult(env, { key: weekend.key, note: result.note, articleId: result.articleId, proposalId: result.proposalId });
+  await saveWeekendResult(env, { key: weekend.manual ? "" : weekend.key, note: result.note, articleId: result.articleId, proposalId: result.proposalId });
   return result;
 }
 
@@ -77,15 +77,17 @@ export async function checkOkoliNow(env, request, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Tlačítko „Napsat článek teď“: na nejbližší víkend, i když už článek je. Píše se hned (Drběna potřebuje asi minutu).
-export async function writeOkoliNow(env, request, { ask } = {}) {
+// Okno „Napsat článek“: na dny od–do (svátky v nich najde Drběna sama). Píše se hned (asi minutu)
+// a plánovaný článek na stejné dny tím nepřijde: ruční se mezi napsané nepočítá.
+export async function writeOkoliNow(env, request, { from, to, ask } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
+  const weekend = periodBetween(String(from ?? ""), String(to ?? ""), pragueNow().date);
+  if (weekend.error) return { ok: false, error: weekend.error };
   const lock = await lockOkoli(env, 5 * 60);
   if (!lock) return { ok: false, error: BUSY };
   try {
     const settings = await loadOkoliSettings(env);
-    const weekend = outingFor(pragueNow().date);
     return await finishWeekend(env, weekend, await writeWeekend(env, settings, weekend, { ask }));
   } finally {
     await unlockOkoli(env, lock);

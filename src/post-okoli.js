@@ -8,7 +8,7 @@ const BASE = "/redakce/okoli";
 export const OKOLI_OK = {
   "okoli-nastaveni": "Nastavení je uložené.",
   "okoli-nacteno": "Akce z okolí jsou načtené.",
-  "okoli-clanek": "Drběna je s víkendovým článkem hotová.",
+  "okoli-clanek": "Drběna je s článkem hotová.",
   "okoli-schovano": "Akce je schovaná, do článku nepůjde.",
   "okoli-vraceno": "Akce je zase vidět.",
 };
@@ -26,8 +26,8 @@ export async function okoliPost(path, request, env, fields) {
     return redirect(`${BASE}?ok=okoli-nacteno`);
   }
   if (path === `${BASE}/napsat`) {
-    const result = await writeOkoliNow(env, request);
-    if (!result.ok) return redirect(withError(BASE, result.error));
+    const result = await writeOkoliNow(env, request, { from: fields.fromDay, to: fields.toDay });
+    if (!result.ok) return redirect(withError(`${BASE}?napsat=1`, result.error));
     return redirect(`${BASE}?ok=okoli-clanek`);
   }
   if (path === `${BASE}/schovat`) {

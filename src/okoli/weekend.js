@@ -35,7 +35,7 @@ const KINDS = { divadlo: "divadlo", kino: "kino", akce: "akce" };
 
 // Jak období nazvat v poznámkách redakci.
 export function periodLabel(period) {
-  return { volno: "volno", svatek: "svátek" }[period.kind] ?? "víkend";
+  return { volno: "volno", svatek: "svátek", dny: "dny" }[period.kind] ?? "víkend";
 }
 
 function periodLine(period) {
@@ -43,6 +43,7 @@ function periodLine(period) {
   const holidays = (period.holidays ?? []).map((holiday) => `${holiday.name} (${czechDay(holiday.day)})`).join(", ");
   if (period.kind === "svatek") return `Článek je na samostatný svátek uprostřed týdne: ${range}. Svátek: ${holidays}.`;
   if (period.kind === "volno") return `Článek je na volno se svátkem: ${range}. Svátky: ${holidays}.`;
+  if (period.kind === "dny") return `Článek je na dny, které vybrala redakce: ${range}.${holidays ? ` Svátky v nich: ${holidays}.` : ""}`;
   return `Článek je na víkend: ${range}.`;
 }
 
@@ -64,6 +65,7 @@ const RULES = `Před víkendem a před svátky píšeš na web Kopidlenská drbn
 Na jaké dny článek je, stojí v přehledu:
 - Víkend: piš o víkendu.
 - Volno se svátkem: řekni, jaký svátek to je, a piš o celém volnu (prodloužený víkend, Velikonoce, Vánoce), ne jen o víkendu. Akce rozlož do všech volných dnů.
+- Dny, které vybrala redakce: piš o těch dnech. Svátek v nich zmiň, u jednoho nebo dvou dnů piš krátce.
 - Samostatný svátek uprostřed týdne: krátký článek jen o ten den. Řekni, jaký je svátek, z okolí vyber nejvýš tři akce a napiš dva až tři odstavce.
 
 Jak článek poskládat:

@@ -52,6 +52,11 @@ export async function ensureOkoliTables(env) {
   // Poslední den vícedenní akce (festival, výstava), jinak prázdné.
   const info = await env.DB.prepare("pragma table_info(okoli_events)").all();
   await addColumn(env, new Set((info.results ?? []).map((row) => row.name)), "ends_on", "alter table okoli_events add column ends_on text not null default ''");
+  // Přepínače plánovaných článků: volno se svátkem a samostatný svátek (víkendy jsou `weekly`).
+  const settingsInfo = await env.DB.prepare("pragma table_info(okoli_settings)").all();
+  const settingsNames = new Set((settingsInfo.results ?? []).map((row) => row.name));
+  await addColumn(env, settingsNames, "auto_volno", "alter table okoli_settings add column auto_volno integer not null default 0");
+  await addColumn(env, settingsNames, "auto_svatek", "alter table okoli_settings add column auto_svatek integer not null default 0");
   await env.DB.prepare("create index if not exists okoli_events_day on okoli_events (starts_on)").run();
   // Přečtené položky zdrojů, které akcí nejsou (nebo už proběhly a akce se smazala), ať se nečtou znovu.
   await env.DB.prepare(
@@ -74,6 +79,8 @@ function mapSettings(row) {
   return {
     enabled: asBool(row?.enabled),
     weekly: asBool(row?.weekly),
+    autoVolno: asBool(row?.auto_volno),
+    autoSvatek: asBool(row?.auto_svatek),
     autoPublish: asBool(row?.auto_publish),
     radiusKm: readRadius(row?.radius_km),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
@@ -94,8 +101,8 @@ export async function loadOkoliSettings(env) {
 export async function saveOkoliSettings(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
-  await env.DB.prepare("update okoli_settings set enabled = ?, weekly = ?, auto_publish = ?, radius_km = ? where id = 1")
-    .bind(input.enabled ? 1 : 0, input.weekly ? 1 : 0, input.autoPublish ? 1 : 0, readRadius(input.radiusKm))
+  await env.DB.prepare("update okoli_settings set enabled = ?, weekly = ?, auto_volno = ?, auto_svatek = ?, auto_publish = ?, radius_km = ? where id = 1")
+    .bind(input.enabled ? 1 : 0, input.weekly ? 1 : 0, input.autoVolno ? 1 : 0, input.autoSvatek ? 1 : 0, input.autoPublish ? 1 : 0, readRadius(input.radiusKm))
     .run();
   return { ok: true };
 }
@@ -107,7 +114,14 @@ export async function writeOkoliStatus(env, { status, note }) {
 }
 
 // Období (jeho začátek, src/okoli/outings.js), na které Drběna článek napsala nebo zjistila, že není o čem.
+// Ruční článek (`key` prázdné) plánovaný nezablokuje: zapíše se jen poznámka a odkaz na článek.
 export async function saveWeekendResult(env, { key, note, articleId = null, proposalId = null }) {
+  if (!key) {
+    await env.DB.prepare("update okoli_settings set weekend_note = ?, weekend_article_id = ?, weekend_proposal_id = ? where id = 1")
+      .bind(clip(note, 400), articleId, proposalId)
+      .run();
+    return;
+  }
   await env.DB.prepare("update okoli_settings set weekend_on = ?, weekend_note = ?, weekend_article_id = ?, weekend_proposal_id = ? where id = 1")
     .bind(key, clip(note, 400), articleId, proposalId)
     .run();

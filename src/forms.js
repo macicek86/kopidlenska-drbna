@@ -33,6 +33,8 @@ export function adminQuery(url) {
     ndicClear: url.searchParams.has("ndic-smazat"),
     importId: positiveParam(url, "zprava"),
     importSettings: url.searchParams.has("nastaveni"),
+    // Akce v okolí: okno ručního článku Kam vyrazit.
+    okoliWrite: url.searchParams.has("napsat"),
     topicId: positiveParam(url, "tema"),
     removeTopicId: positiveParam(url, "smazat-tema"),
     upload: url.searchParams.has("nahrat"),
@@ -115,8 +117,13 @@ export async function formFields(request) {
     phone: text("phone"),
     link: text("link"),
     enabled: form.get("enabled") === "1",
-    // Akce v okolí: každý čtvrtek napsat víkendový článek.
+    // Akce v okolí: přepínače plánovaných článků Kam vyrazit (víkendy, volno se svátkem, samostatné svátky).
     weekly: form.get("weekly") === "1",
+    autoVolno: form.get("autoVolno") === "1",
+    autoSvatek: form.get("autoSvatek") === "1",
+    // Ruční článek Kam vyrazit na dny od–do.
+    fromDay: text("od"),
+    toDay: text("do"),
     closureId: text("closureId"),
     manual: text("manual"),
     radiusKm: text("radiusKm"),
