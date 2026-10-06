@@ -8,7 +8,7 @@ export function hasVectors(env) {
 }
 
 export async function embedTexts(env, texts) {
-  const answer = await env.AI.run(EMBED_MODEL, { text: texts });
+  const answer = await env.AI.run(EMBED_MODEL, { text: texts.map((text) => text.toWellFormed()) });
   const values = answer?.data ?? answer?.response;
   if (!Array.isArray(values) || values.length !== texts.length) throw new Error("Workers AI nevrátil otisky.");
   return values;

@@ -6,6 +6,15 @@ export const MODEL = "claude-opus-5-5";
 export const CHEAP_MODEL = "claude-haiku-4-5";
 
 const CACHED = { type: "ephemeral" };
+
+// Texty se na mnoha místech ořezávají na počet znaků a řez může rozpůlit emoji. Půlka znaku (osamocený
+// surrogate) udělá z dotazu neplatný JSON a Claude ho odmítne chybou 400. Proto každý řetězec v dotazu opraví.
+export function wellFormed(value) {
+  if (typeof value === "string") return value.toWellFormed();
+  if (Array.isArray(value)) return value.map(wellFormed);
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, wellFormed(item)]));
+  return value;
+}
 // Kol s nástroji nejvýš tolik; poslední kolo už nástroje nepustí.
 const MAX_ROUNDS = 4;
 
@@ -63,17 +72,19 @@ export async function callClaude(env, { system, content, schema, effort = "mediu
   for (let round = 1; ; round += 1) {
     try {
       response = cheap
-        ? await client.messages.create({ model: CHEAP_MODEL, max_tokens: 8000, output_config: { format }, system: systemBlocks, messages })
-        : await client.beta.messages.create({
-            model,
-            max_tokens: 16000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: { effort, format },
-            system: systemBlocks,
-            messages,
-            ...tools,
-          });
+        ? await client.messages.create(wellFormed({ model: CHEAP_MODEL, max_tokens: 8000, output_config: { format }, system: systemBlocks, messages }))
+        : await client.beta.messages.create(
+            wellFormed({
+              model,
+              max_tokens: 16000,
+              betas: ["server-side-fallback-2026-07-01"],
+              fallbacks: "default",
+              output_config: { effort, format },
+              system: systemBlocks,
+              messages,
+              ...tools,
+            }),
+          );
     } catch (error) {
       return { ok: false, error: errorText(error) };
     }

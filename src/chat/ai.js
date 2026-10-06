@@ -1,5 +1,6 @@
 // Chat s Drběnou: volání Claude s nástroji na zprávy, výběr modelu a cena odpovědi.
 import Anthropic from "@anthropic-ai/sdk";
+import { wellFormed } from "../claude.js";
 import { CHAT_TOOLS, runChatTool } from "./context.js";
 
 // Ceny v dolarech za milion tokenů (vstup, výstup, čtení z cache, zápis do cache).
@@ -77,7 +78,7 @@ export async function askDrbena(env, { modelKey, system, history }, { runTool = 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     let response;
     try {
-      const params = request(key, { system, messages });
+      const params = wellFormed(request(key, { system, messages }));
       response = key === "haiku" ? await client.messages.create(params) : await client.beta.messages.create(params);
     } catch (error) {
       if (error instanceof Anthropic.RateLimitError) return { ok: false, error: "busy", usage };

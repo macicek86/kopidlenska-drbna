@@ -6,7 +6,7 @@ import { chatModel, DEFAULT_CHAT_MODEL, USD_CZK } from "./ai.js";
 import { turnstileConfig } from "./pass.js";
 import { ownChatPersona } from "./prompt.js";
 
-export const CHAT_DEFAULTS = { perVisitor: 20, perDay: 300, budget: 500, keepDays: 30, archive: 200 };
+export const CHAT_DEFAULTS = { perVisitor: 20, perDay: 300, budget: 500, keepDays: 30, archive: 0 };
 export const BOUNDS = { perVisitor: [1, 200], perDay: [1, 10000], budget: [0, 100000], keepDays: [1, 365], archive: [0, 1000] };
 
 export const CHAT_TABLES = [
@@ -21,7 +21,7 @@ export const CHAT_TABLES = [
     persona text not null default '',
     secret text not null default '',
     ads integer not null default 1,
-    archive integer not null default 200,
+    archive integer not null default 0,
     ideas text not null default ''
   )`,
   `create table if not exists chat_days (
@@ -65,7 +65,7 @@ export async function ensureChatTables(env) {
   const names = new Set((info.results ?? []).map((row) => row.name));
   await addColumn(env, names, "ads", "alter table chat_settings add column ads integer not null default 1");
   // Kolik starších zpráv vidí Drběna v rejstříku (src/chat/archive.js).
-  await addColumn(env, names, "archive", "alter table chat_settings add column archive integer not null default 200");
+  await addColumn(env, names, "archive", "alter table chat_settings add column archive integer not null default 0");
   // Rychlé otázky pod pozdravem v okénku: prázdné = výchozí, pomlčka = žádné.
   await addColumn(env, names, "ideas", "alter table chat_settings add column ideas text not null default ''");
   // Co Drběna k odpovědi hledala a četla (pro ladění hledání).

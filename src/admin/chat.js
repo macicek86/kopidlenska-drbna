@@ -79,7 +79,7 @@ function settingsForm(settings) {
       ${numberField("Měsíční rozpočet v Kč", "budget", settings.budget, 0, 100000, "Když ho chat vyčerpá, do konce měsíce se odmlčí.")}
       ${numberField("Otázky uchovávat dní", "keepDays", settings.keepDays, 1, 365, "Starší se samy smažou.")}
     </div>
-    ${numberField("Starších zpráv v rejstříku", "archive", settings.archive, 0, 1000, "Kromě 30 nejnovějších vidí Drběna i tolik starších, každou jen s nadpisem a klíčovými slovy. Každých 100 zpráv přidá k otázce asi 0,20 Kč se Sonnetem a 0,10 Kč s Haiku. Hledáním najde zprávu v celém archivu i bez rejstříku, ten jen ušetří hledání u nedávných věcí. 0 rejstřík vypne.")}
+    ${numberField("Starších zpráv v rejstříku", "archive", settings.archive, 0, 1000, "Obvykle 0: Drběna vidí 30 nejnovějších zpráv a starší si najde hledáním v celém archivu. Rejstřík jí ukáže i tolik starších, každou jen s nadpisem a klíčovými slovy; každých 100 zpráv přidá k otázce asi 0,20 Kč se Sonnetem a 0,10 Kč s Haiku.")}
     ${field(
       `Rychlé otázky ${settings.ideas ? badge("Vlastní", "info") : badge("Výchozí")}`,
       `<textarea class="${input}" name="ideas" rows="4">${esc(settings.ideas || DEFAULT_CHAT_IDEAS.join("\n"))}</textarea>`,

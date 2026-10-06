@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import test from "node:test";
 import { askDrbena, usageCost } from "../src/chat/ai.js";
+import { wellFormed } from "../src/claude.js";
 import { archiveLine, archiveText } from "../src/chat/archive.js";
 import { adLines, articleWhen, scoreArticle, slugFrom } from "../src/chat/context.js";
 import { fold, searchStems } from "../src/search/query.js";
@@ -102,9 +103,9 @@ test("rychlé otázky chatu: výchozí se neukládají, pomlčka je schová", ()
 
 test("nastavení chatu: meze a výchozí hodnoty", () => {
   const value = readChatSettings({ enabled: true, model: "opus", perVisitor: "9999", perDay: "", budget: "-5", keepDays: "14", persona: DEFAULT_CHAT_PERSONA });
-  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, archive: 200, persona: "", ads: false, ideas: "" });
+  assert.deepEqual(value, { enabled: true, model: "sonnet", perVisitor: 200, perDay: 300, budget: 0, keepDays: 14, archive: 0, persona: "", ads: false, ideas: "" });
   assert.equal(readChatSettings({ model: "haiku" }).model, "haiku");
-  assert.equal(readChatSettings({ archive: "0" }).archive, 0);
+  assert.equal(readChatSettings({ archive: "50" }).archive, 50);
   assert.equal(readChatSettings({ archive: "5000" }).archive, 1000);
   assert.equal(readChatSettings({ chatAds: true }).ads, true);
 });
@@ -213,4 +214,15 @@ test("Drběna v chatu vidí u nových zpráv i čas zveřejnění", () => {
   assert.equal(articleWhen({ createdOn: "2026-10-05", publishedAt: "2026-10-05 07:05:00" }), "5. 10. 2026 v 9:05");
   assert.equal(articleWhen({ createdOn: "2026-12-05", publishedAt: "2026-12-05 13:40:00" }), "5. 12. 2026 v 14:40");
   assert.equal(articleWhen({ createdOn: "2026-10-04", publishedAt: "" }), "4. 10. 2026");
+});
+
+test("půlka emoji z ořezaného textu se před odesláním Claudovi odstraní", async () => {
+  const cut = "Termín 📅 29.".slice(0, 8);
+  assert.equal(cut.isWellFormed(), false);
+  const fixed = wellFormed({ system: [{ text: cut }], n: 3, nothing: null, list: [cut] });
+  assert.equal(fixed.system[0].text.isWellFormed(), true);
+  assert.equal(fixed.list[0].isWellFormed(), true);
+  assert.equal(fixed.n, 3);
+  assert.equal(fixed.nothing, null);
+  JSON.parse(JSON.stringify(fixed));
 });
