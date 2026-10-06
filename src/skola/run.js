@@ -144,7 +144,8 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
 
   const later = source.defer && answer.event ? deferDay(item, answer.event.startsOn, settings.aheadDays, today) : "";
   if (later) {
-    const eventId = await saveBotEvent(env, answer.event, { existingId: item.eventId, published: settings.autoPublish });
+    // Akce bez článku jde na web hned i bez „Rovnou zveřejňovat“: pozvánka přijde až za dlouho a schvaluje se jen ona.
+    const eventId = await saveBotEvent(env, answer.event, { existingId: item.eventId, published: true });
     await deferSkolaItem(env, source, item.id, { writeOn: later, eventId, reason: noteReads(answer.reason, answer), images });
     return { ok: true, status: "odlozeno", usage: answer.usage };
   }
