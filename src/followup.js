@@ -108,18 +108,14 @@ export async function writeFollowup(env, decision, { system, sourceText, article
   return { ok: false, error: `${problem} Zkusí to znovu příště.`, usage };
 }
 
-export function followupLink(target) {
-  return `<p><em>Kdo to minule propásl, <a href="/zpravy/${encodeURIComponent(target.slug)}">může si to přečíst tady</a>.</em></p>`;
-}
-
-// Uloží navazující zprávu. Rovnou na web jen když import zveřejňuje rovnou a redakce to u doplnění dovolila.
-export async function saveFollowup(env, answer, { image, sourceHtml, autoPublish, rubrics, publishOn = "" }) {
+// Uloží navazující zprávu. Odkaz na starou zprávu dá web pod čáru podle `follows_id` (src/article-source.js). Rovnou na web jen když import zveřejňuje rovnou a redakce to u doplnění dovolila.
+export async function saveFollowup(env, answer, { image, source, autoPublish, rubrics, publishOn = "" }) {
   const { followupPublish } = await loadDrbena(env);
   const rubric = rubrics.get(answer.article.rubric) ?? rubrics.get(answer.target.rubricSlug) ?? [...rubrics.values()][0];
   return saveBotArticle(env, {
     article: answer.article,
     image,
-    sourceHtml: `${followupLink(answer.target)}${sourceHtml}`,
+    source,
     autoPublish: autoPublish && followupPublish,
     rubric,
     publishOn,

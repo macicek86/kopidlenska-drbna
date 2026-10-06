@@ -161,7 +161,7 @@ test("podklady pro víkendový článek: Kopidlno napřed, odkazy na drbnu i po�
   assert.match(text, /Jičín \(13 km\), divadlo, Masarykovo divadlo: Vlasta Redl s kapelou\. Koncert\. Odkaz: https:\/\/kzmj\.cz/);
   assert.ok(text.indexOf("Drakiáda") < text.indexOf("Vlasta Redl"));
   assert.equal(kopidlnoLink({ id: 7, articleSlug: "drakiada" }), "/zpravy/drakiada");
-  assert.match(weekendSource([nearby]), /href="https:\/\/kzmj\.cz\/"[^>]*>KZMJ Jičín</);
+  assert.equal(weekendSource([nearby]), "KZMJ Jičín https://kzmj.cz/");
   assert.equal(weekendSource([]), "");
 });
 

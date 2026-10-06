@@ -100,7 +100,7 @@ test("pokyny: vlastní fotka jen se zapnutým nastavením, termín jde Claudovi"
 });
 
 test("pod zprávou je odkaz na článek školy, fotka školy má popisek s původem", () => {
-  assert.match(skolaSource("https://www.zskopidlno.cz/aktuality-zs/a?x=1&y=2"), /href="https:\/\/www\.zskopidlno\.cz\/aktuality-zs\/a\?x=1&amp;y=2"[^>]*>web ZŠ a MŠ Kopidlno</);
+  assert.equal(skolaSource("https://www.zskopidlno.cz/aktuality-zs/a?x=1&y=2"), "web ZŠ a MŠ Kopidlno https://www.zskopidlno.cz/aktuality-zs/a?x=1&y=2");
   assert.equal(photoCaption(""), "Foto: web ZŠ a MŠ Kopidlno");
   assert.equal(photoCaption("Výstava na náměstí"), "Výstava na náměstí (foto: web ZŠ a MŠ Kopidlno)");
   assert.equal(refLink("skola:4"), '<a href="/redakce/skola?zprava=4">Článek školy #4</a>');

@@ -177,7 +177,8 @@ test("kdy se fotbal kontroluje a odkdy bere aktuality", () => {
   assert.equal(footballRunning({ runningAt: "2026-10-01T20:16:00.000Z-abc" }, now), true);
   assert.equal(footballRunning({ runningAt: "2026-10-01T20:14:00.000Z-abc" }, now), false);
   assert.equal(footballRunning({ runningAt: "" }, now), false);
-  assert.match(clubSource("https://www.fkkopidlno.cz/a?b=1&c=2"), /href="https:\/\/www\.fkkopidlno\.cz\/a\?b=1&amp;c=2"/);
+  assert.equal(clubSource("https://www.fkkopidlno.cz/a?b=1&c=2"), "web FK Kopidlno https://www.fkkopidlno.cz/a?b=1&c=2");
+  assert.equal(clubSource(""), "web FK Kopidlno");
 });
 
 test("redakce fotbalu ukáže stav, aktuality, detail a nastavení", () => {

@@ -767,8 +767,12 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .place-ask { margin: -0.4rem 0 1rem; font-weight: 700; }
 .place-ask a { color: var(--brand); }
 
-.article-facebook { margin: 1.4rem 0 0; color: var(--muted); }
-.article-facebook a { font-weight: 700; color: var(--brand); }
+/* Pod čarou: navazující zpráva, zdroj a pozvánka na Facebook (src/article-source.js). */
+.article-foot { margin: 1.8rem 0 2.4rem; padding: 0.9rem 0 0; text-align: left; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+.article-foot p { margin: 0.25rem 0; }
+.article-foot a { color: inherit; font-weight: 600; text-decoration-color: var(--line); text-underline-offset: 2px; }
+.article-foot a:hover { text-decoration-color: currentColor; }
+.article-foot a.article-facebook { color: var(--brand); text-decoration-color: currentColor; }
 
 .place-jump { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
 .place-jump .chip { color: var(--ink); }

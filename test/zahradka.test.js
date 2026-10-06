@@ -76,7 +76,7 @@ test("pokyny zahradnické školy: jen úspěchy, trhy a semináře, vlastní rub
 });
 
 test("odkaz a popisek fotky jmenují zahradnickou školu, duplicita vede na její stránku", () => {
-  assert.match(skolaSource("https://www.zahradnicka-skola-kopidlno.cz/aktuality/a/", ZAHRADKA), />web zahradnické školy Kopidlno</);
+  assert.equal(skolaSource("https://www.zahradnicka-skola-kopidlno.cz/aktuality/a/", ZAHRADKA), "web zahradnické školy Kopidlno https://www.zahradnicka-skola-kopidlno.cz/aktuality/a/");
   assert.equal(photoCaption("", ZAHRADKA), "Foto: web zahradnické školy Kopidlno");
   assert.match(refLink("zahradka:3"), /href="\/redakce\/zahradka\?zprava=3"/);
 });

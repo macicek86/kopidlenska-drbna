@@ -5,6 +5,7 @@ import { byline } from "../db.js";
 import { esc, mediaUrl } from "../html.js";
 import { captionHtml, readCaption } from "../photo.js";
 import { renderArticleHtml } from "../rich.js";
+import { footLines } from "../article-source.js";
 import { rubricHref } from "../rubric-nav.js";
 import { rubricLabel, rubricScope } from "../rubrics.js";
 import { TAG, absoluteHtml, atomFeed } from "./atom.js";
@@ -28,7 +29,9 @@ function articleContent(base, article) {
         )
         .join("")}`
     : "";
-  return `${photo}${absoluteHtml(renderArticleHtml(article.body), base)}${attachments}`;
+  // Navazující zpráva a zdroj jsou na webu pod čarou, ve feedu na konci textu.
+  const foot = footLines(article).map((line) => `<p><em>${line}</em></p>`).join("");
+  return `${photo}${absoluteHtml(`${renderArticleHtml(article.body)}${foot}`, base)}${attachments}`;
 }
 
 export function articleEntry(base, article) {

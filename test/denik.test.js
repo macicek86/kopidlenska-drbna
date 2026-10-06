@@ -88,7 +88,7 @@ test("výsledek, který cituje nebo zmiňuje Deník, neprojde", () => {
 
 test("odkaz na zdroj jen se zapnutým nastavením a redakce má stránku Deník", () => {
   assert.equal(denikSource("https://jicinsky.denik.cz/a", false), "");
-  assert.match(denikSource("https://jicinsky.denik.cz/a?x=1&y=2", true), /href="https:\/\/jicinsky\.denik\.cz\/a\?x=1&amp;y=2"/);
+  assert.equal(denikSource("https://jicinsky.denik.cz/a?x=1&y=2", true), "původní článek https://jicinsky.denik.cz/a?x=1&y=2");
   assert.equal(refLink("denik:4"), '<a href="/redakce/denik?zprava=4">Zpráva z Deníku #4</a>');
   const page = adminDenik(
     { path: "/redakce/denik", copy: {} },

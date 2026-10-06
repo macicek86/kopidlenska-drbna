@@ -63,6 +63,8 @@ export async function formFields(request) {
     image: form.get("image"),
     imageFocus: text("image_focus"),
     imageCaption: text("image_caption"),
+    // Zdroj zprávy pod čarou (src/article-source.js).
+    source: text("source"),
     // Přílohy zprávy (src/attachments.js): formulář je ukázal a tyhle nechává, popisky a nově nahrané.
     attachmentsShown: text("attachments_shown") === "1",
     keepAttachments: form.getAll("keep_attachment").map(String),

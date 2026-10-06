@@ -1,5 +1,6 @@
 // Jeden průchod webu školy nebo města: stáhnout články, nové dát Claudovi a výsledek uložit jako zprávu (návrh) nebo akci.
 // Všechny funkce berou školu ze `sources.js` (bez ní ZŠ a MŠ).
+import { sourceEntry } from "../article-source.js";
 import { saveBotEvent } from "../events-db.js";
 import {
   CLICK_BUDGET_MS,
@@ -41,10 +42,9 @@ export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
 const BUSY = "Drběna už ten web čte. Počkejte, stránka se sama obnoví.";
 
+// Zdroj pod čarou (src/article-source.js).
 export function skolaSource(link, source = SCHOOLS.skola) {
-  if (!link) return `<p><em>Zdroj: web ${source.name}</em></p>`;
-  const href = link.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">web ${source.name}</a></em></p>`;
+  return sourceEntry(`web ${source.name}`, link);
 }
 
 // Fotka je z webu zdroje, i když ji škole (městu) dal někdo jiný (autora uvede Drběna v popisku, když ho škola zmíní).
@@ -97,7 +97,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
       image: await pickStockImage(env, answer.article.imageTopic),
-      sourceHtml: skolaSource(item.link, source),
+      source: skolaSource(item.link, source),
       autoPublish: settings.autoPublish,
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
@@ -124,7 +124,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
       await saveBotArticle(env, {
         article: answer.article,
         image: await skolaImage(env, answer.article, images, settings.ownPhotos, source),
-        sourceHtml: skolaSource(item.link, source),
+        source: skolaSource(item.link, source),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
         publishOn: item.manual ? importSourceDate(item, today) : "",

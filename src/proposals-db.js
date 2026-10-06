@@ -85,7 +85,7 @@ export async function saveProposal(env, request, input) {
     if (stored.key) imageKey = stored.key;
     await env.DB.prepare(
       `update proposals
-       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, image_focus = ?, image_caption = ?, attachments = ?,
+       set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?, image_focus = ?, image_caption = ?, attachments = ?, source = ?,
            submitted_title = ?, submitted_excerpt = ?, submitted_body = ?, submitted_category = ?,
            author_name = ?, status = 'pending', note = '', keywords = ''
        where id = ?`,
@@ -100,6 +100,7 @@ export async function saveProposal(env, request, input) {
         parsed.imageFocus,
         parsed.imageCaption,
         attachmentsValue,
+        parsed.source,
         parsed.title,
         parsed.excerpt,
         parsed.body,
@@ -116,9 +117,9 @@ export async function saveProposal(env, request, input) {
 
   const created = await env.DB.prepare(
     `insert into proposals (
-       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments,
+       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source,
        submitted_title, submitted_excerpt, submitted_body, submitted_category, status
-     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+     ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
   )
     .bind(
       articleId,
@@ -133,6 +134,7 @@ export async function saveProposal(env, request, input) {
       parsed.imageFocus,
       parsed.imageCaption,
       attachmentsValue,
+      parsed.source,
       parsed.title,
       parsed.excerpt,
       parsed.body,
@@ -232,7 +234,7 @@ export async function approveProposal(env, request, input) {
     const redacted = redactedFlag(article.redacted, submitted, finalText) ? 1 : 0;
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = '',
+         image_focus = ?, image_caption = ?, attachments = ?, source = ?, redacted = ?, keywords = '',
          published_at = case when published = 0 and published_at = '' then ? else published_at end, published = 1 where id = ?`,
     )
       .bind(
@@ -245,6 +247,7 @@ export async function approveProposal(env, request, input) {
         parsed.imageFocus,
         parsed.imageCaption,
         attachments.json,
+        parsed.source,
         redacted,
         // Skrytá zpráva bez času zveřejnění vyjde teď (schválením úpravy se zveřejní).
         publishMoment(pragueNow().date),
@@ -256,9 +259,9 @@ export async function approveProposal(env, request, input) {
     const slug = await uniqueSlug(env, slugify(parsed.title));
     const edited = textWasEdited(submitted, finalText);
     const inserted = await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted,
+      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source, published, created_at, author_id, author_name, redacted,
          keywords, follows_id, published_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -271,6 +274,7 @@ export async function approveProposal(env, request, input) {
         parsed.imageFocus,
         parsed.imageCaption,
         attachments.json,
+        parsed.source,
         createdOn,
         proposal.author_id,
         proposal.author_name,
@@ -287,7 +291,7 @@ export async function approveProposal(env, request, input) {
 
   await env.DB.prepare(
     `update proposals set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, image_key = ?,
-       image_focus = ?, image_caption = ?, attachments = '', status = 'approved', note = '' where id = ?`,
+       image_focus = ?, image_caption = ?, attachments = '', source = ?, status = 'approved', note = '' where id = ?`,
   )
     .bind(
       parsed.title,
@@ -298,6 +302,7 @@ export async function approveProposal(env, request, input) {
       imageKey,
       parsed.imageFocus,
       parsed.imageCaption,
+      parsed.source,
       proposal.id,
     )
     .run();

@@ -1,4 +1,5 @@
 // Jeden průchod importu: stáhnout RSS, nové zprávy dát Claudovi a výsledek uložit jako návrh, akci nebo odstávku.
+import { sourceEntry } from "../article-source.js";
 import { saveBotEvent } from "../events-db.js";
 import {
   CLICK_BUDGET_MS,
@@ -44,10 +45,9 @@ export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
 const BUSY = "Drběna už zprávy města čte. Počkejte, stránka se sama obnoví.";
 
+// Zdroj pod čarou (src/article-source.js).
 export function sourceParagraph(link) {
-  if (!link) return `<p><em>Zdroj: Munipolis města Kopidlna</em></p>`;
-  const href = link.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">Munipolis města Kopidlna</a></em></p>`;
+  return sourceEntry("Munipolis města Kopidlna", link);
 }
 
 export { importSourceDate, outcomeOf };
@@ -109,7 +109,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
       image: await articleImage(env, answer.article, images),
-      sourceHtml: sourceParagraph(item.link),
+      source: sourceParagraph(item.link),
       autoPublish: settings.autoPublish,
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
@@ -131,7 +131,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
         article: answer.article,
         image: await articleImage(env, answer.article, images),
         attachments: await articleAttachments(env, answer.article, images),
-        sourceHtml: sourceParagraph(item.link),
+        source: sourceParagraph(item.link),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
         publishOn: item.manual ? importSourceDate(item, today) : "",

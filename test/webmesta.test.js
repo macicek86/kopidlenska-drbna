@@ -62,7 +62,7 @@ test("pokyny webu města: porovnat s Munipolisem, rubriku vybrat volně", () => 
 });
 
 test("zdroj a popisek fotky ukazují na web města", () => {
-  assert.match(skolaSource("https://www.kopidlno.cz/aktuality/letni-kino-2026", WEB), />web města Kopidlna</);
+  assert.equal(skolaSource("https://www.kopidlno.cz/aktuality/letni-kino-2026", WEB), "web města Kopidlna https://www.kopidlno.cz/aktuality/letni-kino-2026");
   assert.equal(photoCaption("", WEB), "Foto: web města Kopidlna");
   assert.equal(refLink("webmesta:3"), '<a href="/redakce/webmesta?zprava=3">Článek z webu města #3</a>');
 });

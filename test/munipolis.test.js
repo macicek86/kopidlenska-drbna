@@ -170,10 +170,8 @@ test("neplatná odpověď Claude skončí chybou", () => {
 });
 
 test("odkaz na zdroj a shrnutí výsledku pro další zprávy", () => {
-  assert.equal(
-    sourceParagraph('https://kopidlno.munipolis.cz/nastenka/1?a=1&b="2"'),
-    '<p><em>Zdroj: <a href="https://kopidlno.munipolis.cz/nastenka/1?a=1&amp;b=&quot;2&quot;" target="_blank" rel="noopener noreferrer">Munipolis města Kopidlna</a></em></p>',
-  );
+  assert.equal(sourceParagraph("https://kopidlno.munipolis.cz/nastenka/1?a=1"), "Munipolis města Kopidlna https://kopidlno.munipolis.cz/nastenka/1?a=1");
+  assert.equal(sourceParagraph(""), "Munipolis města Kopidlna");
   assert.equal(outcomeOf({ status: "hotovo", proposalId: 5, eventId: 3 }), "zpracováno (navrh:5, akce:3)");
   assert.equal(outcomeOf({ status: "duplicita", duplicateOf: "zprava:12" }), "duplicita s zprava:12");
 });

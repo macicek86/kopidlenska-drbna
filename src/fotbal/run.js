@@ -1,4 +1,5 @@
 // Jeden průchod fotbalu: stáhnout aktuality FK Kopidlno (`collect.js`) a nechat Drběnu napsat článek.
+import { sourceEntry } from "../article-source.js";
 import {
   CLICK_BUDGET_MS,
   CLICK_LOCK_SECONDS,
@@ -38,10 +39,9 @@ import {
 export const BATCH_CRON = 8;
 export const BATCH_CLICK = 2;
 
+// Zdroj pod čarou (src/article-source.js).
 export function clubSource(link) {
-  if (!link) return `<p><em>Zdroj: web FK Kopidlno</em></p>`;
-  const href = link.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  return `<p><em>Zdroj: <a href="${href}" target="_blank" rel="noopener noreferrer">web FK Kopidlno</a></em></p>`;
+  return sourceEntry("web FK Kopidlno", link);
 }
 
 async function targetRubric(env, settings) {
@@ -96,7 +96,7 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
   const made = await saveBotArticle(env, {
     article: answer.article,
     image: { key: await articleImage(env, item, settings, fetchImpl) },
-    sourceHtml: clubSource(item.link),
+    source: clubSource(item.link),
     autoPublish: settings.autoPublish && !doubts.length,
     rubric: await targetRubric(env, settings),
     publishOn: item.manual ? footballSourceDate(item, today) : "",

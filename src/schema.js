@@ -32,7 +32,7 @@ import { ensureNotifyTables } from "./notify.js";
 import { ensureSearchTables } from "./search/store.js";
 import { ensureMailinTables } from "./mailin/store.js";
 
-export const SCHEMA_VERSION = 42;
+export const SCHEMA_VERSION = 43;
 
 let schemaReady = false;
 
@@ -204,6 +204,8 @@ async function ensureArticleColumns(env) {
   await addColumn(env, names, "signed_drbena", "alter table articles add column signed_drbena integer not null default 0");
   // Kdy zpráva vyšla na web (UTC, src/db-core.js publishMoment). Starší zprávy ho nemají, platí pro ně jen den.
   await addColumn(env, names, "published_at", "alter table articles add column published_at text not null default ''");
+  // Zdroj zprávy pod čarou (src/article-source.js), dřív byl na konci textu.
+  await addColumn(env, names, "source", "alter table articles add column source text not null default ''");
 }
 
 async function ensureProposalColumns(env) {
@@ -217,6 +219,7 @@ async function ensureProposalColumns(env) {
   await addColumn(env, names, "keywords", "alter table proposals add column keywords text not null default ''");
   await addColumn(env, names, "follows_id", "alter table proposals add column follows_id integer");
   await addColumn(env, names, "attachments", "alter table proposals add column attachments text not null default ''");
+  await addColumn(env, names, "source", "alter table proposals add column source text not null default ''");
 }
 
 // Bod výřezu fotky u reklamy, stejně jako u zprávy.

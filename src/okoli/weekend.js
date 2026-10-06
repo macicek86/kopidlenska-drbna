@@ -1,6 +1,7 @@
 // Článek „Kam vyrazit“: Drběna dostane akce v Kopidlně z kalendáře drbny a akce z okolí (src/okoli/store.js)
 // na období (víkend, volno se svátkem nebo samostatný svátek, src/okoli/outings.js) a napíše jeden článek.
 // Kopidlno vždy první, z okolí jen výběr.
+import { sourceEntry } from "../article-source.js";
 import { saveBotArticle } from "../bot-article.js";
 import { publishNote } from "../publish-time.js";
 import { callClaude } from "../claude.js";
@@ -121,12 +122,10 @@ export function readWeekend(raw) {
   return { ok: true, write: true, reason, article: { title, excerpt, body: body.html, keywords: "" }, imageTopic: cleanText(raw.image_topic, 60) };
 }
 
-// Pod článek: odkud je program okolí.
+// Zdroj pod čarou (src/article-source.js): odkud je program okolí.
 export function weekendSource(nearby) {
   const used = NEARBY_SOURCES.filter((source) => nearby.some((event) => event.source === source.tag));
-  if (!used.length) return "";
-  const links = used.map((source) => `<a href="${source.home}" target="_blank" rel="noopener noreferrer">${source.name}</a>`).join(", ");
-  return `<p><em>Program akcí v okolí: ${links}</em></p>`;
+  return used.map((source) => sourceEntry(source.name, source.home)).join(", ");
 }
 
 // Stejná akce z víc zdrojů (jicin.org přebírá program KZMJ): stejný den, čas a začátek názvu. Zůstane první.
@@ -174,7 +173,7 @@ export async function writeWeekend(env, settings, weekend, { ask = callClaude } 
   const made = await saveBotArticle(env, {
     article: result.article,
     image: await pickStockImage(env, result.imageTopic),
-    sourceHtml: weekendSource(nearby),
+    source: weekendSource(nearby),
     autoPublish: settings.autoPublish,
     publishTime: weekend.manual ? "" : settings.publishTime,
     rubric,

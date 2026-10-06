@@ -7,6 +7,7 @@ import { pragueNow } from "../waste.js";
 import { prepareArticleBody } from "../rich.js";
 import { rubricsFrom } from "../rubrics.js";
 import { MAX_ATTACHMENTS } from "../attachments.js";
+import { SOURCE_MAX } from "../article-source.js";
 import { mediaUrl } from "../html.js";
 import { credit, esc } from "../view.js";
 import { photoField } from "./photo-field.js";
@@ -83,6 +84,15 @@ function attachmentsControl(source) {
     </div>`;
 }
 
+// Zdroj pod čarou (src/article-source.js): název a za ním odkaz, víc zdrojů oddělených čárkou.
+function sourceControl(source) {
+  return field(
+    "Zdroj",
+    `<input class="${input}" name="source" maxlength="${SOURCE_MAX}" value="${esc(source?.source ?? "")}" placeholder="facebook města https://…">`,
+    "Nepovinné. Ukáže se pod zprávou. Odkaz stačí napsat za název, víc zdrojů oddělte čárkou.",
+  );
+}
+
 function richTextField(body) {
   const html = prepareArticleBody(body).html;
   return `<div class="field field-rich"><span>Text</span>
@@ -131,6 +141,7 @@ export function articleFields(source, data, { publish, date, sign } = {}) {
       ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(data.rubrics, source)}</select>`, "Podrubrika je pod svou rubrikou, třeba Fotbal pod Sportem.")}
       ${photoControl(source, data.stock)}
       ${attachmentsControl(source)}
+      ${sourceControl(source)}
       ${publish ? `<div class="field"><span>Viditelnost</span>${check("published", "1", publish.checked, "Zveřejnit na webu")}</div>` : ""}
       ${sign ? `<div class="field"><span>Podpis</span>${check("signed_drbena", "1", sign.checked, "Podepsat jako Koza Drběna", "Na webu bude pod zprávou Drběna místo vás.")}</div>` : ""}
       ${publish ? dateField(source?.createdOn || publish.today) : ""}

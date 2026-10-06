@@ -5,6 +5,7 @@ import { releaseImage } from "./images.js";
 import { formImage, loadStock } from "./stock-db.js";
 import { readCaption, readFocus } from "./photo.js";
 import { prepareArticleBody } from "./rich.js";
+import { readSource } from "./article-source.js";
 import { buildWasteView, pragueNow } from "./waste.js";
 import { isoDate } from "./notices.js";
 import { loadPlaces } from "./places-db.js";
@@ -61,11 +62,13 @@ export { ensureSchema } from "./schema.js";
 export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
 export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.published_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.published_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, a.source, f.slug as follows_slug, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 // Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
 const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "").replace("a.attachments, ", "");
 const ARTICLE_FROM =
-  "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id";
+  "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id" +
+  // Zpráva, na kterou tahle navazuje: odkaz pod čarou jen na tu, která je zveřejněná.
+  " left join articles f on f.id = a.follows_id and f.published = 1";
 
 export function textWasEdited(before, after) {
   return (
@@ -113,6 +116,8 @@ function mapArticle(row) {
     authorAlias: asBool(row.signed_drbena) ? BOT_NAME : String(row.author_alias ?? "").trim(),
     signedDrbena: asBool(row.signed_drbena),
     redacted: asBool(row.redacted),
+    source: String(row.source ?? ""),
+    followsSlug: row.follows_slug ? String(row.follows_slug) : "",
   };
 }
 
@@ -135,6 +140,7 @@ function mapProposal(row) {
     imageFocus: String(row.image_focus ?? ""),
     imageCaption: String(row.image_caption ?? ""),
     attachments: readAttachments(row.attachments),
+    source: String(row.source ?? ""),
     // Návrh úpravy zprávy z doby před přílohami od lidí přílohy nemá, platí ty ze zprávy (src/proposals-db.js).
     ownAttachments: !row.article_id || String(row.attachments ?? "") !== "",
     submittedTitle: String(row.submitted_title),
@@ -180,6 +186,7 @@ function readArticleFields(input) {
     body: prepared.html,
     imageFocus: readFocus(input.imageFocus),
     imageCaption: readCaption(input.imageCaption),
+    source: readSource(input.source),
   };
 }
 
@@ -208,7 +215,7 @@ export async function readArticle(env, input) {
 
 async function loadProposals(env, whereSql, ...binds) {
   const query = env.DB.prepare(
-    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key, p.image_focus, p.image_caption, p.attachments,
+    `select p.id, p.article_id, p.author_id, p.author_name, p.title, p.excerpt, p.body, p.category, p.rubric_id, p.image_key, p.image_focus, p.image_caption, p.attachments, p.source,
             p.submitted_title, p.submitted_excerpt, p.submitted_body, p.submitted_category, p.status, p.note, p.created_at, p.publish_on,
             a.slug as article_slug, a.title as article_title, u.alias as author_alias,
             r.name as rubric_name, parent.name as parent_name
@@ -450,7 +457,7 @@ export async function saveArticle(env, request, input) {
   const stored = await formImage(env, input);
   if (stored.error) return { ok: false, error: stored.error };
   Object.assign(parsed, stored.photo);
-  const { title, excerpt, body, category, rubricId, imageFocus, imageCaption } = parsed;
+  const { title, excerpt, body, category, rubricId, imageFocus, imageCaption, source } = parsed;
   const createdOn = readCreatedOn(input.createdOn);
   if (createdOn.error) return { ok: false, error: createdOn.error };
 
@@ -489,11 +496,11 @@ export async function saveArticle(env, request, input) {
     // Po úpravě textu se klíčová slova smažou a cron je dopočítá znovu (src/keywords.js).
     await env.DB.prepare(
       `update articles set title = ?, excerpt = ?, body = ?, category = ?, rubric_id = ?, published = ?, image_key = ?,
-         image_focus = ?, image_caption = ?, attachments = ?, redacted = ?, keywords = case when ? then '' else keywords end,
+         image_focus = ?, image_caption = ?, attachments = ?, source = ?, redacted = ?, keywords = case when ? then '' else keywords end,
          created_at = case when ? is null or substr(created_at, 1, 10) = ? then created_at else ? end,
          signed_drbena = case when author_id = ? then ? else signed_drbena end, published_at = ? where id = ?`,
     )
-      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, redacted, edited ? 1 : 0, createdOn.date, createdOn.date, createdOn.date, gate.user.id, input.signedDrbena ? 1 : 0, publishedAt, input.id)
+      .bind(title, excerpt, body, category, rubricId, input.published ? 1 : 0, imageKey, imageFocus, imageCaption, attachments.json, source, redacted, edited ? 1 : 0, createdOn.date, createdOn.date, createdOn.date, gate.user.id, input.signedDrbena ? 1 : 0, publishedAt, input.id)
       .run();
     if (stored.key && previous && previous !== stored.key) await releaseImage(env, previous);
     for (const key of attachments.removed) await releaseImage(env, key);
@@ -507,10 +514,10 @@ export async function saveArticle(env, request, input) {
   }
   const slug = await uniqueSlug(env, slugify(title));
   const inserted = await env.DB.prepare(
-    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted, signed_drbena, published_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source, published, created_at, author_id, author_name, redacted, signed_drbena, published_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
   )
-    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, attachments.json, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name, input.signedDrbena ? 1 : 0, input.published ? publishMoment(createdOn.date ?? pragueNow().date) : "")
+    .bind(slug, title, excerpt, body, category, rubricId, stored.key, imageFocus, imageCaption, attachments.json, source, input.published ? 1 : 0, createdOn.date ?? pragueNow().date, gate.user.id, gate.user.name, input.signedDrbena ? 1 : 0, input.published ? publishMoment(createdOn.date ?? pragueNow().date) : "")
     .run();
   // Zpráva psaná k akci (z redakce akcí) se k ní rovnou připojí.
   await attachArticle(env, input.eventId, Number(inserted.meta?.last_row_id));

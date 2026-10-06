@@ -5,6 +5,7 @@ import { facebookUrl, text as tx } from "./copy.js";
 import { formatDayMonth, formatLong } from "./format.js";
 import { esc } from "./html.js";
 import { attachmentsSection } from "./attachments.js";
+import { articleFoot } from "./article-source.js";
 import { articleFigure, storyPhoto } from "./photo.js";
 import { renderArticleHtml } from "./rich.js";
 import { articleCrumbs, newsCount, rubricHref, newsCrumbs, rubricCounts, rubricKicker, rubricNav } from "./rubric-nav.js";
@@ -75,11 +76,11 @@ function articleMeta(article, views) {
   return `<p class="meta">${esc(base)}${mark}${read ? ` · <span class="precteno">${esc(read)}</span>` : ""}</p>`;
 }
 
-// Nenápadná pozvánka do skupiny na Facebooku, drbna sama komentáře nemá.
+// Nenápadná pozvánka do skupiny na Facebooku, drbna sama komentáře nemá. Poslední řádek patičky pod čarou.
 function facebookInvite(copy) {
   const url = facebookUrl(copy);
   if (!url) return "";
-  return `<p class="article-facebook">${esc(tx(copy, "article_facebook"))} <a href="${esc(url)}" rel="noopener">${esc(tx(copy, "article_facebook_link"))}</a></p>`;
+  return `${esc(tx(copy, "article_facebook"))} <a class="article-facebook" href="${esc(url)}" rel="noopener">${esc(tx(copy, "article_facebook_link"))}</a>`;
 }
 
 // Další zprávy v bočním sloupci: rubrika, nadpis a den, bez fotek.
@@ -128,7 +129,7 @@ export function articlePage(article, ctx, extras = {}) {
             <div class="prose">${tieHtml(renderArticleHtml(article.body))}</div>
           </div>
           ${attachmentsSection(article)}
-          ${facebookInvite(ctx.copy)}
+          ${articleFoot(article, [facebookInvite(ctx.copy)])}
         </div>
         ${side ? `<aside class="article-side">${side}</aside>` : ""}
       </div>`,

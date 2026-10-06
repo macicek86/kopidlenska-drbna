@@ -1,4 +1,5 @@
 // Jeden průchod Deníku: z RSS vybrat články o Kopidlnu, stáhnout jejich volnou část a nechat Drběnu napsat, co je podstatné.
+import { sourceEntry } from "../article-source.js";
 import { saveBotEvent } from "../events-db.js";
 import {
   CLICK_BUDGET_MS,
@@ -40,11 +41,10 @@ export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
 const BUSY = "Drběna už Deník čte. Počkejte, stránka se sama obnoví.";
 
-// Odkaz na zdroj jen tehdy, když ho redakce v nastavení zapne. V textu samotném se Deník nezmiňuje.
+// Odkaz na zdroj jen tehdy, když ho redakce v nastavení zapne. Deník se nejmenuje ani tady, pod čarou je jen „původní článek“.
 export function denikSource(link, enabled) {
   if (!enabled || !link) return "";
-  const href = link.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
-  return `<p><em><a href="${href}" target="_blank" rel="noopener noreferrer">Zdroj</a></em></p>`;
+  return sourceEntry("původní článek", link);
 }
 
 export async function processDenikItem(env, item, settings, { fetchImpl = fetch, ask = askDenik } = {}) {
@@ -77,7 +77,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
       image: await pickStockImage(env, answer.article.imageTopic),
-      sourceHtml: denikSource(item.link, settings.sourceLink),
+      source: denikSource(item.link, settings.sourceLink),
       autoPublish: settings.autoPublish,
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
@@ -98,7 +98,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
       await saveBotArticle(env, {
         article: answer.article,
         image: await pickStockImage(env, answer.article.imageTopic),
-        sourceHtml: denikSource(item.link, settings.sourceLink),
+        source: denikSource(item.link, settings.sourceLink),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
         publishOn: item.manual ? importSourceDate(item, today) : "",

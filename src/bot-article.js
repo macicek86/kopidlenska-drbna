@@ -1,4 +1,5 @@
-// Článek od kozy Drběny z importu: rovnou na web, nebo jako návrh ke schválení. Na konec přidá odstavec se zdrojem.
+// Článek od kozy Drběny z importu: rovnou na web, nebo jako návrh ke schválení.
+// `source` je zdroj pod čarou (src/article-source.js: „název odkaz“, víc zdrojů čárkou).
 // `publishOn` (RRRR-MM-DD) je datum ze zdroje při ručním zpracování. Prázdné znamená dnešek, u návrhu den schválení.
 // `image` je { key, focus, caption } (fotka ze zdroje nebo z knihovny obrázků), nebo null.
 // `article.keywords` jsou klíčová slova (src/keywords.js), `followsId` zpráva, na kterou článek navazuje.
@@ -10,14 +11,16 @@ import { scheduledMoment } from "./publish-time.js";
 import { pragueNow } from "./waste.js";
 import { ensureBot } from "./munipolis/store.js";
 import { prepareArticleBody } from "./rich.js";
+import { readSource } from "./article-source.js";
 import { attachmentsJson } from "./attachments.js";
 import { markRecalled } from "./drbena-memory.js";
 import { auditBot } from "./audit.js";
 import { notifyEditors } from "./notify.js";
 
-export async function saveBotArticle(env, { article, image, attachments = [], sourceHtml, autoPublish, rubric, publishOn = "", publishTime = "", followsId = null }) {
+export async function saveBotArticle(env, { article, image, attachments = [], source = "", autoPublish, rubric, publishOn = "", publishTime = "", followsId = null }) {
   const bot = await ensureBot(env);
-  const body = prepareArticleBody(`${article.body}${sourceHtml}`).html;
+  const body = prepareArticleBody(article.body).html;
+  const from = readSource(source);
   const imageKey = image?.key ?? null;
   const focus = image?.focus ?? "";
   const caption = image?.caption ?? article.imageCaption ?? "";
@@ -29,23 +32,23 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
     const day = publishOn || pragueNow().date;
     const publishedAt = scheduledMoment(day, publishTime);
     const result = await env.DB.prepare(
-      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted,
+      `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source, published, created_at, author_id, author_name, redacted,
          keywords, follows_id, published_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 0, ?, ?, ?)`,
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 0, ?, ?, ?)`,
     )
-      .bind(slug, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached, day, bot.id, bot.name, keywords, followsId, publishedAt)
+      .bind(slug, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached, from, day, bot.id, bot.name, keywords, followsId, publishedAt)
       .run();
     await auditBot(env, bot, { title: article.title, published: true }).catch(() => {});
     return { articleId: Number(result.meta.last_row_id), publishedAt };
   }
   const result = await env.DB.prepare(
     `insert into proposals (
-       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments,
+       article_id, author_id, author_name, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source,
        submitted_title, submitted_excerpt, submitted_body, submitted_category, status, publish_on, keywords, follows_id
-     ) values (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
+     ) values (null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
   )
     .bind(
-      bot.id, bot.name, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached,
+      bot.id, bot.name, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached, from,
       article.title, article.excerpt, body, rubric.name, publishOn, keywords, followsId,
     )
     .run();

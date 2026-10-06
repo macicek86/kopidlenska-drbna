@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fillKeywords, readKeywords, shownKeywords } from "../src/keywords.js";
-import { followupLink, followupReason, writeFollowup } from "../src/followup.js";
+import { followupReason, writeFollowup } from "../src/followup.js";
 import { articleLine, contextText, outputSchema, readDecision } from "../src/munipolis/ai.js";
 
 test("klíčová slova se srovnají: malá písmena, bez opakování, nejvýš deset", () => {
@@ -51,8 +51,7 @@ test("doplnění ke zprávě, která není na webu nebo už má dvě, je duplici
   assert.equal(full.decision, "duplicita");
 });
 
-test("odkaz na starou zprávu a poznámka pro redakci", () => {
-  assert.equal(followupLink({ slug: "modelari-letali", title: "Modeláři \"létali\"" }), '<p><em>Kdo to minule propásl, <a href="/zpravy/modelari-letali">může si to přečíst tady</a>.</em></p>');
+test("poznámka pro redakci", () => {
   assert.equal(followupReason({ target: { id: 3 }, reason: "Výsledky." }), "Doplnění ke zprávě zprava:3. Výsledky.");
 });
 

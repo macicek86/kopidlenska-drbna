@@ -66,7 +66,6 @@ export async function processClosure(env, row, settings, { ask = askNdic } = {})
       await saveBotArticle(env, {
         article: answer.article,
         image: await pickStockImage(env, answer.article.imageTopic),
-        sourceHtml: "",
         autoPublish: settings.autoPublish,
         rubric,
       }),
