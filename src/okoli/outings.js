@@ -5,7 +5,7 @@
 // - Úsek bez víkendu (svátek uprostřed týdne): krátký článek den předem, jen na ty dny.
 // S článkem na pracovní týden (`autoTyden`, `withWeekdays`) je týden pokrytý celý dvěma články, které se den překrývají:
 // víkendový sahá až do úterý, týdenní (píše se v pondělí, vyjde večer) od úterý do pátku. Samostatný svátek pak
-// článek nemá, je v tom, který ho pokrývá.
+// článek nemá, je v tom, který ho pokrývá. Krátký týden (míň než `MIN_WEEK_DAYS` pracovních dnů) připadne víkendu.
 
 const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
 
@@ -117,9 +117,19 @@ export function outingsFrom(start, limit = 21, { volno = true } = {}) {
 // Týdenní článek začíná v úterý (je-li svátek, první pracovní den po něm, nejpozději ve čtvrtek).
 const WEEK_STARTS = [2, 3, 4];
 
+// Týdenní článek jen na tolik pracovních dnů a víc (běžně jich má čtyři, úterý až pátek).
+export const MIN_WEEK_DAYS = 3;
+
+const workDays = (from, to) => {
+  let count = 0;
+  for (let day = from; day <= to; day = shiftDay(day, 1)) if (!isOff(day)) count += 1;
+  return count;
+};
+
 // Z období s víkendem udělá dvojice: víkend (volno) prodloužený do prvního dne týdenního článku a týdenní článek
 // od toho dne do začátku dalšího víkendu (včetně, ať se překrývají). Samostatné svátky vypadnou, jsou v nich.
-// Když se týdenní článek do mezery nevejde (Štědrý den ve středu), víkend sahá až do dne před dalším obdobím.
+// Když se týdenní článek do mezery nevejde nebo by měl míň než `MIN_WEEK_DAYS` pracovních dnů (týden před Vánoci),
+// nepíše se a víkend sahá až do dne před dalším obdobím (`weekAfter` říká, jestli po něm týdenní článek přijde).
 export function withWeekdays(periods) {
   const big = periods.filter((period) => period.kind !== "svatek");
   const out = [];
@@ -130,8 +140,9 @@ export function withWeekdays(periods) {
     for (let day = shiftDay(period.to, 1); day < next.from && !first; day = shiftDay(day, 1)) {
       if (!isOff(day) && WEEK_STARTS.includes(weekday(day))) first = day;
     }
+    if (first && workDays(first, next.from) < MIN_WEEK_DAYS) first = "";
     const tail = first || shiftDay(next.from, -1);
-    out.push(tail > period.to ? { ...period, to: tail, offTo: period.to, holidays: holidaysIn(period.from, tail) } : period);
+    out.push(tail > period.to ? { ...period, to: tail, offTo: period.to, weekAfter: Boolean(first), holidays: holidaysIn(period.from, tail) } : period);
     if (first) out.push({ key: first, from: first, to: next.from, write: shiftDay(first, -1), kind: "tyden", holidays: holidaysIn(first, next.from) });
   });
   return out;
