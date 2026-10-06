@@ -17,13 +17,15 @@ function settingsForm(settings) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
     ${check("enabled", "1", settings.enabled, "Stahovat akce z okolí automaticky", "Drbna se na weby zdrojů podívá každé čtyři hodiny. Akce se na webu samy neukážou, jsou jen podkladem pro víkendový článek.")}
     <fieldset class="field checks"><legend>Psát článek Kam vyrazit sám</legend>
-    ${check("weekly", "1", settings.weekly, "Na víkendy", "V pátek ráno na pátek až neděli.")}
+    ${check("weekly", "1", settings.weekly, "Na víkendy", "V pátek ráno na pátek až neděli, s článkem na týden až do úterý.")}
     ${check("autoVolno", "1", settings.autoVolno, "Na volno se svátkem", "Svátek navazující na víkend (Velikonoce, Vánoce, prodloužený víkend): celé volno, den před ním. Bez zaškrtnutí je to obyčejný víkendový článek.")}
-    ${check("autoSvatek", "1", settings.autoSvatek, "Na samostatné svátky", "Svátek uprostřed týdne: krátký článek den předem jen na ten den.")}
+    ${check("autoSvatek", "1", settings.autoSvatek, "Na samostatné svátky", "Svátek uprostřed týdne: krátký článek den předem jen na ten den. S článkem na týden ho nepíše, svátek je v něm.")}
+    ${check("autoTyden", "1", settings.autoTyden, "Na pracovní týden", "V pondělí večer na úterý až pátek. Překrývá se s víkendovým článkem: úterý a pátek jsou v obou, akce z předchozího článku Drběna jen připomene.")}
     </fieldset>
     <p class="hint">Nejdřív akce v Kopidlně z kalendáře, pak výběr z okolí. Když se nic nekoná, článek nevyjde.</p>
     ${check("autoPublish", "1", settings.autoPublish, "Článek rovnou zveřejnit", "Bez zaškrtnutí čeká jako návrh ke schválení.")}
     ${publishTimeField(settings.publishTime, "Drběna píše v noci, na web článek půjde až v tuhle hodinu. Prázdné: hned. Článek napsaný tlačítkem vyjde vždy hned.")}
+    ${publishTimeField(settings.weekPublishTime, "Článek na pracovní týden Drběna píše odpoledne den předem, na web půjde v tuhle hodinu.", { name: "weekPublishTime", label: "Článek na týden zveřejnit v" })}
     ${field("Okruh v km", `<input class="${input}" type="number" name="radiusKm" min="1" max="100" required value="${settings.radiusKm}">`, "Zdroje dál od Kopidla Drběna do článku nebere.")}
     ${VOICE_NOTE}
     ${formFoot("Uložit", cancelLink(BASE))}
@@ -42,14 +44,14 @@ function nextLine(settings, today = pragueNow().date) {
   if (!next) return "";
   const holidays = next.holidays.map((holiday) => holiday.name).join(", ");
   const range = next.from === next.to ? czechDay(next.from) : `${czechDay(next.from)} až ${czechDay(next.to)}`;
-  const when = settings.autoPublish ? ` (vyjde${atTime(settings.publishTime)})` : "";
+  const when = settings.autoPublish ? ` (vyjde${atTime(next.kind === "tyden" ? settings.weekPublishTime : settings.publishTime)})` : "";
   return `Příští článek: ${czechDay(next.write)}${when} na ${periodLabel(next)} ${range}${holidays ? ` (${holidays})` : ""}.`;
 }
 
 function statusPanel(data, settings) {
   const checked = settings.checkedAt ? `Naposledy načteno ${stamp(settings.checkedAt)}.` : "Ještě se nenačítalo.";
   const fetching = settings.enabled ? "Stahuje se automaticky." : "Stahuje se jen tlačítkem.";
-  const weekly = settings.weekly || settings.autoVolno || settings.autoSvatek
+  const weekly = settings.weekly || settings.autoVolno || settings.autoSvatek || settings.autoTyden
     ? `Článek píše sama, ${settings.autoPublish ? `rovnou na web${atTime(settings.publishTime)}` : "jako návrh"}.`
     : "Víkendový článek je vypnutý.";
   const keyWarn = data.hasApiKey ? "" : callout("Chybí klíč pro Claude (<code>ANTHROPIC_API_KEY</code>), článek se nenapíše.", "warn");

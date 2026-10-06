@@ -125,19 +125,66 @@ test("článek Kam vyrazit: cron ho píše v den období, ráno a jednou", () =>
   assert.deepEqual(plannedOutings({ ...on, weekly: false }, "2026-10-26").map((period) => period.kind), ["svatek"]);
 });
 
+test("článek na pracovní týden: víkend do úterý, týden od úterý do pátku, vychází v pondělí večer", () => {
+  const brief = (period) => [period.kind, period.from, period.to, period.write];
+  const on = { weekly: true, autoVolno: true, autoSvatek: true, autoTyden: true, weekendOn: "" };
+  const plan = (start) => plannedOutings(on, start).map(brief);
+  assert.deepEqual(plan("2026-10-07").slice(0, 3), [
+    ["tyden", "2026-10-06", "2026-10-09", "2026-10-05"],
+    ["vikend", "2026-10-09", "2026-10-13", "2026-10-09"],
+    ["tyden", "2026-10-13", "2026-10-16", "2026-10-12"],
+  ]);
+  // Svátek ve středu 28. 10. je v týdenním článku, vlastní nemá.
+  const october = plannedOutings(on, "2026-10-26");
+  const week = october.find((period) => period.kind === "tyden");
+  assert.deepEqual(brief(week), ["tyden", "2026-10-27", "2026-10-30", "2026-10-26"]);
+  assert.deepEqual(week.holidays.map((holiday) => holiday.day), ["2026-10-28"]);
+  assert.ok(october.every((period) => period.kind !== "svatek"));
+  // Svátek v úterý 17. 11.: víkend do středy, týden od středy, píše se ve svátek.
+  assert.deepEqual(plan("2026-11-14").slice(0, 2), [["vikend", "2026-11-13", "2026-11-18", "2026-11-13"], ["tyden", "2026-11-18", "2026-11-20", "2026-11-17"]]);
+  // Vánoce: týden úterý až Štědrý den, volno do úterý 29. 12., pak týden do Nového roku.
+  assert.deepEqual(plan("2026-12-21").slice(1, 5), [
+    ["tyden", "2026-12-22", "2026-12-24", "2026-12-21"],
+    ["volno", "2026-12-24", "2026-12-29", "2026-12-23"],
+    ["tyden", "2026-12-29", "2027-01-01", "2026-12-28"],
+    ["volno", "2027-01-01", "2027-01-05", "2026-12-31"],
+  ]);
+  // Cron: týdenní se píše odpoledne v pondělí, víkendový ráno v pátek.
+  assert.equal(outingDue(on, { date: "2026-10-12", time: "06:15" }), null);
+  assert.equal(outingDue({ ...on, weekendOn: "2026-10-09" }, { date: "2026-10-12", time: "14:15" }).key, "2026-10-13");
+  assert.equal(outingDue({ ...on, weekendOn: "2026-10-13" }, { date: "2026-10-12", time: "22:15" }), null);
+  assert.equal(outingDue(on, { date: "2026-10-09", time: "02:15" }).to, "2026-10-13");
+  // Bez přepínače týdne zůstává víkend pátek až neděle.
+  assert.deepEqual(brief(outingDue({ ...on, autoTyden: false }, { date: "2026-10-09", time: "02:15" })), ["vikend", "2026-10-09", "2026-10-11", "2026-10-09"]);
+  assert.equal(outingDue({ ...on, autoTyden: false }, { date: "2026-10-12", time: "14:15" }), null);
+  // Do promptu: víkend s výhledem do týdne, týden a předchozí článek.
+  const friday = outingDue(on, { date: "2026-10-09", time: "02:15" });
+  const fridayText = weekendText({ today: "2026-10-09", weekend: friday, home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.match(fridayText, /na víkend: pátek 9\. 10\. až neděle 11\. 10\. 2026\. K tomu začátek týdne po něm: pondělí 12\. 10\. až úterý 13\. 10\. 2026\./);
+  const monday = plannedOutings(on, "2026-10-12").find((period) => period.kind === "tyden");
+  const previous = { title: "Víkend s pouťí", text: "V úterý je v knihovně čtení.", day: "2026-10-09" };
+  const weekText = weekendText({ today: "2026-10-12", weekend: monday, home: [], nearby: [], radiusKm: 25, topics: [], previous });
+  assert.match(weekText, /na pracovní týden: úterý 13\. 10\. až pátek 16\. 10\. 2026\. Vychází večer předem\./);
+  assert.match(weekText, /Předchozí článek Kam vyrazit \(pátek 9\. 10\.\): Víkend s pouťí\nV úterý je v knihovně čtení\./);
+});
+
 test("ruční článek od–do: svátky najde sám a plánovaný nezablokuje", () => {
   const holiday = periodBetween("2026-10-28", "2026-10-28", "2026-10-20");
   assert.deepEqual([holiday.kind, holiday.manual, holiday.holidays[0].name], ["svatek", true, "Den vzniku samostatného československého státu"]);
   assert.equal(periodBetween("2026-10-10", "2026-10-11", "2026-10-07").kind, "vikend");
-  assert.equal(periodBetween("2026-10-13", "2026-10-15", "2026-10-07").kind, "dny");
-  assert.equal(periodBetween("2026-10-27", "2026-10-28", "2026-10-20").kind, "dny");
+  assert.equal(periodBetween("2026-10-13", "2026-10-15", "2026-10-07").kind, "tyden");
+  assert.equal(periodBetween("2026-10-15", "2026-10-17", "2026-10-07").kind, "dny");
+  assert.equal(periodBetween("2026-10-14", "2026-10-14", "2026-10-07").kind, "dny");
+  assert.equal(periodBetween("2026-10-27", "2026-10-28", "2026-10-20").kind, "tyden");
   assert.equal(periodBetween("2026-04-03", "2026-04-06", "2026-03-30").kind, "volno");
   assert.match(periodBetween("2026-10-05", "2026-10-06", "2026-10-07").error, /ještě nebyly/);
   assert.match(periodBetween("2026-10-12", "2026-10-10", "2026-10-07").error, /pozdější/);
   assert.match(periodBetween("2026-10-08", "2026-10-30", "2026-10-07").error, /14 dní/);
   assert.match(periodBetween("", "2026-10-10", "2026-10-07").error, /Vyberte/);
-  const text = weekendText({ today: "2026-10-07", weekend: periodBetween("2026-10-13", "2026-10-15", "2026-10-07"), home: [], nearby: [], radiusKm: 25, topics: [] });
-  assert.match(text, /dny, které vybrala redakce: úterý 13\. 10\. až čtvrtek 15\. 10\. 2026\./);
+  const text = weekendText({ today: "2026-10-07", weekend: periodBetween("2026-10-15", "2026-10-17", "2026-10-07"), home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.match(text, /dny, které vybrala redakce: čtvrtek 15\. 10\. až sobota 17\. 10\. 2026\./);
+  const week = weekendText({ today: "2026-10-06", weekend: periodBetween("2026-10-06", "2026-10-09", "2026-10-06"), home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.match(week, /na pracovní týden: úterý 6\. 10\. až pátek 9\. 10\. 2026\.\n/);
 });
 
 test("podklady na svátek: Drběna ví, jaký je", () => {

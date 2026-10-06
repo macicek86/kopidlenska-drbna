@@ -124,10 +124,14 @@ export async function formFields(request) {
     phone: text("phone"),
     link: text("link"),
     enabled: form.get("enabled") === "1",
-    // Akce v okolí: přepínače plánovaných článků Kam vyrazit (víkendy, volno se svátkem, samostatné svátky).
+    // Akce v okolí: přepínače plánovaných článků Kam vyrazit (víkendy, volno se svátkem, samostatné svátky, týden).
     weekly: form.get("weekly") === "1",
     autoVolno: form.get("autoVolno") === "1",
     autoSvatek: form.get("autoSvatek") === "1",
+    autoTyden: form.get("autoTyden") === "1",
+    // Čas zveřejnění článků z nočního cronu (src/publish-time.js), u Kam vyrazit i pro týdenní článek.
+    publishTime: text("publishTime"),
+    weekPublishTime: text("weekPublishTime"),
     // Ruční článek Kam vyrazit na dny od–do.
     fromDay: text("od"),
     toDay: text("do"),

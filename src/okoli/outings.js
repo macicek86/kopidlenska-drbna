@@ -3,6 +3,9 @@
 // - Úsek s víkendem: když začíná sobotou, přidá se k němu pátek (večerní akce) a článek se píše v pátek ráno,
 //   když začíná svátkem (Velký pátek, svátek ve čtvrtek a v pátek), píše se den předem. Pondělní svátek ho prodlouží.
 // - Úsek bez víkendu (svátek uprostřed týdne): krátký článek den předem, jen na ty dny.
+// S článkem na pracovní týden (`autoTyden`, `withWeekdays`) je týden pokrytý celý dvěma články, které se den překrývají:
+// víkendový sahá až do úterý, týdenní (píše se v pondělí, vyjde večer) od úterý do pátku. Samostatný svátek pak
+// článek nemá, je v tom, který ho pokrývá.
 
 const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
 
@@ -111,33 +114,64 @@ export function outingsFrom(start, limit = 21, { volno = true } = {}) {
   return periods;
 }
 
+// Týdenní článek začíná v úterý (je-li svátek, první pracovní den po něm, nejpozději ve čtvrtek).
+const WEEK_STARTS = [2, 3, 4];
+
+// Z období s víkendem udělá dvojice: víkend (volno) prodloužený do prvního dne týdenního článku a týdenní článek
+// od toho dne do začátku dalšího víkendu (včetně, ať se překrývají). Samostatné svátky vypadnou, jsou v nich.
+// Když se týdenní článek do mezery nevejde (Štědrý den ve středu), víkend sahá až do dne před dalším obdobím.
+export function withWeekdays(periods) {
+  const big = periods.filter((period) => period.kind !== "svatek");
+  const out = [];
+  big.forEach((period, index) => {
+    const next = big[index + 1];
+    if (!next) return out.push(period);
+    let first = "";
+    for (let day = shiftDay(period.to, 1); day < next.from && !first; day = shiftDay(day, 1)) {
+      if (!isOff(day) && WEEK_STARTS.includes(weekday(day))) first = day;
+    }
+    const tail = first || shiftDay(next.from, -1);
+    out.push(tail > period.to ? { ...period, to: tail, offTo: period.to, holidays: holidaysIn(period.from, tail) } : period);
+    if (first) out.push({ key: first, from: first, to: next.from, write: shiftDay(first, -1), kind: "tyden", holidays: holidaysIn(first, next.from) });
+  });
+  return out;
+}
+
 // Na co psát teď (tlačítko v redakci): období, které ještě neskončilo, od dneška (`key` zůstává).
 export function outingFor(today) {
   const period = outingsFrom(today).find((each) => each.to >= today);
   return { ...period, from: period.from > today ? period.from : today };
 }
 
-// Které články se píšou samy (přepínače v redakci): víkendy, volno se svátkem, samostatné svátky.
-const kindOn = (settings, kind) => ({ vikend: settings.weekly, volno: settings.autoVolno, svatek: settings.autoSvatek })[kind] ?? false;
+// Které články se píšou samy (přepínače v redakci): víkendy, volno se svátkem, samostatné svátky, pracovní týden.
+const kindOn = (settings, kind) =>
+  ({ vikend: settings.weekly, volno: settings.autoVolno, svatek: settings.autoSvatek, tyden: settings.autoTyden })[kind] ?? false;
 
 // Plánovaná období podle přepínačů redakce.
 export function plannedOutings(settings, start, limit = 21) {
-  return outingsFrom(start, limit, { volno: settings.autoVolno }).filter((period) => kindOn(settings, period.kind));
+  if (!settings.autoTyden) return outingsFrom(start, limit, { volno: settings.autoVolno }).filter((period) => kindOn(settings, period.kind));
+  // O týden zpátky, ať je známý víkend před prvním týdenním článkem.
+  const periods = withWeekdays(outingsFrom(shiftDay(start, -7), limit + 7, { volno: settings.autoVolno }));
+  return periods.filter((period) => period.to >= start && kindOn(settings, period.kind));
 }
 
-// Cron: článek se píše v den `write` hned první běh po půlnoci (do šesti večer, kdyby noční běhy selhaly)
-// a jen jednou za období (`weekendOn` = jeho `key`).
+// Kdy se článek v den `write` píše: týdenní odpoledne (vychází večer, ať vidí akce přidané přes den),
+// ostatní hned první běh po půlnoci (do šesti večer, kdyby noční běhy selhaly).
+export const writeWindow = (period) => (period.kind === "tyden" ? ["12:00", "24:00"] : ["00:00", "18:00"]);
+
+// Cron: článek se píše v den `write` v jeho okně a jen jednou za období (`weekendOn` = jeho `key`).
 export function outingDue(settings, now) {
-  if (now.time >= "18:00") return null;
   const period = plannedOutings(settings, now.date).find((each) => each.write === now.date);
   if (!period || settings.weekendOn === period.key) return null;
-  return period;
+  const [from, to] = writeWindow(period);
+  return now.time >= from && now.time < to ? period : null;
 }
 
 // Ruční článek nejvýš na tolik dní a nejpozději tolik dní dopředu.
 export const MANUAL_MAX_DAYS = 14;
 
-// Ruční článek na dny od–do: svátky v nich najde sám, druh podle nich a podle délky ("dny": jiný rozsah).
+// Ruční článek na dny od–do: svátky v nich najde sám, druh podle nich a podle délky ("tyden": jen pracovní dny,
+// "dny": jiný rozsah).
 export function periodBetween(from, to, today) {
   const valid = /^\d{4}-\d{2}-\d{2}$/;
   if (!valid.test(from) || !valid.test(to) || Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to))) return { error: "Vyberte den od a do." };
@@ -150,6 +184,8 @@ export function periodBetween(from, to, today) {
   const weekendOnly = days.every((day) => [5, 6, 0].includes(weekday(day)));
   const hasWeekend = days.some((day) => [6, 0].includes(weekday(day)));
   const lonelyHoliday = days.length === 1 && holidays.length && !hasWeekend;
-  const kind = lonelyHoliday ? "svatek" : holidays.length && hasWeekend ? "volno" : !holidays.length && weekendOnly ? "vikend" : "dny";
+  // Aspoň dva dny jen z pondělí až pátku: článek na pracovní týden.
+  const workweek = days.length >= 2 && days.every((day) => weekday(day) >= 1 && weekday(day) <= 5);
+  const kind = lonelyHoliday ? "svatek" : holidays.length && hasWeekend ? "volno" : !holidays.length && weekendOnly ? "vikend" : workweek ? "tyden" : "dny";
   return { key: from, from, to, write: today, kind, holidays, manual: true };
 }

@@ -7,6 +7,8 @@ import { NEARBY_SOURCES, nearbySource } from "./sources.js";
 import { publishTimeColumn, readPublishTime } from "../publish-time.js";
 
 export const DEFAULT_RADIUS = 25;
+// Týdenní článek (src/okoli/outings.js) vychází v pondělí večer.
+export const DEFAULT_WEEK_TIME = "18:00";
 // Poslední den akce: u vícedenní `ends_on`, jinak den začátku.
 const LAST_DAY = "(case when ends_on > starts_on then ends_on else starts_on end)";
 
@@ -60,6 +62,9 @@ export async function ensureOkoliTables(env) {
   await addColumn(env, settingsNames, "auto_svatek", "alter table okoli_settings add column auto_svatek integer not null default 0");
   // V kolik článek z nočního cronu vyjde (src/publish-time.js).
   await addColumn(env, settingsNames, "publish_time", publishTimeColumn("okoli_settings"));
+  // Článek na pracovní týden: přepínač a vlastní čas zveřejnění.
+  await addColumn(env, settingsNames, "auto_tyden", "alter table okoli_settings add column auto_tyden integer not null default 0");
+  await addColumn(env, settingsNames, "week_publish_time", `alter table okoli_settings add column week_publish_time text not null default '${DEFAULT_WEEK_TIME}'`);
   await env.DB.prepare("create index if not exists okoli_events_day on okoli_events (starts_on)").run();
   // Přečtené položky zdrojů, které akcí nejsou (nebo už proběhly a akce se smazala), ať se nečtou znovu.
   await env.DB.prepare(
@@ -84,8 +89,10 @@ function mapSettings(row) {
     weekly: asBool(row?.weekly),
     autoVolno: asBool(row?.auto_volno),
     autoSvatek: asBool(row?.auto_svatek),
+    autoTyden: asBool(row?.auto_tyden),
     autoPublish: asBool(row?.auto_publish),
     publishTime: readPublishTime(row?.publish_time),
+    weekPublishTime: row ? readPublishTime(row.week_publish_time) : DEFAULT_WEEK_TIME,
     radiusKm: readRadius(row?.radius_km),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
@@ -105,8 +112,12 @@ export async function loadOkoliSettings(env) {
 export async function saveOkoliSettings(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
-  await env.DB.prepare("update okoli_settings set enabled = ?, weekly = ?, auto_volno = ?, auto_svatek = ?, auto_publish = ?, publish_time = ?, radius_km = ? where id = 1")
-    .bind(input.enabled ? 1 : 0, input.weekly ? 1 : 0, input.autoVolno ? 1 : 0, input.autoSvatek ? 1 : 0, input.autoPublish ? 1 : 0, readPublishTime(input.publishTime), readRadius(input.radiusKm))
+  await env.DB.prepare(`update okoli_settings set enabled = ?, weekly = ?, auto_volno = ?, auto_svatek = ?, auto_tyden = ?, auto_publish = ?, publish_time = ?,
+       week_publish_time = ?, radius_km = ? where id = 1`)
+    .bind(
+      input.enabled ? 1 : 0, input.weekly ? 1 : 0, input.autoVolno ? 1 : 0, input.autoSvatek ? 1 : 0, input.autoTyden ? 1 : 0, input.autoPublish ? 1 : 0,
+      readPublishTime(input.publishTime), readPublishTime(input.weekPublishTime), readRadius(input.radiusKm),
+    )
     .run();
   return { ok: true };
 }

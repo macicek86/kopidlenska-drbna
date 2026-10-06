@@ -1,9 +1,11 @@
 // Článek „Kam vyrazit“: Drběna dostane akce v Kopidlně z kalendáře drbny a akce z okolí (src/okoli/store.js)
-// na období (víkend, volno se svátkem nebo samostatný svátek, src/okoli/outings.js) a napíše jeden článek.
-// Kopidlno vždy první, z okolí jen výběr.
+// na období (víkend, volno se svátkem, samostatný svátek nebo pracovní týden, src/okoli/outings.js) a napíše jeden článek.
+// Kopidlno vždy první, z okolí jen výběr. Víkendový a týdenní článek se den překrývají: Drběna dostane předchozí
+// článek a akce, o kterých už psala, jen připomene.
 import { sourceEntry } from "../article-source.js";
 import { saveBotArticle } from "../bot-article.js";
 import { publishNote } from "../publish-time.js";
+import { htmlText } from "../chat/prompt.js";
 import { callClaude } from "../claude.js";
 import { loadDrbena } from "../drbena-db.js";
 import { DEFAULT_VOICE, voiceFor } from "../drbena.js";
@@ -13,7 +15,7 @@ import { prepareArticleBody } from "../rich.js";
 import { topicsText } from "../stock.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { pragueNow } from "../waste.js";
-import { czechDay } from "./outings.js";
+import { czechDay, shiftDay } from "./outings.js";
 import { NEARBY_SOURCES } from "./sources.js";
 import { loadNearbyEvents } from "./store.js";
 
@@ -37,19 +39,46 @@ const KINDS = { divadlo: "divadlo", kino: "kino", akce: "akce" };
 
 // Jak období nazvat v poznámkách redakci.
 export function periodLabel(period) {
-  return { volno: "volno", svatek: "svátek", dny: "dny" }[period.kind] ?? "víkend";
+  return { volno: "volno", svatek: "svátek", dny: "dny", tyden: "pracovní týden" }[period.kind] ?? "víkend";
 }
+
+const rangeText = (from, to) => (from === to ? `${czechDay(from)} ${from.slice(0, 4)}` : `${czechDay(from)} až ${czechDay(to)} ${to.slice(0, 4)}`);
 
 function periodLine(period) {
-  const range = period.from === period.to ? `${czechDay(period.from)} ${period.from.slice(0, 4)}` : `${czechDay(period.from)} až ${czechDay(period.to)} ${period.to.slice(0, 4)}`;
   const holidays = (period.holidays ?? []).map((holiday) => `${holiday.name} (${czechDay(holiday.day)})`).join(", ");
+  // Víkend (volno) prodloužený do začátku týdne, src/okoli/outings.js `withWeekdays`.
+  const offTo = period.offTo ?? period.to;
+  const range = rangeText(period.from, offTo);
+  const tail = period.offTo ? ` K tomu začátek týdne po něm: ${rangeText(shiftDay(period.offTo, 1), period.to)}. Večer před posledním z těch dnů vyjde článek na pracovní týden.` : "";
   if (period.kind === "svatek") return `Článek je na samostatný svátek uprostřed týdne: ${range}. Svátek: ${holidays}.`;
-  if (period.kind === "volno") return `Článek je na volno se svátkem: ${range}. Svátky: ${holidays}.`;
+  if (period.kind === "volno") return `Článek je na volno se svátkem: ${range}.${tail} Svátky: ${holidays}.`;
   if (period.kind === "dny") return `Článek je na dny, které vybrala redakce: ${range}.${holidays ? ` Svátky v nich: ${holidays}.` : ""}`;
-  return `Článek je na víkend: ${range}.`;
+  if (period.kind === "tyden") return `Článek je na pracovní týden: ${range}.${period.manual ? "" : " Vychází večer předem."}${holidays ? ` Svátky v něm: ${holidays}.` : ""}`;
+  return `Článek je na víkend: ${range}.${tail}${holidays ? ` Svátky: ${holidays}.` : ""}`;
 }
 
-export function weekendText({ today, weekend, home, nearby, radiusKm, topics }) {
+// Předchozí článek Kam vyrazit (nejvýš týden starý, zveřejněný i návrh), ať Drběna u dnů, které se překrývají,
+// akce jen připomene. Vrací { title, text, day } nebo null.
+export async function previousOuting(env, today) {
+  const since = shiftDay(today, -7);
+  const query = (table, extra) =>
+    env.DB.prepare(
+      `select t.id, t.title, t.body, t.created_at as day from ${table} t join rubrics r on r.id = t.rubric_id
+       where r.slug = ? and t.created_at >= ?${extra} order by t.created_at desc, t.id desc limit 1`,
+    )
+      .bind(WEEKEND_RUBRIC, since)
+      .first();
+  const rows = (await Promise.all([query("articles", ""), query("proposals", " and t.status = 'pending'")])).filter(Boolean);
+  const last = rows.sort((a, b) => String(b.day).localeCompare(String(a.day)))[0];
+  return last ? { title: String(last.title), text: htmlText(last.body).slice(0, 6000), day: String(last.day).slice(0, 10) } : null;
+}
+
+function previousText(previous) {
+  if (!previous) return "";
+  return `Předchozí článek Kam vyrazit (${czechDay(previous.day)}): ${previous.title}\n${previous.text}`;
+}
+
+export function weekendText({ today, weekend, home, nearby, radiusKm, topics, previous = null }) {
   const homeLines = home.map((event) => eventLine({ ...event, link: kopidlnoLink(event) }));
   const nearLines = nearby
     .slice(0, MAX_NEARBY)
@@ -58,14 +87,19 @@ export function weekendText({ today, weekend, home, nearby, radiusKm, topics }) 
     `Dnes je ${czechDay(today)} ${today.slice(0, 4)}. ${periodLine(weekend)}`,
     `Akce v Kopidlně (z kalendáře drbny):\n${homeLines.join("\n") || "Žádné."}`,
     `Akce v okolí (do ${radiusKm} km):\n${nearLines.join("\n") || "Žádné."}`,
+    previousText(previous),
     topicsText(topics),
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
-const RULES = `Před víkendem a před svátky píšeš na web Kopidlenská drbna článek o tom, kam vyrazit. Dostaneš akce v Kopidlně z kalendáře drbny a akce z okolí ze stažených programů.
+const RULES = `Před víkendem, před svátky a na pracovní týden píšeš na web Kopidlenská drbna článek o tom, kam vyrazit. Dostaneš akce v Kopidlně z kalendáře drbny a akce z okolí ze stažených programů.
 
 Na jaké dny článek je, stojí v přehledu:
 - Víkend: piš o víkendu.
+- Víkend (nebo volno) a k tomu začátek týdne po něm: hlavní je víkend. Pracovní dny po něm dej na konec, krátce a věcněji, jako výhled (nejvýš jeden odstavec). Když se v nich nic neděje, vynech je.
+- Pracovní týden: článek obvykle vychází večer předem. Začni tím, že je tu další pracovní týden (pokaždé jinými slovy). Pořád povídáš, ale pracovně: věcněji a stručněji, jako kolegům v práci, co se dá v týdnu stihnout po práci a po škole. Kopidlno první, z okolí nejvýš tři akce, z kina nejvýš jeden film. Dva až čtyři odstavce. O sobotě a neděli nepiš, víkend má vlastní článek; páteční akce ale do týdne patří.
 - Volno se svátkem: řekni, jaký svátek to je, a piš o celém volnu (prodloužený víkend, Velikonoce, Vánoce), ne jen o víkendu. Akce rozlož do všech volných dnů.
 - Dny, které vybrala redakce: piš o těch dnech. Svátek v nich zmiň, u jednoho nebo dvou dnů piš krátce.
 - Samostatný svátek uprostřed týdne: krátký článek jen o ten den. Řekni, jaký je svátek, z okolí vyber nejvýš tři akce a napiš dva až tři odstavce.
@@ -77,6 +111,7 @@ Jak článek poskládat:
 - Vícedenní akci (festival, výstava) piš s rozsahem dní, ne jen prvním dnem.
 - Když se v Kopidlně v těch dnech nic nekoná, řekni to jednou lehkou větou a pokračuj okolím. Když je jen Kopidlno, okolí vynech.
 - Když v přehledu není nic, co by stálo za doporučení, dej write false a zbytek nech prázdný.
+- Když je v přehledu předchozí článek Kam vyrazit: akce, o kterých jsi v něm už psala, jen krátce připomeň (jednou větou, třeba „jak jsem psala, …“), i s odkazem. Nové akce, které v něm nebyly, rozepiš normálně. Věty z něj neopakuj.
 
 Pravidla:
 - O přehledu ani o podkladech nepiš („podle přehledu“, „v kalendáři mám“), piš, jako bys to věděla sama.
@@ -84,7 +119,7 @@ Pravidla:
 - Každou akci, o které píšeš, odkaž jednou: <a href="adresa">název</a>. Adresu opiš z přehledu (u kopidlenských začíná lomítkem). Jiné adresy nepiš.
 - title: do 90 znaků, vlastní a pokaždé jiný, ať je poznat, co tyhle dny nabízejí. Bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
-- body_html: povídání, ne výčet. Piš souvislé odstavce, jako když sousedům u plotu vyprávíš, co se v těch dnech děje a kam se sama chystáš. Akce propoj do příběhu volných dnů (dopoledne, odpoledne, večer, další den), přecházej mezi nimi přirozeně a u každé řekni, proč by tam někdo měl jít, ale jen z toho, co je v přehledu. Den, čas a místo vpleť do věty, nepiš je jako hlavičku. Žádné seznamy ani tučné řádky s časem. Kopidlno dej na začátek, okolí po něm; nadpis <h3> smíš použít nanejvýš jednou, když se přechází do okolí, klidně vůbec. Tři až šest odstavců, u samostatného svátku dva až tři. Smíš použít jen <p>, <strong>, <em>, <h3> a <a>.
+- body_html: povídání, ne výčet. Piš souvislé odstavce, jako když sousedům u plotu vyprávíš, co se v těch dnech děje a kam se sama chystáš (u pracovního týdne věcněji, viz výše). Akce propoj do příběhu volných dnů (dopoledne, odpoledne, večer, další den), přecházej mezi nimi přirozeně a u každé řekni, proč by tam někdo měl jít, ale jen z toho, co je v přehledu. Den, čas a místo vpleť do věty, nepiš je jako hlavičku. Žádné seznamy ani tučné řádky s časem. Kopidlno dej na začátek, okolí po něm; nadpis <h3> smíš použít nanejvýš jednou, když se přechází do okolí, klidně vůbec. Tři až šest odstavců, u samostatného svátku dva až tři, u pracovního týdne dva až čtyři. Smíš použít jen <p>, <strong>, <em>, <h3> a <a>.
 - image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.
 - reason: jedna věta pro redakci, co jsi vybrala a proč (nebo proč článek není).`;
 
@@ -157,11 +192,10 @@ export async function writeWeekend(env, settings, weekend, { ask = callClaude } 
   const today = pragueNow().date;
   const { home, nearby } = await weekendInput(env, weekend, settings.radiusKm);
   if (!home.length && !nearby.length) return { ok: true, note: `Na ${periodLabel(weekend)} od ${czechDay(weekend.from)} nejsou žádné akce, článek nevyšel.` };
-  const topics = await loadStockTopics(env);
-  const drbena = await loadDrbena(env);
+  const [topics, drbena, previous] = await Promise.all([loadStockTopics(env), loadDrbena(env), previousOuting(env, today)]);
   const answer = await ask(env, {
     system: weekendPrompt(voiceFor(drbena)),
-    content: [{ type: "text", text: weekendText({ today, weekend, home, nearby, radiusKm: settings.radiusKm, topics }) }],
+    content: [{ type: "text", text: weekendText({ today, weekend, home, nearby, radiusKm: settings.radiusKm, topics, previous }) }],
     schema: weekendSchema(topics.map((topic) => topic.slug)),
   });
   if (!answer.ok) return answer;
@@ -175,7 +209,7 @@ export async function writeWeekend(env, settings, weekend, { ask = callClaude } 
     image: await pickStockImage(env, result.imageTopic),
     source: weekendSource(nearby),
     autoPublish: settings.autoPublish,
-    publishTime: weekend.manual ? "" : settings.publishTime,
+    publishTime: weekend.manual ? "" : weekend.kind === "tyden" ? settings.weekPublishTime : settings.publishTime,
     rubric,
   });
   const where = made.articleId ? publishNote(made.publishedAt) : "čeká jako návrh";
