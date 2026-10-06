@@ -1,9 +1,12 @@
 // Přihlašovací stránky redakce: e-mail, kód z e-mailu a odkaz z e-mailu (src/login.js).
 import { esc } from "../view.js";
 import { adminDocument } from "./document.js";
-import { field, input } from "./ui.js";
+import { check, field, input } from "./ui.js";
 
 const TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+
+// Zaškrtnuté zařízení se neodhlásí po nečinnosti a přihlášení vydrží rok (src/login-db.js).
+const remember = check("neodhlasovat", "1", false, "Neodhlašovat na tomto zařízení", "Jen na vlastním počítači nebo telefonu. Přihlášení vydrží rok.");
 
 function page(body, scripts = "") {
   return adminDocument({
@@ -53,6 +56,7 @@ function codeForm(next, login, flash) {
     ${errorBox(flash)}
     <input type="hidden" name="next" value="${esc(next)}">
     ${field("Kód z e-mailu", `<input class="${input} login-code" name="kod" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus>`)}
+    ${remember}
     <button class="btn btn-primary btn-block" type="submit" data-busy="Ověřuji…">Přihlásit</button>
     <a class="btn btn-ghost btn-block" href="/redakce/jiny-email">Poslat nový kód nebo zadat jiný e-mail</a>
   </form>`;
@@ -80,6 +84,7 @@ export function linkPage({ token, live }) {
     <h1>Redakce</h1>
     <p class="adm-lede">Přihlásit se do redakce v tomhle prohlížeči?</p>
     <input type="hidden" name="token" value="${esc(token)}">
+    ${remember}
     <button class="btn btn-primary btn-block" type="submit" data-busy="Přihlašuji…">Přihlásit</button>
   </form>`);
 }

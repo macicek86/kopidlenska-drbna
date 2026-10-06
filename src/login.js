@@ -16,6 +16,7 @@ import {
   loginSettings,
   pendingLogin,
   readNamedCookie,
+  REMEMBER_DAYS,
   requestCode,
   startSession,
   verifyCode,
@@ -75,10 +76,10 @@ function codeMail(code, link) {
   return { subject: `Kód do redakce: ${code}`, text, html };
 }
 
-async function signIn(env, request, user, how, next) {
+async function signIn(env, request, user, how, next, remember) {
   const https = secure(request);
-  const token = await startSession(env, user.id, deviceLabel(request.headers.get("user-agent")));
-  const { maxDays } = await loginSettings(env);
+  const token = await startSession(env, user.id, deviceLabel(request.headers.get("user-agent")), Date.now(), remember);
+  const maxDays = remember ? REMEMBER_DAYS : (await loginSettings(env)).maxDays;
   await auditLogin(env, { user, how }).catch(() => {});
   const response = redirect(next, sessionCookie(token, https, maxDays * 86_400));
   response.headers.append("set-cookie", loginCookie("", https));
@@ -111,7 +112,7 @@ async function askForCode(request, env, url, fields) {
 async function checkCode(request, env, fields) {
   const next = nextPage(fields.next);
   const result = await verifyCode(env, readNamedCookie(request, LOGIN_COOKIE), fields.loginCode);
-  if (result.ok) return signIn(env, request, result.user, "kódem z e-mailu", next);
+  if (result.ok) return signIn(env, request, result.user, "kódem z e-mailu", next, fields.remember);
   if (result.email) await auditLogin(env, { email: result.email, error: result.error }).catch(() => {});
   const response = redirect(back(next, result.error));
   if (result.done) response.headers.set("set-cookie", loginCookie("", secure(request)));
@@ -124,7 +125,7 @@ export async function loginPost(path, request, env, url, fields) {
   if (path === "/redakce/overit") return checkCode(request, env, fields);
   if (path === "/redakce/vstup") {
     const result = await verifyLink(env, fields.token);
-    if (result.ok) return signIn(env, request, result.user, "odkazem z e-mailu", HOME);
+    if (result.ok) return signIn(env, request, result.user, "odkazem z e-mailu", HOME, fields.remember);
     if (result.email) await auditLogin(env, { email: result.email, error: result.error }).catch(() => {});
     return redirect(back(HOME, result.error));
   }

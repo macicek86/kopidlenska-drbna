@@ -28,7 +28,7 @@ function devicesPanel(sessions, currentId) {
     return item({
       title: session.device,
       meta: `přihlášeno ${esc(stamp(session.createdAt))} · naposledy ${esc(stamp(session.lastSeen))}`,
-      badges: here ? badge("Tohle zařízení", "brand") : "",
+      badges: [here ? badge("Tohle zařízení", "brand") : "", session.remember ? badge("Neodhlašovat") : ""].join(""),
       actions: here ? "" : postButton(`${BASE}/odhlasit-zarizeni`, { zarizeni: session.id }, "Odhlásit", "btn-ghost"),
     });
   });

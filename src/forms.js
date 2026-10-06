@@ -80,6 +80,7 @@ export async function formFields(request) {
     writeArticle: text("potom") === "zprava",
     // Přihlášení kódem z e-mailu (src/login.js); `next` je stránka, kam se po přihlášení vrátit.
     loginCode: text("kod"),
+    remember: text("neodhlasovat") === "1",
     // Odběr a data: zaškrtnuté vypínače feedů (src/feeds/settings.js).
     feedSwitches: form.getAll("feed").map(String),
     // Můj účet: zaškrtnutá upozornění e-mailem (src/notify.js).

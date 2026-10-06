@@ -1,7 +1,10 @@
 // Přihlášení do redakce kódem z e-mailu: kódy, přihlášená zařízení a odhlášení po nečinnosti.
 // Kód i odkaz z e-mailu jsou v D1 jen jako otisk SHA-256. Kód patří k prohlížeči, který si ho vyžádal
 // (cookie drbna_login nese „výzvu“), odkaz z e-mailu funguje kdekoli. Přihlášené zařízení je řádek
-// v `sessions`; cookie drbna_editor nese jeho token, v D1 je zase jen otisk.
+// v `sessions`; cookie drbna_editor nese jeho token, v D1 je zase jen otisk. Zařízení se zaškrtnutým
+// „Neodhlašovat na tomto zařízení“ (`remember`) se neodhlásí po nečinnosti a přihlášení vydrží REMEMBER_DAYS.
+
+import { addColumn } from "./db-core.js";
 
 export const LOGIN_COOKIE = "drbna_login";
 export const CODE_MINUTES = 10;
@@ -17,6 +20,7 @@ const DAY = 86_400_000;
 export const IDLE_CHOICES = [30, 60, 120, 240, 480, 1440, 0];
 export const MAX_DAY_CHOICES = [1, 7, 14, 30, 90];
 const DEFAULTS = { idleMinutes: 120, maxDays: 30 };
+export const REMEMBER_DAYS = 365;
 
 export const CODE_EXPIRED = "Kód už neplatí. Nechte si poslat nový.";
 
@@ -44,9 +48,13 @@ export async function ensureLoginTables(env) {
       token_hash text not null unique,
       device text not null default '',
       created_at integer not null,
-      last_seen integer not null
+      last_seen integer not null,
+      remember integer not null default 0
     )`,
   ).run();
+  const info = await env.DB.prepare("pragma table_info(sessions)").all();
+  const names = new Set((info.results ?? []).map((column) => String(column.name)));
+  await addColumn(env, names, "remember", "alter table sessions add column remember integer not null default 0");
   await env.DB.prepare("create index if not exists sessions_user on sessions(user_id)").run();
   await env.DB.prepare(
     `create table if not exists login_settings (
@@ -219,15 +227,16 @@ export async function verifyLink(env, link, now = Date.now()) {
   return useCode(env, row);
 }
 
-export async function startSession(env, userId, device = "", now = Date.now()) {
+export async function startSession(env, userId, device = "", now = Date.now(), remember = false) {
   const token = randomToken();
-  await env.DB.prepare("insert into sessions (user_id, token_hash, device, created_at, last_seen) values (?, ?, ?, ?, ?)")
-    .bind(userId, await sha256(token), String(device).slice(0, 60), now, now)
+  await env.DB.prepare("insert into sessions (user_id, token_hash, device, created_at, last_seen, remember) values (?, ?, ?, ?, ?, ?)")
+    .bind(userId, await sha256(token), String(device).slice(0, 60), now, now, remember ? 1 : 0)
     .run();
   return token;
 }
 
 function expired(row, limits, now) {
+  if (Number(row.remember) === 1) return now > Number(row.created_at) + REMEMBER_DAYS * DAY;
   if (now > Number(row.created_at) + limits.maxDays * DAY) return true;
   return limits.idleMinutes > 0 && now > Number(row.last_seen) + limits.idleMinutes * MINUTE;
 }
@@ -237,7 +246,7 @@ export async function sessionAccount(env, token, now = Date.now()) {
   if (!token || String(token).length < 20) return null;
   const [row, limits] = await Promise.all([
     env.DB.prepare(
-      `select s.id as session_id, s.created_at, s.last_seen, u.id, u.login, u.name, u.alias, u.email, u.role, u.active
+      `select s.id as session_id, s.created_at, s.last_seen, s.remember, u.id, u.login, u.name, u.alias, u.email, u.role, u.active
        from sessions s join users u on u.id = s.user_id where s.token_hash = ?`,
     )
       .bind(await sha256(token))
@@ -257,7 +266,7 @@ export async function sessionAccount(env, token, now = Date.now()) {
 }
 
 export async function listSessions(env, userId) {
-  const rows = await env.DB.prepare("select id, device, created_at, last_seen from sessions where user_id = ? order by last_seen desc")
+  const rows = await env.DB.prepare("select id, device, created_at, last_seen, remember from sessions where user_id = ? order by last_seen desc")
     .bind(userId)
     .all();
   return (rows.results ?? []).map((row) => ({
@@ -265,6 +274,7 @@ export async function listSessions(env, userId) {
     device: String(row.device || "Neznámé zařízení"),
     createdAt: Number(row.created_at),
     lastSeen: Number(row.last_seen),
+    remember: Number(row.remember) === 1,
   }));
 }
 
@@ -290,8 +300,9 @@ export async function endUserSessions(env, userId) {
 export async function pruneLogin(env, now = Date.now()) {
   const limits = await loginSettings(env);
   await env.DB.prepare("delete from login_codes where created_at < ?").bind(now - DAY).run();
-  await env.DB.prepare("delete from sessions where created_at < ?").bind(now - limits.maxDays * DAY).run();
+  await env.DB.prepare("delete from sessions where remember = 0 and created_at < ?").bind(now - limits.maxDays * DAY).run();
+  await env.DB.prepare("delete from sessions where remember = 1 and created_at < ?").bind(now - REMEMBER_DAYS * DAY).run();
   if (limits.idleMinutes > 0) {
-    await env.DB.prepare("delete from sessions where last_seen < ?").bind(now - limits.idleMinutes * MINUTE).run();
+    await env.DB.prepare("delete from sessions where remember = 0 and last_seen < ?").bind(now - limits.idleMinutes * MINUTE).run();
   }
 }

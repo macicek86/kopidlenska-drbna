@@ -123,6 +123,16 @@ test("přihlášení vyprší po nečinnosti a po nejdelší době, aktivita ho 
   assert.equal((await saveLoginSettings(env, { idleMinutes: "7", maxDays: "1" })).ok, false);
 });
 
+test("„Neodhlašovat na tomto zařízení“: bez odhlášení po nečinnosti, vydrží rok", async () => {
+  const env = await freshEnv();
+  const token = await startSession(env, 1, "", NOW, true);
+  const later = NOW + 100 * 24 * 60 * MIN;
+  assert.equal((await sessionAccount(env, token, later)).row.id, 1, "po 100 dnech nečinnosti platí");
+  await pruneLogin(env, NOW + 200 * 24 * 60 * MIN);
+  assert.equal((await listSessions(env, 1))[0].remember, true, "cron ho nesmaže");
+  assert.equal(await sessionAccount(env, token, NOW + 366 * 24 * 60 * MIN), null, "po roce konec");
+});
+
 test("vypnutý účet se nepřihlásí ani starým zařízením, ostatní zařízení jde odhlásit", async () => {
   const env = await freshEnv();
   const petr = await startSession(env, 2, "", NOW);
