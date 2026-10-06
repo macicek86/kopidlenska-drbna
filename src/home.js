@@ -4,7 +4,7 @@ import { storyPhoto } from "./photo.js";
 import { rubricKicker } from "./rubric-nav.js";
 import { text as tx } from "./copy.js";
 import { countdownLabel, formatDayMonth, formatLong } from "./format.js";
-import { homeNotice } from "./doctors.js";
+import { homeNotice, withoutEndedChanges } from "./doctors.js";
 import { groupedNotices } from "./places.js";
 import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
@@ -54,10 +54,10 @@ function cardLink(href, name) {
 }
 
 function doctorsTeaser(data, ctx) {
-  const today = clockOf(data).date;
+  const now = clockOf(data);
   const lines = (data.doctors ?? [])
     .map((doctor) => {
-      const item = homeNotice(doctor, today);
+      const item = homeNotice(withoutEndedChanges(doctor, now), now.date);
       if (!item) return "";
       return `<li class="is-change">
         <p class="yard-home-name">${cardLink(`/lekari#lekar-${doctor.id}`, item.name)}</p>
@@ -78,7 +78,11 @@ function doctorsTeaser(data, ctx) {
 
 // Zavřeno, jiná nebo nová otevírací doba, jen datum a důvod (rozpis je na stránce). Stejné upozornění u víc míst je jeden řádek se všemi názvy.
 function placesTeaser(data, ctx) {
-  const notices = groupedNotices(data.places, clockOf(data).date);
+  const now = clockOf(data);
+  const notices = groupedNotices(
+    (data.places ?? []).map((place) => withoutEndedChanges(place, now)),
+    now.date,
+  );
   if (!notices.length) return "";
   const lines = notices
     .map(

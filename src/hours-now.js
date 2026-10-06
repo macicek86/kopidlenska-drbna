@@ -1,6 +1,6 @@
 // Otevírací doba: kdo má teď otevřeno. Jeden řádek na místo nahoře na stránce, odkaz vede na jeho kartu.
 // Počítá se z hodin, které ten den opravdu platí (i se změnou), takže dovolená nebo zavírka je vidět i tady.
-import { hasOpenSlot } from "./doctors.js";
+import { changeOver, hasOpenSlot } from "./doctors.js";
 import { esc } from "./html.js";
 import { hoursOn, NEXT_DAYS } from "./hours-days.js";
 import { addDays, civilWeekday } from "./waste.js";
@@ -25,7 +25,8 @@ function whenLabel(iso, today) {
 export function stateNow(entity, now) {
   const today = now.date;
   const day = hoursOn(entity, today, today);
-  const note = day.change?.note ?? "";
+  // Změna, která dnes po zavření skončila, už poznámku nedává.
+  const note = day.change && !changeOver(day.change, now) ? (day.change.note ?? "") : "";
   const parts = spans(day.slot);
   const current = parts.find((part) => part.from <= now.time && now.time < part.to);
   if (current) return { open: true, text: `Otevřeno do ${clock(current.to)}`, note: "" };
@@ -36,8 +37,9 @@ export function stateNow(entity, now) {
   }
   for (let step = 1; step <= NEXT_DAYS; step += 1) {
     const iso = addDays(today, step);
-    const first = spans(hoursOn(entity, iso, today).slot)[0];
-    if (first) return { open: false, text: `Zavřeno, ${whenLabel(iso, today)} od ${clock(first.from)}`, note };
+    const next = hoursOn(entity, iso, today);
+    const first = spans(next.slot)[0];
+    if (first) return { open: false, text: `Zavřeno, ${whenLabel(iso, today)} od ${clock(first.from)}`, note: note || (next.change?.note ?? "") };
   }
   return { open: false, text: "Zavřeno", note };
 }

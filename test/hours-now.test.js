@@ -87,3 +87,22 @@ test("bez času (pokyny chatu) stránky neukazují, kdo má teď otevřeno, ať 
   assert.match(at({ date: "2026-10-05", time: "09:00" }), /je teď otevřený/);
   assert.doesNotMatch(at(false), /je teď/);
 });
+
+test("změna, která dnes skončila, po zavření zmizí z titulky i z poznámky „teď otevřeno“", async () => {
+  const { changeOver, withoutEndedChanges } = await import("../src/doctors.js");
+  const { groupedNotices } = await import("../src/places.js");
+  const week = blankWeek().map((slot) =>
+    slot.day === 2 ? { ...slot, morning: { open: true, from: "08:00", to: "12:00" }, afternoon: { open: true, from: "13:00", to: "17:00" } } : slot,
+  );
+  const change = { id: 7, kind: "docasna", startsOn: "2026-10-06", endsOn: "2026-10-06", note: "zkrácená doba", week };
+  const place = { ...kvc, changes: [change] };
+  assert.equal(changeOver(change, { date: "2026-10-06", time: "16:59" }), false);
+  assert.equal(changeOver(change, { date: "2026-10-06", time: "17:00" }), true);
+  // Celý zavřený poslední den platí do půlnoci.
+  assert.equal(changeOver(closure("2026-10-06", "2026-10-06"), { date: "2026-10-06", time: "23:00" }), false);
+  const after = { date: "2026-10-06", time: "17:30" };
+  assert.equal(groupedNotices([withoutEndedChanges(place, after)], after.date).length, 0);
+  assert.equal(groupedNotices([withoutEndedChanges(place, { date: "2026-10-06", time: "10:00" })], "2026-10-06").length, 1);
+  assert.equal(stateNow(place, after).note, "");
+  assert.equal(stateNow(place, { date: "2026-10-06", time: "12:30" }).note, "zkrácená doba");
+});

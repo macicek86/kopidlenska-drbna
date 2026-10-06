@@ -169,6 +169,24 @@ export function activeChange(doctor, today) {
   return list.reduce(laterChange, null);
 }
 
+// Dočasná změna skončila: po posledním dni, nebo poslední den v čase, kdy podle změny zavřelo.
+// Poslední den celý zavřený platí do půlnoci. `now` je { date, time } v Praze.
+export function changeOver(change, now) {
+  if (change.endsOn !== now.date) return change.endsOn < now.date;
+  const slot = slotOn(change.week, change.endsOn);
+  const close = [slot?.morning, slot?.afternoon]
+    .filter((part) => part?.open)
+    .map((part) => part.to)
+    .sort()
+    .at(-1);
+  return Boolean(close) && now.time >= close;
+}
+
+// Řádek bez dočasných změn, které už skončily (titulka a „kdo má teď otevřeno“ je přestanou ukazovat hned po zavření).
+export function withoutEndedChanges(entity, now) {
+  return { ...entity, changes: (entity.changes ?? []).filter((change) => change.kind === "trvala" || !changeOver(change, now)) };
+}
+
 export function visibleHomeChange(doctor, today) {
   const horizon = addDays(today, HOME_LEAD_DAYS);
   const list = (doctor.changes ?? []).filter((change) => change.endsOn >= today && change.startsOn <= horizon);
