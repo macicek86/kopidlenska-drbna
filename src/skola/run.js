@@ -81,7 +81,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   const answer = await ask(env, {
     source,
     item,
-    known: await knownContent(env, { itemId: item.id, today, table: source.itemsTable, recall: memory }),
+    known: await knownContent(env, { itemId: item.id, today, table: source.itemsTable, recall: memory, about: item }),
     images,
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],

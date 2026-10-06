@@ -87,14 +87,23 @@ const CACHED = { type: "ephemeral" };
 // `media` jsou hotové bloky obrázků, `tail` texty položky (prázdné se vynechají).
 export function importContent(known, { today, topics = "", media = [], tail = [] }) {
   const { fixed, articles, imports } = contextSections(known);
+  const related = relatedSection(known.related);
   const head = [`Dnes je ${today}.`, topics, fixed].filter(Boolean).join("\n\n");
   return [
     { type: "text", text: head, cache_control: CACHED },
     { type: "text", text: articles, cache_control: CACHED },
     { type: "text", text: imports },
     ...media,
-    { type: "text", text: tail.filter(Boolean).join("\n\n") },
+    { type: "text", text: [related, ...tail].filter(Boolean).join("\n\n") },
   ];
+}
+
+// Starší zprávy, které k téhle položce našlo hledání v celém archivu (jen pro jednu položku, proto až za cache).
+export function relatedSection(rows) {
+  if (!rows?.length) return "";
+  return `Možná souvisí (starší zprávy, které k téhle položce našlo hledání v celém archivu drbny; nemusí jít o stejnou věc, rozhodni podle obsahu; zpráva stará měsíce bývá jiný ročník nebo jiná událost, ne duplicita):\n${rows
+    .map((row) => articleLine(row, "zprava"))
+    .join("\n")}`;
 }
 
 // Text dotazu bez obrázků (testy, ukázka v redakci).

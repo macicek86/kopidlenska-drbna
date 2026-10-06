@@ -63,7 +63,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
   const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
     item,
-    known: await knownContent(env, { itemId: item.id, today, table: "denik_items", recall: memory }),
+    known: await knownContent(env, { itemId: item.id, today, table: "denik_items", recall: memory, about: item }),
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
     voice: withMemory(voiceFor(drbena), memory),

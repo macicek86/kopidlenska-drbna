@@ -7,13 +7,14 @@ import { addMessageContact, MESSAGE_KINDS, messageKind, messagePage, saveChatMes
 import { notifyEditors } from "../notify.js";
 import { binsPage } from "../bins-view.js";
 import { doctorsPage, eventsPage, outagesPage, placesPage, yardsPage } from "../view.js";
+import { fold, searchNews, searchStems } from "../search/query.js";
 import { archiveText } from "./archive.js";
 import { htmlText } from "./prompt.js";
 
 const PAGE_MAX = 6000;
 export const RECENT_ARTICLES = 30;
-const SEARCH_POOL = 400;
-const SEARCH_HITS = 6;
+const SEARCH_HITS = 8;
+const SOURCE_HITS = 4;
 const ARTICLE_MAX = 6000;
 const SOURCE_MAX = 5000;
 
@@ -84,22 +85,7 @@ ${older ? `\n${older}\n` : ""}
 ${sitePages(data, ctx).join("\n\n")}${ads.length ? `\n\n## Reklamy: nabídky sousedů a místních (/reklamy)\n${ads.join("\n")}` : ""}`;
 }
 
-// Bez diakritiky a malými písmeny, ať „knihovně“ najde „knihovna“.
-export function fold(text) {
-  return String(text ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-}
-
-// Slova dotazu jako kmeny: české koncovky se mění, prvních pět písmen většinou stačí.
-export function searchStems(query) {
-  return [...new Set(fold(query).split(/[^a-z0-9]+/).filter((word) => word.length >= 3))]
-    .map((word) => (word.length > 6 ? word.slice(0, 5) : word))
-    .slice(0, 8);
-}
-
-// Klíčová slova (src/keywords.js) váží jako nadpis: říkají, o čem zpráva je, i když to v nadpisu není.
+// Zdroje se hledají postaru v paměti (jsou jich stovky): klíčová slova váží jako nadpis.
 export function scoreArticle(article, stems) {
   const title = fold(article.title);
   const keywords = fold(article.keywords);
@@ -113,25 +99,6 @@ export function scoreArticle(article, stems) {
     if (body.includes(stem)) score += 1;
   }
   return score;
-}
-
-async function poolArticles(env) {
-  const rows = await env.DB.prepare(
-    `select a.slug, a.title, a.excerpt, a.body, a.keywords, a.created_at, coalesce(r.name, a.category) as rubric
-     from articles a left join rubrics r on r.id = a.rubric_id
-     where ${liveArticle()} order by a.created_at desc, a.id desc limit ?`,
-  )
-    .bind(SEARCH_POOL)
-    .all();
-  return (rows.results ?? []).map((row) => ({
-    slug: String(row.slug),
-    title: String(row.title),
-    excerpt: String(row.excerpt),
-    keywords: String(row.keywords ?? ""),
-    body: htmlText(String(row.body ?? "")),
-    createdOn: String(row.created_at ?? "").slice(0, 10),
-    rubric: String(row.rubric ?? ""),
-  }));
 }
 
 // Zdroje importů, které na drbně (zatím) nejsou: čekají, přeskočené, duplicity. Deník ne: jeho podmínky
@@ -174,24 +141,43 @@ function rank(items, stems) {
     .map((item) => ({ item, score: scoreArticle(item, stems) }))
     .filter((hit) => hit.score > 0)
     .sort((a, b) => b.score - a.score || b.item.createdOn.localeCompare(a.item.createdOn))
-    .slice(0, SEARCH_HITS)
     .map((hit) => hit.item);
 }
 
 const shortDate = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? formatShort(iso) : "bez data");
 
-export async function searchArticles(env, query) {
-  const stems = searchStems(query);
-  if (!stems.length) return "Zadej aspoň jedno slovo o třech a více písmenech.";
-  const [articles, sources] = await Promise.all([poolArticles(env), poolSources(env)]);
-  const found = rank(articles, stems);
-  const extra = rank(sources, stems).slice(0, 4);
-  if (!found.length && !extra.length) return `Na drbně jsem ke „${query}“ nic nenašla.`;
+// Rok z nástroje: jen rozumné celé číslo, jinak bez omezení.
+function searchYear(value) {
+  const year = Number(value);
+  return Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : null;
+}
+
+function searchWords(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((word) => String(word ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+// input: { dotaz, slova?, rok? } z nástroje hledat_zpravy. Vrací text pro Claude a počty pro záznam v redakci.
+export async function findArticles(env, input) {
+  const query = String(input?.dotaz ?? "").trim();
+  const words = searchWords(input?.slova);
+  const year = searchYear(input?.rok);
+  const stems = searchStems([query, ...words].join(" "));
+  if (!stems.length && !query) return { text: "Zadej, co hledáš, aspoň jedním slovem o třech a více písmenech.", articles: 0, sources: 0 };
+  const [found, sources] = await Promise.all([
+    searchNews(env, { query, words, year, limit: SEARCH_HITS }),
+    year ? [] : poolSources(env),
+  ]);
+  const extra = rank(sources, stems).slice(0, SOURCE_HITS);
+  const counts = { articles: found.length, sources: extra.length };
+  if (!found.length && !extra.length) return { text: `Na drbně jsem ke „${query || words.join(", ")}“${year ? ` z roku ${year}` : ""} nic nenašla.`, ...counts };
   const parts = [];
   if (found.length) {
     parts.push(
-      `Zprávy na drbně:\n${found
-        .map((article) => `- ${shortDate(article.createdOn)} · ${article.rubric} · ${article.title} (/zpravy/${article.slug}): ${article.excerpt}`)
+      `Zprávy na drbně (od nejvhodnější; hledání bere i podobný význam, tak si ověř, že jde opravdu o to, nač se ptá):\n${found
+        .map((article) => `- ${shortDate(article.createdOn)} · ${article.rubric} · ${article.title} (/zpravy/${article.slug}): ${article.excerpt}${article.keywords ? ` [${article.keywords}]` : ""}`)
         .join("\n")}`,
     );
   }
@@ -202,7 +188,20 @@ export async function searchArticles(env, query) {
         .join("\n")}`,
     );
   }
-  return parts.join("\n\n");
+  return { text: parts.join("\n\n"), ...counts };
+}
+
+export async function searchArticles(env, input) {
+  return (await findArticles(env, input)).text;
+}
+
+// Řádek pro redakci: co Drběna hledala a kolik toho našla.
+export function searchNote(input, found) {
+  const words = searchWords(input?.slova);
+  const year = searchYear(input?.rok);
+  const extra = [words.length ? `+ ${words.join(", ")}` : "", year ? `rok ${year}` : ""].filter(Boolean).join("; ");
+  const hits = found.articles || found.sources ? `${found.articles} zpráv${found.sources ? `, ${found.sources} ze zdrojů` : ""}` : "nic";
+  return `hledala „${String(input?.dotaz ?? "").trim()}“${extra ? ` (${extra})` : ""} → ${hits}`;
 }
 
 export async function readSource(env, ref) {
@@ -255,10 +254,19 @@ export const CHAT_TOOLS = [
   {
     name: "hledat_zpravy",
     description:
-      "Hledá ve všech zveřejněných zprávách drbny (i starších, než jsou v přehledu) podle slov v nadpisu, klíčových slovech, perexu a textu. Vrátí nanejvýš šest zpráv s datem, adresou a perexem. Projde i oznámení města, web FK Kopidlno a web ZŠ a MŠ, ze kterých drbna čerpá, i když z nich zpráva ještě není.",
+      "Hledá ve všech zveřejněných zprávách drbny, i několik let starých, podle slov i podle významu. Vrátí nanejvýš osm zpráv od nejvhodnější s datem, adresou, perexem a klíčovými slovy. Projde i oznámení města a weby FK Kopidlno a škol, ze kterých drbna čerpá, i když z nich zpráva ještě není. Celý text pak vrátí precist_zpravu.",
     input_schema: {
       type: "object",
-      properties: { dotaz: { type: "string", description: "Pár klíčových slov, třeba „hasiči ples“ nebo „uzavírka Husova“." } },
+      properties: {
+        dotaz: { type: "string", description: "O čem zprávu hledáš, pár slov nebo krátká věta, třeba „barva zámku“ nebo „ples hasičů“." },
+        slova: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Jiné tvary a synonyma, ať je hledání podle slov najde, i když zpráva píše jinak: třeba k „barva zámku“ [\"zámku\", \"zámecký\", \"fasáda\", \"nátěr\", \"omítka\"]. Nepovinné.",
+        },
+        rok: { type: "integer", description: "Jen zprávy z tohoto roku, když se ptá na určitou dobu (třeba „loni“). Nepovinné." },
+      },
       required: ["dotaz"],
       additionalProperties: false,
     },
@@ -359,8 +367,18 @@ async function messageTool(env, name, input, who) {
 
 export async function runChatTool(env, name, input, who = null) {
   if (name === "predat_redakci" || name === "doplnit_kontakt") return messageTool(env, name, input, who);
-  if (name === "hledat_zpravy") return searchArticles(env, String(input?.dotaz ?? ""));
-  if (name === "precist_zpravu") return readArticle(env, input?.adresa);
-  if (name === "precist_zdroj") return readSource(env, input?.oznaceni);
+  if (name === "hledat_zpravy") {
+    const found = await findArticles(env, input);
+    who?.log?.push(searchNote(input, found));
+    return found.text;
+  }
+  if (name === "precist_zpravu") {
+    who?.log?.push(`četla /zpravy/${slugFrom(input?.adresa)}`);
+    return readArticle(env, input?.adresa);
+  }
+  if (name === "precist_zdroj") {
+    who?.log?.push(`četla zdroj ${String(input?.oznaceni ?? "").trim()}`);
+    return readSource(env, input?.oznaceni);
+  }
   return "Takový nástroj nemám.";
 }

@@ -49,7 +49,8 @@ export const CHAT_TABLES = [
     answer text not null default '',
     model text not null default '',
     cost_usd real not null default 0,
-    ok integer not null default 1
+    ok integer not null default 1,
+    lookups text not null default ''
   )`,
   "create index if not exists chat_questions_asked on chat_questions (asked_at)",
 ];
@@ -67,6 +68,9 @@ export async function ensureChatTables(env) {
   await addColumn(env, names, "archive", "alter table chat_settings add column archive integer not null default 200");
   // Rychlé otázky pod pozdravem v okénku: prázdné = výchozí, pomlčka = žádné.
   await addColumn(env, names, "ideas", "alter table chat_settings add column ideas text not null default ''");
+  // Co Drběna k odpovědi hledala a četla (pro ladění hledání).
+  const asked = await env.DB.prepare("pragma table_info(chat_questions)").all();
+  await addColumn(env, new Set((asked.results ?? []).map((row) => row.name)), "lookups", "alter table chat_questions add column lookups text not null default ''");
   await env.DB.prepare("insert into chat_settings (id, secret) select 1, ? where not exists (select 1 from chat_settings where id = 1)")
     .bind(randomSecret())
     .run();
@@ -230,7 +234,7 @@ export async function countQuestion(env, settings, { day, visitor, conversation 
 }
 
 // Odpověď (i nepovedená): tokeny a cena do denního součtu, otázka do seznamu pro redakci, staré otázky pryč.
-export async function recordAnswer(env, settings, { day, now = new Date(), conversation, question, answer, ok, usage, cost }) {
+export async function recordAnswer(env, settings, { day, now = new Date(), conversation, question, answer, ok, usage, cost, lookups = [] }) {
   const cutoff = new Date(now.getTime() - settings.keepDays * 86_400_000).toISOString();
   await env.DB.batch([
     env.DB.prepare(
@@ -239,8 +243,8 @@ export async function recordAnswer(env, settings, { day, now = new Date(), conve
          output_tokens = output_tokens + excluded.output_tokens, cost_usd = cost_usd + excluded.cost_usd`,
     ).bind(day, ok ? 0 : 1, usage.input + usage.read + usage.write, usage.output, cost),
     env.DB.prepare(
-      "insert into chat_questions (asked_at, conversation, question, answer, model, cost_usd, ok) values (?, ?, ?, ?, ?, ?, ?)",
-    ).bind(now.toISOString(), conversation, clip(question, 1000), clip(answer, 4000), settings.model, cost, ok ? 1 : 0),
+      "insert into chat_questions (asked_at, conversation, question, answer, model, cost_usd, ok, lookups) values (?, ?, ?, ?, ?, ?, ?, ?)",
+    ).bind(now.toISOString(), conversation, clip(question, 1000), clip(answer, 4000), settings.model, cost, ok ? 1 : 0, clip(lookups.join("\n"), 2000)),
     env.DB.prepare("delete from chat_questions where asked_at < ?").bind(cutoff),
   ]);
 }
@@ -276,7 +280,7 @@ export async function loadChatStats(env, today) {
   const from = since < monthStart(today) ? since : monthStart(today);
   const [rows, questions] = await Promise.all([
     env.DB.prepare("select * from chat_days where day >= ? order by day").bind(from).all(),
-    env.DB.prepare("select id, asked_at, question, answer, model, cost_usd, ok from chat_questions order by id desc limit 100").all(),
+    env.DB.prepare("select id, asked_at, question, answer, model, cost_usd, ok, lookups from chat_questions order by id desc limit 100").all(),
   ]);
   const byDay = new Map((rows.results ?? []).map((row) => [String(row.day), mapDay(row)]));
   const chart = [];
@@ -298,6 +302,7 @@ export async function loadChatStats(env, today) {
       model: String(row.model),
       cost: Number(row.cost_usd) * USD_CZK,
       ok: asBool(row.ok),
+      lookups: String(row.lookups ?? ""),
     })),
   };
 }

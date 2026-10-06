@@ -60,6 +60,7 @@ import { stockPost } from "./post-stock.js";
 import { munipolisPost } from "./post-munipolis.js";
 import { drbenaPost } from "./post-drbena.js";
 import { fillKeywords } from "./keywords.js";
+import { syncSearch } from "./search/store.js";
 import { runImport } from "./munipolis/run.js";
 import { footballPost } from "./post-fotbal.js";
 import { denikPost } from "./post-denik.js";
@@ -356,6 +357,7 @@ export default {
     for (const source of SCHOOL_LIST) ctx.waitUntil(runSkola(env, source).catch(() => {}));
     ctx.waitUntil(runNdic(env).catch(() => {}));
     ctx.waitUntil(fillKeywords(env).catch(() => {}));
+    ctx.waitUntil(syncSearch(env).catch(() => {}));
     ctx.waitUntil(pruneAudit(env).catch(() => {}));
     ctx.waitUntil(pruneLogin(env).catch(() => {}));
   },

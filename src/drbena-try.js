@@ -65,7 +65,7 @@ export async function tryVoice(env, input, { askCity = askClaude, askBall = askF
   const title = input.title || "(bez nadpisu)";
   if (input.kind === "mesto") {
     const rubrics = await rubricMap(env);
-    const known = await loadKnown(env, { itemId: 0, today, recall: input.memory });
+    const known = await loadKnown(env, { itemId: 0, today, recall: input.memory, about: { title: input.title, text: input.text } });
     const answer = await askCity(env, {
       item: { title, text: input.text, publishedAt: today },
       known,

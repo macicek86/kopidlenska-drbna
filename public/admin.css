@@ -629,6 +629,8 @@ html { font-size: 100%; }
 }
 .assist-link:hover { text-decoration-color: currentColor; }
 .assist-link:disabled { opacity: 0.5; cursor: progress; }
+.assist-related { flex-basis: 100%; margin: 0; font-size: 0.84rem; line-height: 1.4; color: var(--muted); }
+.assist-related a { color: inherit; }
 .assist-undo { color: var(--muted); }
 .assist-info {
   flex: none; width: 1.3rem; height: 1.3rem; padding: 0; border: 1px solid var(--line-2); border-radius: 50%;

@@ -118,6 +118,7 @@ export async function chatPost(path, request, env, execution) {
   const writer = {
     ...who,
     page: messagePage(body.page),
+    log: [],
     defer: execution?.waitUntil ? (promise) => execution.waitUntil(promise) : null,
   };
   const result = await askDrbena(
@@ -135,6 +136,7 @@ export async function chatPost(path, request, env, execution) {
     ok: result.ok,
     usage: result.usage,
     cost,
+    lookups: writer.log,
   }).catch(() => {});
   if (execution?.waitUntil) execution.waitUntil(saving);
   else await saving;

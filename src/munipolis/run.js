@@ -94,7 +94,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
   const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
     item,
-    known: await knownContent(env, { itemId: item.id, today, recall: memory }),
+    known: await knownContent(env, { itemId: item.id, today, recall: memory, about: item }),
     images,
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],

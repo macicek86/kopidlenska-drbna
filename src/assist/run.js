@@ -4,6 +4,7 @@ import { requireUser, userCan } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
 import { prepareArticleBody } from "../rich.js";
+import { fold, searchNews } from "../search/query.js";
 import { loadStock } from "../stock-db.js";
 import { pragueNow } from "../waste.js";
 import { askAssist, ASSIST_MODES, ASSIST_TEXT_MIN } from "./ai.js";
@@ -72,6 +73,22 @@ function stockSuggestion(stock, slug) {
   return { id: image.id, topic: topic.name };
 }
 
+// Co už na drbně o stejné věci je: redaktor si to může přečíst a odkázat na to. Sama zpráva (při úpravě) ne.
+const RELATED_MAX = 3;
+
+export async function relatedFor(env, { input, answer }) {
+  const same = new Set([fold(input.title).trim(), fold(answer.title).trim()]);
+  try {
+    const found = await searchNews(env, { query: answer.title, about: `${answer.title}\n${answer.excerpt}`, limit: RELATED_MAX + 1 });
+    return found
+      .filter((row) => !same.has(fold(row.title).trim()))
+      .slice(0, RELATED_MAX)
+      .map((row) => ({ title: row.title, url: `/zpravy/${row.slug}`, date: row.createdOn }));
+  } catch {
+    return [];
+  }
+}
+
 export async function assistPost(path, request, env, { ask = askAssist } = {}) {
   if (path !== ASSIST_PATH) return null;
   const gate = await requireUser(env, request);
@@ -106,6 +123,7 @@ export async function assistPost(path, request, env, { ask = askAssist } = {}) {
     rubricId: rubrics.find((row) => row.slug === answer.rubric)?.id ?? null,
     stock: input.wantsPhoto ? stockSuggestion(stock, answer.imageTopic) : null,
     note: answer.note,
+    related: await relatedFor(env, { input, answer }),
     left: chief ? null : left,
   });
 }

@@ -46,5 +46,16 @@ bucket_name = "kopidlenska-drbna"
 [images]
 binding = "IMAGES"
 
+# Hledání v celém archivu zpráv podle významu (src/search/): otisky z Workers AI (model bge-m3, 1024 čísel)
+# ve Vectorize. Index se zakládá jednou (umí to i npm run nasadit):
+#   npx wrangler vectorize create kopidlenska-drbna-zpravy --dimensions=1024 --metric=cosine
+# Místně Vectorize neběží, náhled hledá jen fulltextem.
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "VECTORS"
+index_name = "kopidlenska-drbna-zpravy"
+
 [triggers]
 crons = ["15 */4 * * *"]

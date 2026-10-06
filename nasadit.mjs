@@ -56,6 +56,12 @@ if (bucketResult.code !== 0 && !/already exists|already owned/i.test(bucketResul
   process.exit(bucketResult.code);
 }
 
+console.log("Zakládám index pro hledání podle významu (Vectorize)…");
+const vectorsResult = run(["vectorize", "create", "kopidlenska-drbna-zpravy", "--dimensions=1024", "--metric=cosine"], { allowFail: true });
+if (vectorsResult.code !== 0 && !/already exists|duplicate/i.test(vectorsResult.text)) {
+  process.exit(vectorsResult.code);
+}
+
 console.log("Nahrávám schéma a výchozí texty…");
 run(["d1", "execute", dbName, "--remote", "--file=./schema.sql"]);
 

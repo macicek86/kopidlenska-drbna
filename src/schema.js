@@ -28,8 +28,9 @@ import { ensureLinkTables } from "./hours-links-db.js";
 import { ensureAuditTables } from "./audit-db.js";
 import { ensureLoginTables } from "./login-db.js";
 import { ensureNotifyTables } from "./notify.js";
+import { ensureSearchTables } from "./search/store.js";
 
-export const SCHEMA_VERSION = 32;
+export const SCHEMA_VERSION = 33;
 
 let schemaReady = false;
 
@@ -448,6 +449,7 @@ async function migrateSchema(env) {
   ).first();
   if (articlesTable) {
     await ensureArticleColumns(env);
+    await ensureSearchTables(env);
     const proposalsTable = await env.DB.prepare(
       "select 1 as ok from sqlite_master where type = 'table' and name = 'proposals'",
     ).first();

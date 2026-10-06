@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { askDrbena, usageCost } from "../src/chat/ai.js";
 import { archiveLine, archiveText } from "../src/chat/archive.js";
-import { adLines, articleWhen, fold, scoreArticle, searchStems, slugFrom } from "../src/chat/context.js";
+import { adLines, articleWhen, scoreArticle, slugFrom } from "../src/chat/context.js";
+import { fold, searchStems } from "../src/search/query.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "../src/chat/pass.js";
 import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, ownChatPersona } from "../src/chat/prompt.js";
 import { readHistory } from "../src/chat/run.js";
@@ -29,13 +30,14 @@ test("povaha v chatu: výchozí text se neukládá a pokyny mluví v první osob
 
 test("hledání: bez diakritiky a podle kmene slova", () => {
   assert.equal(fold("Knihovně ŽÁDOST"), "knihovne zadost");
-  assert.deepEqual(searchStems("Kdy je ples hasičů v knihovně?"), ["kdy", "ples", "hasicu", "kniho"]);
+  assert.deepEqual(searchStems("Kdy je ples hasičů v knihovně?"), ["ples", "hasic", "knihov"]);
   const article = { title: "Hasičský ples", excerpt: "Zve SDH Kopidlno", body: "Sobota v sokolovně" };
-  assert.equal(scoreArticle(article, searchStems("ples hasičů")), 3);
+  assert.equal(scoreArticle(article, searchStems("ples hasičů")), 6);
   assert.equal(scoreArticle(article, searchStems("sokolovna")), 1);
   assert.equal(scoreArticle(article, searchStems("fotbal")), 0);
   // Klíčová slova váží jako nadpis, i když slovo v nadpisu není.
   assert.equal(scoreArticle({ ...article, keywords: "dobrovolní hasiči" }, searchStems("dobrovolní")), 3);
+  assert.equal(scoreArticle(article, searchStems("sokolovně")), 1);
 });
 
 test("adresa zprávy: z cesty, celé adresy i holého slugu", () => {

@@ -4,6 +4,7 @@ import { loadNotices } from "./notices-db.js";
 import { knownClosures } from "./ndic/store.js";
 import { shownKeywords } from "./keywords.js";
 import { loadPlaces } from "./places-db.js";
+import { searchNews } from "./search/query.js";
 import { addDays, pragueNow } from "./waste.js";
 import { recentEvents } from "./drbena-memory.js";
 
@@ -122,9 +123,11 @@ export async function knownArticles(env, today) {
 // Co už na drbně je, aby Claude poznal stejnou věc od někoho jiného. `table` je tabulka zpracovávané položky,
 // `closureRef` uzavírka z NDIC, kterou zrovna zpracovává Drběna (sama sebe v přehledu mít nesmí).
 // `recall` přidá nedávné akce, na které smí Drběna vzpomenout (paměť, src/drbena-memory.js).
-export async function knownContent(env, { itemId, today, table = "import_items", closureRef = 0, recall = false }) {
+// `about` ({ title, text }) je zpracovávaná položka: hledání k ní najde starší zprávy, které v přehledu nejsou.
+export async function knownContent(env, { itemId, today, table = "import_items", closureRef = 0, recall = false, about = null }) {
   const since = addDays(today, -LOOKBACK_DAYS);
   const { articles, older, proposals } = await knownArticles(env, today);
+  const related = about ? await relatedArticles(env, about, [...articles, ...older]) : [];
   const events = await rows(
     env,
     "select id, title, place, starts_on, starts_time from events where starts_on >= ? order by starts_on asc limit 60",
@@ -136,6 +139,7 @@ export async function knownContent(env, { itemId, today, table = "import_items",
   return {
     articles,
     older,
+    related,
     proposals,
     events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time })),
     notices,
@@ -145,6 +149,20 @@ export async function knownContent(env, { itemId, today, table = "import_items",
     places: await loadPlaces(env, { today }),
     doctors: await loadDoctors(env, { today }),
   };
+}
+
+// Starší zprávy z celého archivu, které se k položce hodí podle slov nadpisu nebo podle významu.
+const RELATED_LIMIT = 5;
+
+export async function relatedArticles(env, { title, text }, shown = []) {
+  const name = String(title ?? "").trim();
+  if (!name) return [];
+  const about = `${name}\n${String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 600)}`;
+  try {
+    return await searchNews(env, { query: name, about, limit: RELATED_LIMIT, skip: shown.map((row) => row.id) });
+  } catch {
+    return [];
+  }
 }
 
 export async function rubricMap(env) {

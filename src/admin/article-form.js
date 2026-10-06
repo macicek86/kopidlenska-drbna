@@ -115,6 +115,7 @@ function assistBar(user) {
       <button class="assist-info" type="button" data-assist-info aria-expanded="false" aria-label="Jak pomocník funguje">i</button>
       <p class="assist-hint" data-assist-hint hidden>Napište, co víte, klidně jen v bodech. Drběna z toho udělá zprávu a navrhne rubriku i fotku. Nic se neuloží, dokud nedáte Uložit.</p>
       <p class="assist-status" data-assist-status role="status" aria-live="polite"></p>
+      <p class="assist-related" data-assist-related hidden></p>
     </div>`;
 }
 

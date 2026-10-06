@@ -71,6 +71,26 @@ function say(bar, text, kind = "") {
   status.classList.toggle("is-ok", kind === "ok");
 }
 
+// Starší zprávy o stejné věci, které našlo hledání (otevřou se v novém panelu, ať formulář zůstane).
+function showRelated(bar, list) {
+  const box = bar.querySelector("[data-assist-related]");
+  if (!box) return;
+  box.replaceChildren();
+  box.hidden = !list?.length;
+  if (!list?.length) return;
+  box.append("K tomu už na drbně je: ");
+  list.forEach((row, index) => {
+    if (index) box.append(", ");
+    const link = document.createElement("a");
+    link.href = row.url;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = row.title;
+    box.append(link, ` (${row.date.split("-").reverse().map(Number).join(". ")})`);
+  });
+  box.append(". Odkaz můžete dát do textu.");
+}
+
 function busy(bar, on) {
   bar.classList.toggle("is-busy", on);
   for (const button of bar.querySelectorAll("button")) button.disabled = on;
@@ -126,6 +146,7 @@ async function run(bar, mode) {
   const undo = bar.querySelector("[data-assist-undo]");
   if (undo) undo.hidden = false;
   say(bar, summary(fields, answer, stockSet), "ok");
+  showRelated(bar, answer.related);
 }
 
 function undo(bar) {
@@ -135,6 +156,7 @@ function undo(bar) {
   bar.assistBefore = null;
   const button = bar.querySelector("[data-assist-undo]");
   if (button) button.hidden = true;
+  showRelated(bar, []);
   say(bar, "Vráceno, jak to bylo.");
 }
 
