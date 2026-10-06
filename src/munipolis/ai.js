@@ -235,7 +235,17 @@ function readAttachmentPicks(raw, imageUse) {
   return picks.slice(0, MAX_ATTACHMENTS);
 }
 
+function readEvent(raw) {
+  if (!raw?.include) return null;
+  const date = isoDate(raw.date);
+  const title = clean(raw.title, 160);
+  const place = clean(raw.place, 160);
+  if (!date || title.length < 3 || place.length < 2) return null;
+  return { title, place, startsOn: date, startsTime: clockTime(raw.time), description: clean(raw.description, 4000) };
+}
+
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
+// Doplnění nese jen akci, kterou stará zpráva neměla v kalendáři (src/followup.js).
 export function readDecision(raw, { rubricSlugs, force = false }) {
   if (!raw || typeof raw !== "object") return { ok: false, error: "Claude nevrátil rozhodnutí." };
   let decision = ["vytvorit", "preskocit", "duplicita", "doplneni"].includes(raw.decision) ? raw.decision : "";
@@ -246,7 +256,7 @@ export function readDecision(raw, { rubricSlugs, force = false }) {
   if (decision === "doplneni") {
     // Doplnit jde jen zprávu. K návrhu nebo bez značky je to duplicita (při ručním zpracování nová zpráva).
     const follow = /^zprava:(\d+)$/.exec(duplicateOf);
-    if (follow) return { ok: true, decision, reason, duplicateOf, followOf: Number(follow[1]), article: null, event: null, notice: null, hours: [] };
+    if (follow) return { ok: true, decision, reason, duplicateOf, followOf: Number(follow[1]), article: null, event: readEvent(raw.event), notice: null, hours: [] };
     if (!force) return { ok: true, decision: "duplicita", reason, duplicateOf, article: null, event: null, notice: null, hours: [] };
     decision = "vytvorit";
   }
@@ -254,15 +264,7 @@ export function readDecision(raw, { rubricSlugs, force = false }) {
 
   let article = readArticle(raw.article, rubricSlugs);
 
-  let event = null;
-  if (raw.event?.include) {
-    const date = isoDate(raw.event.date);
-    const title = clean(raw.event.title, 160);
-    const place = clean(raw.event.place, 160);
-    if (date && title.length >= 3 && place.length >= 2) {
-      event = { title, place, startsOn: date, startsTime: clockTime(raw.event.time), description: clean(raw.event.description, 4000) };
-    }
-  }
+  const event = readEvent(raw.event);
 
   let notice = null;
   if (raw.notice?.include) {

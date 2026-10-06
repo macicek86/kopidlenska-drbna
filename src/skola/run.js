@@ -13,7 +13,7 @@ import {
   STALE_REASON,
 } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
-import { followupReason, saveFollowup } from "../followup.js";
+import { followupReason, saveFollowup, saveFollowupEvent } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
@@ -131,7 +131,7 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
       status: "hotovo",
       reason: noteReads(followupReason(answer), answer),
       duplicateOf: answer.duplicateOf,
-      eventId: item.eventId,
+      eventId: await saveFollowupEvent(env, answer, item, made, settings.autoPublish),
       ...made,
     });
     return { ok: true, status: "hotovo", usage: answer.usage };

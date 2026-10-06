@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fillKeywords, readKeywords, shownKeywords } from "../src/keywords.js";
-import { followupReason, writeFollowup } from "../src/followup.js";
+import { followupReason, saveFollowupEvent, writeFollowup } from "../src/followup.js";
 import { articleLine, contextText, outputSchema, readDecision } from "../src/munipolis/ai.js";
 
 test("klíčová slova se srovnají: malá písmena, bez opakování, nejvýš deset", () => {
@@ -26,6 +26,13 @@ test("rozhodnutí doplneni jen ke zprávě, jinak duplicita", () => {
   const base = { reason: "Víc jmen.", article: { include: false }, event: { include: false }, notice: { include: false } };
   const follow = readDecision({ ...base, decision: "doplneni", duplicate_of: "zprava:12" }, { rubricSlugs: slugs });
   assert.deepEqual([follow.decision, follow.followOf], ["doplneni", 12]);
+  assert.equal(follow.event, null);
+  // Doplnění s dnem akce, která v kalendáři chybí (stará zpráva znala jen měsíc): akce jde s ním.
+  const dated = readDecision(
+    { ...base, decision: "doplneni", duplicate_of: "zprava:48", event: { include: true, title: "Vítání občánků", place: "Zámek Kopidlno", date: "2026-11-22", time: "", description: "" } },
+    { rubricSlugs: slugs },
+  );
+  assert.deepEqual(dated.event, { title: "Vítání občánků", place: "Zámek Kopidlno", startsOn: "2026-11-22", startsTime: "", description: "" });
   assert.equal(readDecision({ ...base, decision: "doplneni", duplicate_of: "navrh:4" }, { rubricSlugs: slugs }).decision, "duplicita");
   // Ruční zpracování doplnění nezakáže.
   assert.equal(readDecision({ ...base, decision: "doplneni", duplicate_of: "zprava:12" }, { rubricSlugs: slugs, force: true }).decision, "doplneni");
@@ -81,4 +88,16 @@ test("cron doplní klíčová slova a nevrácené označí pomlčkou", async () 
   assert.deepEqual(result, { ok: true, filled: 1 });
   assert.deepEqual(updates, [["articles", "kopidlno", 1], ["articles", "-", 2]]);
   assert.deepEqual(await fillKeywords({ DB: env.DB }), { ok: true, skipped: true });
+});
+
+test("akce z doplnění se uloží s navazující zprávou, položka s akcí ji nemění", async () => {
+  const saved = [];
+  const env = { DB: { prepare: (sql) => ({ bind: (...values) => ({ run: async () => (saved.push([sql, values]), { meta: { last_row_id: 16 } }), first: async () => null }) }) } };
+  const event = { title: "Vítání občánků", place: "Zámek", startsOn: "2026-11-22", startsTime: "", description: "" };
+  assert.equal(await saveFollowupEvent(env, { event }, { eventId: null }, { proposalId: 51 }, false), 16);
+  assert.match(saved[0][0], /insert into events/);
+  assert.ok(saved[0][1].includes(51));
+  assert.equal(await saveFollowupEvent(env, { event }, { eventId: 9 }, {}, false), 9);
+  assert.equal(await saveFollowupEvent(env, { event: null }, { eventId: null }, {}, false), null);
+  assert.equal(saved.length, 1);
 });

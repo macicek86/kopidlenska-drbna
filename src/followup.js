@@ -2,6 +2,7 @@
 // Import nejdřív jen rozhodne „doplneni“ (stejné volání jako duplicita), teprve pak druhé volání dostane celou starou
 // zprávu a napíše novou, která na ni navazuje. Jde jako návrh, rovnou na web jen se zapnutým nastavením na stránce Koza Drběna.
 import { saveBotArticle } from "./bot-article.js";
+import { saveBotEvent } from "./events-db.js";
 import { pragueNow } from "./waste.js";
 import { addUsage, callClaude } from "./claude.js";
 import { loadDrbena } from "./drbena-db.js";
@@ -100,7 +101,7 @@ export async function writeFollowup(env, decision, { system, sourceText, article
     if (answer.raw?.decision === "duplicita") return { ...DOUBLE(reason, ref), usage };
     const article = readArticle({ ...answer.raw?.article, include: true });
     if (!article) return { ok: false, error: "Claude chtěl napsat doplnění, ale nevrátil článek, který by šel uložit." };
-    const written = { ok: true, decision: "doplneni", reason, duplicateOf: ref, article, target, event: null, notice: null, hours: [], usage };
+    const written = { ok: true, decision: "doplneni", reason, duplicateOf: ref, article, target, event: decision.event ?? null, notice: null, hours: [], usage };
     problem = check(written);
     if (!problem) return written;
     retry = `Minulý pokus nešel použít: ${problem} Napiš to znovu, úplně vlastními slovy a bez zmínky o zdroji.`;
@@ -121,6 +122,13 @@ export async function saveFollowup(env, answer, { image, source, autoPublish, ru
     publishOn,
     followsId: answer.target.id,
   });
+}
+
+// Akce, kterou doplnění přineslo (den, který v kalendáři chyběl), s navazující zprávou (`made` z `saveFollowup`).
+// Položka, která už akci má (zpracovaná znovu), ji nemění.
+export async function saveFollowupEvent(env, answer, item, made, published) {
+  if (item.eventId || !answer.event) return item.eventId ?? null;
+  return saveBotEvent(env, answer.event, { published, articleId: made.articleId, proposalId: made.proposalId });
 }
 
 // Poznámka k položce importu pro redakci.

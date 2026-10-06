@@ -12,7 +12,7 @@ import {
   STALE_REASON,
 } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
-import { followupReason, saveFollowup } from "../followup.js";
+import { followupReason, saveFollowup, saveFollowupEvent } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
@@ -114,7 +114,8 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
     });
-    await finishItem(env, item.id, { status: "hotovo", reason: noteReads(followupReason(answer), answer), duplicateOf: answer.duplicateOf, eventId: item.eventId, ...made });
+    const eventId = await saveFollowupEvent(env, answer, item, made, settings.autoPublish);
+    await finishItem(env, item.id, { status: "hotovo", reason: noteReads(followupReason(answer), answer), duplicateOf: answer.duplicateOf, eventId, ...made });
     return { ok: true, status: "hotovo", usage: answer.usage };
   }
   if (answer.decision !== "vytvorit") {
