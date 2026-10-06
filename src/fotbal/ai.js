@@ -3,7 +3,9 @@ import { callClaude } from "../claude.js";
 import { prepareArticleBody } from "../rich.js";
 import { DEFAULT_FOOTBALL_VOICE } from "../drbena.js";
 import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
-import { addArticles } from "../import-overview.js";
+import { readRecall } from "../drbena-memory.js";
+import { addArticles, recentSection, relatedSection } from "../import-overview.js";
+import { footballLookup, withLookups } from "../import-tools.js";
 
 export { DEFAULT_FOOTBALL_VOICE };
 
@@ -23,11 +25,14 @@ Pravidla:
 - Výsledek, góly, minuty, jména, data, časy a místa opiš přesně podle zdroje. Nic nevymýšlej, ani průběh zápasu, který ve zdroji není. Když údaj chybí, nepiš ho.
 - Řádek „Oficiálně (fotbalunas.cz)“ jsou údaje svazu. Týmy (i jestli hrálo A, B, nebo C), datum, čas, výsledek a střelci podle něj platí, i když klub v aktualitě píše něco jiného. Rozpor v článku nezmiňuj, prostě piš správně. Celé jméno střelce smíš vzít z webu klubu, když sedí příjmení.
 - Skóre piš jako 7:6, poločas v závorce (3:3). Jména hráčů piš tak, jak jsou ve zdroji.
+- V přehledu a v oddílu „Možná souvisí“ (když je, ukazuje starší zprávy z archivu drbny) najdeš i dřívější zápasy. U zápasu smíš jednou větou připomenout předchozí zápas stejného týmu (A, B, nebo C) se stejným soupeřem, třeba „Na podzim Céčko Libuň doma porazilo 3:1.“ Řekni, kdy to bylo, a ber jen výsledek a fakta z nadpisu a perexu té zprávy. Když si nejsi jistá, že jde o stejný tým i soupeře, nepiš to. Výsledek dnešního zápasu má vždy přednost.
+- Taková věta a vzpomínka na akci (když ji pokyny dovolují) dohromady nanejvýš jednou v článku.
 - Kopidlno může hrát doma i venku. Kdo je domácí, poznáš podle pořadí v nadpisu (první je domácí).
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny. U zápasu ať je v nadpisu výsledek nebo soupeř.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
 ${KEYWORDS_RULE} U zápasu dej do nich soupeře, soutěž a datum zápasu.
+- recall: značka akce, na kterou v článku vzpomínáš (jen když to dovolují pravidla paměti), třeba "akce:12". Jinak prázdné.
 - U "preskocit" a "duplicita" nech článek prázdný.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
 
@@ -39,7 +44,7 @@ export function footballSchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords"],
+    required: ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords", "recall"],
     properties: {
       decision: { type: "string", enum: ["vytvorit", "preskocit", "duplicita"] },
       reason: { type: "string" },
@@ -48,6 +53,7 @@ export function footballSchema() {
       excerpt: { type: "string" },
       body_html: { type: "string" },
       keywords: keywordsSchema(),
+      recall: { type: "string" },
     },
   };
 }
@@ -57,9 +63,12 @@ export function footballPrompt(voice) {
   return `${RULES}\n\nHlas a styl textů:\n${style}`;
 }
 
+// Přehled zpráv, s pamětí i akce z posledních dní (`known.recent`).
 export function footballContext(known) {
   const parts = [];
   addArticles((heading, rows) => parts.push(`${heading}:\n${rows.length ? rows.join("\n") : "(nic)"}`), known);
+  const recent = recentSection(known.recent);
+  if (recent) parts.push(recent);
   return parts.join("\n\n");
 }
 
@@ -79,6 +88,7 @@ export function footballText(item, known, { today, force = false, doubts = [], f
   return [
     `Dnes je ${today}.`,
     footballContext(known),
+    relatedSection(known.related),
     `Aktualita z webu FK Kopidlno (druh: ${KIND_LABEL[item.kind] ?? item.kind}, zveřejněno ${item.publishedOn || "neznámo kdy"}):`,
     `Nadpis: ${item.title}`,
     `Text:\n${item.text || "(bez textu)"}`,
@@ -111,7 +121,13 @@ export function readFootballDecision(raw, { force = false } = {}) {
   if (title.length < 3 || excerpt.length < 3 || prepared.text.length < 3) {
     return { ok: false, error: "Claude chtěl aktualitu zpracovat, ale nevrátil článek, který by šel uložit." };
   }
-  return { ok: true, decision, reason, duplicateOf: "", article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords) } };
+  return {
+    ok: true,
+    decision,
+    reason,
+    duplicateOf: "",
+    article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords), recall: readRecall(raw.recall) },
+  };
 }
 
 export async function askFootball(env, { item, known, voice, today, force = false, doubts = [], fixes = [] }) {
@@ -120,7 +136,8 @@ export async function askFootball(env, { item, known, voice, today, force = fals
     content: [{ type: "text", text: footballText(item, known, { today, force, doubts, fixes }) }],
     schema: footballSchema(),
     effort: "low",
+    lookup: footballLookup(env),
   });
   if (!answer.ok) return answer;
-  return readFootballDecision(answer.raw, { force });
+  return withLookups(readFootballDecision(answer.raw, { force }), answer);
 }

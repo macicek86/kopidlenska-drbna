@@ -230,3 +230,8 @@ test("importy: Drběna si sama dohledá starší zprávu v archivu, zdůvodněn�
   assert.equal(lookupLabel({ name: "hledat_zpravy", input: { dotaz: " drakiáda " } }), "hledání „drakiáda“");
   assert.equal(lookupLabel({ name: "precist_zpravu", input: { znacka: "zprava:3" } }), "zprava:3");
 });
+
+test("Kopidlno je skoro v každé zprávě, hledání podle slov ho přeskočí", () => {
+  assert.deepEqual(searchStems("FK Kopidlno C - Sokol Libuň 2:2"), ["soko", "libu"]);
+  assert.deepEqual(searchStems("V Kopidlně"), []);
+});

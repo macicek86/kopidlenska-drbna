@@ -14,9 +14,9 @@ export function fold(text) {
     .replace(/[̀-ͯ]/g, "");
 }
 
-// Slova, která v dotazu nic neříkají a fulltextem by našla půl archivu.
+// Slova, která v dotazu nic neříkají a fulltextem by našla půl archivu (i Kopidlno, to je skoro v každé zprávě).
 const STOP = new Set(
-  "kdy kde kdo jak jaky jaka jake jakou jaci proc kolik ktery ktera ktere kterou bude budou byl byla bylo byly jsou jste jsem mate vite neni nebo pro pri tak tam ten tuto tento tohle tady uz jeste taky take prosim dnes zitra vcera".split(
+  "kdy kde kdo jak jaky jaka jake jakou jaci proc kolik ktery ktera ktere kterou bude budou byl byla bylo byly jsou jste jsem mate vite neni nebo pro pri tak tam ten tuto tento tohle tady uz jeste taky take prosim dnes zitra vcera kopidlno kopidlna kopidlnu kopidlne kopidlnem".split(
     " ",
   ),
 );

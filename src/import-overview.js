@@ -25,6 +25,14 @@ function noticeEnd(row) {
   return row.endsOn ? ` až ${row.endsOn}${row.endsTime ? ` ${row.endsTime}` : ""}` : "";
 }
 
+// Akce z posledních dní pro paměť Drběny (src/drbena-memory.js); sdílí je i fotbal.
+export function recentSection(rows) {
+  if (!rows?.length) return "";
+  return `Akce, které nedávno proběhly a Drběna na nich byla:\n${rows
+    .map((row) => `[akce:${row.id}] ${row.startsOn} · ${line(row.title, 140)} · ${line(row.place, 80)}`)
+    .join("\n")}`;
+}
+
 // Zprávy a návrhy z přehledu (sdílí je i fotbal).
 export function addArticles(add, known) {
   add("Zprávy na webu za poslední týdny", (known.articles ?? []).map((row) => articleLine(row, "zprava")));
@@ -44,12 +52,7 @@ export function contextSections(known) {
       (row) => `[akce:${row.id}] ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 140)} · ${line(row.place, 80)}`,
     ),
   );
-  if (known.recent?.length) {
-    add(
-      "Akce, které nedávno proběhly a Drběna na nich byla",
-      known.recent.map((row) => `[akce:${row.id}] ${row.startsOn} · ${line(row.title, 140)} · ${line(row.place, 80)}`),
-    );
-  }
+  if (known.recent?.length) fixed.push(recentSection(known.recent));
   add(
     "Odstávky vody a uzavírky",
     (known.notices ?? []).map(

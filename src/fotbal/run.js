@@ -13,8 +13,10 @@ import { saveBotArticle } from "../bot-article.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
 import { voiceFor } from "../drbena.js";
+import { memoryOn, recentEvents, withMemory } from "../drbena-memory.js";
+import { noteReads } from "../import-tools.js";
 import { fetchImage, storeImageBytes } from "../images.js";
-import { knownArticles } from "../import-context.js";
+import { knownArticles, relatedArticles } from "../import-context.js";
 import { MAX_ATTEMPTS } from "../munipolis/store.js";
 import { pragueNow } from "../waste.js";
 import { askFootball } from "./ai.js";
@@ -72,15 +74,23 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
   const today = pragueNow().date;
   const force = item.manual;
   const { doubts, fixes } = checkDates(item);
-  const known = await knownArticles(env, today);
-  const answer = await ask(env, { item, known, voice: voiceFor(await loadDrbena(env), "fotbal"), today, force, doubts, fixes });
+  // Paměť jako u ostatních importů: akce z posledních dní a jen u článku s dnešním datem.
+  const drbena = await loadDrbena(env);
+  const memory = memoryOn(drbena, item.manual ? footballSourceDate(item, today) : "", today);
+  const overview = await knownArticles(env, today);
+  const known = {
+    ...overview,
+    related: await relatedArticles(env, item, [...overview.articles, ...overview.older]),
+    recent: memory ? await recentEvents(env, today) : [],
+  };
+  const answer = await ask(env, { item, known, voice: withMemory(voiceFor(drbena, "fotbal"), memory), today, force, doubts, fixes });
   if (!answer.ok) {
     await finishFootballItem(env, item.id, { status: "chyba", reason: answer.error });
     return { ok: false, error: answer.error };
   }
   if (answer.decision !== "vytvorit") {
     const status = answer.decision === "duplicita" ? "duplicita" : "preskoceno";
-    await finishFootballItem(env, item.id, { status, reason: answer.reason, duplicateOf: answer.duplicateOf });
+    await finishFootballItem(env, item.id, { status, reason: noteReads(answer.reason, answer), duplicateOf: answer.duplicateOf });
     return { ok: true, status };
   }
   const made = await saveBotArticle(env, {
@@ -94,7 +104,7 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
   const reason = [
     fixes.length ? `Opraveno podle fotbalunas.cz: ${fixes.join(" ")}` : "",
     doubts.length ? `Zkontrolujte datum, ve zdroji nesedí: ${doubts.join(" ")}` : "",
-    answer.reason,
+    noteReads(answer.reason, answer),
   ]
     .filter(Boolean)
     .join(" ");

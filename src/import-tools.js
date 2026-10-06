@@ -141,6 +141,17 @@ export function noteReads(reason, answer) {
   return read.length ? `${reason ?? ""} (Dohledávala: ${read.join(", ")}.)`.trim() : reason;
 }
 
+// Fotbal: hledání a čtení zpráv drbny (zdroje importů ho nezajímají).
+const FOOTBALL_TOOLS_RULE = `Nástroje:
+- Přehled sahá u zpráv jen rok zpátky a oddíl Možná souvisí (když je) ukazuje jen pár starších zpráv. Když potřebuješ vědět, jestli už na drbně je zpráva o stejném zápase, nebo hledáš předchozí zápas stejného týmu se stejným soupeřem a z přehledu ho nenajdeš, hledej (hledat_zpravy) a zprávu si případně přečti (precist_zpravu).
+- Hledej a čti jen ve sporných případech, dohromady nejvýš ${MAX_READS}×. Když je to z přehledu jasné, rozhodni rovnou.
+- Z přečtených textů nic neopisuj.`;
+
+export function footballLookup(env) {
+  const tools = IMPORT_TOOLS.filter((tool) => tool.name !== "precist_zdroj");
+  return { tools, rule: FOOTBALL_TOOLS_RULE, run: (name, input) => runImportTool(env, name, input), maxCalls: MAX_READS, label: lookupLabel };
+}
+
 // Co dostane `callClaude` jako `lookup`.
 export function importLookup(env) {
   return { tools: IMPORT_TOOLS, rule: TOOLS_RULE, run: (name, input) => runImportTool(env, name, input), maxCalls: MAX_READS, label: lookupLabel };

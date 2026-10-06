@@ -142,11 +142,23 @@ test("Drběna dostane aktualitu s doplňky a její odpověď se ověří", () =>
   assert.match(text, /druh: Po zápase/);
   assert.match(text, /\[zprava:4\] 2026-09-25 · Kopidlno vyhrálo/);
   assert.match(text, /Doplněno z rozpisu a tabulky/);
-  assert.deepEqual(footballSchema().required, ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords"]);
+  assert.deepEqual(footballSchema().required, ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords", "recall"]);
+  // Paměť a archiv: akce z posledních dní a starší zprávy, které k zápasu našlo hledání.
+  const remembered = footballText(item, {
+    articles: [],
+    proposals: [],
+    recent: [{ id: 7, title: "Drakiáda", place: "Bažantnice", startsOn: "2026-09-27" }],
+    related: [{ id: 2, title: "Chomutice porazily béčko 2:1", excerpt: "Na jaře.", createdOn: "2026-04-12" }],
+  }, { today: "2026-10-01" });
+  assert.match(remembered, /Akce, které nedávno proběhly a Drběna na nich byla:\n\[akce:7\] 2026-09-27 · Drakiáda · Bažantnice/);
+  assert.match(remembered, /Možná souvisí[^\n]*\n\[zprava:2\] 2026-04-12 · Chomutice porazily béčko 2:1/);
+  assert.doesNotMatch(text, /Možná souvisí|nedávno proběhly/);
 
   const made = readFootballDecision({ decision: "vytvorit", reason: "Zápas.", duplicate_of: "", title: "Gólová přestřelka", excerpt: "Kopidlno B vyhrálo 7:6.", body_html: "<p>Mééé, sedm gólů!</p><script>x</script>" });
   assert.equal(made.ok, true);
   assert.equal(made.article.title, "Gólová přestřelka");
+  assert.equal(made.article.recall, "");
+  assert.equal(readFootballDecision({ decision: "vytvorit", reason: "", duplicate_of: "", title: "Gólová přestřelka", excerpt: "Béčko vyhrálo.", body_html: "<p>Sedm gólů.</p>", recall: "akce:7" }).article.recall, "akce:7");
   assert.doesNotMatch(made.article.body, /script/);
   const duplicate = readFootballDecision({ decision: "duplicita", reason: "Už je.", duplicate_of: "zprava:4", title: "", excerpt: "", body_html: "" });
   assert.deepEqual([duplicate.decision, duplicate.duplicateOf, duplicate.article], ["duplicita", "zprava:4", null]);
