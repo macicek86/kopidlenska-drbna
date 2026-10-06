@@ -42,9 +42,8 @@ export function deferDay(item, startsOn, aheadDays, today) {
 
 // Druhé čtení odložené položky: akci Drběna dala do kalendáře sama, za duplicitu ji mít nesmí.
 export function laterNote(item) {
-  if (!item.writeOn) return "";
-  const event = item.eventId ? ` (akce:${item.eventId})` : "";
-  return `Akci z tohohle článku jsi dřív dala do kalendáře${event} a pozvánku sis nechala na dnešek. Ta akce sama duplicita není: napiš k ní pozvánku a event dej include false. Duplicita je jen zpráva nebo návrh o téže akci, třeba ze zpráv města v Munipolisu.`;
+  if (!item.writeOn || !item.eventId) return "";
+  return `Akci z tohohle článku jsi dřív dala do kalendáře (akce:${item.eventId}) a pozvánku sis nechala na dnešek. Ta akce sama duplicita není: napiš k ní pozvánku a event dej include false. Duplicita je jen zpráva nebo návrh o téže akci, třeba ze zpráv města v Munipolisu.`;
 }
 
 // Cron: odložené položky, kterým nastal den, vrátí do fronty jako automatické (bez vynucení, s dnešním datem).

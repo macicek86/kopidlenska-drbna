@@ -181,6 +181,7 @@ test("při druhém čtení Drběna ví, že akci v kalendáři dala sama", () =>
   assert.match(text, /dřív dala do kalendáře \(akce:11\)/);
   assert.match(text, /event dej include false/);
   assert.equal(laterNote({ ...item, writeOn: "" }), "");
+  assert.equal(laterNote({ ...item, eventId: null }), "");
 });
 
 test("odložená položka čeká a v den psaní se vrátí do fronty jako automatická", async () => {
