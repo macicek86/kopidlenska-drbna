@@ -48,7 +48,7 @@ export function eventsFeed(base, events, copy, today) {
     entries: fresh.map((event) => ({
       id: `${TAG}akce-${event.id}`,
       seq: event.id,
-      title: `${event.title} (${eventWhen(event)})`,
+      title: `${event.cancelled ? "Zrušeno: " : ""}${event.title} (${eventWhen(event)})`,
       url: eventUrl(base, event),
       updated: event.createdAt,
       published: event.createdAt,
@@ -68,10 +68,11 @@ export function eventsCalendar(base, events, copy, today) {
         .filter((event) => event.published && event.startsOn >= from)
         .map((event) => ({
           uid: `akce-${event.id}@kopidlenskadrbna.org`,
-          stamp: event.createdAt,
+          stamp: event.updatedAt || event.createdAt,
+          cancelled: event.cancelled,
           startsOn: event.startsOn,
           startsTime: event.startsTime,
-          title: event.title,
+          title: event.cancelled ? `Zrušeno: ${event.title}` : event.title,
           place: event.place,
           description: [event.description, eventUrl(base, event)].filter(Boolean).join("\n\n"),
           url: eventUrl(base, event),

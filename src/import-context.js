@@ -26,6 +26,8 @@ export function outcomeOf(item) {
   }
   if (item.status === "duplicita") return `duplicita s ${item.duplicateOf || "něčím na webu"}`;
   if (item.status === "preskoceno") return "přeskočeno";
+  // Odložená pozvánka (src/skola/defer.js): akce už je v kalendáři, pozvánku drbna napíše sama.
+  if (item.status === "odlozeno") return `akce${item.eventId ? ` akce:${item.eventId}` : ""} je v kalendáři, pozvánku drbna napíše ${item.writeOn}`;
   return "";
 }
 
@@ -46,19 +48,19 @@ async function rows(env, sql, ...binds) {
 export const IMPORT_SOURCES = [
   { table: "import_items", tag: "munipolis" },
   { table: "denik_items", tag: "denik" },
-  { table: "skola_items", tag: "skola" },
-  { table: "zahradka_items", tag: "zahradka" },
-  { table: "webmesta_items", tag: "webmesta" },
+  { table: "skola_items", tag: "skola", deferred: true },
+  { table: "zahradka_items", tag: "zahradka", deferred: true },
+  { table: "webmesta_items", tag: "webmesta", deferred: true },
 ];
 
-async function pastImports(env, { table, tag }, itemTable, itemId, since) {
+async function pastImports(env, { table, tag, deferred = false }, itemTable, itemId, since) {
   const exists = await env.DB.prepare("select 1 as ok from sqlite_master where type = 'table' and name = ?").bind(table).first();
   if (!exists) return [];
   const list = await rows(
     env,
     `select id, title, published_at, status, duplicate_of, article_id, proposal_id, event_id, notice_id,
-       ${table === "import_items" ? "hours_ids" : "'' as hours_ids"} from ${table}
-     where id != ? and status in ('hotovo', 'duplicita', 'preskoceno') and published_at >= ? order by published_at desc limit 40`,
+       ${table === "import_items" ? "hours_ids" : "'' as hours_ids"}, ${deferred ? "write_on" : "'' as write_on"} from ${table}
+     where id != ? and status in ('hotovo', 'duplicita', 'preskoceno', 'odlozeno') and published_at >= ? order by published_at desc limit 40`,
     table === itemTable ? itemId : 0,
     since,
   );
@@ -75,6 +77,7 @@ async function pastImports(env, { table, tag }, itemTable, itemId, since) {
       eventId: row.event_id,
       noticeId: row.notice_id,
       hoursIds: splitRefs(row.hours_ids),
+      writeOn: String(row.write_on ?? ""),
     }),
   }));
 }
@@ -130,7 +133,7 @@ export async function knownContent(env, { itemId, today, table = "import_items",
   const related = about ? await relatedArticles(env, about, [...articles, ...older]) : [];
   const events = await rows(
     env,
-    "select id, title, place, starts_on, starts_time from events where starts_on >= ? order by starts_on asc limit 60",
+    "select id, title, place, starts_on, starts_time, cancelled from events where starts_on >= ? order by starts_on asc limit 60",
     addDays(today, -30),
   );
   const notices = (await loadNotices(env)).filter((row) => (row.endsOn || row.startsOn) >= addDays(today, -30));
@@ -141,7 +144,7 @@ export async function knownContent(env, { itemId, today, table = "import_items",
     older,
     related,
     proposals,
-    events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time })),
+    events: events.map((row) => ({ id: row.id, title: row.title, place: row.place, startsOn: row.starts_on, startsTime: row.starts_time, cancelled: Boolean(row.cancelled) })),
     notices,
     closures: (await knownClosures(env)).filter((row) => row.ref !== closureRef),
     imports,

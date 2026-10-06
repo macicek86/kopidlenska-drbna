@@ -40,12 +40,18 @@ function eventKicker(event, today, copy) {
   return [day + year, event.startsTime].filter(Boolean).join(" · ");
 }
 
+// Zrušená akce zůstává v kalendáři, ať to vidí i ti, kdo o ní věděli (src/event-change.js).
+export function cancelTag(event) {
+  return event.cancelled ? `<span class="cancel-tag">Zrušeno</span> ` : "";
+}
+
 function eventCard(event, ctx, today) {
   const isToday = event.startsOn === today ? " is-today" : "";
-  return `<article class="card event-card${isToday}" id="akce-${esc(event.id)}">
+  const cancelled = event.cancelled ? " is-cancelled" : "";
+  return `<article class="card event-card${isToday}${cancelled}" id="akce-${esc(event.id)}">
             <p class="event-date"><span class="event-day">${Number(event.startsOn.slice(8, 10))}.</span><span class="event-month">${esc(monthShort(event.startsOn))}</span></p>
             <div class="event-body">
-              <p class="kicker">${esc(eventKicker(event, today, ctx.copy))}</p>
+              <p class="kicker">${cancelTag(event)}${esc(eventKicker(event, today, ctx.copy))}</p>
               <h3>${escTie(event.title)}</h3>
               <p class="meta">${esc(event.place)}</p>
               ${event.description ? `<p class="muted">${escTie(event.description)}</p>` : ""}

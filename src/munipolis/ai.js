@@ -1,5 +1,6 @@
 // Claude roztřídí zprávu z Munipolisu, pozná duplicitu a přepíše ji hlasem kozy Drběny.
 import { callClaude, MODEL } from "../claude.js";
+import { EVENT_CHANGE_RULE, eventChangeSchema, readEventChange } from "../event-change.js";
 import { clubRules } from "../clubs.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
@@ -84,7 +85,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
   const schema = {
     type: "object",
     additionalProperties: false,
-    required: ["decision", "reason", "duplicate_of", "article", "event", "notice"],
+    required: ["decision", "reason", "duplicate_of", "article", "event", "event_change", "notice"],
     properties: {
       decision: { type: "string", enum: ["vytvorit", "preskocit", "duplicita", ...(followup ? ["doplneni"] : [])] },
       reason: stringField(),
@@ -118,6 +119,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
           description: stringField(),
         },
       },
+      event_change: eventChangeSchema(),
       notice: {
         type: "object",
         additionalProperties: false,
@@ -162,7 +164,7 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
 export function systemPrompt(voice, { rubricSlugs = null } = {}) {
   const style = String(voice ?? "").trim() || DEFAULT_VOICE;
   const clubs = clubRules(rubricSlugs);
-  return `${RULES}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
+  return `${RULES}\n${EVENT_CHANGE_RULE}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
 }
 
 // Samotná zpráva ze zdroje. Bez přehledu ji dostane i druhé volání, které píše navazující zprávu.
@@ -245,8 +247,15 @@ function readEvent(raw) {
 }
 
 // Ověří, co Claude vrátil, a převede to na tvar, který umí uložit drbna. Když něco nesedí, vrátí chybu.
-// Doplnění nese jen akci, kterou stará zpráva neměla v kalendáři (src/followup.js).
-export function readDecision(raw, { rubricSlugs, force = false }) {
+// Doplnění nese jen akci, kterou stará zpráva neměla v kalendáři (src/followup.js). Zrušení nebo změnu akce
+// v kalendáři (`eventChange`, src/event-change.js) nese každé rozhodnutí kromě přeskočení.
+export function readDecision(raw, options) {
+  const decision = readDecisionBase(raw, options);
+  if (!decision.ok || decision.decision === "preskocit") return decision;
+  return { ...decision, eventChange: readEventChange(raw.event_change) };
+}
+
+function readDecisionBase(raw, { rubricSlugs, force = false }) {
   if (!raw || typeof raw !== "object") return { ok: false, error: "Claude nevrátil rozhodnutí." };
   let decision = ["vytvorit", "preskocit", "duplicita", "doplneni"].includes(raw.decision) ? raw.decision : "";
   if (!decision) return { ok: false, error: "Claude nevrátil rozhodnutí." };

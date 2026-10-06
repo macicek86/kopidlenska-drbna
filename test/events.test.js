@@ -4,6 +4,11 @@ import { mapEvent, readEventLink, saveBotEvent } from "../src/events-db.js";
 import { calendarHtml } from "../src/events-calendar.js";
 import { eventsPage } from "../src/events-view.js";
 import { DatabaseSync } from "node:sqlite";
+import { applyEventChange, noteEventChange, readEventChange } from "../src/event-change.js";
+import { eventsCalendar } from "../src/feeds/events.js";
+import { outcomeOf } from "../src/import-context.js";
+import { contextSections } from "../src/import-overview.js";
+import { eventLd } from "../src/seo.js";
 
 const row = { id: 1, title: "Posvícení", place: "Náměstí", starts_on: "2026-10-10", starts_time: "", description: "", published: 1 };
 
@@ -76,4 +81,39 @@ test("kalendář začíná pondělím a přeskočí přes rok", () => {
   assert.equal(html.match(/is-blank/g).length, 1);
   assert.match(html, /mesic=2027-01/);
   assert.match(html, /mesic=2026-11/);
+});
+
+test("import zruší nebo změní akci v kalendáři, zrušená zůstává se štítkem", async () => {
+  assert.equal(readEventChange({ include: false, ref: "akce:3", kind: "zruseno" }), null);
+  assert.equal(readEventChange({ include: true, ref: "zprava:3", kind: "zruseno" }), null);
+  assert.deepEqual(readEventChange({ include: true, ref: "akce:3", kind: "zruseno", date: "", time: "", place: "" }), { eventId: 3, kind: "zruseno" });
+  assert.equal(readEventChange({ include: true, ref: "akce:3", kind: "zmena", date: "", time: "", place: "" }), null);
+  const db = new DatabaseSync(":memory:");
+  const statement = (sql, values = []) => ({
+    bind: (...next) => statement(sql, next),
+    run: async () => db.prepare(sql).run(...values),
+    first: async () => db.prepare(sql).get(...values) ?? null,
+  });
+  const env = { DB: { prepare: (sql) => statement(sql) } };
+  db.exec(`create table events (id integer primary key, title text, place text, starts_on text, starts_time text, cancelled integer not null default 0, updated_at text not null default '')`);
+  db.exec(`insert into events (id, title, place, starts_on, starts_time) values (3, 'Drakiáda', 'Louka', '2026-11-22', '14:00')`);
+  const moved = readEventChange({ include: true, ref: "akce:3", kind: "zmena", date: "2026-11-29", time: "14:00", place: "" });
+  assert.equal(await applyEventChange(env, moved), "U akce akce:3 změnila den na 2026-11-29.");
+  assert.equal(await applyEventChange(env, moved), "");
+  assert.equal(await noteEventChange(env, { reason: "Ruší se.", eventChange: { eventId: 3, kind: "zruseno" } }), "Ruší se. Akci akce:3 v kalendáři označila jako zrušenou.");
+  assert.deepEqual({ ...db.prepare("select starts_on, place, cancelled from events").get() }, { starts_on: "2026-11-29", place: "Louka", cancelled: 1 });
+  assert.equal(await applyEventChange(env, { eventId: 99, kind: "zruseno" }), "");
+  // Na webu: štítek, přeškrtnutí v kalendáři, JSON-LD i kalendář v telefonu vědí, že se nekoná.
+  const event = { id: 3, title: "Drakiáda", place: "Louka", startsOn: "2026-11-29", startsTime: "14:00", description: "", cancelled: true, published: true, createdAt: "2026-10-01 08:00:00", updatedAt: "2026-10-06 20:00:00" };
+  const ctx = { path: "/akce", copy: {}, mainOrigin: "https://drbna.test", origin: "https://drbna.test" };
+  const html = eventsPage({ events: [event], waste: { today: "2026-11-01" }, ads: [] }, ctx);
+  assert.match(html, /event-card is-cancelled/);
+  assert.match(html, /<span class="cancel-tag">Zrušeno<\/span>/);
+  assert.equal(eventLd("https://drbna.test", event).eventStatus, "https://schema.org/EventCancelled");
+  const ics = eventsCalendar("https://drbna.test", [event], {}, "2026-11-01");
+  assert.match(ics, /SUMMARY:Zrušeno: Drakiáda\r\nSTATUS:CANCELLED/);
+  assert.match(ics, /DTSTAMP:20261006T200000Z/);
+  // Přehled pro Drběnu: zrušená akce a odložená pozvánka z webu města.
+  assert.match(contextSections({ events: [{ id: 3, title: "Drakiáda", place: "Louka", startsOn: "2026-11-29", startsTime: "", cancelled: true }] }).fixed, /\[akce:3\] 2026-11-29 · Drakiáda · Louka · ZRUŠENO/);
+  assert.equal(outcomeOf({ status: "odlozeno", eventId: 21, writeOn: "2026-11-13" }), "akce akce:21 je v kalendáři, pozvánku drbna napíše 2026-11-13");
 });

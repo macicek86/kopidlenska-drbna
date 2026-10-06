@@ -163,7 +163,7 @@ export function eventLd(base, event) {
     "@type": "Event",
     name: event.title,
     startDate: eventStart(event),
-    eventStatus: "https://schema.org/EventScheduled",
+    eventStatus: event.cancelled ? "https://schema.org/EventCancelled" : "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     ...(event.description ? { description: event.description } : {}),
     location: {

@@ -81,7 +81,13 @@ const DOUBLE = (reason, ref) => ({ ok: true, decision: "duplicita", reason, dupl
 // Druhé volání: navazující zpráva. `decision` je odpověď prvního volání s `followOf` (id staré zprávy).
 // `system` jsou pokyny zdroje (fakta, podmínky Deníku, povaha), `sourceText` popis nové zprávy ze zdroje,
 // `readArticle` převede článek z odpovědi, `check` vrátí problém (Deník: citace, zmínka o zdroji), nebo prázdný text.
-export async function writeFollowup(env, decision, { system, sourceText, articleSchema, readArticle, topics = [], today, check = () => "" }) {
+// Zrušení nebo změna akce z prvního volání (`eventChange`) platí, i když druhé volání řekne duplicita.
+export async function writeFollowup(env, decision, options) {
+  const result = await writeFollowupBase(env, decision, options);
+  return result.ok ? { ...result, eventChange: decision.eventChange ?? null } : result;
+}
+
+async function writeFollowupBase(env, decision, { system, sourceText, articleSchema, readArticle, topics = [], today, check = () => "" }) {
   const ref = `zprava:${decision.followOf}`;
   const target = await loadFollowTarget(env, decision.followOf);
   if (!target) return DOUBLE(decision.reason, ref);

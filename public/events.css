@@ -12,6 +12,23 @@
   color: var(--paper);
 }
 
+/* Zrušená akce: zůstává v kalendáři se štítkem a přeškrtnutým názvem. */
+.cancel-tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+.is-cancelled h3,
+.cal-events .is-cancelled a { text-decoration: line-through; text-decoration-thickness: 2px; }
+.cal-events .is-cancelled a { opacity: 0.5; }
+.cal-list .is-cancelled a { color: var(--muted); }
+.event-card.is-cancelled .event-date,
+.event-card.is-cancelled .meta,
+.event-card.is-cancelled .muted { opacity: 0.6; }
+
 /* Stránka akcí: nahoře karta s Drběnou, pak dnešní akce, měsíční kalendář a seznamy. */
 .events-hero {
   display: grid;

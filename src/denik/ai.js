@@ -2,6 +2,7 @@
 // Deník to dovolil s podmínkou: žádné citace jeho textu, žádné „jak píše Deník“, ne celý článek, jen podstatné věci.
 import { callClaude } from "../claude.js";
 import { clubRules } from "../clubs.js";
+import { EVENT_CHANGE_RULE } from "../event-change.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
@@ -48,7 +49,7 @@ const FORCE = "Redakce chce tenhle článek zpracovat, i když jsi ho předtím 
 export function denikPrompt(voice, { rubricSlugs = null } = {}) {
   const style = String(voice ?? "").trim() || DEFAULT_VOICE;
   const clubs = clubRules(rubricSlugs);
-  return `${RULES}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
+  return `${RULES}\n${EVENT_CHANGE_RULE}${clubs ? `\n\n${clubs}` : ""}\n\nHlas a styl textů:\n${style}`;
 }
 
 export function denikItemText(item) {

@@ -11,6 +11,7 @@ import {
   STALE_REASON,
 } from "../background.js";
 import { saveBotArticle } from "../bot-article.js";
+import { noteEventChange } from "../event-change.js";
 import { followupReason, saveFollowup, saveFollowupEvent } from "../followup.js";
 import { requireChief } from "../db-core.js";
 import { loadDrbena } from "../drbena-db.js";
@@ -73,6 +74,8 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
     await finishDenikItem(env, item.id, { status: "chyba", reason: answer.error });
     return { ok: false, error: answer.error, usage: answer.usage };
   }
+  // Zrušení nebo změna akce v kalendáři (src/event-change.js) a věta o ní do zdůvodnění.
+  answer.reason = await noteEventChange(env, answer);
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
       image: await pickStockImage(env, answer.article.imageTopic),

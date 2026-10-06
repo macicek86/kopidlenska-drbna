@@ -10,7 +10,7 @@ import { homeStatus } from "./yards.js";
 import { outagesTeaser } from "./outages-view.js";
 import { siteLd } from "./seo.js";
 import { escTie } from "./typo.js";
-import { eventLinks } from "./events-view.js";
+import { cancelTag, eventLinks } from "./events-view.js";
 import { clockOf, contentAd, layout, signedWhen, siteOrigin } from "./view.js";
 
 function wasteTeaser(data, ctx) {
@@ -130,7 +130,7 @@ function eventsHtml(data, ctx) {
   return `<div class="cards-3">${upcoming
     .map(
       (event) => `<article class="card">
-        <p class="kicker">${event.startsOn === data.waste.today ? `<span class="today-tag">${esc(tx(ctx.copy, "events_today_short"))}</span> ` : ""}${esc(formatLong(event.startsOn))}</p>
+        <p class="kicker">${cancelTag(event)}${event.startsOn === data.waste.today ? `<span class="today-tag">${esc(tx(ctx.copy, "events_today_short"))}</span> ` : ""}${esc(formatLong(event.startsOn))}</p>
         <h3>${escTie(event.title)}</h3>
         <p class="muted">${esc(event.place)}${event.startsTime ? ` · ${esc(event.startsTime)}` : ""}</p>
         ${eventLinks(event, ctx)}

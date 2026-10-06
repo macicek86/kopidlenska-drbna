@@ -1,8 +1,10 @@
 // Akce v kalendáři v D1. Akce může mít zprávu (`article_id`), návrh zprávy od Drběny, který čeká na schválení
 // (`proposal_id`, po schválení se z něj stane `article_id`), a odkaz jinam (`link`, přidává jen redakce).
+// Zrušená akce (`cancelled`, redakce nebo import podle zprávy ze zdroje, src/event-change.js) na webu zůstává s označením Zrušeno.
+// `updated_at` je poslední změna (kalendář v telefonu podle ní pozná, že akci má přepsat).
 import { addColumn, asBool, clip, liveArticle, requireChief } from "./db-core.js";
 
-const eventFields = () => `e.id, e.title, e.place, e.starts_on, e.starts_time, e.description, e.published, e.link,
+const eventFields = () => `e.id, e.title, e.place, e.starts_on, e.starts_time, e.description, e.published, e.link, e.cancelled, e.updated_at,
   e.article_id, a.slug as article_slug, a.title as article_title, (${liveArticle()}) as article_published,
   e.proposal_id, p.title as proposal_title, p.status as proposal_status, e.created_at`;
 const EVENT_FROM = "events e left join articles a on a.id = e.article_id left join proposals p on p.id = e.proposal_id";
@@ -16,6 +18,8 @@ export async function ensureEventColumns(env) {
   await addColumn(env, names, "link", "alter table events add column link text not null default ''");
   // Drběna už na akci v článku vzpomněla (src/drbena-memory.js), podruhé ne.
   await addColumn(env, names, "recalled", "alter table events add column recalled integer not null default 0");
+  await addColumn(env, names, "cancelled", "alter table events add column cancelled integer not null default 0");
+  await addColumn(env, names, "updated_at", "alter table events add column updated_at text not null default ''");
   // Kdy akce přibyla (UTC), pro feed nových akcí. Akce, které už v kalendáři byly, dostanou čas přidání sloupce.
   if (!names.has("created_at")) {
     await addColumn(env, names, "created_at", "alter table events add column created_at text not null default ''");
@@ -37,6 +41,7 @@ export function mapEvent(row) {
     startsTime: String(row.starts_time ?? ""),
     description: String(row.description ?? ""),
     published: asBool(row.published),
+    cancelled: asBool(row.cancelled),
     link: String(row.link ?? ""),
     articleId: optionalId(row.article_id),
     articleTitle: String(row.article_title ?? ""),
@@ -46,6 +51,7 @@ export function mapEvent(row) {
     proposalId: row.proposal_status === "pending" ? optionalId(row.proposal_id) : null,
     proposalTitle: row.proposal_status === "pending" ? String(row.proposal_title ?? "") : "",
     createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? "") || String(row.created_at ?? ""),
   };
 }
 
@@ -89,21 +95,22 @@ export async function saveEvent(env, request, input) {
   const articleId = input.eventArticleId ?? null;
   if (!(await articleExists(env, articleId))) return { ok: false, error: "Ta zpráva už tu není." };
   const published = input.published ? 1 : 0;
+  const cancelled = input.eventCancelled ? 1 : 0;
   if (input.id) {
     // Návrh od Drběny drží akce dál, dokud redakce nevybere jinou zprávu.
     await env.DB.prepare(
-      `update events set title = ?, place = ?, starts_on = ?, starts_time = ?, description = ?, published = ?, link = ?,
-         article_id = ?, proposal_id = case when ? is null then proposal_id else null end
+      `update events set title = ?, place = ?, starts_on = ?, starts_time = ?, description = ?, published = ?, link = ?, cancelled = ?,
+         article_id = ?, proposal_id = case when ? is null then proposal_id else null end, updated_at = datetime('now')
        where id = ?`,
     )
-      .bind(title, place, startsOn, startsTime, description, published, link.link, articleId, articleId, input.id)
+      .bind(title, place, startsOn, startsTime, description, published, link.link, cancelled, articleId, articleId, input.id)
       .run();
     return { ok: true, id: input.id };
   }
   const result = await env.DB.prepare(
-    "insert into events (title, place, starts_on, starts_time, description, published, link, article_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
+    "insert into events (title, place, starts_on, starts_time, description, published, link, cancelled, article_id, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
   )
-    .bind(title, place, startsOn, startsTime, description, published, link.link, articleId)
+    .bind(title, place, startsOn, startsTime, description, published, link.link, cancelled, articleId)
     .run();
   return { ok: true, id: Number(result.meta?.last_row_id) };
 }

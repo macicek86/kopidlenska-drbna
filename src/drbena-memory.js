@@ -31,7 +31,7 @@ export function readRecall(value) {
 export async function recentEvents(env, today) {
   const result = await env.DB.prepare(
     `select id, title, place, starts_on from events
-     where starts_on < ? and starts_on >= ? and recalled = 0 order by starts_on desc limit 10`,
+     where starts_on < ? and starts_on >= ? and recalled = 0 and cancelled = 0 order by starts_on desc limit 10`,
   )
     .bind(today, addDays(today, -RECALL_DAYS))
     .all();

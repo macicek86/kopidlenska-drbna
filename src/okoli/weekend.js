@@ -143,7 +143,7 @@ export function dedupeNearby(events) {
 // Podklady pro článek na období `weekend` (src/okoli/outings.js).
 export async function weekendInput(env, weekend, radiusKm) {
   const events = await loadEvents(env, { publicOnly: true });
-  const home = events.filter((event) => event.startsOn >= weekend.from && event.startsOn <= weekend.to);
+  const home = events.filter((event) => !event.cancelled && event.startsOn >= weekend.from && event.startsOn <= weekend.to);
   const nearby = dedupeNearby(await loadNearbyEvents(env, { from: weekend.from, to: weekend.to, radiusKm }));
   return { home, nearby };
 }

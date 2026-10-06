@@ -74,6 +74,8 @@ export async function formFields(request) {
     newAttachmentCaptions: form.getAll("new_attachment_caption").map(String),
     place: text("place"),
     startsOn: text("startsOn"),
+    // Akce je zrušená (formulář akce v redakci).
+    eventCancelled: form.get("cancelled") === "1",
     startsTime: text("startsTime"),
     description: text("description"),
     // Akce: připojená zpráva, nebo zpráva psaná k akci. „Potom napsat zprávu“ u nové akce.

@@ -49,7 +49,7 @@ export function contextSections(known) {
   add(
     "Akce v kalendáři",
     (known.events ?? []).map(
-      (row) => `[akce:${row.id}] ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 140)} · ${line(row.place, 80)}`,
+      (row) => `[akce:${row.id}] ${row.startsOn}${row.startsTime ? ` ${row.startsTime}` : ""} · ${line(row.title, 140)} · ${line(row.place, 80)}${row.cancelled ? " · ZRUŠENO" : ""}`,
     ),
   );
   if (known.recent?.length) fixed.push(recentSection(known.recent));

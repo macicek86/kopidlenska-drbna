@@ -1,6 +1,7 @@
 // Claude roztřídí článek z webu školy nebo města, pozná duplicitu a přepíše ho hlasem kozy Drběny. Co brát, říká zdroj v `sources.js`.
 import { callClaude } from "../claude.js";
 import { clubRules } from "../clubs.js";
+import { EVENT_CHANGE_RULE } from "../event-change.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { KEYWORDS_RULE } from "../keywords.js";
@@ -51,7 +52,7 @@ export function skolaPrompt(voice, { ownPhotos = false, source = SCHOOLS.skola, 
     .replace("{IMAGES}", ownPhotos ? OWN_IMAGES.replace("{PEOPLE}", source.people) : STOCK_IMAGES)
     .replace("{CLUBS}", clubs ? `\n${clubs}` : "")
     .replace("{RUBRIC}", rubricRule(source));
-  return `${rules}\n\nHlas a styl textů:\n${style}`;
+  return `${rules}\n${EVENT_CHANGE_RULE}\n\nHlas a styl textů:\n${style}`;
 }
 
 export function skolaItemText(item, source = SCHOOLS.skola) {

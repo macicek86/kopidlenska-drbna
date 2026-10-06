@@ -41,7 +41,7 @@ function dayCell(iso, day, events, today) {
   else if (iso < today) classes.push("is-past");
   if (events.length) classes.push("has-events");
   const items = events
-    .map((event) => `<li><a href="#akce-${event.id}" title="${esc(event.title)}">${escTie(event.title)}</a></li>`)
+    .map((event) => `<li${event.cancelled ? ` class="is-cancelled"` : ""}><a href="#akce-${event.id}" title="${event.cancelled ? "Zrušeno: " : ""}${esc(event.title)}">${escTie(event.title)}</a></li>`)
     .join("");
   return `<li class="${classes.join(" ")}">
           <span class="cal-num">${day}</span>
@@ -49,13 +49,18 @@ function dayCell(iso, day, events, today) {
         </li>`;
 }
 
+function listClass(event, today) {
+  const classes = [event.startsOn === today && "is-today", event.cancelled && "is-cancelled"].filter(Boolean);
+  return classes.length ? ` class="${classes.join(" ")}"` : "";
+}
+
 // Seznam akcí měsíce pod mřížkou: na mobilu místo nadpisů v políčkách, na počítači schovaný.
 function monthList(events, today) {
   if (!events.length) return "";
   return `<ul class="cal-list">${events
     .map(
-      (event) => `<li${event.startsOn === today ? ` class="is-today"` : ""}>
-          <a href="#akce-${event.id}"><span class="cal-list-date">${Number(event.startsOn.slice(8, 10))}. ${esc(monthShort(event.startsOn))}</span> ${escTie(event.title)}</a>
+      (event) => `<li${listClass(event, today)}>
+          <a href="#akce-${event.id}"><span class="cal-list-date">${Number(event.startsOn.slice(8, 10))}. ${esc(monthShort(event.startsOn))}</span> ${event.cancelled ? `<span class="cancel-tag">Zrušeno</span> ` : ""}${escTie(event.title)}</a>
         </li>`,
     )
     .join("")}</ul>`;

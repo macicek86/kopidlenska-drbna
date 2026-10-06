@@ -81,6 +81,7 @@ export function icsCalendar(calendar) {
       `DTSTAMP:${dtstamp(event.stamp)}`,
       ...eventTimes(event),
       `SUMMARY:${icsText(event.title)}`,
+      ...(event.cancelled ? ["STATUS:CANCELLED"] : []),
       ...(event.place ? [`LOCATION:${icsText(event.place)}`] : []),
       ...(event.description ? [`DESCRIPTION:${icsText(event.description)}`] : []),
       // URL je typ URI, ne text: neescapuje se.

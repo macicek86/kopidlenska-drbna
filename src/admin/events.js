@@ -61,6 +61,7 @@ function eventForm(editing, articles) {
       "Nepovinný. Třeba web pořadatele nebo vstupenky. Drběna ho sama nepřidává.",
     )}
     ${check("published", "1", editing ? editing.published : true, "Zveřejnit na webu")}
+    ${check("cancelled", "1", Boolean(editing?.cancelled), "Akce je zrušená", "Na webu zůstane s označením Zrušeno, ať to vidí i ti, kdo o ní věděli.")}
     ${editing?.articleId || editing?.proposalId ? "" : check("potom", "zprava", false, "Po uložení napsat k akci zprávu", "Otevře se nová zpráva předvyplněná z akce. Když vyberete zprávu výš, nic se nepíše.")}
     ${formFoot("Uložit", cancelLink(BASE))}
   </form>`;
@@ -88,7 +89,7 @@ export function adminEvents(ctx, data, message, query = {}) {
       title: row.title,
       meta: `${dateBox(row.startsOn)}${esc(formatLong(row.startsOn))}${row.startsTime ? ` v ${esc(row.startsTime)}` : ""} · ${esc(row.place)}${linkedMeta(row)}`,
       search: `${row.title} ${row.place} ${formatLong(row.startsOn)}`,
-      badges: `${row.published ? "" : badge("Skrytá", "off")}${row.proposalId && !row.articleId ? badge("Zpráva čeká", "warn") : ""}`,
+      badges: `${row.cancelled ? badge("Zrušeno", "bad") : ""}${row.published ? "" : badge("Skrytá", "off")}${row.proposalId && !row.articleId ? badge("Zpráva čeká", "warn") : ""}`,
       actions: `${modalLink(`${BASE}?id=${row.id}`, "Upravit")}${
         row.articleId || row.proposalId ? "" : `<a class="btn btn-sm btn-ghost" href="/redakce/zpravy?novy=1&amp;akce=${row.id}">Napsat zprávu</a>`
       }${modalLink(`${BASE}?smazat=${row.id}`, "Smazat", "btn-ghost btn-danger-text")}`,
