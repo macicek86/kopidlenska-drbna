@@ -4,6 +4,7 @@ import { changeSpan, normalizeWeek, parseHours } from "./doctors.js";
 import { addColumn, asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
 import { removeLinksOf } from "./hours-links-db.js";
+import { removeMailTargetsOf } from "./mailin/store.js";
 import { NEW_HOURS_DAYS, PLACE_SEEDS } from "./places.js";
 import { addDays, pragueNow } from "./waste.js";
 
@@ -169,6 +170,7 @@ export async function removePlace(env, request, id) {
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from place_changes where place_id = ?").bind(id).run();
   await removeLinksOf(env, "oteviraci-doba", id);
+  await removeMailTargetsOf(env, "oteviraci-doba", id);
   await env.DB.prepare("delete from places where id = ?").bind(id).run();
   return { ok: true };
 }

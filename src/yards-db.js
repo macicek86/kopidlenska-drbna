@@ -2,6 +2,7 @@
 import { asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
 import { removeLinksOf } from "./hours-links-db.js";
+import { removeMailTargetsOf } from "./mailin/store.js";
 import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
 
 function mapYard(row) {
@@ -101,6 +102,7 @@ export async function removeYard(env, request, id) {
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from yard_closures where yard_id = ?").bind(id).run();
   await removeLinksOf(env, "dvory", id);
+  await removeMailTargetsOf(env, "dvory", id);
   await env.DB.prepare("delete from yards where id = ?").bind(id).run();
   return { ok: true };
 }

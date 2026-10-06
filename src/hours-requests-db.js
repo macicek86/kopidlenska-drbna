@@ -121,7 +121,7 @@ function mapRequest(row) {
     reply: String(row.reply ?? ""),
     createdBy: Number(row.created_by) || null,
     linkId: row.link_id == null ? null : Number(row.link_id),
-    author: row.link_id == null ? String(row.author ?? "") : linkAuthor(row.author_name, row.link_label),
+    author: row.link_id != null ? linkAuthor(row.author_name, row.link_label) : String(row.author ?? row.author_name ?? ""),
     createdAt: String(row.created_at ?? ""),
   };
 }
@@ -154,7 +154,8 @@ export async function submitHours(env, request, { section, actions, action, targ
   return fileHours(env, { section, actions, action, targetId, input, mode, userId: gate.user.id, author: gate.user.name });
 }
 
-// Společné pro redakci i odkaz pro správce (`linkId`, `userId` je pak null a `author` je jméno, které žadatel napsal).
+// Společné pro redakci, odkaz pro správce (`linkId`) a e-mail na otevírací dobu (src/mailin/): bez `userId`
+// je `author` jméno, které se uloží k žádosti (žadatel ho napsal, nebo je to adresa e-mailu).
 export async function fileHours(env, { section, actions, action, targetId, input, mode, userId = null, author = "", linkId = null, linkLabel = "" }) {
   const spec = actions[action];
   if (!spec) return { ok: false, error: "Tahle změna tu nejde." };
@@ -168,7 +169,7 @@ export async function fileHours(env, { section, actions, action, targetId, input
   const created = await env.DB.prepare(
     "insert into hours_requests (section, action, target_id, payload, created_by, link_id, author_name) values (?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, linkId ? clip(author, 160) : "")
+    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, userId ? "" : clip(author, 160))
     .run();
   await requestNotice(env, linkId ? linkAuthor(author, linkLabel) : author, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0) });
   return { ok: true, requested: true, value };

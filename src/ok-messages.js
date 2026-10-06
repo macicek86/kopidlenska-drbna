@@ -17,12 +17,14 @@ import { ARTICLES_OK } from "./post-articles.js";
 import { ADS_OK } from "./post-ads.js";
 import { EVENTS_OK } from "./post-events.js";
 import { FEEDS_OK } from "./post-feeds.js";
+import { MAILIN_OK } from "./post-mailin.js";
 
 export const OK = {
   ...ARTICLES_OK,
   ...ADS_OK,
   ...EVENTS_OK,
   ...FEEDS_OK,
+  ...MAILIN_OK,
   web: "Svoz a kontakt jsou uložené.",
   texty: "Texty jsou uložené.",
   uvitani: "Texty jsou uložené. Uvítací okno se ukáže znovu všem, i těm, kdo ho už viděli.",

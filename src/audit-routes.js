@@ -45,6 +45,14 @@ const permissions = {
   },
 };
 
+const mailTargets = {
+  label: "co adresa smí měnit",
+  async read({ env, fields }) {
+    const rows = (await env.DB.prepare("select section, target_id from mail_sender_targets where sender_id = ? order by section, target_id").bind(num(fields.id)).all()).results ?? [];
+    return { "řádky": rows.map((row) => `${row.section}:${row.target_id}`).join(", ") };
+  },
+};
+
 const notifyOff = {
   label: "upozornění e-mailem",
   async read({ env, user }) {
@@ -148,6 +156,8 @@ const ROUTES = {
 
   "/redakce/svoz/ulozit": [single("settings", "nastavení")],
   "/redakce/odber/ulozit": [single("feed_settings", "nastavení odběru")],
+  "/redakce/emaily/ulozit": [by("mail_senders", "id"), mailTargets],
+  "/redakce/emaily/smazat": [existing("mail_senders", "id"), mailTargets],
   "/redakce/texty/ulozit": [copyTexts, single("settings", "nastavení")],
 
   ...hoursRoutes("/redakce/dvory", "yards", "yardId", "yard_closures"),

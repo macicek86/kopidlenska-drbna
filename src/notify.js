@@ -13,6 +13,7 @@ export const NOTIFY_TOPICS = {
   navrh: { who: "hlavni", label: "Návrh zprávy nebo nabídky od přispěvatele", path: "/redakce/zpravy" },
   drbena: { who: "hlavni", label: "Návrh zprávy od Drběny (z importů)", path: "/redakce/zpravy" },
   hodiny: { who: "hlavni", label: "Změna u dvorů, lékařů nebo otevírací doby ke schválení", path: "/redakce/prehled" },
+  posta: { who: "hlavni", label: "E-mail na otevírací dobu, který Drběna nezapsala", path: "/redakce/emaily" },
 };
 
 export const NOTIFY_TABLES = [

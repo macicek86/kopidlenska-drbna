@@ -50,6 +50,7 @@ function nav(data) {
         canSeeHours(data.user, "dvory") && ["dvory", "Sběrné dvory", "recycle", hoursWaiting("dvory")],
         canSeeHours(data.user, "lekari") && ["lekari", "Lékaři", "cross", hoursWaiting("lekari")],
         canSeeHours(data.user, "oteviraci-doba") && ["oteviraci-doba", "Otevírací doba", "clock", hoursWaiting("oteviraci-doba")],
+        chief && ["emaily", "E-mail na hodiny", "inbox"],
         chief && ["odstavky", "Odstávky", "bolt", noticesWaiting],
       ],
     },
@@ -79,7 +80,7 @@ function navHtml(data, tab) {
     .join("");
 }
 
-export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
+export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "emaily", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
 
 export function toastHtml(flash) {
   if (!flash.text) return "";

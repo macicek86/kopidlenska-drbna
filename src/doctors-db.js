@@ -2,6 +2,7 @@
 import { asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
 import { removeLinksOf } from "./hours-links-db.js";
+import { removeMailTargetsOf } from "./mailin/store.js";
 import { changeSpan, normalizeWeek as normalizeDoctorWeek, parseHours as parseDoctorHours } from "./doctors.js";
 
 function mapDoctor(row) {
@@ -109,6 +110,7 @@ export async function removeDoctor(env, request, id) {
   if (!gate.ok) return { ok: false, error: gate.error };
   await env.DB.prepare("delete from doctor_changes where doctor_id = ?").bind(id).run();
   await removeLinksOf(env, "lekari", id);
+  await removeMailTargetsOf(env, "lekari", id);
   await env.DB.prepare("delete from doctors where id = ?").bind(id).run();
   return { ok: true };
 }

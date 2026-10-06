@@ -9,6 +9,7 @@ export { adminOkoli } from "./okoli.js";
 export { adminDrbena } from "./drbena.js";
 export { adminEvents } from "./events.js";
 export { adminFeeds } from "./feeds.js";
+export { adminMailin } from "./mailin.js";
 export { adminFootball } from "./fotbal.js";
 export { adminMessages } from "./messages.js";
 export { adminMunipolis } from "./munipolis.js";

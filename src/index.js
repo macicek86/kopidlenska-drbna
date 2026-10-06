@@ -82,6 +82,8 @@ import { articlesPost } from "./post-articles.js";
 import { adsPost } from "./post-ads.js";
 import { eventsPost } from "./post-events.js";
 import { feedsPost } from "./post-feeds.js";
+import { mailinPost } from "./post-mailin.js";
+import { receiveMail } from "./mailin/run.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
@@ -318,6 +320,7 @@ async function handlePost(request, env, path, fields, execution) {
     (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena"))) ??
     (await chatAdminPost(path, request, env, fields)) ??
     (await feedsPost(path, request, env, fields)) ??
+    (await mailinPost(path, request, env, fields)) ??
     (await messagesPost(path, request, env, fields));
   if (section) return section;
   return new Response("Tahle akce tu není.", { status: 404 });
@@ -353,6 +356,11 @@ export default {
       const message = error instanceof Error ? error.message : "Neznámá chyba.";
       return html(brokenPage(message), 500);
     }
+  },
+  // E-mail na oteviracidoba@ (Cloudflare Email Routing, pravidlo „Send to a Worker“): src/mailin/run.js.
+  async email(message, env) {
+    await ensureSchema(env);
+    await receiveMail(message, env);
   },
   async scheduled(_event, env, ctx) {
     await ensureSchema(env);

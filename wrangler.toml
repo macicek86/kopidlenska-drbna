@@ -37,6 +37,10 @@ database_id = "6b49d75b-58bf-433d-91be-1869f543a388"
 [[send_email]]
 name = "EMAIL"
 
+# Příjem e-mailu na oteviracidoba@kopidlenskadrbna.org (src/mailin/): v Cloudflare Email Routing → Routing rules
+# pravidlo pro tu adresu s akcí „Send to a Worker“ a tímto Workerem. Žádné nastavení tady není potřeba,
+# Worker má handler `email` (src/index.js).
+
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "kopidlenska-drbna"
