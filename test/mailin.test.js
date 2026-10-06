@@ -35,11 +35,11 @@ function d1() {
 const CHIEF = "token-hlavni-0000000000";
 const chief = () => new Request("http://drbna.test/", { headers: { cookie: `drbna_editor=${CHIEF}` } });
 
-// Hlavička, kterou Cloudflare přidá nad Received, když odesílatel prošel ověřením.
-const PASSED = "ARC-Authentication-Results: i=1; mx.cloudflare.net; dkim=pass header.d=kopidlno.cz header.s=s1; dmarc=pass header.from=kopidlno.cz policy.dmarc=none; spf=pass smtp.mailfrom=knihovna@kopidlno.cz";
+// Výsledek kontroly, který Cloudflare přidá pod svou hlavičku Received, když odesílatel prošel ověřením.
+const PASSED = "Authentication-Results: mx.cloudflare.net; dkim=pass header.d=kopidlno.cz header.s=s1; dmarc=pass header.from=kopidlno.cz policy.dmarc=none; spf=pass smtp.mailfrom=knihovna@kopidlno.cz";
 
 function rawMail({ from = "knihovna@kopidlno.cz", subject = "Zavřeno", text = "15.8 kvc zavřeno", auth = PASSED, extra = "" } = {}) {
-  const headers = [auth, "Received: from mail.kopidlno.cz by mx.cloudflare.net", extra, `From: Knihovna <${from}>`, "To: oteviracidoba@kopidlenskadrbna.org", `Subject: ${subject}`, "Content-Type: text/plain; charset=utf-8"];
+  const headers = ["Received: from mail.kopidlno.cz by mx.cloudflare.net", auth, "Received: by mail.kopidlno.cz", extra, `From: Knihovna <${from}>`, "To: oteviracidoba@kopidlenskadrbna.org", `Subject: ${subject}`, "Content-Type: text/plain; charset=utf-8"];
   headers.push(`Message-ID: <${subject.length}-${text.length}@kopidlno.cz>`);
   return `${headers.filter(Boolean).join("\r\n")}\r\n\r\n${text}`;
 }
@@ -90,13 +90,22 @@ test("text bez citace a podpisu", () => {
   assert.equal(freshText("nahoře\n> citace\ndole"), "nahoře\ndole");
 });
 
-test("ověření bere jen hlavičku Cloudflare nad Received a doménu odesílatele", () => {
-  const headers = (auth) => [{ key: "arc-authentication-results", value: auth }, { key: "received", value: "by mx.cloudflare.net" }];
-  assert.equal(authVerdict(headers(PASSED.slice(PASSED.indexOf(":") + 2)), "knihovna@kopidlno.cz").verified, true);
-  assert.equal(authVerdict(headers("i=1; mx.cloudflare.net; dmarc=pass header.from=jinde.cz"), "knihovna@kopidlno.cz").verified, false);
-  // Podvržená hlavička pod Received (napsal ji odesílatel) se nepočítá.
-  const forged = [{ key: "received", value: "by mx.cloudflare.net" }, { key: "authentication-results", value: "mx.cloudflare.net; dmarc=pass header.from=kopidlno.cz" }];
-  assert.equal(authVerdict(forged, "knihovna@kopidlno.cz").verified, false);
+test("ověření bere jen první Authentication-Results od Cloudflare a doménu odesílatele", () => {
+  // Pořadí jako u skutečného e-mailu z Gmailu, který prošel Cloudflare.
+  const cloudflare = (result) => [
+    { key: "received", value: "from mail-ot1.google.com by mx.cloudflare.net" },
+    { key: "arc-authentication-results", value: `i=2; mx.cloudflare.net; ${result}` },
+    { key: "authentication-results", value: `mx.cloudflare.net; ${result}` },
+    { key: "received", value: "by 2002:a05 with SMTP" },
+  ];
+  const pass = "dkim=pass header.d=gmail.com header.s=20251104; dmarc=pass header.from=gmail.com policy.dmarc=none; spf=pass smtp.mailfrom=jana@gmail.com";
+  assert.equal(authVerdict(cloudflare(pass), "jana@gmail.com").verified, true);
+  assert.equal(authVerdict(cloudflare(pass), "jana@kopidlno.cz").verified, false);
+  // Podvržený e-mail: Cloudflare napíše fail, odesílatelova vlastní hlavička pod ním se nepočítá.
+  const forged = [...cloudflare("dkim=none; dmarc=fail header.from=gmail.com"), { key: "authentication-results", value: `mx.cloudflare.net; ${pass}` }];
+  assert.equal(authVerdict(forged, "jana@gmail.com").verified, false);
+  // Bez hlavičky od Cloudflare nic.
+  assert.equal(authVerdict([{ key: "authentication-results", value: `mx.google.com; ${pass}` }], "jana@gmail.com").verified, false);
 });
 
 test("automatické odpovědi pozná", () => {

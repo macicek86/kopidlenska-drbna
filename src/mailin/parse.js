@@ -46,26 +46,21 @@ function sameDomain(domain, fromDomain) {
   return Boolean(d) && (fromDomain === d || fromDomain.endsWith(`.${d}`));
 }
 
-// Ověření odesílatele: hlavička, kterou e-mailu přidá Cloudflare při příjmu (DMARC nebo DKIM pro doménu z „Od“).
-// Bere se jen hlavička nad první hlavičkou Received: tu nahoru přidává přijímající server a odesílatel ji
-// podvrhnout nemůže, kdežto hlavičky níž mohl napsat kdokoli. Když ji Cloudflare nepřidá, e-mail je neověřený
-// a změny z něj jdou ke schválení.
+// Ověření odesílatele: výsledek kontroly, který e-mailu při příjmu přidá Cloudflare (DMARC nebo DKIM pro doménu z „Od“).
+// Cloudflare dává nahoru svůj blok: Received, ARC-*, Received-SPF, Authentication-Results. Bere se jen první
+// Authentication-Results v e-mailu a jen když je od mx.cloudflare.net: odesílatel může vlastní napsat až pod něj.
+// Další hlavičky (i se stejným jménem) se nečtou, mohl je podvrhnout. Neověřený e-mail jde ke schválení.
 export function authVerdict(headers, fromEmail) {
   const fromDomain = domainOf(fromEmail);
-  const lines = [];
-  for (const header of headers ?? []) {
-    const key = String(header.key ?? "").toLowerCase();
-    if (key === "received") break;
-    if ((key === "authentication-results" || key === "arc-authentication-results") && /cloudflare/i.test(header.value)) lines.push(String(header.value));
+  const first = (headers ?? []).find((header) => String(header.key ?? "").toLowerCase() === "authentication-results");
+  const line = String(first?.value ?? "").replace(/\s+/g, " ").trim();
+  if (!/^mx\.cloudflare\.net\s*;/i.test(line)) return { verified: false, auth: line };
+  const dmarc = /\bdmarc=pass\b[^;]*?header\.from=([^\s;]+)/i.exec(line);
+  if (dmarc && sameDomain(dmarc[1], fromDomain)) return { verified: true, auth: line };
+  for (const dkim of line.matchAll(/\bdkim=pass\b[^;]*?header\.d=([^\s;]+)/gi)) {
+    if (sameDomain(dkim[1], fromDomain)) return { verified: true, auth: line };
   }
-  for (const line of lines) {
-    const dmarc = /\bdmarc=pass\b[^;]*?header\.from=([^\s;]+)/i.exec(line);
-    if (dmarc && sameDomain(dmarc[1], fromDomain)) return { verified: true, auth: line };
-    for (const dkim of line.matchAll(/\bdkim=pass\b[^;]*?header\.d=([^\s;]+)/gi)) {
-      if (sameDomain(dkim[1], fromDomain)) return { verified: true, auth: line };
-    }
-  }
-  return { verified: false, auth: lines[0] ?? "" };
+  return { verified: false, auth: line };
 }
 
 // Když ověření neprojde: pořadí prvních hlaviček a všechno, co se týká ověření, ať jde ze záznamu
