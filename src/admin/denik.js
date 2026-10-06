@@ -3,12 +3,11 @@ import { MODEL } from "../claude.js";
 import { DEFAULT_FEED_URL } from "../denik/feed.js";
 import { DEFAULT_FRESH_DAYS, denikRunning } from "../denik/store.js";
 import { esc } from "../view.js";
-import { entryDatesLine, importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDatesLine, importEntryItem, madeLinks, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/denik";
-const PICK = "vyber-clanku";
 
 function entryDetail(entry) {
   const made = madeLinks(entry);
@@ -27,8 +26,8 @@ function entryDetail(entry) {
 
 function settingsForm(settings) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
-    ${check("enabled", "1", settings.enabled, "Kontrolovat Deník automaticky", "Drbna se podívá každé čtyři hodiny a nové články o Kopidlnu rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď články jen načte a zpracuje se, co vyberete.")}
-    ${field("Automaticky jen články z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na Deníku. Starší články automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
+    ${check("enabled", "1", settings.enabled, "Kontrolovat Deník automaticky", "Drbna se podívá každé čtyři hodiny a nové články o Kopidlnu rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď udělá totéž hned.")}
+    ${field("Automaticky jen články z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na Deníku. Starší články automatika nechá být a počkají, až je pustíte ručně v detailu. Ty pak dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce a odstávky jako skryté.")}
     ${check("withFootball", "1", settings.football, "Brát i fotbal", "Fotbal FK Kopidlno má drbna z webu klubu. Zapněte, jen pokud ho chcete i z Deníku.")}
     ${check("sourceLink", "1", settings.sourceLink, "Pod zprávu dát odkaz na článek", "Jen nenápadný odkaz Zdroj na konci. V textu samotném se Deník nezmiňuje nikdy.")}
@@ -55,7 +54,7 @@ function statusPanel(data, settings, entries) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji články…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: denikRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte vybrané články. Jeden jí trvá asi půl minuty." })}
+    ${workingNote({ running: denikRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte články. Jeden jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -74,7 +73,7 @@ export function adminDenik(ctx, data, message, query = {}) {
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries)}
-    ${panel({ id: "clanky-deniku", title: "Články o Kopidlnu", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat v článcích…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE, PICK)), "Zatím žádný článek o Kopidlnu. Klikněte na Zkontrolovat teď.") })}
+    ${panel({ id: "clanky-deniku", title: "Články o Kopidlnu", count: entries.length, filter: entries.length > 6 ? "Hledat v článcích…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE)), "Zatím žádný článek o Kopidlnu. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "denik", message, body, { title: "Deník" });
 }

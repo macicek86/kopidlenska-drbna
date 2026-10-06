@@ -179,15 +179,17 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
 }
 
 // Stáhne RSS a nové články si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
-async function collect(env, source, settings, fetchImpl, { manual = false } = {}) {
+async function collect(env, source, settings, fetchImpl) {
   const feed = await source.fetchItems(settings.feedUrls, { fetchImpl });
   if (!feed.ok) {
     await writeSkolaStatus(env, source, { status: "error", note: feed.error });
     return feed;
   }
   const today = pragueNow().date;
+  // Odložené pozvánky, kterým nastal den (`defer.js`), jdou zpátky do fronty.
+  if (source.defer) await reopenDeferred(env, source, today);
   const isOld = (item) => !isFresh(importSourceDate(item, today), today, settings.freshDays);
-  return { ok: true, warning: feed.warning, added: await rememberSkolaItems(env, source, feed.items, { manual, isOld }) };
+  return { ok: true, warning: feed.warning, added: await rememberSkolaItems(env, source, feed.items, { isOld }) };
 }
 
 // Další článek z fronty. Automatický, který mezitím zestárl (třeba po dlouhé pauze), jde stranou mezi starší.
@@ -225,7 +227,6 @@ export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola 
     let added = 0;
     let warning = "";
     if (settings.enabled) {
-      if (source.defer) await reopenDeferred(env, source, pragueNow().date);
       const collected = await collect(env, source, settings, fetchImpl);
       if (!collected.ok) return collected;
       ({ added, warning } = collected);
@@ -245,17 +246,17 @@ export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola 
   }
 }
 
-// Tlačítko „Zkontrolovat teď“: jen načte nové články. Zpracuje se až to, co redakce vybere.
-export async function checkSkolaNow(env, request, source, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“: stáhne nové články.
+async function collectNow(env, request, source, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadSkolaSettings(env, source);
   const lock = await lockSkola(env, source, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: false, error: BUSY };
   try {
-    const collected = await collect(env, source, settings, fetchImpl, { manual: true });
+    const collected = await collect(env, source, settings, fetchImpl);
     if (!collected.ok) return collected;
-    const found = collected.added ? `Načteno nových článků: ${collected.added}. Vyberte, které má Drběna zpracovat.` : "Nic nového.";
+    const found = collected.added ? `Načteno nových článků: ${collected.added}. Drběna je teď zpracuje.` : "Nic nového.";
     await writeSkolaStatus(env, source, { status: collected.warning ? "partial" : "ok", note: collected.warning ? `${found} Jeden kanál nejde: ${collected.warning}` : found });
     return { ok: true, added: collected.added };
   } finally {
@@ -263,15 +264,23 @@ export async function checkSkolaNow(env, request, source, { fetchImpl = fetch } 
   }
 }
 
-// Ručně vybrané zpracuje na pozadí po krátkých dávkách. Volá se po výběru i při každém otevření stránky školy.
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové články a čerstvé začne psát na pozadí po krátkých dávkách
+// (stránka školy se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
+export async function checkSkolaNow(env, request, source, { ctx = null, fetchImpl = fetch } = {}) {
+  const collected = await collectNow(env, request, source, { fetchImpl });
+  if (collected.ok) await continueSkola(env, source, { ctx, fetchImpl });
+  return collected;
+}
+
+// Čekající články (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje na pozadí po krátkých dávkách. Volá se po kliknutí i při každém otevření stránky školy.
 export async function continueSkola(env, source, { ctx = null, fetchImpl = fetch, ask = askSkola } = {}) {
-  if (!(await countWaitingSkola(env, source, { manualOnly: true }))) return { ok: true, idle: true };
+  if (!(await countWaitingSkola(env, source))) return { ok: true, idle: true };
   const lock = await lockSkola(env, source, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadSkolaSettings(env, source);
   const work = async () => {
     try {
-      await writeBatch(env, source, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK, manualOnly: true });
+      await writeBatch(env, source, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
     } finally {
       await unlockSkola(env, source, lock);
     }

@@ -95,11 +95,10 @@ export const countWaitingDenik = (env, options) => countQueued(env, "denik_items
 export const selectDenikItems = (env, ids) => markManual(env, "denik_items", ids);
 
 // Nové články o Kopidlnu si zapamatuje. Starší (`isOld`) jen odloží stranou.
-// Při ručním načtení počkají všechny, až redakce vybere, které zpracovat.
-export async function rememberDenikItems(env, items, { manual = false, isOld = () => false } = {}) {
+export async function rememberDenikItems(env, items, { isOld = () => false } = {}) {
   let added = 0;
   for (const item of items) {
-    const status = manual ? "nacteno" : isOld(item) ? "stare" : "nove";
+    const status = isOld(item) ? "stare" : "nove";
     const result = await env.DB.prepare(
       `insert or ignore into denik_items (guid, link, title, text, published_at, status, reason) values (?, ?, ?, ?, ?, ?, ?)`,
     )

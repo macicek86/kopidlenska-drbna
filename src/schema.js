@@ -2,7 +2,7 @@
 // Migrace běží jen když verze v tabulce schema_version nesedí se SCHEMA_VERSION. Kdo změní migrace
 // (nová tabulka, sloupec, index nebo výchozí data), zvedne SCHEMA_VERSION; test/schema.test.js to hlídá.
 import { AD_SEEDS } from "./ads.js";
-import { addColumn } from "./db-core.js";
+import { addColumn, IMPORT_ITEM_TABLES } from "./db-core.js";
 import { DOCTOR_SEEDS } from "./doctors.js";
 import { KOPIDLNO } from "./outages.js";
 import { ensurePlaceTables } from "./places-db.js";
@@ -32,7 +32,7 @@ import { ensureNotifyTables } from "./notify.js";
 import { ensureSearchTables } from "./search/store.js";
 import { ensureMailinTables } from "./mailin/store.js";
 
-export const SCHEMA_VERSION = 46;
+export const SCHEMA_VERSION = 47;
 
 let schemaReady = false;
 
@@ -418,6 +418,13 @@ async function seedAds(env) {
   await env.DB.prepare("update settings set ads_seeded = 1 where id = 1").run();
 }
 
+// Výběr položek importu zaškrtáváním skončil (Zkontrolovat teď dělá totéž co cron). Co na výběr čekalo, je přeskočené.
+async function retireLoadedItems(env) {
+  for (const table of IMPORT_ITEM_TABLES) {
+    await env.DB.prepare(`update ${table} set status = 'preskoceno', reason = 'Čekalo na ruční výběr, který už není. Jde pustit v detailu.' where status = 'nacteno'`).run();
+  }
+}
+
 async function migrateSchema(env) {
   await createDeskTables(env);
   await ensureNoticeTables(env);
@@ -441,6 +448,7 @@ async function migrateSchema(env) {
   await ensureLoginTables(env);
   await ensureNotifyTables(env);
   await ensureMailinTables(env);
+  await retireLoadedItems(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",
   ).first();

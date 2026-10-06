@@ -112,7 +112,7 @@ export async function renderAdmin(env, url, ctx, data, execution) {
   }
   if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
   if (tab === "munipolis") {
-    // Otevřená stránka dopisuje, co redakce vybrala (na pozadí, po krátkých dávkách).
+    // Otevřená stránka dopisuje frontu (na pozadí, po krátkých dávkách).
     if (data.signedIn && (await continueImport(env, { ctx: execution })).background) data.importSettings = await loadImportSettings(env);
     return html(adminMunipolis(ctx, data, message, query));
   }

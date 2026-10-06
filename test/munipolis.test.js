@@ -326,10 +326,11 @@ test("redakce Munipolisu ukáže, že Drběna čte, a obnoví se", () => {
   };
   const busy = adminMunipolis(CTX, data, { text: "", kind: "ok" }, {});
   assert.match(busy, /data-refresh="8"/);
-  const idle = adminMunipolis(CTX, { ...data, importSettings: { ...data.importSettings, runningAt: "" } }, { text: "", kind: "ok" }, {});
+  const waiting = adminMunipolis(CTX, { ...data, importSettings: { ...data.importSettings, runningAt: "" } }, { text: "", kind: "ok" }, {});
+  assert.match(waiting, /data-refresh="8"[^>]*>Drběna právě čte zprávy města\. Jedna jí trvá asi půl minuty\. Čeká ještě 1\./);
+  assert.doesNotMatch(waiting, /form="vyber-zprav"/);
+  const idle = adminMunipolis(CTX, { ...data, importItems: [], importSettings: { ...data.importSettings, runningAt: "" } }, { text: "", kind: "ok" }, {});
   assert.doesNotMatch(idle, /data-refresh=/);
-  assert.match(idle, /Na zpracování čeká 1\. Kontrola je vypnutá, zaškrtněte je/);
-  assert.match(idle, /value="7" form="vyber-zprav"/);
 });
 
 test("ručně vybraná zpráva z Munipolisu dostane pražský den zveřejnění", () => {

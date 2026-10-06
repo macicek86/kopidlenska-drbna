@@ -154,11 +154,10 @@ export const countWaitingItems = (env, options) => countQueued(env, "import_item
 export const selectImportItems = (env, ids) => markManual(env, "import_items", ids);
 
 // Nové zprávy z kanálu si zapamatuje. Starší (`isOld`) jen odloží stranou.
-// Při ručním načtení počkají všechny, až redakce vybere, které zpracovat.
-export async function rememberItems(env, items, { manual = false, isOld = () => false } = {}) {
+export async function rememberItems(env, items, { isOld = () => false } = {}) {
   let added = 0;
   for (const item of items) {
-    const status = manual ? "nacteno" : isOld(item) ? "stare" : "nove";
+    const status = isOld(item) ? "stare" : "nove";
     const result = await env.DB.prepare(
       `insert or ignore into import_items (guid, link, title, text, images, published_at, status, reason)
        values (?, ?, ?, ?, ?, ?, ?, ?)`,

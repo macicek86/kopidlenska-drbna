@@ -128,11 +128,10 @@ export const countWaitingSkola = (env, source, options) => countQueued(env, sour
 export const selectSkolaItems = (env, source, ids) => markManual(env, source.itemsTable, ids);
 
 // Nové články si zapamatuje. Starší (`isOld`) jen odloží stranou.
-// Při ručním načtení počkají všechny, až redakce vybere, které zpracovat.
-export async function rememberSkolaItems(env, source, items, { manual = false, isOld = () => false } = {}) {
+export async function rememberSkolaItems(env, source, items, { isOld = () => false } = {}) {
   let added = 0;
   for (const item of items) {
-    const status = manual ? "nacteno" : isOld(item) ? "stare" : "nove";
+    const status = isOld(item) ? "stare" : "nove";
     const result = await env.DB.prepare(
       `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, documents, section, term, published_at, status, reason)
        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

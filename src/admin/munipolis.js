@@ -3,12 +3,11 @@ import { MODEL } from "../munipolis/ai.js";
 import { DEFAULT_FEED_URL } from "../munipolis/feed.js";
 import { DEFAULT_FRESH_DAYS, importRunning } from "../munipolis/store.js";
 import { esc } from "../view.js";
-import { entryDatesLine, importEntryItem, madeLinks, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDatesLine, importEntryItem, madeLinks, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { callout, cancelLink, check, field, formFoot, icon, input, list, modal, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/munipolis";
-const PICK = "vyber-zprav";
 
 function entryDetail(entry) {
   const made = madeLinks(entry);
@@ -28,8 +27,8 @@ function entryDetail(entry) {
 
 function settingsForm(settings) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
-    ${check("enabled", "1", settings.enabled, "Kontrolovat Munipolis automaticky", "Drbna se podívá každé čtyři hodiny a nové zprávy rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď zprávy jen načte a zpracuje se, co vyberete.")}
-    ${field("Automaticky jen zprávy z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na Munipolisu. Starší zprávy (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
+    ${check("enabled", "1", settings.enabled, "Kontrolovat Munipolis automaticky", "Drbna se podívá každé čtyři hodiny a nové zprávy rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď udělá totéž hned.")}
+    ${field("Automaticky jen zprávy z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na Munipolisu. Starší zprávy (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je pustíte ručně v detailu. Ty pak dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce a odstávky jako skryté.")}
     ${field("Adresa RSS", `<input class="${input}" type="url" name="feedUrl" required maxlength="300" value="${esc(settings.feedUrl || DEFAULT_FEED_URL)}">`)}
     ${VOICE_NOTE}
@@ -54,7 +53,7 @@ function statusPanel(data, settings, entries) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji zprávy…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: importRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte vybrané zprávy města. Jedna jí trvá asi půl minuty." })}
+    ${workingNote({ running: importRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte zprávy města. Jedna jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -69,11 +68,11 @@ export function adminMunipolis(ctx, data, message, query = {}) {
   if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
   const body = `${pageHead(
     "Munipolis",
-    "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek, zavření a změny otevírací doby propíše rovnou a ostatní přepíše po svém. Když už stejná věc na drbně je, nechá ji být. Po ručním načtení zpracuje jen to, co zaškrtnete.",
+    "Koza Drběna čte zprávy města z Munipolisu, třídí je do rubrik, akcí a odstávek, zavření a změny otevírací doby propíše rovnou a ostatní přepíše po svém. Když už stejná věc na drbně je, nechá ji být.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries)}
-    ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE, PICK)), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
+    ${panel({ id: "zpravy-mesta", title: "Zprávy města", count: entries.length, filter: entries.length > 6 ? "Hledat ve zprávách…" : "", body: list(entries.map((entry) => importEntryItem(entry, BASE)), "Zatím žádná zpráva. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "munipolis", message, body, { title: "Munipolis" });
 }

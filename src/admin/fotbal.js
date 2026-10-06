@@ -6,12 +6,11 @@ import { DEFAULT_TRUTH_URL } from "../fotbal/fotbalunas.js";
 import { DEFAULT_FRESH_DAYS, footballRunning, INTERVALS } from "../fotbal/store.js";
 import { esc } from "../view.js";
 import { rubricOptions } from "./article-form.js";
-import { entryDates, entryDatesLine, pickBox, pickForm, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
+import { entryDates, entryDatesLine, processButton, refLink, stamp, statusBadge, textBlock, VOICE_NOTE, workingNote } from "./imports.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, modalLink, pageHead, panel } from "./ui.js";
 
 const BASE = "/redakce/fotbal";
-const PICK = "vyber-aktualit";
 
 function day(date) {
   const match = String(date ?? "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -35,7 +34,7 @@ function entryItem(entry) {
     title: entry.title,
     meta: [...entryDates(entry, day(entry.publishedOn)).map(esc), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
     badges: statusBadges(entry),
-    actions: `${pickBox(entry, PICK)}${modalLink(`${BASE}?zprava=${entry.id}`, "Detail")}`,
+    actions: `${modalLink(`${BASE}?zprava=${entry.id}`, "Detail")}`,
     search: `${entry.title} ${entry.reason}`,
   });
 }
@@ -58,9 +57,9 @@ function intervalOptions(current) {
 
 function settingsForm(settings, rubrics) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
-    ${check("enabled", "1", settings.enabled, "Kontrolovat web klubu automaticky", "Nové aktuality rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď aktuality jen načte a zpracuje se, co vyberete.")}
+    ${check("enabled", "1", settings.enabled, "Kontrolovat web klubu automaticky", "Nové aktuality rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď udělá totéž hned.")}
     ${field("Jak často", `<select class="${input}" name="intervalHours">${intervalOptions(settings.intervalHours)}</select>`)}
-    ${field("Automaticky jen aktuality z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na webu klubu, u zápasu podle dne, kdy se hrál. Starší (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.")}
+    ${field("Automaticky jen aktuality z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? DEFAULT_FRESH_DAYS}">`, "Dní podle data na webu klubu, u zápasu podle dne, kdy se hrál. Starší (třeba po prvním zapnutí nebo dlouhé pauze) automatika nechá být a počkají, až je pustíte ručně v detailu. Ty pak dostanou datum ze zdroje.")}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká každý článek jako návrh na schválení.")}
     ${field("Rubrika", `<select class="${input}" name="rubric_id">${rubricOptions(rubrics, { rubricId: settings.rubricId })}</select>`)}
     ${check("previews", "1", settings.previews, "Psát pozvánky na zápasy", "Když klub ohlásí zápas, který se teprve hraje.")}
@@ -93,7 +92,7 @@ function statusPanel(data, settings, entries) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji aktuality…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: footballRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě píše vybrané aktuality. Jeden článek jí trvá asi půl minuty." })}
+    ${workingNote({ running: footballRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě píše aktuality. Jeden článek jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
@@ -108,11 +107,11 @@ export function adminFootball(ctx, data, message, query = {}) {
   if (open) dialogs.push(modal({ id: "okno", title: open.title, size: "wide", close: BASE, open: true, body: entryDetail(open) }));
   const body = `${pageHead(
     "Fotbal",
-    "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu, datum a výsledek ověří na fotbalunas.cz. Po ručním načtení zpracuje jen to, co zaškrtnete.",
+    "Koza Drběna čte aktuality na webu FK Kopidlno. Po zápase napíše, jak to dopadlo, před zápasem pozve sousedy na hřiště. Výsledky, góly a tabulku si doplní z rozpisu klubu, datum a výsledek ověří na fotbalunas.cz.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings, entries)}
-    ${panel({ id: "aktuality-klubu", title: "Aktuality klubu", count: entries.length, tools: entries.some((entry) => pickBox(entry, PICK)) ? pickForm(BASE, PICK) : "", filter: entries.length > 6 ? "Hledat v aktualitách…" : "", body: list(entries.map(entryItem), "Zatím žádná aktualita. Klikněte na Zkontrolovat teď.") })}
+    ${panel({ id: "aktuality-klubu", title: "Aktuality klubu", count: entries.length, filter: entries.length > 6 ? "Hledat v aktualitách…" : "", body: list(entries.map(entryItem), "Zatím žádná aktualita. Klikněte na Zkontrolovat teď.") })}
     ${dialogs.join("")}`;
   return adminShell(ctx, data, "fotbal", message, body, { title: "Fotbal" });
 }

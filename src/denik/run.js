@@ -127,7 +127,7 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
   return { ok: true, status: "hotovo", usage: answer.usage };
 }
 
-async function collect(env, settings, fetchImpl, { manual = false } = {}) {
+async function collect(env, settings, fetchImpl) {
   const feed = await fetchDenikFeed(settings.feedUrl, { fetchImpl, football: settings.football });
   if (!feed.ok) {
     await writeDenikStatus(env, { status: "error", note: feed.error });
@@ -135,7 +135,7 @@ async function collect(env, settings, fetchImpl, { manual = false } = {}) {
   }
   const today = pragueNow().date;
   const isOld = (item) => !isFresh(importSourceDate(item, today), today, settings.freshDays);
-  return { ok: true, added: await rememberDenikItems(env, feed.items, { manual, isOld }) };
+  return { ok: true, added: await rememberDenikItems(env, feed.items, { isOld }) };
 }
 
 async function nextFresh(env, settings, manualOnly) {
@@ -181,17 +181,17 @@ export async function runDenik(env, { fetchImpl = fetch, ask = askDenik } = {}) 
   }
 }
 
-// Tlačítko „Zkontrolovat teď“: jen načte nové články. Zpracuje se až to, co redakce vybere.
-export async function checkDenikNow(env, request, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“: stáhne nové články.
+async function collectNow(env, request, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadDenikSettings(env);
   const lock = await lockDenik(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: false, error: BUSY };
   try {
-    const collected = await collect(env, settings, fetchImpl, { manual: true });
+    const collected = await collect(env, settings, fetchImpl);
     if (!collected.ok) return collected;
-    const note = collected.added ? `Načteno nových článků: ${collected.added}. Vyberte, které má Drběna zpracovat.` : "Nic nového o Kopidlnu.";
+    const note = collected.added ? `Načteno nových článků: ${collected.added}. Drběna je teď zpracuje.` : "Nic nového o Kopidlnu.";
     await writeDenikStatus(env, { status: "ok", note });
     return { ok: true, added: collected.added };
   } finally {
@@ -199,15 +199,23 @@ export async function checkDenikNow(env, request, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Ručně vybrané zpracuje na pozadí po krátkých dávkách. Volá se po výběru i při každém otevření stránky Deník.
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové články a čerstvé začne psát na pozadí po krátkých dávkách
+// (stránka Deník se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
+export async function checkDenikNow(env, request, { ctx = null, fetchImpl = fetch } = {}) {
+  const collected = await collectNow(env, request, { fetchImpl });
+  if (collected.ok) await continueDenik(env, { ctx, fetchImpl });
+  return collected;
+}
+
+// Čekající články (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje na pozadí po krátkých dávkách. Volá se po kliknutí i při každém otevření stránky Deník.
 export async function continueDenik(env, { ctx = null, fetchImpl = fetch, ask = askDenik } = {}) {
-  if (!(await countWaitingDenik(env, { manualOnly: true }))) return { ok: true, idle: true };
+  if (!(await countWaitingDenik(env))) return { ok: true, idle: true };
   const lock = await lockDenik(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadDenikSettings(env);
   const work = async () => {
     try {
-      await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK, manualOnly: true });
+      await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
     } finally {
       await unlockDenik(env, lock);
     }

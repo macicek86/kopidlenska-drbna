@@ -225,14 +225,15 @@ test("když Drběna píše, redakce to ukáže a obnoví se; jinak řekne, kolik
   const busy = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "2999-01-01T00:00:00.000Z-x" } }, { text: "", kind: "ok" }, { importId: 2 });
   assert.match(busy, /data-refresh="8"/);
   assert.match(busy, /Drběna právě píše/);
-  const idle = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
+  // Čekající fronta (i bez běžícího zámku) stránku obnovuje, každé otevření pošle další dávku. Zaškrtávání už není.
+  const waiting = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
+  assert.match(waiting, /data-refresh="8"[^>]*>Drběna právě píše aktuality\. Jeden článek jí trvá asi půl minuty\. Čeká ještě 1\./);
+  assert.doesNotMatch(waiting, /name="ids"|\/vybrat/);
+  const idle = adminFootball(ctx, { ...base, footballItems: [base.footballItems[1]], footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
   assert.doesNotMatch(idle, /data-refresh=/);
-  assert.match(idle, /Na automatické zpracování čeká 1\. Dopíše je cron/);
-  assert.match(idle, /name="ids" value="2" form="vyber-aktualit"/);
-  assert.match(idle, /<form id="vyber-aktualit" method="post" action="\/redakce\/fotbal\/vybrat">/);
 });
 
-test("ručně načtené čekají na výběr, vybrané se píšou a stránka se obnovuje", () => {
+test("aktualita puštěná v detailu má štítek, vypnutá automatika to řekne", () => {
   const row = (id, status, manual = false) => ({ id, guid: `${id}:zapas`, kind: "zapas", link: "", title: `Zápas ${id}`, text: "", extra: "", images: [], cover: "", publishedOn: "2026-09-23", status, reason: "", duplicateOf: "", attempts: 0, manual, articleId: null, proposalId: status === "hotovo" ? 4 : null });
   const data = {
     signedIn: true,
@@ -240,19 +241,14 @@ test("ručně načtené čekají na výběr, vybrané se píšou a stránka se o
     hasApiKey: true,
     rubrics: [],
     footballSettings: { enabled: false, autoPublish: false, clubUrl: BASE, voice: "", rubricId: null, previews: true, clubNews: false, useCrest: true, intervalHours: 24, checkedAt: "", status: "", note: "", runningAt: "" },
-    footballItems: [row(1, "nacteno"), row(2, "hotovo"), row(3, "nove", true)],
+    footballItems: [row(2, "hotovo"), row(3, "nove", true)],
   };
   const ctx = { path: "/redakce/fotbal", copy: {}, mainOrigin: "", origin: "" };
   const page = adminFootball(ctx, data, { text: "", kind: "ok" }, {});
-  assert.match(page, /Načteno, čeká na výběr/);
-  assert.match(page, /Vybráno, Drběna se k tomu dostane/);
-  assert.match(page, /data-refresh="8"[^>]*>Drběna právě píše vybrané aktuality\. Jeden článek jí trvá asi půl minuty\. Vybraných zbývá 1\./);
-  assert.match(page, /value="1" form="vyber-aktualit"/);
-  assert.doesNotMatch(page, /value="2" form=/);
-  assert.doesNotMatch(page, /value="3" form=/);
-  const loaded = adminFootball(ctx, { ...data, footballItems: [row(1, "nacteno")] }, { text: "", kind: "ok" }, {});
-  assert.match(loaded, /Načteno a čeká na výběr: 1\./);
-  assert.match(loaded, /datum ze zdroje/);
+  assert.match(page, /Puštěno, Drběna se k tomu dostane/);
+  assert.match(page, /data-refresh="8"/);
+  const quiet = adminFootball(ctx, { ...data, footballItems: [row(2, "hotovo")] }, { text: "", kind: "ok" }, {});
+  assert.match(quiet, /Automatika je vypnutá\. Nové věci stáhne a zpracuje jen tlačítko Zkontrolovat teď\./);
 });
 
 test("ručně vybraný zápas dostane datum, kdy se hrál, nikdy ne budoucí", () => {

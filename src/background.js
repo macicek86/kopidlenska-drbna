@@ -67,7 +67,7 @@ export async function markManual(env, table, ids) {
 }
 
 // Automatika bere jen čerstvé položky (podle data ve zdroji), ať se po prvním spuštění nebo dlouhé pauze
-// drbna nenaplní starými věcmi s dnešním datem. Starší počkají, až je redakce vybere ručně.
+// drbna nenaplní starými věcmi s dnešním datem. Starší počkají, až je redakce pustí ručně v detailu.
 export function isFresh(sourceDay, today, days) {
   if (!sourceDay) return true;
   const limit = new Date(`${today}T12:00:00Z`);
@@ -80,7 +80,7 @@ export function readFreshDays(value, fallback) {
   return Number.isInteger(days) && days >= 1 && days <= 60 ? days : fallback;
 }
 
-export const STALE_REASON = "Ve zdroji je starší, než kolik dní bere automatika. Zaškrtněte ji, pokud ji chcete zpracovat.";
+export const STALE_REASON = "Ve zdroji je starší, než kolik dní bere automatika. Pokud ji chcete zpracovat, pusťte ji v detailu.";
 
 export const CLICK_LOCK_SECONDS = 90;
 export const CLICK_BUDGET_MS = 8_000;

@@ -96,8 +96,7 @@ export function footballSourceDate(item, today) {
 }
 
 // Projde úvodní stránku a aktuality klubu. Nové aktuality uloží do fronty, starší (podle data ve zdroji) a vypnuté rovnou odloží.
-// Při ručním načtení (`manual`) počkají všechny, až redakce vybere, které zpracovat.
-export async function collectNews(env, settings, { fetchImpl = fetch, manual = false } = {}) {
+export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
   const home = await fetchPage(settings.clubUrl, fetchImpl);
   if (!home.ok) return home;
   const pages = clubPages(home.html, settings.clubUrl);
@@ -145,9 +144,7 @@ export async function collectNews(env, settings, { fetchImpl = fetch, manual = f
     };
     const old = !isFresh(footballSourceDate(item, today), today, settings.freshDays);
     const off = (entry.kind === "pozvanka" && !settings.previews) || (entry.kind === "clanek" && !settings.clubNews);
-    if (manual) {
-      if (await rememberFootballItem(env, item, { status: "nacteno" })) added += 1;
-    } else if (old) await rememberFootballItem(env, item, { status: "stare", reason: STALE_REASON });
+    if (old) await rememberFootballItem(env, item, { status: "stare", reason: STALE_REASON });
     else if (off) await rememberFootballItem(env, item, { status: "preskoceno", reason: "Tenhle druh aktualit je v nastavení vypnutý." });
     else if (await rememberFootballItem(env, item)) added += 1;
   }

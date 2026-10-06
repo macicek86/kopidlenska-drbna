@@ -161,7 +161,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
 }
 
 // Stáhne RSS a nové zprávy si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
-async function collect(env, settings, fetchImpl, { manual = false } = {}) {
+async function collect(env, settings, fetchImpl) {
   const feed = await fetchFeed(settings.feedUrl, { fetchImpl });
   if (!feed.ok) {
     await writeImportStatus(env, { status: "error", note: feed.error });
@@ -169,7 +169,7 @@ async function collect(env, settings, fetchImpl, { manual = false } = {}) {
   }
   const today = pragueNow().date;
   const isOld = (item) => !isFresh(importSourceDate(item, today), today, settings.freshDays);
-  return { ok: true, added: await rememberItems(env, feed.items, { manual, isOld }) };
+  return { ok: true, added: await rememberItems(env, feed.items, { isOld }) };
 }
 
 // Další zpráva z fronty. Automatická, která mezitím zestárla (třeba po dlouhé pauze), jde stranou mezi starší.
@@ -216,17 +216,17 @@ export async function runImport(env, { fetchImpl = fetch, ask = askClaude } = {}
   }
 }
 
-// Tlačítko „Zkontrolovat teď“: jen načte nové zprávy. Zpracuje se až to, co redakce vybere.
-export async function checkImportNow(env, request, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“: stáhne nové zprávy.
+async function collectNow(env, request, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadImportSettings(env);
   const lock = await lockImport(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: false, error: BUSY };
   try {
-    const collected = await collect(env, settings, fetchImpl, { manual: true });
+    const collected = await collect(env, settings, fetchImpl);
     if (!collected.ok) return collected;
-    const note = collected.added ? `Načteno nových zpráv: ${collected.added}. Vyberte, které má Drběna zpracovat.` : "Nic nového.";
+    const note = collected.added ? `Načteno nových zpráv: ${collected.added}. Drběna je teď zpracuje.` : "Nic nového.";
     await writeImportStatus(env, { status: "ok", note });
     return { ok: true, added: collected.added };
   } finally {
@@ -234,16 +234,24 @@ export async function checkImportNow(env, request, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Ručně vybrané zprávy zpracuje na pozadí po krátkých dávkách. Volá se po výběru i při každém otevření stránky
-// Munipolis, takže se vybrané dopisují, dokud je stránka otevřená (sama se obnovuje).
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové zprávy a čerstvé začne psát na pozadí po krátkých dávkách
+// (stránka Munipolis se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
+export async function checkImportNow(env, request, { ctx = null, fetchImpl = fetch } = {}) {
+  const collected = await collectNow(env, request, { fetchImpl });
+  if (collected.ok) await continueImport(env, { ctx, fetchImpl });
+  return collected;
+}
+
+// Čekající zprávy (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje na pozadí po krátkých dávkách. Volá se po kliknutí
+// i při každém otevření stránky Munipolis, takže se fronta dopisuje, dokud je stránka otevřená (sama se obnovuje).
 export async function continueImport(env, { ctx = null, fetchImpl = fetch, ask = askClaude } = {}) {
-  if (!(await countWaitingItems(env, { manualOnly: true }))) return { ok: true, idle: true };
+  if (!(await countWaitingItems(env))) return { ok: true, idle: true };
   const lock = await lockImport(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadImportSettings(env);
   const work = async () => {
     try {
-      await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK, manualOnly: true });
+      await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
     } finally {
       await unlockImport(env, lock);
     }
@@ -253,7 +261,7 @@ export async function continueImport(env, { ctx = null, fetchImpl = fetch, ask =
   return { ok: true };
 }
 
-// Redakce zaškrtla zprávy (nebo klikla na „Zpracovat teď“ u jedné). Hotové se znovu nezpracují.
+// Redakce pustila zprávu ručně („Zpracovat teď“ v detailu). Hotové se znovu nezpracují.
 export async function selectImport(env, request, ids, options = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;

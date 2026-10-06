@@ -52,25 +52,15 @@ export function queued(entry) {
   return entry.status === "nove" || (entry.status === "chyba" && entry.attempts < MAX_ATTEMPTS);
 }
 
-// Vybraná redakcí a ještě nenapsaná.
+// Puštěná redakcí v detailu a ještě nenapsaná.
 export function picked(entry) {
   return Boolean(entry.manual) && queued(entry);
 }
 
 export function statusBadge(entry) {
-  if (picked(entry)) return badge("Vybráno, Drběna se k tomu dostane", "info");
+  if (picked(entry)) return badge("Puštěno, Drběna se k tomu dostane", "info");
   if (entry.status === "odlozeno" && entry.writeOn) return badge(`Akce v kalendáři, pozvánku napíše ${formatShort(entry.writeOn)}`, "info");
   return badge(STATUS[entry.status] ?? entry.status, TONE[entry.status] ?? "");
-}
-
-// Zaškrtávátko u položky v seznamu. Patří k formuláři `pickForm` přes atribut form, ať se formuláře nevnořují.
-export function pickBox(entry, formId) {
-  if (entry.status === "hotovo" || picked(entry)) return "";
-  return `<label class="pick"><input type="checkbox" name="ids" value="${entry.id}" form="${formId}"> <span>Vybrat</span></label>`;
-}
-
-export function pickForm(base, formId) {
-  return `<form id="${formId}" method="post" action="${base}/vybrat"><button class="btn btn-sm btn-primary" type="submit" data-busy="Posílám Drběně…">Zpracovat vybrané</button></form>`;
 }
 
 export function processButton(base, entry) {
@@ -84,28 +74,15 @@ export function processButton(base, entry) {
   return `<form method="post" action="${base}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Posílám Drběně…">${label}</button></form>`;
 }
 
-export const SOURCE_DATE_NOTE = "Ručně vybrané dostanou datum ze zdroje, ať se starší věci neobjeví na drbně jako nové.";
-
-// Co importu zbývá. Dokud Drběna píše vybrané, stránka se po chvíli sama obnoví (public/admin.js, data-refresh)
-// a každé otevření stránky pošle další dávku (src/index.js).
+// Co importu zbývá. Dokud se fronta zpracovává, stránka se po chvíli sama obnoví (public/admin.js, data-refresh)
+// a každé otevření stránky pošle další dávku (src/admin-get.js). Bez zapnutého importu frontu dopíše jen otevřená stránka.
 export function workingNote({ running, entries, enabled, busy }) {
-  const pickedCount = entries.filter(picked).length;
-  if (running || pickedCount) {
-    const left = pickedCount ? ` Vybraných zbývá ${pickedCount}.` : "";
+  const waiting = entries.filter(queued).length;
+  if (running || waiting) {
+    const left = waiting ? ` Čeká ještě ${waiting}.` : "";
     return `<div class="callout callout-info" data-refresh="8">${esc(busy)}${left} Stránka se sama obnoví.</div>`;
   }
-  const notes = [];
-  const loaded = entries.filter((entry) => entry.status === "nacteno").length;
-  if (loaded) notes.push(`Načteno a čeká na výběr: ${loaded}. Zaškrtněte, co má Drběna zpracovat. ${SOURCE_DATE_NOTE}`);
-  const waiting = entries.filter(queued).length;
-  if (waiting) {
-    notes.push(
-      enabled
-        ? `Na automatické zpracování čeká ${waiting}. Dopíše je cron (běží každé čtyři hodiny).`
-        : `Na zpracování čeká ${waiting}. Kontrola je vypnutá, zaškrtněte je, pokud je chcete zpracovat.`,
-    );
-  }
-  return notes.map((note) => callout(esc(note), "info")).join("");
+  return enabled ? "" : callout("Automatika je vypnutá. Nové věci stáhne a zpracuje jen tlačítko Zkontrolovat teď.", "info");
 }
 
 // V nastavení importů místo pole s povahou: ta je společná na stránce Koza Drběna.
@@ -134,14 +111,14 @@ export function entryDatesLine(entry, source) {
 }
 
 // Řádek převzaté zprávy v seznamu (Munipolis, Deník).
-export function importEntryItem(entry, base, formId) {
+export function importEntryItem(entry, base) {
   const made = madeLinks(entry);
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
   return item({
     title: entry.title,
     meta: [...entryDates(entry).map(esc), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
     badges: `${statusBadge(entry)}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
-    actions: `${pickBox(entry, formId)}${modalLink(`${base}?zprava=${entry.id}`, "Detail")}`,
+    actions: modalLink(`${base}?zprava=${entry.id}`, "Detail"),
     search: `${entry.title} ${entry.reason}`,
   });
 }

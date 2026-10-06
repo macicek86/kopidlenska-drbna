@@ -118,7 +118,6 @@ function importRoutes(base, settingsTable) {
   return {
     [`${base}/ulozit`]: [single(settingsTable, "nastavení")],
     [`${base}/zkontrolovat`]: "always",
-    [`${base}/vybrat`]: "always",
     [`${base}/zpracovat`]: "always",
   };
 }
