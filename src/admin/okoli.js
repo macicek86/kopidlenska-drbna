@@ -56,10 +56,11 @@ function statusPanel(data, settings) {
 
 function sourceItem(source, radiusKm) {
   const out = source.km > radiusKm;
+  const relay = source.relay ? `Přes GitHub, ${source.seenAt ? `naposledy ${stamp(source.seenAt)}` : "zatím nic nepřišlo"}.` : "";
   return item({
     title: source.name,
     meta: esc(`${source.title} · ${source.town} · ${source.km} km · budoucích akcí ${source.upcoming}`),
-    badges: out ? badge("mimo okruh", "warn") : "",
+    badges: [out && badge("mimo okruh", "warn"), relay && `<span class="item-sub">${esc(relay)}</span>`].filter(Boolean).join(""),
     actions: `<a class="btn btn-sm btn-line" href="${esc(source.home)}" target="_blank" rel="noopener noreferrer">Web</a>`,
   });
 }

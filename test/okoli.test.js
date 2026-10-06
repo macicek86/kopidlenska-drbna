@@ -232,3 +232,26 @@ test("víkend: stejná akce z KZMJ i jicin.org jen jednou, vícedenní s rozsahe
   });
   assert.match(text, /- od 1\. 10\. do 7\. 10\., Jičín/);
 });
+
+test("most přes GitHub: bez klíče nic, poslané akce jen ve tvaru čtečky", async () => {
+  const { okoliRelay, readRelayFeed } = await import("../src/okoli/relay.js");
+  const request = (auth) => new Request("https://www.kopidlenskadrbna.org/okoli/prijem?zdroj=kzmj", { headers: auth ? { authorization: auth } : {} });
+  assert.equal((await okoliRelay(request(), {})).status, 503);
+  assert.equal((await okoliRelay(request("Bearer spatne"), { OKOLI_RELAY_TOKEN: "tajne" })).status, 401);
+  const source = { tag: "kzmj", hosts: ["kzmj.cz"] };
+  const feed = readRelayFeed({
+    items: [
+      { guid: "kzmj:biograf_akce:1", stamp: "s", link: "https://kzmj.cz/sekce-biograf/hnizdo/", title: "Hnízdo", kind: "kino", startsOn: "2026-10-17", startsTime: "21:30", place: "Biograf Český ráj" },
+      { guid: "kzmj:divadlo_akce:2", stamp: "t", unchanged: true },
+      { guid: "kzmj:divadlo_akce:3", link: "https://zlo.example/", title: "Podvrh", startsOn: "2026-10-17" },
+      { guid: "jinde:1", link: "https://kzmj.cz/x/", title: "Cizí", startsOn: "2026-10-17" },
+      { guid: "kzmj:divadlo_akce:4", link: "https://kzmj.cz/x/", title: "Bez data", startsOn: "17. 10." },
+    ],
+    listed: ["kzmj:biograf_akce:1", "jinde:2"],
+    complete: true,
+  }, source);
+  assert.deepEqual(feed.items.map((item) => item.guid), ["kzmj:biograf_akce:1", "kzmj:divadlo_akce:2"]);
+  assert.equal(feed.items[0].startsTime, "21:30");
+  assert.deepEqual(feed.listed, ["kzmj:biograf_akce:1"]);
+  assert.equal(feed.complete, true);
+});

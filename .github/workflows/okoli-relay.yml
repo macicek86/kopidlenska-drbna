@@ -1,0 +1,24 @@
+# Akce ze zdroje, který Cloudflare nepustí (kzmj.cz), stahuje GitHub a posílá drbně (scripts/okoli-relay.mjs).
+# Potřebuje tajemství repozitáře OKOLI_RELAY_TOKEN se stejnou hodnotou jako tajemství Workeru.
+name: Akce z okolí přes GitHub
+
+on:
+  schedule:
+    - cron: "40 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/okoli-relay.mjs
+        env:
+          OKOLI_RELAY_TOKEN: ${{ secrets.OKOLI_RELAY_TOKEN }}

@@ -246,9 +246,16 @@ export async function hideNearbyEvent(env, request, id, hidden) {
   return { ok: true };
 }
 
-// Kolik budoucích akcí má každý zdroj (pro redakci).
+// Kolik budoucích akcí má každý zdroj a kdy z něj naposledy něco přišlo (pro redakci, hlavně u zdroje přes GitHub).
 export async function countBySource(env, today) {
-  const rows = await env.DB.prepare(`select source, count(*) as n from okoli_events where ${LAST_DAY} >= ? group by source`).bind(today).all();
-  const counts = Object.fromEntries((rows.results ?? []).map((row) => [String(row.source), Number(row.n)]));
-  return NEARBY_SOURCES.map((source) => ({ ...source, upcoming: counts[source.tag] ?? 0 }));
+  const rows = await env.DB.prepare(
+    `select source, sum(case when ${LAST_DAY} >= ? then 1 else 0 end) as n, max(seen_at) as seen from okoli_events group by source`,
+  )
+    .bind(today)
+    .all();
+  const stats = new Map((rows.results ?? []).map((row) => [String(row.source), row]));
+  return NEARBY_SOURCES.map((source) => {
+    const row = stats.get(source.tag);
+    return { ...source, upcoming: Number(row?.n ?? 0), seenAt: row?.seen ? `${String(row.seen).replace(" ", "T")}Z` : "" };
+  });
 }

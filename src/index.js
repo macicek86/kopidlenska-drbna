@@ -44,6 +44,7 @@ import { pickAd, readSeenAd, seenAdCookie } from "./ads.js";
 import { boardJson, feedIsStale } from "./outages.js";
 import { formFields } from "./forms.js";
 import { NDIC_PUSH_PATH, ndicPush } from "./ndic/push.js";
+import { okoliRelay, RELAY_PATH } from "./okoli/relay.js";
 import { runNdic } from "./ndic/run.js";
 import { visitPath, visitTarget } from "./visits.js";
 import { pathViews, recordVisit } from "./visits-db.js";
@@ -325,8 +326,8 @@ async function handlePost(request, env, path, fields, execution) {
 export default {
   async fetch(request, env, execution) {
     const url = new URL(request.url);
-    // NDIC přesměrování nesleduje: zprávy o uzavírkách se berou na kterékoli adrese.
-    const moved = url.pathname === NDIC_PUSH_PATH ? null : hostRedirect(request);
+    // NDIC přesměrování nesleduje: zprávy o uzavírkách (a akce od úlohy na GitHubu) se berou na kterékoli adrese.
+    const moved = url.pathname === NDIC_PUSH_PATH || url.pathname === RELAY_PATH ? null : hostRedirect(request);
     if (moved) return moved;
     try {
       // Statické soubory databázi nepotřebují.
@@ -338,6 +339,8 @@ export default {
       await ensureSchema(env);
       // Zprávy od NDIC (uzavírky silnic): vlastní přihlášení jménem a heslem, bez kontroly původu.
       if (url.pathname === NDIC_PUSH_PATH) return await ndicPush(request, env, execution);
+      // Akce ze zdroje, který Cloudflare nepustí, posílá úloha na GitHubu (src/okoli/relay.js).
+      if (url.pathname === RELAY_PATH) return await okoliRelay(request, env);
       if (request.method === "GET" || request.method === "HEAD") {
         const response = await renderGet(request, env, url, execution);
         const visit = visitPath(request, response);

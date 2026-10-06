@@ -17,6 +17,10 @@ export const NEARBY_SOURCES = [
     // Po silnici z Kopidla.
     km: 15,
     fetchEvents: fetchKzmj,
+    // kzmj.cz Cloudflare nepustí (Workerům vrací 500). Stahuje ho úloha na GitHubu a posílá na src/okoli/relay.js;
+    // `hosts` jsou domény, na které smí vést odkazy z poslaných akcí.
+    relay: true,
+    hosts: ["kzmj.cz"],
   },
   {
     tag: "jicinorg",

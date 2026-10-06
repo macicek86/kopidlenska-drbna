@@ -14,6 +14,8 @@ export async function collectNearby(env, { fetchImpl = fetch } = {}) {
   let removed = 0;
   const problems = [];
   for (const source of NEARBY_SOURCES) {
+    // Zdroj přes GitHub (src/okoli/relay.js) Worker sám nestahuje.
+    if (source.relay) continue;
     const known = await knownStamps(env, source);
     const feed = await source.fetchEvents({ env, fetchImpl, known });
     if (!feed.ok) {
@@ -29,7 +31,7 @@ export async function collectNearby(env, { fetchImpl = fetch } = {}) {
   const found = added ? `Nových akcí: ${added}.` : "Nic nového.";
   const gone = removed ? ` Zrušených: ${removed}.` : "";
   const note = `${found}${gone}${problems.length ? ` Nejde: ${problems.join(" ")}` : ""}`;
-  const status = problems.length === NEARBY_SOURCES.length ? "error" : problems.length ? "partial" : "ok";
+  const status = problems.length === NEARBY_SOURCES.filter((source) => !source.relay).length ? "error" : problems.length ? "partial" : "ok";
   await writeOkoliStatus(env, { status, note });
   return { ok: status !== "error", added, note };
 }
