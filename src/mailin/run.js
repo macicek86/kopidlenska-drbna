@@ -13,7 +13,7 @@ import { pragueNow } from "../waste.js";
 import { loadYards } from "../yards-db.js";
 import { askDrbena, changeInput, mailContent } from "./ai.js";
 import { describeChange } from "./describe.js";
-import { authVerdict, automatic, readMail } from "./parse.js";
+import { authTrace, authVerdict, automatic, readMail } from "./parse.js";
 import { MAILIN_ADDRESS, NOT_HOURS, UNKNOWN_SENDER, pageLinks, replyTo } from "./reply.js";
 import { answeredToday, countSenderUse, earlierQuestion, logMail, senderByEmail, senderHasRoom } from "./store.js";
 
@@ -82,17 +82,17 @@ async function tellEditors(env, mail, why) {
 
 // Zapíše změny z odpovědi Drběny. Vrací řádky do odpovědi odesílateli a stav do záznamu.
 async function applyChanges(env, { raw, allowed, sender, verified, today, who, mail }) {
-  const tags = new Set([
-    ...allowed.places.map((row) => `misto:${row.id}`),
-    ...allowed.doctors.map((row) => `lekar:${row.id}`),
-    ...allowed.yards.map((row) => `dvur:${row.id}`),
+  const regular = new Map([
+    ...allowed.places.map((row) => [`misto:${row.id}`, row.week]),
+    ...allowed.doctors.map((row) => [`lekar:${row.id}`, row.week]),
+    ...allowed.yards.map((row) => [`dvur:${row.id}`, null]),
   ]);
   const done = [];
   const asked = [];
   const failed = [];
   const sections = [];
   for (const item of (raw ?? []).slice(0, 10)) {
-    const change = changeInput(item, tags);
+    const change = changeInput(item, regular);
     if (change.error) {
       failed.push(`${String(item?.target ?? "").replace(/^\[|\]$/g, "")}: ${change.error}`);
       continue;
@@ -145,7 +145,9 @@ export async function receiveMail(message, env) {
     await logMail(env, { ...base, status: "automaticky", result: "Automatická zpráva, bez odpovědi." });
     return;
   }
-  const { verified, auth } = authVerdict(mail.headers, mail.from);
+  const check = authVerdict(mail.headers, mail.from);
+  const verified = check.verified;
+  const auth = verified ? check.auth : authTrace(mail.headers, message.headers);
   const sender = await senderByEmail(env, mail.from);
   if (!sender) {
     // Neověřené adrese neodpovídá: mohla být podvržená a odpověď by šla někomu, kdo nic neposlal.

@@ -185,7 +185,7 @@ export async function logMail(env, { email, senderId = null, subject, excerpt, s
   await env.DB.prepare(
     "insert into mail_log (sender_email, sender_id, subject, excerpt, status, result, verified, auth) values (?, ?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(clip(email, 160), senderId, clip(subject, 200), clip(excerpt, 1000), status, clip(result, 1000), verified ? 1 : 0, clip(auth, 400))
+    .bind(clip(email, 160), senderId, clip(subject, 200), clip(excerpt, 1000), status, clip(result, 1000), verified ? 1 : 0, clip(auth, 3000))
     .run();
 }
 

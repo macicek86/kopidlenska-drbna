@@ -8,6 +8,9 @@ import { PLACE_ACTIONS } from "../src/places-db.js";
 import { ensureLinkTables } from "../src/hours-links-db.js";
 import { ensureLoginTables, sha256 } from "../src/login-db.js";
 import { calendarText, changeInput } from "../src/mailin/ai.js";
+import { describeChange, weekText } from "../src/mailin/describe.js";
+import { authTrace } from "../src/mailin/parse.js";
+import { normalizeWeek } from "../src/doctors.js";
 import { authVerdict, automatic, freshText } from "../src/mailin/parse.js";
 import { receiveMail } from "../src/mailin/run.js";
 import { ensureMailinTables, loadMailAdmin, saveSender } from "../src/mailin/store.js";
@@ -103,7 +106,7 @@ test("automatické odpovědi pozná", () => {
 });
 
 test("změna z odpovědi: jen povolené řádky, dvůr bez dočasné doby", () => {
-  const tags = new Set(["misto:1", "dvur:2"]);
+  const tags = new Map([["misto:1", []], ["dvur:2", null]]);
   assert.match(changeInput({ target: "misto:9", kind: "zavreno", starts_on: "2026-08-15", ends_on: "", note: "", slots: [] }, tags).error, /nejde/);
   const place = changeInput({ target: "[misto:1]", kind: "zavreno", starts_on: "2026-08-15", ends_on: "", note: "", slots: [] }, tags);
   assert.equal(place.section, "oteviraci-doba");
@@ -294,4 +297,43 @@ test("změna z e-mailu ke schválení: po schválení i zamítnutí přijde odes
   } finally {
     claude.close();
   }
+});
+
+const part = (from, to) => ({ open: true, from, to, note: "" });
+// Duhovka: po–pá 7:30–12:00 a 13:00–16:00, v úterý jen 7:30–14:00.
+const duhovka = normalizeWeek([
+  ...[1, 3, 4, 5].map((day) => ({ day, morning: part("07:30", "12:00"), afternoon: part("13:00", "16:00") })),
+  { day: 2, morning: part("07:30", "14:00") },
+]).week;
+
+test("„zavřeno od 14“: běžné hodiny se jen oříznou, polední pauza zůstane", () => {
+  const regular = new Map([["misto:8", duhovka]]);
+  const raw = { target: "misto:8", kind: "docasna", starts_on: "2026-10-12", ends_on: "2026-10-16", open_from: "", close_at: "14:00", note: "", slots: [] };
+  const change = changeInput(raw, regular);
+  assert.equal(change.input.changeNote, "Zavírá už v 14:00");
+  const monday = change.input.doctorWeek.find((slot) => slot.day === 1);
+  assert.deepEqual([monday.morning.from, monday.morning.to, monday.afternoon.from, monday.afternoon.to, monday.afternoon.open], ["07:30", "12:00", "13:00", "14:00", true]);
+  const line = describeChange("oteviraci-doba", "zmena", { kind: "docasna", startsOn: "2026-10-12", endsOn: "2026-10-16", note: "", week: change.input.doctorWeek }, "Duhovka");
+  assert.equal(line, "Duhovka: pondělí 12. října až pátek 16. října, otevřeno po 7:30–12:00 a 13:00–14:00, út 7:30–14:00, st–pá 7:30–12:00 a 13:00–14:00");
+  // Otevírá později: dopoledne začne v 10, zbytek beze změny.
+  const late = changeInput({ ...raw, close_at: "", open_from: "10:00" }, regular);
+  assert.equal(late.input.doctorWeek.find((slot) => slot.day === 3).morning.from, "10:00");
+});
+
+test("výpis týdne slučuje stejné dny a jednodenní změna ukáže jen svůj den", () => {
+  assert.equal(weekText(duhovka), "po 7:30–12:00 a 13:00–16:00, út 7:30–14:00, st–pá 7:30–12:00 a 13:00–16:00");
+  assert.equal(describeChange("oteviraci-doba", "zmena", { kind: "docasna", startsOn: "2026-10-09", endsOn: "2026-10-09", note: "", week: duhovka }, ""), "pátek 9. října, otevřeno pá 7:30–12:00 a 13:00–16:00");
+});
+
+test("záznam hlaviček pro ověření: pořadí a hlavičky s výsledkem kontroly", () => {
+  const headers = [
+    { key: "received", value: "from mail-x.google.com by mx.cloudflare.net" },
+    { key: "authentication-results", value: "mx.cloudflare.net; dkim=pass header.d=gmail.com" },
+    { key: "dkim-signature", value: "v=1; a=rsa-sha256; d=gmail.com; s=20230601; b=abc" },
+  ];
+  const trace = authTrace(headers, new Headers({ "x-cf-spamh-score": "0" }));
+  assert.match(trace, /pořadí: received, authentication-results, dkim-signature/);
+  assert.match(trace, /authentication-results: mx\.cloudflare\.net; dkim=pass/);
+  assert.match(trace, /dkim-signature d=gmail\.com/);
+  assert.match(trace, /worker x-cf-spamh-score: 0/);
 });

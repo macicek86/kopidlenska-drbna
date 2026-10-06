@@ -83,7 +83,7 @@ function senderItem(data, sender) {
 
 function logItem(row) {
   const [label, tone] = STATUS[row.status] ?? [row.status, ""];
-  const text = [row.excerpt && `<p class="message-text">${esc(row.excerpt).replace(/\n/g, "<br>")}</p>`, row.result && `<p class="item-sub"><b>Drběna:</b> ${esc(row.result).replace(/\n/g, "<br>")}</p>`]
+  const text = [row.excerpt && `<p class="message-text">${esc(row.excerpt).replace(/\n/g, "<br>")}</p>`, row.result && `<p class="item-sub"><b>Drběna:</b> ${esc(row.result).replace(/\n/g, "<br>")}</p>`, row.auth && `<details class="item-sub"><summary>Ověření odesílatele</summary><p>${esc(row.auth).replace(/\n/g, "<br>")}</p></details>`]
     .filter(Boolean)
     .join("");
   return item({

@@ -68,6 +68,26 @@ export function authVerdict(headers, fromEmail) {
   return { verified: false, auth: lines[0] ?? "" };
 }
 
+// Když ověření neprojde: pořadí prvních hlaviček a všechno, co se týká ověření, ať jde ze záznamu
+// v redakci poznat, kam a jak Cloudflare výsledek kontroly píše. `extra` jsou hlavičky z Workeru (message.headers).
+export function authTrace(headers, extra = null) {
+  const keys = (headers ?? []).slice(0, 14).map((header) => String(header.key).toLowerCase());
+  const related = /authentication-results|received-spf|^cf-|^x-cf|spam/i;
+  const lines = (headers ?? [])
+    .filter((header) => related.test(String(header.key)))
+    .map((header) => `${header.key}: ${String(header.value).replace(/\s+/g, " ").slice(0, 400)}`);
+  const dkim = (headers ?? [])
+    .filter((header) => String(header.key).toLowerCase() === "dkim-signature")
+    .map((header) => `dkim-signature d=${/\bd=([^;\s]+)/.exec(header.value)?.[1] ?? "?"}`);
+  const worker = [];
+  if (extra && typeof extra.forEach === "function") {
+    extra.forEach((value, key) => {
+      if (related.test(key)) worker.push(`worker ${key}: ${String(value).replace(/\s+/g, " ").slice(0, 400)}`);
+    });
+  }
+  return [`pořadí: ${keys.join(", ")}`, ...lines, ...dkim, ...worker].join("\n");
+}
+
 // Automatická odpověď (dovolená, nedoručitelnost, rozesílka): Drběna na ni neodpovídá, jinak by se točily dokola.
 export function automatic(headers, fromEmail) {
   const get = (name) => (headers ?? []).find((header) => String(header.key).toLowerCase() === name)?.value ?? "";
