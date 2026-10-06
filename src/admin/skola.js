@@ -1,5 +1,6 @@
 // Redakce: články z webů škol (ZŠ a MŠ, zahradnická) a města. Nastavení, stav poslední kontroly a co s nimi Koza Drběna udělala.
 import { MODEL } from "../claude.js";
+import { DEFAULT_AHEAD_DAYS } from "../skola/defer.js";
 import { SCHOOLS } from "../skola/sources.js";
 import { skolaRunning } from "../skola/store.js";
 import { esc } from "../view.js";
@@ -32,11 +33,21 @@ function feedField(source, settings) {
   return field("Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, source.feedHint);
 }
 
+function aheadField(source, settings) {
+  if (!source.defer) return "";
+  return field(
+    "Pozvánku na akci psát dní předem",
+    `<input class="${input}" type="number" name="aheadDays" min="1" max="60" required value="${settings.aheadDays ?? DEFAULT_AHEAD_DAYS}">`,
+    "Akce, která je dál, jde do kalendáře hned a pozvánku Drběna napíše až tolik dní před ní. Pozná tak i pozvánku, kterou město mezitím poslalo přes Munipolis. Akce, které už proběhly, automatika přeskočí.",
+  );
+}
+
 function settingsForm(source, settings) {
   const BASE = baseOf(source);
   return `<form class="form" method="post" action="${BASE}/ulozit">
     ${check("enabled", "1", settings.enabled, `Kontrolovat ${source.site} automaticky`, "Drbna se podívá každé čtyři hodiny a nové články rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď články jen načte a zpracuje se, co vyberete.")}
     ${field("Automaticky jen články z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? source.freshDays}">`, `Dní podle data na ${source.siteOf}. Starší články automatika nechá být a počkají, až je vyberete. Ručně vybrané dostanou datum ze zdroje.`)}
+    ${aheadField(source, settings)}
     ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce jako skryté.")}
     ${check("ownPhotos", "1", settings.ownPhotos, `Brát fotky z ${source.siteOf}`, `Drběna vezme fotku od článku, když je pěkná (plakát ne), a pod ni napíše, odkud je. Bez zaškrtnutí dává vždy ilustrační fotku z knihovny obrázků.`)}
     ${feedField(source, settings)}

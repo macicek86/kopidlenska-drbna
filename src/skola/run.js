@@ -26,6 +26,7 @@ import { pragueNow } from "../waste.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { askSkola } from "./ai.js";
 import { DESK_SECTION, fetchDocuments } from "./deska.js";
+import { deferDay, deferSkolaItem, laterNote, PAST_REASON, reopenDeferred, termOver } from "./defer.js";
 import { SCHOOLS } from "./sources.js";
 import {
   countWaitingSkola,
@@ -73,9 +74,15 @@ export async function skolaImage(env, article, images, ownPhotos, source = SCHOO
   return pickStockImage(env, article.imageTopic);
 }
 
-// Ručně vybraný článek Drběna zpracuje vždy (redakce rozhodla) a zpráva dostane datum ze zdroje. Cron píše s dnešním datem.
+// Ručně vybraný článek Drběna zpracuje vždy (redakce rozhodla) a zpráva dostane datum ze zdroje. Cron píše s dnešním datem,
+// stejně jako odloženou pozvánku (`defer.js`), i když ji redakce pustí dřív.
 export async function processSkolaItem(env, source, item, settings, { fetchImpl = fetch, ask = askSkola } = {}) {
   const today = pragueNow().date;
+  if (source.defer && !item.manual && termOver(item.term, today)) {
+    await finishSkolaItem(env, source, item.id, { status: "preskoceno", reason: PAST_REASON });
+    return { ok: true, status: "preskoceno" };
+  }
+  const publishOn = item.manual && !item.writeOn ? importSourceDate(item, today) : "";
   const rubrics = await rubricMap(env);
   const images = await downloadImages(env, item.images, fetchImpl);
   const documents = item.documents?.length ? await fetchDocuments(item.documents, { fetchImpl }) : [];
@@ -85,7 +92,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
     return { ok: false, error: reason };
   }
   const drbena = await loadDrbena(env);
-  const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
+  const memory = memoryOn(drbena, publishOn, today);
   const answer = await ask(env, {
     source,
     item,
@@ -97,6 +104,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
     voice: withMemory(voiceFor(drbena), memory),
     today,
     force: item.manual,
+    later: laterNote(item),
     ownPhotos: settings.ownPhotos,
   });
   if (!answer.ok) {
@@ -109,7 +117,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
       source: skolaSource(item.link, source, item.section),
       autoPublish: settings.autoPublish,
       rubrics,
-      publishOn: item.manual ? importSourceDate(item, today) : "",
+      publishOn,
     });
     await finishSkolaItem(env, source, item.id, {
       status: "hotovo",
@@ -122,8 +130,16 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   }
   if (answer.decision !== "vytvorit") {
     const status = answer.decision === "duplicita" ? "duplicita" : "preskoceno";
-    await finishSkolaItem(env, source, item.id, { status, reason: noteReads(answer.reason, answer), duplicateOf: answer.duplicateOf });
+    // Akce z dřívějšího čtení (odložená pozvánka) v kalendáři zůstává.
+    await finishSkolaItem(env, source, item.id, { status, reason: noteReads(answer.reason, answer), duplicateOf: answer.duplicateOf, eventId: item.eventId });
     return { ok: true, status, usage: answer.usage };
+  }
+
+  const later = source.defer && answer.event ? deferDay(item, answer.event.startsOn, settings.aheadDays, today) : "";
+  if (later) {
+    const eventId = await saveBotEvent(env, answer.event, { existingId: item.eventId, published: settings.autoPublish });
+    await deferSkolaItem(env, source, item.id, { writeOn: later, eventId, reason: noteReads(answer.reason, answer) });
+    return { ok: true, status: "odlozeno", usage: answer.usage };
   }
 
   const made = {};
@@ -136,7 +152,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
         source: skolaSource(item.link, source, item.section),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
-        publishOn: item.manual ? importSourceDate(item, today) : "",
+        publishOn,
       }),
     );
   }
@@ -171,7 +187,7 @@ async function nextFresh(env, source, settings, manualOnly) {
   const today = pragueNow().date;
   for (;;) {
     const [item] = await waitingSkolaItems(env, source, 1, { manualOnly });
-    if (!item || item.manual || isFresh(importSourceDate(item, today), today, settings.freshDays)) return item;
+    if (!item || item.manual || item.writeOn || isFresh(importSourceDate(item, today), today, settings.freshDays)) return item;
     await env.DB.prepare(`update ${source.itemsTable} set status = 'stare', reason = ? where id = ?`).bind(STALE_REASON, item.id).run();
   }
 }
@@ -201,6 +217,7 @@ export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola 
     let added = 0;
     let warning = "";
     if (settings.enabled) {
+      if (source.defer) await reopenDeferred(env, source, pragueNow().date);
       const collected = await collect(env, source, settings, fetchImpl);
       if (!collected.ok) return collected;
       ({ added, warning } = collected);

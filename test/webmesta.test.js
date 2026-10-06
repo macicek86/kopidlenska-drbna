@@ -8,6 +8,9 @@ import { DESK_FEED, DESK_SECTION, fetchDocuments, parseDeskFeed } from "../src/s
 import { parseSchoolFeed } from "../src/skola/feed.js";
 import { photoCaption, skolaSource } from "../src/skola/run.js";
 import { SCHOOLS } from "../src/skola/sources.js";
+import { DatabaseSync } from "node:sqlite";
+import { deferDay, deferSkolaItem, laterNote, reopenDeferred, termDays, termOver } from "../src/skola/defer.js";
+import { schoolTables, waitingSkolaItems } from "../src/skola/store.js";
 
 const WEB = SCHOOLS.webmesta;
 
@@ -152,4 +155,50 @@ test("PDF z desky jde Claudovi jako dokument, zdroj je úřední deska", async (
     "úřední deska města Kopidlna https://www.kopidlno.cz/uredni-deska?id=550&action=detail",
   );
   assert.match(skolaPrompt("", { source: WEB }), /Jména lidí, kteří od města kupují/);
+});
+
+test("pozvánka na akci daleko dopředu počká, akce, která proběhla, se přeskočí", () => {
+  assert.deepEqual(termDays("13. 10. 2026 až 14. 10. 2026"), { from: "2026-10-13", to: "2026-10-14" });
+  assert.deepEqual(termDays("22. 11. 2026"), { from: "2026-11-22", to: "2026-11-22" });
+  assert.equal(termDays(""), null);
+  assert.equal(termDays("31. 2. 2026"), null);
+  assert.equal(termOver("24. 9. 2026", "2026-10-06"), true);
+  assert.equal(termOver("6. 10. 2026", "2026-10-06"), false);
+  assert.equal(termOver("", "2026-10-06"), false);
+  // Akce za sedm týdnů: pozvánka deset dní před ní.
+  assert.equal(deferDay({}, "2026-11-23", 10, "2026-10-06"), "2026-11-13");
+  // Blízká akce se píše hned, odložená položka se podruhé neodkládá.
+  assert.equal(deferDay({}, "2026-10-13", 10, "2026-10-06"), "");
+  assert.equal(deferDay({ writeOn: "2026-11-13" }, "2026-11-23", 10, "2026-11-13"), "");
+  assert.equal(deferDay({}, "", 10, "2026-10-06"), "");
+  assert.equal(WEB.defer, true);
+  assert.equal(SCHOOLS.skola.defer, undefined);
+});
+
+test("při druhém čtení Drběna ví, že akci v kalendáři dala sama", () => {
+  const item = { title: "Dušedílna", text: "Zveme.", section: "Aktuality", term: "23. 11. 2026", publishedAt: "2026-10-05T17:45:51Z", writeOn: "2026-11-13", eventId: 11 };
+  const text = skolaText(item, {}, { today: "2026-11-13", source: WEB, later: laterNote(item) });
+  assert.match(text, /dřív dala do kalendáře \(akce:11\)/);
+  assert.match(text, /event dej include false/);
+  assert.equal(laterNote({ ...item, writeOn: "" }), "");
+});
+
+test("odložená položka čeká a v den psaní se vrátí do fronty jako automatická", async () => {
+  const db = new DatabaseSync(":memory:");
+  const statement = (sql, values = []) => ({
+    bind: (...next) => statement(sql, next),
+    run: async () => ({ meta: { changes: Number(db.prepare(sql).run(...values).changes) } }),
+    first: async () => db.prepare(sql).get(...values) ?? null,
+    all: async () => ({ results: db.prepare(sql).all(...values) }),
+  });
+  const env = { DB: { prepare: (sql) => statement(sql) } };
+  for (const sql of schoolTables(WEB)) db.exec(sql);
+  db.exec(`insert into ${WEB.itemsTable} (guid, title, term, status, manual) values ('a', 'Dušedílna', '23. 11. 2026', 'nove', 1)`);
+  await deferSkolaItem(env, WEB, 1, { writeOn: "2026-11-13", eventId: 11, reason: "Nová akce." });
+  assert.deepEqual(await waitingSkolaItems(env, WEB, 5), []);
+  await reopenDeferred(env, WEB, "2026-11-12");
+  assert.deepEqual(await waitingSkolaItems(env, WEB, 5), []);
+  await reopenDeferred(env, WEB, "2026-11-13");
+  const [item] = await waitingSkolaItems(env, WEB, 5);
+  assert.deepEqual([item.status, item.manual, item.writeOn, item.eventId], ["nove", false, "2026-11-13", 11]);
 });

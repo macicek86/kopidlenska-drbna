@@ -114,6 +114,8 @@ export const SCHOOLS = {
     feedHint: "Jedna na řádek. Prázdné pole vrátí aktuality města.",
     // Město zve na akce s předstihem i měsíc, píše ale málokdy.
     freshDays: 14,
+    // Pozvánku na akci daleko dopředu píše Drběna až pár dní před ní (`defer.js`).
+    defer: true,
     rules: WEB_MESTA_RULES,
     people: "lidé při akci, místo ve městě, koncert, výstava",
     intro: "Koza Drběna čte aktuality na webu města kopidlno.cz a z úřední desky usnesení a zápisy rady a zastupitelstva. Akce, novinky a to, co město rozhodlo, napíše po svém, s odkazem na zdroj. Co už přišlo z Munipolisu nebo jinak na drbně je, pozná a nechá být.",

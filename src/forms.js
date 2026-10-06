@@ -206,6 +206,7 @@ export async function formFields(request) {
     sourceLink: form.get("sourceLink") === "1",
     ownPhotos: form.get("ownPhotos") === "1",
     freshDays: text("freshDays"),
+    aheadDays: text("aheadDays"),
     images: form.getAll("images"),
     stockId: positive("stock_id"),
     topicId: positive("topicId"),

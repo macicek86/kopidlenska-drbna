@@ -5,7 +5,7 @@ import { esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { badge, callout, item, modalLink } from "./ui.js";
 
-export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad", smazano: "off" };
+export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad", smazano: "off", odlozeno: "info" };
 
 // Kam vede značka, kterou Claude použil v duplicate_of nebo kterou zpráva vytvořila.
 export function refLink(ref) {
@@ -59,6 +59,7 @@ export function picked(entry) {
 
 export function statusBadge(entry) {
   if (picked(entry)) return badge("Vybráno, Drběna se k tomu dostane", "info");
+  if (entry.status === "odlozeno" && entry.writeOn) return badge(`Akce v kalendáři, pozvánku napíše ${formatShort(entry.writeOn)}`, "info");
   return badge(STATUS[entry.status] ?? entry.status, TONE[entry.status] ?? "");
 }
 
@@ -75,7 +76,11 @@ export function pickForm(base, formId) {
 export function processButton(base, entry) {
   if (entry.status === "hotovo" || picked(entry)) return "";
   const label =
-    entry.status === "smazano" ? "Zpracovat znovu" : entry.status === "preskoceno" || entry.status === "duplicita" ? "Přesto zpracovat" : "Zpracovat teď";
+    entry.status === "odlozeno"
+      ? "Napsat pozvánku hned"
+      : entry.status === "smazano"
+        ? "Zpracovat znovu"
+        : entry.status === "preskoceno" || entry.status === "duplicita" ? "Přesto zpracovat" : "Zpracovat teď";
   return `<form method="post" action="${base}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Posílám Drběně…">${label}</button></form>`;
 }
 

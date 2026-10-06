@@ -2,6 +2,7 @@
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
 import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { MAX_ATTEMPTS, mapImportItem } from "../munipolis/store.js";
+import { DEFAULT_AHEAD_DAYS, readAheadDays } from "./defer.js";
 import { readFeedUrls } from "./feed.js";
 import { SCHOOL_LIST } from "./sources.js";
 
@@ -13,6 +14,7 @@ export const schoolTables = (source) => [
     auto_publish integer not null default 0,
     fresh_days integer not null default ${source.freshDays},
     own_photos integer not null default 0,
+    ahead_days integer not null default ${DEFAULT_AHEAD_DAYS},
     checked_at text,
     status text not null default '',
     note text not null default '',
@@ -37,6 +39,7 @@ export const schoolTables = (source) => [
     event_id integer,
     notice_id integer,
     manual integer not null default 0,
+    write_on text not null default '',
     attempts integer not null default 0,
     created_at text not null default (datetime('now')),
     processed_at text
@@ -50,6 +53,11 @@ export async function ensureSkolaTables(env) {
     const names = new Set((info.results ?? []).map((row) => row.name));
     // PDF z úřední desky (zatím jen web města, `deska.js`).
     await addColumn(env, names, "documents", `alter table ${source.itemsTable} add column documents text not null default '[]'`);
+    // Odložená pozvánka na akci (`defer.js`).
+    await addColumn(env, names, "write_on", `alter table ${source.itemsTable} add column write_on text not null default ''`);
+    const settingsInfo = await env.DB.prepare(`pragma table_info(${source.settingsTable})`).all();
+    const settingsNames = new Set((settingsInfo.results ?? []).map((row) => row.name));
+    await addColumn(env, settingsNames, "ahead_days", `alter table ${source.settingsTable} add column ahead_days integer not null default ${DEFAULT_AHEAD_DAYS}`);
     await env.DB.prepare(`insert into ${source.settingsTable} (id) select 1 where not exists (select 1 from ${source.settingsTable} where id = 1)`).run();
   }
 }
@@ -68,6 +76,7 @@ function mapSettings(row, source) {
     autoPublish: asBool(row?.auto_publish),
     freshDays: readFreshDays(row?.fresh_days, source.freshDays),
     ownPhotos: asBool(row?.own_photos),
+    aheadDays: readAheadDays(row?.ahead_days),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
     note: String(row?.note ?? ""),
@@ -77,13 +86,13 @@ function mapSettings(row, source) {
 
 export async function loadSkolaSettings(env, source) {
   const row = await env.DB.prepare(
-    `select enabled, feed_urls, auto_publish, fresh_days, own_photos, checked_at, status, note, running_at from ${source.settingsTable} where id = 1`,
+    `select enabled, feed_urls, auto_publish, fresh_days, own_photos, ahead_days, checked_at, status, note, running_at from ${source.settingsTable} where id = 1`,
   ).first();
   return mapSettings(row, source);
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at, created_at";
+  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, write_on, attempts, processed_at, created_at";
 
 function parseDocuments(text) {
   try {
@@ -95,7 +104,7 @@ function parseDocuments(text) {
 }
 
 function mapSkolaItem(row) {
-  return { ...mapImportItem(row), documents: parseDocuments(row.documents), section: String(row.section ?? ""), term: String(row.term ?? "") };
+  return { ...mapImportItem(row), documents: parseDocuments(row.documents), section: String(row.section ?? ""), term: String(row.term ?? ""), writeOn: String(row.write_on ?? "") };
 }
 
 export async function loadSkolaItems(env, source, limit = 40) {
@@ -183,7 +192,7 @@ export async function saveSkolaSettings(env, request, source, input) {
   const urls = source.feedField ? readFeedUrls(input.feedUrls, source.defaultFeeds) : [];
   if (!urls) return { ok: false, error: "Každá adresa RSS musí začínat https://." };
   await env.DB.prepare(
-    `update ${source.settingsTable} set enabled = ?, feed_urls = ?, auto_publish = ?, fresh_days = ?, own_photos = ? where id = 1`,
+    `update ${source.settingsTable} set enabled = ?, feed_urls = ?, auto_publish = ?, fresh_days = ?, own_photos = ?, ahead_days = ? where id = 1`,
   )
     .bind(
       input.enabled ? 1 : 0,
@@ -191,6 +200,7 @@ export async function saveSkolaSettings(env, request, source, input) {
       input.autoPublish ? 1 : 0,
       readFreshDays(input.freshDays, source.freshDays),
       input.ownPhotos ? 1 : 0,
+      readAheadDays(input.aheadDays),
     )
     .run();
   return { ok: true };

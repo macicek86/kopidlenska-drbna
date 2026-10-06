@@ -65,13 +65,14 @@ export function skolaItemText(item, source = SCHOOLS.skola) {
     .join("\n\n");
 }
 
-export function skolaContent(item, known, { today, force = false, topics = [], images = [], documents = [], source = SCHOOLS.skola }) {
+// `later` je poznámka k odložené pozvánce (`defer.js`).
+export function skolaContent(item, known, { today, force = false, later = "", topics = [], images = [], documents = [], source = SCHOOLS.skola }) {
   const media = [
     ...documents.map((doc) => ({ type: "document", source: { type: "base64", media_type: doc.type, data: base64(doc.bytes) } })),
     ...images.map((image) => ({ type: "image", source: { type: "base64", media_type: image.type, data: base64(image.bytes) } })),
   ];
   const shown = images.length ? `Přiložené obrázky: ${images.length}.` : "Bez přiloženého obrázku.";
-  return importContent(known, { today, topics: topicsText(topics), media, tail: [skolaItemText(item, source), shown, force ? FORCE : ""] });
+  return importContent(known, { today, topics: topicsText(topics), media, tail: [skolaItemText(item, source), shown, later, force ? FORCE : ""] });
 }
 
 export function skolaText(item, known, { images = 0, ...options }) {
@@ -81,9 +82,9 @@ export function skolaText(item, known, { images = 0, ...options }) {
 
 // Jedno volání Claude. Obrázky vidí vždy (plakát nese údaje), vybrat vlastní fotku smí jen s `ownPhotos`.
 // `documents` jsou PDF z úřední desky ({ type, bytes }).
-export async function askSkola(env, { source = SCHOOLS.skola, item, known, images = [], documents = [], topics = [], rubricSlugs, voice, today, force = false, ownPhotos = false }) {
+export async function askSkola(env, { source = SCHOOLS.skola, item, known, images = [], documents = [], topics = [], rubricSlugs, voice, today, force = false, later = "", ownPhotos = false }) {
   const shown = visibleImages(images);
-  const content = skolaContent(item, known, { today, force, topics, images: shown, documents, source });
+  const content = skolaContent(item, known, { today, force, later, topics, images: shown, documents, source });
   const slugs = topics.map((topic) => topic.slug);
   const schema = outputSchema(rubricSlugs, { topics: slugs, ownImage: ownPhotos, followup: true });
   const system = skolaPrompt(voice, { ownPhotos, source, rubricSlugs });
