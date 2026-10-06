@@ -94,7 +94,7 @@ const DECISIONS = { vytvorit: "napsat", preskocit: "přeskočit", duplicita: "du
 function extras(result) {
   const rows = [];
   if (result.reason) rows.push(`<li><b>Rozhodla (${esc(DECISIONS[result.decision] ?? result.decision)}):</b> ${esc(result.reason)}</li>`);
-  if (result.read?.length) rows.push(`<li><b>Přečetla si:</b> ${result.read.map((ref) => refLink(ref) || esc(ref)).join(", ")}</li>`);
+  if (result.read?.length) rows.push(`<li><b>Dohledávala:</b> ${result.read.map((ref) => refLink(ref) || esc(ref)).join(", ")}</li>`);
   if (result.recalled) {
     rows.push(`<li><b>Vzpomněla na akci:</b> ${esc(result.recalled.title)} · ${esc(result.recalled.startsOn)}</li>`);
   }

@@ -75,7 +75,7 @@ test("Claude si přečte zprávu nástrojem a pak odpoví JSONem; pokyny jdou do
     const [first, second] = api.seen;
     assert.deepEqual(first.system[0].cache_control, { type: "ephemeral" });
     assert.match(first.system[0].text, /^Pokyny\n\nNástroje:/);
-    assert.deepEqual(first.tools.map((tool) => tool.name), ["precist_zpravu", "precist_zdroj"]);
+    assert.deepEqual(first.tools.map((tool) => tool.name), ["hledat_zpravy", "precist_zpravu", "precist_zdroj"]);
     // Druhé kolo: stejný začátek, odpověď s myšlenkami beze změny a výsledek nástroje.
     assert.deepEqual(second.messages[0], first.messages[0]);
     assert.equal(second.messages[1].role, "assistant");
@@ -150,7 +150,7 @@ test("nástroje čtou zprávy, návrhy a zdroje; text Deníku ne", async () => {
 });
 
 test("zdůvodnění řekne, co si Drběna přečetla, souhrn průchodu ukáže cache", () => {
-  assert.equal(noteReads("Stejná akce.", { read: ["zprava:12", "munipolis:40"] }), "Stejná akce. (Přečetla si: zprava:12, munipolis:40.)");
+  assert.equal(noteReads("Stejná akce.", { read: ["zprava:12", "munipolis:40"] }), "Stejná akce. (Dohledávala: zprava:12, munipolis:40.)");
   assert.equal(noteReads("Nová akce.", { read: [] }), "Nová akce.");
   const merged = withLookups({ ok: true, reason: "x", read: ["navrh:5"], usage }, { read: ["zprava:1"], usage });
   assert.deepEqual(merged.read, ["navrh:5", "zprava:1"]);
@@ -182,7 +182,7 @@ test("zkouška povahy jako automatika nechá Drběnu rozhodnout a ukáže, co si
   );
   assert.match(page, /name="auto" value="1"[^>]* checked/);
   assert.match(page, /Rozhodla \(duplicita\):<\/b> Už to tu je\./);
-  assert.match(page, /Přečetla si:<\/b> <a href="\/redakce\/zpravy\?id=12">Zpráva #12<\/a>/);
+  assert.match(page, /Dohledávala:<\/b> <a href="\/redakce\/zpravy\?id=12">Zpráva #12<\/a>/);
 });
 
 test("formulář pošle zaškrtnutou paměť i automatiku", async () => {

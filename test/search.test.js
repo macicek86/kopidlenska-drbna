@@ -8,6 +8,7 @@ import { MIN_SCORE } from "../src/search/vectors.js";
 import { relatedArticles } from "../src/import-context.js";
 import { importContent, relatedSection } from "../src/import-overview.js";
 import { relatedFor } from "../src/assist/run.js";
+import { lookupLabel, runImportTool } from "../src/import-tools.js";
 
 // Malá náhrada D1 nad SQLite v paměti (má i FTS5): prepare/bind/run/first/all a batch.
 function d1() {
@@ -217,4 +218,15 @@ test("pomocník při psaní: ukáže starší zprávy o stejné věci, ne zpráv
     answer: { title: "Oprava skleníku začne", excerpt: "Palmový skleník dostane nové zdivo." },
   });
   assert.deepEqual(related, [{ title: "Palmový skleník obehnala páska", url: "/zpravy/skleník", date: "2026-09-09" }]);
+});
+
+test("importy: Drběna si sama dohledá starší zprávu v archivu, zdůvodnění řekne, co hledala", async () => {
+  const env = await freshEnv();
+  await ensureSearchTables(env);
+  const old = await addArticle(env, { slug: "drakiada-2024", title: "Drakiáda na Bažantnici", excerpt: "Draci létali.", keywords: "drakiáda, bažantnice", created_at: "2024-10-05" });
+  const text = await runImportTool(env, "hledat_zpravy", { dotaz: "pouštění draků", slova: ["drakiáda"] });
+  assert.match(text, new RegExp(`^Zprávy z archivu drbny[^\\n]*\\n\\[zprava:${old}\\] 2024-10-05 · Drakiáda na Bažantnici · Draci létali\\. · klíčová slova: drakiáda, bažantnice$`));
+  assert.match(await runImportTool(env, "hledat_zpravy", { dotaz: "fotbal", slova: [] }), /nic nenašla/);
+  assert.equal(lookupLabel({ name: "hledat_zpravy", input: { dotaz: " drakiáda " } }), "hledání „drakiáda“");
+  assert.equal(lookupLabel({ name: "precist_zpravu", input: { znacka: "zprava:3" } }), "zprava:3");
 });

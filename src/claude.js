@@ -94,7 +94,7 @@ export async function callClaude(env, { system, content, schema, effort = "mediu
     const calls = (response.content ?? []).filter((block) => block.type === "tool_use");
     // Obsah odpovědi (i myšlenky) se vrací beze změny, jinak by na ni Claude nemohl navázat.
     messages.push({ role: "assistant", content: response.content }, { role: "user", content: await toolResults(calls, lookup, used) });
-    for (const call of calls.slice(0, Math.max(0, lookup.maxCalls - used))) read.push(String(call.input?.znacka ?? call.name));
+    for (const call of calls.slice(0, Math.max(0, lookup.maxCalls - used))) read.push(lookup.label ? lookup.label(call) : String(call.input?.znacka ?? call.name));
     used += calls.length;
   }
   if (response.stop_reason === "refusal") return { ok: false, error: "Claude tuhle zprávu odmítl zpracovat." };
