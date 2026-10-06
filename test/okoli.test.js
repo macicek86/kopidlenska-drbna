@@ -316,3 +316,53 @@ test("most přes GitHub: bez klíče nic, poslané akce jen ve tvaru čtečky", 
   assert.deepEqual(feed.listed, ["kzmj:biograf_akce:1"]);
   assert.equal(feed.complete, true);
 });
+
+test("obce na Galileu: přehled akcí s Kdy a Kde", async () => {
+  const { parseGalileoList, parseGalileoWhen } = await import("../src/okoli/galileo.js");
+  assert.deepEqual(parseGalileoWhen("24. 10. 2026 začátek od 15:00"), { startsOn: "2026-10-24", endsOn: "", startsTime: "15:00" });
+  assert.deepEqual(parseGalileoWhen("1. 11. 2026 – 3. 11. 2026"), { startsOn: "2026-11-01", endsOn: "2026-11-03", startsTime: "" });
+  assert.equal(parseGalileoWhen("brzy"), null);
+  // Výřez skutečné stránky rozdalovice.eu/mesto/akce-ve-meste/.
+  const html = `<div class="events events-actions readable_list">
+    <div class="event event-message readable_item" id="event-1156">
+      <a href="/mesto/akce-ve-meste/3-rocnik-halloweenske-stezky-1156_135cs.html" class="event-link">
+        <h3 class="event-name">3. ročník Halloweenské stezky</h3>
+        <div class="action_date text-body"><i class="fa fa-calendar-alt mr-1" title="Kdy"></i><span class="sr-only">Kdy:</span>
+          24. 10. 2026 začátek od 15:00</div>
+        <div class="venues text-body"><i class="fa fa-map-marker-alt mr-1" title="Kde"></i><span class="sr-only">Kde:</span>
+          Naučná stezka Holské rybníky, Rožďalovice</div>
+        <p class="event-perex">Město Rožďalovice Vás zve na Halloweenské dobrodružství.</p>
+      </a></div>
+    <div class="event event-message readable_item" id="event-1200">
+      <a href="/mesto/akce-ve-meste/vystava-1200_1cs.html" class="event-link">
+        <h3 class="event-name">Dlouhá výstava</h3>
+        <div class="action_date text-body">1. 9. 2026 – 31. 12. 2026</div>
+      </a></div>
+  </div>`;
+  assert.deepEqual(parseGalileoList(html, "https://www.rozdalovice.eu/mesto/akce-ve-meste/"), [{
+    id: "1156",
+    link: "https://www.rozdalovice.eu/mesto/akce-ve-meste/3-rocnik-halloweenske-stezky-1156_135cs.html",
+    title: "3. ročník Halloweenské stezky",
+    place: "Naučná stezka Holské rybníky, Rožďalovice",
+    description: "Město Rožďalovice Vás zve na Halloweenské dobrodružství.",
+    startsOn: "2026-10-24",
+    endsOn: "",
+    startsTime: "15:00",
+  }]);
+});
+
+test("obce na Galileu: novější vzhled přehledu a vynechaná oznámení", async () => {
+  const { parseGalileoList } = await import("../src/okoli/galileo.js");
+  // Výřez skutečné stránky dymokury.cz/cs/zivot-v-obci/akce-v-obci/.
+  const item = (id, slug, title, when) => `<div class="event-action__item readable_item col-12" id="event-${id}">
+    <a class="event-action__link event-action__link--action" href="/cs/zivot-v-obci/akce-v-obci/${slug}" >
+      <h3 class="event-action__heading">${title}</h3>
+      <span class="event-action__row-body event-action__row-body--date-start">${when}</span>
+      <span class="event-action__row-body event-action__row-body--venue">celá obec</span>
+    </a></div>`;
+  const html = item(147, "lampionovy-pruvod-147_62cs.html", "Lampionový průvod", "26. 10. 2026 18:00")
+    + item(146, "svoz-146_61cs.html", "Mobilní svoz nebezpečných odpadů", "21. 11. 2026 10:45");
+  const events = parseGalileoList(html, "https://www.dymokury.cz/cs/zivot-v-obci/akce-v-obci/");
+  assert.deepEqual(events.map((event) => [event.id, event.title, event.startsOn, event.startsTime, event.place]), [["147", "Lampionový průvod", "2026-10-26", "18:00", "celá obec"]]);
+  assert.equal(events[0].link, "https://www.dymokury.cz/cs/zivot-v-obci/akce-v-obci/lampionovy-pruvod-147_62cs.html");
+});

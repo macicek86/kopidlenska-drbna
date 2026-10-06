@@ -3,6 +3,7 @@
 // `fetchEvents({ env, fetchImpl, known })` vrací { ok, items, listed, seen, complete, warning, error } s položkami
 // jako parseKzmj (src/okoli/kzmj.js); co v `known` (guid → stamp) je a nezměnilo se, znovu nečte.
 import { anteeReader } from "./antee.js";
+import { galileoReader } from "./galileo.js";
 import { fetchJicinOrg } from "./jicin-org.js";
 import { fetchKzmj } from "./kzmj.js";
 
@@ -76,6 +77,30 @@ const ANTEE_TOWNS = [
 ];
 
 for (const town of ANTEE_TOWNS) NEARBY_SOURCES.push({ ...town, fetchEvents: anteeReader(town) });
+
+// Obce na Galileu (oba vzhledy přehledu): akce s termínem a místem (src/okoli/galileo.js), bez modelu. Nová obec je nový řádek.
+const GALILEO_TOWNS = [
+  {
+    tag: "rozdalovice",
+    name: "Město Rožďalovice",
+    title: "akce ve městě Rožďalovice",
+    home: "https://www.rozdalovice.eu/mesto/akce-ve-meste/",
+    list: "https://www.rozdalovice.eu/mesto/akce-ve-meste/",
+    town: "Rožďalovice",
+    km: 9,
+  },
+  {
+    tag: "dymokury",
+    name: "Obec Dymokury",
+    title: "akce v obci Dymokury",
+    home: "https://www.dymokury.cz/cs/zivot-v-obci/akce-v-obci/",
+    list: "https://www.dymokury.cz/cs/zivot-v-obci/akce-v-obci/",
+    town: "Dymokury",
+    km: 12,
+  },
+];
+
+for (const town of GALILEO_TOWNS) NEARBY_SOURCES.push({ ...town, fetchEvents: galileoReader(town) });
 
 export function nearbySource(tag) {
   return NEARBY_SOURCES.find((source) => source.tag === tag) ?? null;
