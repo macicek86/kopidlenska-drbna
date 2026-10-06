@@ -52,7 +52,7 @@ test("doplnění ke zprávě, která není na webu nebo už má dvě, je duplici
 });
 
 test("odkaz na starou zprávu a poznámka pro redakci", () => {
-  assert.equal(followupLink({ slug: "modelari-letali", title: "Modeláři \"létali\"" }), '<p><em>Navazuje na zprávu <a href="/zpravy/modelari-letali">Modeláři &quot;létali&quot;</a></em></p>');
+  assert.equal(followupLink({ slug: "modelari-letali", title: "Modeláři \"létali\"" }), '<p><em>Kdo to minule propásl, <a href="/zpravy/modelari-letali">může si to přečíst tady</a>.</em></p>');
   assert.equal(followupReason({ target: { id: 3 }, reason: "Výsledky." }), "Doplnění ke zprávě zprava:3. Výsledky.");
 });
 

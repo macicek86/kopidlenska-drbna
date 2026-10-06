@@ -108,12 +108,8 @@ export async function writeFollowup(env, decision, { system, sourceText, article
   return { ok: false, error: `${problem} Zkusí to znovu příště.`, usage };
 }
 
-function attr(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-
 export function followupLink(target) {
-  return `<p><em>Navazuje na zprávu <a href="/zpravy/${encodeURIComponent(target.slug)}">${attr(target.title)}</a></em></p>`;
+  return `<p><em>Kdo to minule propásl, <a href="/zpravy/${encodeURIComponent(target.slug)}">může si to přečíst tady</a>.</em></p>`;
 }
 
 // Uloží navazující zprávu. Rovnou na web jen když import zveřejňuje rovnou a redakce to u doplnění dovolila.
