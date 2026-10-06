@@ -27,9 +27,13 @@ export function stockCaption(caption) {
   return own ? `${STOCK_LABEL} · ${own}` : STOCK_LABEL;
 }
 
+// Téma fotky podle toho, o čem článek je: parkování k výstavě nemá dostat fotku silnice.
+export const TOPIC_RULE =
+  "Téma vyber podle toho, čeho se článek týká (akce, místo, událost), ne podle praktické podrobnosti kolem. Parkování, objížďka nebo autobus k výstavě je pořád článek o výstavě. Silnice, dopravu a podobně vyber jen tehdy, když jsou samy hlavní zprávou.";
+
 // Témata pro Claude: značka, název a kdy téma použít.
 export function topicsText(topics) {
   if (!topics.length) return "Témata knihovny obrázků: (žádná, image_topic nech prázdné)";
   const rows = topics.map((topic) => `- ${topic.slug}: ${topic.name}${topic.hint ? ` (${topic.hint})` : ""}`);
-  return `Témata knihovny obrázků:\n${rows.join("\n")}`;
+  return `Témata knihovny obrázků:\n${rows.join("\n")}\n${TOPIC_RULE}`;
 }

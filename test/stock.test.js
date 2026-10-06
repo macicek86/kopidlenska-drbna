@@ -32,7 +32,7 @@ test("výchozí témata mají jedinečné značky a obecné téma", () => {
 });
 
 test("Claude dostane témata knihovny a smí vybrat jen z nich", () => {
-  assert.match(topicsText(TOPICS), /- obecne: Kopidlno obecně \(Náměstí, zámek\.\)\n- kultura: Kultura a akce$/);
+  assert.match(topicsText(TOPICS), /- obecne: Kopidlno obecně \(Náměstí, zámek\.\)\n- kultura: Kultura a akce\nTéma vyber podle toho, čeho se článek týká/);
   assert.match(topicsText([]), /žádná/);
   const text = userText({ title: "Pouť", text: "Text" }, {}, { today: "2026-10-02", topics: TOPICS, images: 1 });
   assert.match(text, /kultura: Kultura a akce/);
