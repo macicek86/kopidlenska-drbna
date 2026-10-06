@@ -223,14 +223,18 @@ test("když Drběna píše, redakce to ukáže a obnoví se; jinak řekne, kolik
   const settings = { enabled: true, autoPublish: false, clubUrl: BASE, voice: "", rubricId: null, previews: true, clubNews: false, useCrest: true, intervalHours: 24, checkedAt: "", status: "", note: "" };
   const ctx = { path: "/redakce/fotbal", copy: {}, mainOrigin: "", origin: "" };
   const busy = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "2999-01-01T00:00:00.000Z-x" } }, { text: "", kind: "ok" }, { importId: 2 });
-  assert.match(busy, /data-refresh="8"/);
+  assert.match(busy, /data-continue="\/redakce\/fotbal\/pokracovat"/);
   assert.match(busy, /Drběna právě píše/);
-  // Čekající fronta (i bez běžícího zámku) stránku obnovuje, každé otevření pošle další dávku. Zaškrtávání už není.
+  // Čekající frontu dopisuje otevřená stránka požadavkem na /pokracovat. Zaškrtávání už není.
   const waiting = adminFootball(ctx, { ...base, footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
-  assert.match(waiting, /data-refresh="8"[^>]*>Drběna právě píše aktuality\. Jeden článek jí trvá asi půl minuty\. Čeká ještě 1\./);
+  assert.match(waiting, /data-continue="\/redakce\/fotbal\/pokracovat">Drběna právě píše aktuality\. Jeden článek jí trvá asi půl minuty\. Čeká ještě 1\./);
   assert.doesNotMatch(waiting, /name="ids"|\/vybrat/);
   const idle = adminFootball(ctx, { ...base, footballItems: [base.footballItems[1]], footballSettings: { ...settings, runningAt: "" } }, { text: "", kind: "ok" }, {});
-  assert.doesNotMatch(idle, /data-refresh=/);
+  assert.doesNotMatch(idle, /data-refresh=|data-continue=/);
+  // Jen běží cron: stránka se obnovuje, ale nic neposílá.
+  const cron = adminFootball(ctx, { ...base, footballItems: [base.footballItems[1]], footballSettings: { ...settings, runningAt: "2999-01-01T00:00:00.000Z-x" } }, { text: "", kind: "ok" }, {});
+  assert.match(cron, /data-refresh="8"/);
+  assert.doesNotMatch(cron, /data-continue=/);
 });
 
 test("aktualita puštěná v detailu má štítek, vypnutá automatika to řekne", () => {
@@ -246,7 +250,7 @@ test("aktualita puštěná v detailu má štítek, vypnutá automatika to řekne
   const ctx = { path: "/redakce/fotbal", copy: {}, mainOrigin: "", origin: "" };
   const page = adminFootball(ctx, data, { text: "", kind: "ok" }, {});
   assert.match(page, /Puštěno, Drběna se k tomu dostane/);
-  assert.match(page, /data-refresh="8"/);
+  assert.match(page, /data-continue=/);
   const quiet = adminFootball(ctx, { ...data, footballItems: [row(2, "hotovo")] }, { text: "", kind: "ok" }, {});
   assert.match(quiet, /Automatika je vypnutá\. Nové věci stáhne a zpracuje jen tlačítko Zkontrolovat teď\./);
 });

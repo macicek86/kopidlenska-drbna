@@ -7,7 +7,6 @@ import {
   CRON_BUDGET_MS,
   CRON_LOCK_SECONDS,
   drain,
-  inBackground,
   isFresh,
   STALE_REASON,
 } from "../background.js";
@@ -181,8 +180,9 @@ export async function runDenik(env, { fetchImpl = fetch, ask = askDenik } = {}) 
   }
 }
 
-// Tlačítko „Zkontrolovat teď“: stáhne nové články.
-async function collectNow(env, request, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové články, starší odloží stranou. Čerstvé pak píše
+// otevřená stránka (`continueDenik` přes /pokracovat).
+export async function checkDenikNow(env, request, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadDenikSettings(env);
@@ -199,37 +199,26 @@ async function collectNow(env, request, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové články a čerstvé začne psát na pozadí po krátkých dávkách
-// (stránka Deník se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
-export async function checkDenikNow(env, request, { ctx = null, fetchImpl = fetch } = {}) {
-  const collected = await collectNow(env, request, { fetchImpl });
-  if (collected.ok) await continueDenik(env, { ctx, fetchImpl });
-  return collected;
-}
 
-// Čekající články (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje na pozadí po krátkých dávkách. Volá se po kliknutí i při každém otevření stránky Deník.
-export async function continueDenik(env, { ctx = null, fetchImpl = fetch, ask = askDenik } = {}) {
+// Čekající články (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje po krátké dávce. Volá ji otevřená stránka Deník
+// požadavkem na /pokracovat a čeká na odpověď, takže práci Cloudflare po 30 s neutne jako `waitUntil`.
+export async function continueDenik(env, { fetchImpl = fetch, ask = askDenik } = {}) {
   if (!(await countWaitingDenik(env))) return { ok: true, idle: true };
   const lock = await lockDenik(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadDenikSettings(env);
-  const work = async () => {
-    try {
-      await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
-    } finally {
-      await unlockDenik(env, lock);
-    }
-  };
-  if (inBackground(ctx, work)) return { ok: true, background: true };
-  await work();
+  try {
+    await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
+  } finally {
+    await unlockDenik(env, lock);
+  }
   return { ok: true };
 }
 
-export async function selectDenik(env, request, ids, options = {}) {
+export async function selectDenik(env, request, ids) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const marked = await selectDenikItems(env, ids);
   if (!marked) return { ok: false, error: "Vyberte aspoň jeden článek, který ještě není zpracovaný." };
-  const started = await continueDenik(env, options);
-  return { ok: true, marked, background: Boolean(started.background || started.busy) };
+  return { ok: true, marked };
 }

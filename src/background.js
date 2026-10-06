@@ -82,7 +82,9 @@ export function readFreshDays(value, fallback) {
 
 export const STALE_REASON = "Ve zdroji je starší, než kolik dní bere automatika. Pokud ji chcete zpracovat, pusťte ji v detailu.";
 
-export const CLICK_LOCK_SECONDS = 90;
+// Dávku po kliknutí píše požadavek, na který stránka čeká (`/pokracovat`), zámek pustí sám. Tohle je jen pojistka,
+// kdyby stránku někdo zavřel uprostřed.
+export const CLICK_LOCK_SECONDS = 5 * 60;
 export const CLICK_BUDGET_MS = 8_000;
 export const CRON_LOCK_SECONDS = 14 * 60;
 export const CRON_BUDGET_MS = 8 * 60_000;

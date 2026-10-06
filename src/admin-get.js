@@ -38,15 +38,7 @@ import { loadMessages } from "./messages-db.js";
 import { listSessions, loginSettings } from "./login-db.js";
 import { loadNotifySwitches } from "./notify.js";
 import { loadStats, STAT_PERIODS } from "./visits-db.js";
-import { continueImport } from "./munipolis/run.js";
-import { loadImportSettings } from "./munipolis/store.js";
-import { continueFootball } from "./fotbal/run.js";
-import { loadFootballSettings } from "./fotbal/store.js";
-import { continueDenik } from "./denik/run.js";
-import { loadDenikSettings } from "./denik/store.js";
-import { continueSkola } from "./skola/run.js";
 import { SCHOOL_LIST, SCHOOLS } from "./skola/sources.js";
-import { loadSkolaSettings } from "./skola/store.js";
 import { countBySource, loadNearbyEvents, loadOkoliSettings } from "./okoli/store.js";
 import { shiftDay } from "./okoli/outings.js";
 import { loadAssistAdmin } from "./assist/store.js";
@@ -55,8 +47,8 @@ import { pragueNow } from "./waste.js";
 import { loadFeedSettings } from "./feeds/settings.js";
 import { loadMailAdmin } from "./mailin/store.js";
 
-// `data` je loadAdmin, `execution` kontext Workeru (importy dopisují vybrané na pozadí). Neznámá stránka: null.
-export async function renderAdmin(env, url, ctx, data, execution) {
+// `data` je loadAdmin. Neznámá stránka: null.
+export async function renderAdmin(env, url, ctx, data) {
   const tab = url.pathname.replace(/\/+$/, "").slice("/redakce/".length);
   const message = messageFrom(url);
   const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "drbena", "chat", "odber", "emaily", "historie"]);
@@ -112,23 +104,16 @@ export async function renderAdmin(env, url, ctx, data, execution) {
   }
   if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
   if (tab === "munipolis") {
-    // Otevřená stránka dopisuje frontu (na pozadí, po krátkých dávkách).
-    if (data.signedIn && (await continueImport(env, { ctx: execution })).background) data.importSettings = await loadImportSettings(env);
     return html(adminMunipolis(ctx, data, message, query));
   }
   if (tab === "fotbal") {
-    if (data.signedIn && (await continueFootball(env, { ctx: execution })).background) data.footballSettings = await loadFootballSettings(env);
     return html(adminFootball(ctx, data, message, query));
   }
   if (tab === "denik") {
-    if (data.signedIn && (await continueDenik(env, { ctx: execution })).background) data.denikSettings = await loadDenikSettings(env);
     return html(adminDenik(ctx, data, message, query));
   }
   if (Object.hasOwn(SCHOOLS, tab)) {
     const source = SCHOOLS[tab];
-    if (data.signedIn && (await continueSkola(env, source, { ctx: execution })).background) {
-      data.schools = { ...data.schools, [tab]: { ...data.schools?.[tab], settings: await loadSkolaSettings(env, source) } };
-    }
     return html(adminSkola(ctx, data, message, query, source));
   }
   if (tab === "okoli") {

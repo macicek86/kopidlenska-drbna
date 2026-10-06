@@ -6,7 +6,6 @@ import {
   CRON_BUDGET_MS,
   CRON_LOCK_SECONDS,
   drain,
-  inBackground,
   isFresh,
   STALE_REASON,
 } from "../background.js";
@@ -148,8 +147,9 @@ async function writeBatch(env, settings, { added, checked, fetchImpl, ask, budge
 
 const BUSY = "Drběna už na fotbale pracuje. Počkejte, stránka se sama obnoví.";
 
-// Tlačítko „Zkontrolovat teď“: stáhne nové aktuality.
-async function collectNow(env, request, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové aktuality, starší odloží stranou. Čerstvé pak píše
+// otevřená stránka (`continueFootball` přes /pokracovat).
+export async function checkFootballNow(env, request, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadFootballSettings(env);
@@ -169,41 +169,29 @@ async function collectNow(env, request, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové aktuality a čerstvé začne psát na pozadí po krátkých dávkách
-// (stránka Fotbal se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
-export async function checkFootballNow(env, request, { ctx = null, fetchImpl = fetch } = {}) {
-  const collected = await collectNow(env, request, { fetchImpl });
-  if (collected.ok) await continueFootball(env, { ctx, fetchImpl });
-  return collected;
-}
 
-// Čekající aktuality (z cronu, Zkontrolovat teď i ručně puštěné v detailu) píše na pozadí po krátkých dávkách. Volá se po kliknutí
-// i při každém otevření stránky Fotbal, takže se fronta dopisuje, dokud je stránka otevřená (sama se obnovuje).
-export async function continueFootball(env, { ctx = null, fetchImpl = fetch, ask = askFootball } = {}) {
+// Čekající aktuality (z cronu, Zkontrolovat teď i ručně puštěné v detailu) píše po krátké dávce. Volá ji otevřená stránka Fotbal
+// požadavkem na /pokracovat a čeká na odpověď (bez `ctx`), takže práci Cloudflare po 30 s neutne jako `waitUntil`.
+export async function continueFootball(env, { fetchImpl = fetch, ask = askFootball } = {}) {
   if (!(await countWaiting(env, MAX_ATTEMPTS))) return { ok: true, idle: true };
   const lock = await lockFootball(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadFootballSettings(env);
-  const work = async () => {
-    try {
-      await writeBatch(env, settings, { added: 0, checked: false, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
-    } finally {
-      await unlockFootball(env, lock);
-    }
-  };
-  if (inBackground(ctx, work)) return { ok: true, background: true };
-  await work();
+  try {
+    await writeBatch(env, settings, { added: 0, checked: false, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
+  } finally {
+    await unlockFootball(env, lock);
+  }
   return { ok: true };
 }
 
 // Redakce pustila aktualitu ručně („Zpracovat teď“ v detailu). Hotové se znovu nepíšou.
-export async function selectFootball(env, request, ids, options = {}) {
+export async function selectFootball(env, request, ids) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const marked = await selectFootballItems(env, ids);
   if (!marked) return { ok: false, error: "Vyberte aspoň jednu aktualitu, která ještě není zpracovaná." };
-  const started = await continueFootball(env, options);
-  return { ok: true, marked, background: Boolean(started.background || started.busy) };
+  return { ok: true, marked };
 }
 
 // Cron každé čtyři hodiny: web klubu stáhne, jen když je čas (podle nastavení), frontu ale dopisuje pokaždé.

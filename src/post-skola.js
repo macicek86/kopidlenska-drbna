@@ -1,6 +1,7 @@
 // Formuláře stránek škol (ZŠ a MŠ, zahradnická) a webu města: nastavení importu, tlačítko Zkontrolovat teď a ruční puštění článku v detailu.
+import { continueResponse } from "./admin-continue.js";
 import { redirect, withError } from "./http.js";
-import { checkSkolaNow, selectSkola } from "./skola/run.js";
+import { checkSkolaNow, continueSkola, selectSkola } from "./skola/run.js";
 import { SCHOOL_LIST } from "./skola/sources.js";
 import { saveSkolaSettings } from "./skola/store.js";
 
@@ -20,14 +21,16 @@ export async function skolaPost(path, request, env, fields, ctx) {
     if (!result.ok) return redirect(withError(`${base}?nastaveni=1`, result.error));
     return redirect(`${base}?ok=skola-nastaveni`);
   }
+  // Otevřená stránka dopisuje frontu po jedné dávce a čeká na odpověď (public/admin.js, data-continue).
+  if (path === `${base}/pokracovat`) return continueResponse(env, request, ctx, () => continueSkola(env, source));
   if (path === `${base}/zkontrolovat`) {
-    const result = await checkSkolaNow(env, request, source, { ctx });
+    const result = await checkSkolaNow(env, request, source);
     if (!result.ok) return redirect(withError(base, result.error));
     return redirect(`${base}?ok=${result.added ? "skola-nacteno" : "skola-nic"}`);
   }
   if (path === `${base}/zpracovat`) {
     const back = fields.id ? `${base}?zprava=${fields.id}` : base;
-    const result = await selectSkola(env, request, source, [fields.id], { ctx });
+    const result = await selectSkola(env, request, source, [fields.id]);
     if (!result.ok) return redirect(withError(back, result.error));
     return redirect(`${back}${back.includes("?") ? "&" : "?"}ok=skola-bezi`);
   }

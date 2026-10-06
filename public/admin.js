@@ -451,7 +451,7 @@ function scheduleRefresh() {
   const holder = document.querySelector("[data-refresh]");
   if (!holder) return;
   setTimeout(async () => {
-    const busy = document.querySelector("[data-dirty].is-dirty, dialog[open] form.is-dirty, input[name=ids]:checked");
+    const busy = document.querySelector("[data-dirty].is-dirty, dialog[open] form.is-dirty");
     if (busy || submitting) return scheduleRefresh();
     try {
       await softRefresh();
@@ -459,7 +459,41 @@ function scheduleRefresh() {
       return location.replace(currentUrl());
     }
     scheduleRefresh();
+    continueQueue();
   }, Number(holder.dataset.refresh || 10) * 1000);
+}
+
+/* --- Fronta importu: stránka dopisuje, co čeká (src/admin-continue.js) ----- */
+
+// Pošle požadavek na jednu dávku a počká na odpověď (na čekající požadavek Cloudflare limit 30 s nemá), pak obnoví
+// obsah a jede dál, dokud v něm poznámka s data-continue je. Když dávku drží cron, chvíli počká.
+let continuing = false;
+async function continueQueue() {
+  const holder = document.querySelector("[data-continue]");
+  if (!holder || continuing) return;
+  continuing = true;
+  let wait = 0;
+  try {
+    const response = await fetch(holder.dataset.continue, { method: "POST", body: new FormData(), credentials: "same-origin" });
+    const result = response.ok ? await response.json() : { busy: true };
+    if (result.busy) wait = 8000;
+  } catch {
+    wait = 8000;
+  }
+  await new Promise((resolve) => setTimeout(resolve, wait));
+  for (;;) {
+    const busy = document.querySelector("[data-dirty].is-dirty, dialog[open] form.is-dirty");
+    if (!busy && !submitting) break;
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  try {
+    await softRefresh();
+  } catch {
+    return location.replace(currentUrl());
+  }
+  continuing = false;
+  continueQueue();
+  scheduleRefresh();
 }
 
 /* --- Start --------------------------------------------------------------- */
@@ -467,6 +501,7 @@ function scheduleRefresh() {
 cleanFlashFromUrl();
 bindForms(document);
 scheduleRefresh();
+continueQueue();
 document.querySelector(".adm-link.is-on")?.scrollIntoView({ block: "nearest", inline: "center" });
 const first = document.querySelector("dialog[data-autoopen]");
 if (first) openDialog(first);

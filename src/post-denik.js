@@ -1,6 +1,7 @@
 // Formuláře sekce Deník: nastavení importu, tlačítko Zkontrolovat teď a ruční puštění článku v detailu.
+import { continueResponse } from "./admin-continue.js";
 import { redirect, withError } from "./http.js";
-import { checkDenikNow, selectDenik } from "./denik/run.js";
+import { checkDenikNow, continueDenik, selectDenik } from "./denik/run.js";
 import { saveDenikSettings } from "./denik/store.js";
 
 const BASE = "/redakce/denik";
@@ -18,14 +19,16 @@ export async function denikPost(path, request, env, fields, ctx) {
     if (!result.ok) return redirect(withError(`${BASE}?nastaveni=1`, result.error));
     return redirect(`${BASE}?ok=denik-nastaveni`);
   }
+  // Otevřená stránka dopisuje frontu po jedné dávce a čeká na odpověď (public/admin.js, data-continue).
+  if (path === `${BASE}/pokracovat`) return continueResponse(env, request, ctx, () => continueDenik(env));
   if (path === `${BASE}/zkontrolovat`) {
-    const result = await checkDenikNow(env, request, { ctx });
+    const result = await checkDenikNow(env, request);
     if (!result.ok) return redirect(withError(BASE, result.error));
     return redirect(`${BASE}?ok=${result.added ? "denik-nacteno" : "denik-nic"}`);
   }
   if (path === `${BASE}/zpracovat`) {
     const back = fields.id ? `${BASE}?zprava=${fields.id}` : BASE;
-    const result = await selectDenik(env, request, [fields.id], { ctx });
+    const result = await selectDenik(env, request, [fields.id]);
     if (!result.ok) return redirect(withError(back, result.error));
     return redirect(`${back}${back.includes("?") ? "&" : "?"}ok=denik-bezi`);
   }

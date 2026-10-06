@@ -74,14 +74,15 @@ export function processButton(base, entry) {
   return `<form method="post" action="${base}/zpracovat"><input type="hidden" name="id" value="${entry.id}"><button class="btn btn-primary" type="submit" data-busy="Posílám Drběně…">${label}</button></form>`;
 }
 
-// Co importu zbývá. Dokud se fronta zpracovává, stránka se po chvíli sama obnoví (public/admin.js, data-refresh)
-// a každé otevření stránky pošle další dávku (src/admin-get.js). Bez zapnutého importu frontu dopíše jen otevřená stránka.
-export function workingNote({ running, entries, enabled, busy }) {
+// Co importu zbývá. Když něco čeká, otevřená stránka pošle `base`/pokracovat, počká na dávku a obnoví se
+// (public/admin.js, data-continue, src/admin-continue.js). Když jen běží cron, stránka se po chvíli obnoví (data-refresh).
+// Bez JS frontu dopíše cron.
+export function workingNote({ base, running, entries, enabled, busy }) {
   const waiting = entries.filter(queued).length;
-  if (running || waiting) {
-    const left = waiting ? ` Čeká ještě ${waiting}.` : "";
-    return `<div class="callout callout-info" data-refresh="8">${esc(busy)}${left} Stránka se sama obnoví.</div>`;
+  if (waiting) {
+    return `<div class="callout callout-info" data-continue="${esc(base)}/pokracovat">${esc(busy)} Čeká ještě ${waiting}. Nechte stránku otevřenou, sama se obnoví.</div>`;
   }
+  if (running) return `<div class="callout callout-info" data-refresh="8">${esc(busy)} Stránka se sama obnoví.</div>`;
   return enabled ? "" : callout("Automatika je vypnutá. Nové věci stáhne a zpracuje jen tlačítko Zkontrolovat teď.", "info");
 }
 

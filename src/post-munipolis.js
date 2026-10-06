@@ -1,6 +1,7 @@
 // Formuláře sekce Munipolis: nastavení importu, tlačítko Zkontrolovat teď a ruční puštění zprávy v detailu.
+import { continueResponse } from "./admin-continue.js";
 import { redirect, withError } from "./http.js";
-import { checkImportNow, selectImport } from "./munipolis/run.js";
+import { checkImportNow, continueImport, selectImport } from "./munipolis/run.js";
 import { saveImportSettings } from "./munipolis/store.js";
 
 const BASE = "/redakce/munipolis";
@@ -18,14 +19,16 @@ export async function munipolisPost(path, request, env, fields, ctx) {
     if (!result.ok) return redirect(withError(`${BASE}?nastaveni=1`, result.error));
     return redirect(`${BASE}?ok=import-nastaveni`);
   }
+  // Otevřená stránka dopisuje frontu po jedné dávce a čeká na odpověď (public/admin.js, data-continue).
+  if (path === `${BASE}/pokracovat`) return continueResponse(env, request, ctx, () => continueImport(env));
   if (path === `${BASE}/zkontrolovat`) {
-    const result = await checkImportNow(env, request, { ctx });
+    const result = await checkImportNow(env, request);
     if (!result.ok) return redirect(withError(BASE, result.error));
     return redirect(`${BASE}?ok=${result.added ? "import-nacteno" : "import-nic"}`);
   }
   if (path === `${BASE}/zpracovat`) {
     const back = fields.id ? `${BASE}?zprava=${fields.id}` : BASE;
-    const result = await selectImport(env, request, [fields.id], { ctx });
+    const result = await selectImport(env, request, [fields.id]);
     if (!result.ok) return redirect(withError(back, result.error));
     return redirect(`${back}${back.includes("?") ? "&" : "?"}ok=import-bezi`);
   }

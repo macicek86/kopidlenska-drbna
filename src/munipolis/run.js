@@ -7,7 +7,6 @@ import {
   CRON_BUDGET_MS,
   CRON_LOCK_SECONDS,
   drain,
-  inBackground,
   isFresh,
   STALE_REASON,
 } from "../background.js";
@@ -216,8 +215,9 @@ export async function runImport(env, { fetchImpl = fetch, ask = askClaude } = {}
   }
 }
 
-// Tlačítko „Zkontrolovat teď“: stáhne nové zprávy.
-async function collectNow(env, request, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové zprávy, starší odloží stranou. Čerstvé pak píše
+// otevřená stránka (`continueImport` přes /pokracovat).
+export async function checkImportNow(env, request, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadImportSettings(env);
@@ -234,39 +234,27 @@ async function collectNow(env, request, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové zprávy a čerstvé začne psát na pozadí po krátkých dávkách
-// (stránka Munipolis se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
-export async function checkImportNow(env, request, { ctx = null, fetchImpl = fetch } = {}) {
-  const collected = await collectNow(env, request, { fetchImpl });
-  if (collected.ok) await continueImport(env, { ctx, fetchImpl });
-  return collected;
-}
 
-// Čekající zprávy (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje na pozadí po krátkých dávkách. Volá se po kliknutí
-// i při každém otevření stránky Munipolis, takže se fronta dopisuje, dokud je stránka otevřená (sama se obnovuje).
-export async function continueImport(env, { ctx = null, fetchImpl = fetch, ask = askClaude } = {}) {
+// Čekající zprávy (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje po krátké dávce. Volá ji otevřená stránka Munipolis
+// požadavkem na /pokracovat a čeká na odpověď (bez `ctx`), takže práci Cloudflare po 30 s neutne jako `waitUntil`.
+export async function continueImport(env, { fetchImpl = fetch, ask = askClaude } = {}) {
   if (!(await countWaitingItems(env))) return { ok: true, idle: true };
   const lock = await lockImport(env, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadImportSettings(env);
-  const work = async () => {
-    try {
-      await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
-    } finally {
-      await unlockImport(env, lock);
-    }
-  };
-  if (inBackground(ctx, work)) return { ok: true, background: true };
-  await work();
+  try {
+    await writeBatch(env, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
+  } finally {
+    await unlockImport(env, lock);
+  }
   return { ok: true };
 }
 
 // Redakce pustila zprávu ručně („Zpracovat teď“ v detailu). Hotové se znovu nezpracují.
-export async function selectImport(env, request, ids, options = {}) {
+export async function selectImport(env, request, ids) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const marked = await selectImportItems(env, ids);
   if (!marked) return { ok: false, error: "Vyberte aspoň jednu zprávu, která ještě není zpracovaná." };
-  const started = await continueImport(env, options);
-  return { ok: true, marked, background: Boolean(started.background || started.busy) };
+  return { ok: true, marked };
 }

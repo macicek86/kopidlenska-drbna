@@ -8,7 +8,6 @@ import {
   CRON_BUDGET_MS,
   CRON_LOCK_SECONDS,
   drain,
-  inBackground,
   isFresh,
   STALE_REASON,
 } from "../background.js";
@@ -246,8 +245,9 @@ export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola 
   }
 }
 
-// Tlačítko „Zkontrolovat teď“: stáhne nové články.
-async function collectNow(env, request, source, { fetchImpl = fetch } = {}) {
+// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové články, starší odloží stranou. Čerstvé pak píše
+// otevřená stránka (`continueSkola` přes /pokracovat).
+export async function checkSkolaNow(env, request, source, { fetchImpl = fetch } = {}) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const settings = await loadSkolaSettings(env, source);
@@ -264,37 +264,26 @@ async function collectNow(env, request, source, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové články a čerstvé začne psát na pozadí po krátkých dávkách
-// (stránka školy se sama obnovuje a každé otevření pošle další dávku). Starší jdou stranou.
-export async function checkSkolaNow(env, request, source, { ctx = null, fetchImpl = fetch } = {}) {
-  const collected = await collectNow(env, request, source, { fetchImpl });
-  if (collected.ok) await continueSkola(env, source, { ctx, fetchImpl });
-  return collected;
-}
 
-// Čekající články (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje na pozadí po krátkých dávkách. Volá se po kliknutí i při každém otevření stránky školy.
-export async function continueSkola(env, source, { ctx = null, fetchImpl = fetch, ask = askSkola } = {}) {
+// Čekající články (z cronu, Zkontrolovat teď i ručně puštěné v detailu) zpracuje po krátké dávce. Volá ji otevřená stránka školy
+// požadavkem na /pokracovat a čeká na odpověď, takže práci Cloudflare po 30 s neutne jako `waitUntil`.
+export async function continueSkola(env, source, { fetchImpl = fetch, ask = askSkola } = {}) {
   if (!(await countWaitingSkola(env, source))) return { ok: true, idle: true };
   const lock = await lockSkola(env, source, CLICK_LOCK_SECONDS);
   if (!lock) return { ok: true, busy: true };
   const settings = await loadSkolaSettings(env, source);
-  const work = async () => {
-    try {
-      await writeBatch(env, source, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
-    } finally {
-      await unlockSkola(env, source, lock);
-    }
-  };
-  if (inBackground(ctx, work)) return { ok: true, background: true };
-  await work();
+  try {
+    await writeBatch(env, source, settings, { added: 0, fetchImpl, ask, budgetMs: CLICK_BUDGET_MS, max: BATCH_CLICK });
+  } finally {
+    await unlockSkola(env, source, lock);
+  }
   return { ok: true };
 }
 
-export async function selectSkola(env, request, source, ids, options = {}) {
+export async function selectSkola(env, request, source, ids) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
   const marked = await selectSkolaItems(env, source, ids);
   if (!marked) return { ok: false, error: "Vyberte aspoň jeden článek, který ještě není zpracovaný." };
-  const started = await continueSkola(env, source, options);
-  return { ok: true, marked, background: Boolean(started.background || started.busy) };
+  return { ok: true, marked };
 }

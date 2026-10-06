@@ -245,7 +245,7 @@ async function renderGet(request, env, url, execution) {
     if (login) return login;
     // Místní náhled s LOGIN_CODE_ECHO: kód z adresy se ukáže na přihlašovací stránce.
     if (admin.login && echoEnabled(env, url)) admin.login.echo = /^\d{6}$/.test(url.searchParams.get("kod") ?? "") ? url.searchParams.get("kod") : "";
-    const page = await renderAdmin(env, url, ctx, admin, execution);
+    const page = await renderAdmin(env, url, ctx, admin);
     if (page) return page;
   }
   return notFound(request, env, { ...ctx, path: "/" });

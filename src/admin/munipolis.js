@@ -53,7 +53,7 @@ function statusPanel(data, settings, entries) {
       <form method="post" action="${BASE}/zkontrolovat"><button class="btn btn-line" type="submit" data-busy="Stahuji zprávy…">Zkontrolovat teď</button></form>
     </div>
     ${settings.note && settings.status !== "ok" ? callout(esc(settings.note), tone) : settings.note ? `<p class="status-sub">${esc(settings.note)}</p>` : ""}
-    ${workingNote({ running: importRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte zprávy města. Jedna jí trvá asi půl minuty." })}
+    ${workingNote({ base: BASE, running: importRunning(settings), entries, enabled: settings.enabled, busy: "Drběna právě čte zprávy města. Jedna jí trvá asi půl minuty." })}
     ${keyWarn}
   </section>`;
 }
