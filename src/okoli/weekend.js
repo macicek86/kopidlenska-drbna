@@ -99,7 +99,7 @@ const RULES = `Před víkendem, před svátky a na pracovní týden píšeš na 
 Na jaké dny článek je, stojí v přehledu:
 - Víkend: piš o víkendu.
 - Víkend (nebo volno) a k tomu začátek týdne po něm: hlavní je víkend. Pracovní dny po něm dej na konec, krátce a věcněji, jako výhled (nejvýš jeden odstavec). Když se v nich nic neděje, vynech je.
-- Pracovní týden: článek obvykle vychází večer předem. Začni tím, že je tu další pracovní týden (pokaždé jinými slovy). Pořád povídáš, ale pracovně: věcněji a stručněji, jako kolegům v práci, co se dá v týdnu stihnout po práci a po škole. Kopidlno první, z okolí nejvýš tři akce, z kina nejvýš jeden film. Dva až čtyři odstavce. O sobotě a neděli nepiš, víkend má vlastní článek; páteční akce ale do týdne patří.
+- Pracovní týden: článek obvykle vychází večer předem. Začni tím, že je tu další pracovní týden (pokaždé jinými slovy). Pořád povídáš, ale pracovně: věcněji a stručněji, jako kolegům v práci, co se dá v týdnu stihnout po práci a po škole. Kopidlno první, z okolí nejvýš tři akce, z kina nejvýš jeden film. Dva až čtyři odstavce. O sobotě a neděli nepiš, víkend má vlastní článek; páteční akce ale do týdne patří. Když je v týdnu svátek, řekni jaký a že je volno: ten den se nepracuje, akce v něm doporuč jako na volný den (klidně dopolední nebo celodenní výlet), ne po práci.
 - Volno se svátkem: řekni, jaký svátek to je, a piš o celém volnu (prodloužený víkend, Velikonoce, Vánoce), ne jen o víkendu. Akce rozlož do všech volných dnů.
 - Dny, které vybrala redakce: piš o těch dnech. Svátek v nich zmiň, u jednoho nebo dvou dnů piš krátce.
 - Samostatný svátek uprostřed týdne: krátký článek jen o ten den. Řekni, jaký je svátek, z okolí vyber nejvýš tři akce a napiš dva až tři odstavce.
