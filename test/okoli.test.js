@@ -192,3 +192,43 @@ test("obce na Antee: plakát v plné velikosti, každý jednou", async () => {
     ["https://www.mestoliban.cz/image.php?nid=777&oid=1", "https://www.mestoliban.cz/image.php?nid=777&oid=2"],
   );
 });
+
+test("jicin.org: termín, seznam a stránka akce", async () => {
+  const { parseJicinDetail, parseJicinList, parseRange } = await import("../src/okoli/jicin-org.js");
+  assert.deepEqual(parseRange("6. 10. 2026"), { startsOn: "2026-10-06", endsOn: "" });
+  assert.deepEqual(parseRange("1. - 7. 10. 2026"), { startsOn: "2026-10-01", endsOn: "2026-10-07" });
+  assert.deepEqual(parseRange("9. 9. - 27. 10. 2026"), { startsOn: "2026-09-09", endsOn: "2026-10-27" });
+  assert.deepEqual(parseRange("28. 11. 2026 - 6. 1. 2027"), { startsOn: "2026-11-28", endsOn: "2027-01-06" });
+  const row = (date, title, href) => `<div class="views-row"><div class="group-date">${date}</div>
+    <div class="field field--name-node-title field--type-ds">  <a href="${href}" hreflang="cs">${title}</a></div>
+    <div class="field field--name-body field--type-text-with-summary">  Přednáška o&nbsp;zdraví.</div></div>`;
+  const html = [
+    row('<div class="field field--name-field-datetime-startend"><time datetime="2026-10-06T18:00:00+02:00">6. 10. 2026</time></div><div class="field field--name-display-field-copynode-date-start-copy3"><time datetime="2026-10-06T16:00:00Z">18.00</time></div>', "Kraj pro zdraví", "/kraj-pro-zdravi"),
+    row('<span class="date-display-range">1. - 7. 10. 2026</span>', "Den architektury", "/den-architektury"),
+    row('<span class="date-display-range">9. 9. - 27. 10. 2026</span>', "VR film Tmání", "/vr-film-tmani"),
+    row('<div class="field field--name-field-datetime-startend"><time datetime="2026-10-06T00:00:00+02:00">6. 10. 2026</time></div>', "TEST Akce", "/test-akce"),
+  ].join("");
+  assert.deepEqual(parseJicinList(html), [
+    { link: "https://www.jicin.org/kraj-pro-zdravi", title: "Kraj pro zdraví", startsOn: "2026-10-06", endsOn: "", startsTime: "18:00", summary: "Přednáška o zdraví." },
+    { link: "https://www.jicin.org/den-architektury", title: "Den architektury", startsOn: "2026-10-01", endsOn: "2026-10-07", startsTime: "", summary: "Přednáška o zdraví." },
+  ]);
+  const detail = parseJicinDetail('<div class="field field--name-body">Přednáška.</div><div class="field field--name-field-link-mapycz"><a href="https://mapy.cz/x">Knihovna Václava Čtvrtka - Deniska</a></div>');
+  assert.equal(detail.place, "Knihovna Václava Čtvrtka - Deniska");
+  assert.equal(detail.body, "Přednáška.");
+});
+
+test("víkend: stejná akce z KZMJ i jicin.org jen jednou, vícedenní s rozsahem", async () => {
+  const { dedupeNearby } = await import("../src/okoli/weekend.js");
+  const base = { startsOn: "2026-10-17", startsTime: "19:00", place: "Masarykovo divadlo", town: "Jičín", km: 15, description: "", link: "https://x/", kind: "akce" };
+  const kept = dedupeNearby([
+    { ...base, title: "Balada pro banditu", source: "kzmj" },
+    { ...base, title: "Balada pro Banditu!", source: "jicinorg" },
+    { ...base, title: "Slavnost stromů 2026", startsTime: "14:00", source: "jicinorg" },
+  ]);
+  assert.deepEqual(kept.map((event) => event.source), ["kzmj", "jicinorg"]);
+  const text = weekendText({
+    today: "2026-10-02", weekend: weekendFor("2026-10-02"), home: [], radiusKm: 25, topics: [],
+    nearby: [{ ...base, title: "Den architektury", startsOn: "2026-10-01", endsOn: "2026-10-07", startsTime: "" }],
+  });
+  assert.match(text, /- od 1\. 10\. do 7\. 10\., Jičín/);
+});

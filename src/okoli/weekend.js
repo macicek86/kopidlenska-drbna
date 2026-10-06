@@ -47,7 +47,9 @@ export function czechDay(day) {
 }
 
 function eventLine(event, extra = "") {
-  const when = `${czechDay(event.startsOn)}${event.startsTime ? ` v ${event.startsTime}` : ""}`;
+  const short = (day) => czechDay(day).replace(/^\S+ /, "");
+  const days = event.endsOn && event.endsOn > event.startsOn ? `od ${short(event.startsOn)} do ${short(event.endsOn)}` : czechDay(event.startsOn);
+  const when = `${days}${event.startsTime ? ` v ${event.startsTime}` : ""}`;
   const about = event.description ? ` ${event.description.replace(/\s+/g, " ").slice(0, 320)}` : "";
   return `- ${when}, ${extra}${event.place}: ${event.title}.${event.soldOut ? " VYPRODÁNO." : ""}${about} Odkaz: ${event.link}`;
 }
@@ -78,6 +80,8 @@ const RULES = `Jednou týdně píšeš na web Kopidlenská drbna článek o tom,
 Jak článek poskládat:
 - Nejdřív Kopidlno: všechny kopidlenské akce z přehledu, každou s dnem, časem a místem. Kopidlno je doma, má přednost.
 - Pak okolí: vyber 3 až 6 akcí, které za cestu stojí. Dej přednost jedinečným akcím (koncert, divadlo, přednáška, pohádka pro děti) před běžným promítáním. Z kina vyber nejvýš dva filmy, spíš zvláštní promítání (předpremiéra, přenos opery nebo baletu, film pro děti o víkendu). Vyprodané nedoporučuj. Snaž se o pestrost: něco pro rodiny s dětmi, něco na večer. U každé akce napiš město a místo, den a čas a v kostce, o co jde.
+- Akce z okolí, která se koná přímo v Kopidle (místo v přehledu), patří ke kopidlenským. Když je stejná jako některá kopidlenská, napiš ji jen jednou.
+- Vícedenní akci (festival, výstava) piš s rozsahem dní, ne jen prvním dnem.
 - Když se v Kopidlně o víkendu nic nekoná, řekni to jednou lehkou větou a pokračuj okolím. Když je jen Kopidlno, okolí vynech.
 - Když v přehledu není nic, co by stálo za doporučení, dej write false a zbytek nech prázdný.
 
@@ -132,11 +136,23 @@ export function weekendSource(nearby) {
   return `<p><em>Program akcí v okolí: ${links}</em></p>`;
 }
 
+// Stejná akce z víc zdrojů (jicin.org přebírá program KZMJ): stejný den, čas a začátek názvu. Zůstane první.
+export function dedupeNearby(events) {
+  const seen = new Set();
+  return events.filter((event) => {
+    const name = event.title.toLocaleLowerCase("cs").normalize("NFD").replace(/[^a-z0-9]/g, "").slice(0, 14);
+    const key = `${event.startsOn} ${event.startsTime} ${name}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // Podklady pro článek na víkend `weekend` (weekendFor).
 export async function weekendInput(env, weekend, radiusKm) {
   const events = await loadEvents(env, { publicOnly: true });
   const home = events.filter((event) => event.startsOn >= weekend.from && event.startsOn <= weekend.to);
-  const nearby = await loadNearbyEvents(env, { from: weekend.from, to: weekend.to, radiusKm });
+  const nearby = dedupeNearby(await loadNearbyEvents(env, { from: weekend.from, to: weekend.to, radiusKm }));
   return { home, nearby };
 }
 

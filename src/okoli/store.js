@@ -2,10 +2,12 @@
 // Akce z okolí nejsou v tabulce `events`: kalendář /akce zůstává kopidlenský. `mapNearbyEvent` jim ale dává
 // stejný tvar jako `mapEvent`, ať je jde později ukázat v kalendáři vedle kopidlenských (přepínač „i okolí“).
 import { lockHeld, lockRow, unlockRow } from "../background.js";
-import { asBool, clip, requireChief } from "../db-core.js";
+import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { NEARBY_SOURCES, nearbySource } from "./sources.js";
 
 export const DEFAULT_RADIUS = 25;
+// Poslední den akce: u vícedenní `ends_on`, jinak den začátku.
+const LAST_DAY = "(case when ends_on > starts_on then ends_on else starts_on end)";
 
 export async function ensureOkoliTables(env) {
   await env.DB.prepare(
@@ -47,6 +49,9 @@ export async function ensureOkoliTables(env) {
       seen_at text
     )`,
   ).run();
+  // Poslední den vícedenní akce (festival, výstava), jinak prázdné.
+  const info = await env.DB.prepare("pragma table_info(okoli_events)").all();
+  await addColumn(env, new Set((info.results ?? []).map((row) => row.name)), "ends_on", "alter table okoli_events add column ends_on text not null default ''");
   await env.DB.prepare("create index if not exists okoli_events_day on okoli_events (starts_on)").run();
   // Přečtené položky zdrojů, které akcí nejsou (nebo už proběhly a akce se smazala), ať se nečtou znovu.
   await env.DB.prepare(
@@ -129,11 +134,11 @@ export async function pruneNearby(env, today, days = 60) {
   limit.setUTCDate(limit.getUTCDate() - days);
   const before = limit.toISOString().slice(0, 10);
   await env.DB.prepare(
-    `insert or replace into okoli_seen (guid, source, stamp) select guid, source, stamp from okoli_events where starts_on < ?`,
+    `insert or replace into okoli_seen (guid, source, stamp) select guid, source, stamp from okoli_events where ${LAST_DAY} < ?`,
   )
     .bind(before)
     .run();
-  await env.DB.prepare("delete from okoli_events where starts_on < ?").bind(before).run();
+  await env.DB.prepare(`delete from okoli_events where ${LAST_DAY} < ?`).bind(before).run();
   await env.DB.prepare("delete from okoli_seen where seen_at < datetime('now', '-365 days')").run();
 }
 
@@ -148,11 +153,11 @@ export async function rememberNearby(env, source, feed, known = new Map()) {
     }
     if (!known.has(item.guid)) added += 1;
     await env.DB.prepare(
-      `insert into okoli_events (source, guid, stamp, link, title, place, town, km, kind, starts_on, starts_time, ends_time, description, sold_out, seen_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `insert into okoli_events (source, guid, stamp, link, title, place, town, km, kind, starts_on, starts_time, ends_time, ends_on, description, sold_out, seen_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
        on conflict(guid) do update set stamp = excluded.stamp, link = excluded.link, title = excluded.title, place = excluded.place,
          town = excluded.town, km = excluded.km, kind = excluded.kind, starts_on = excluded.starts_on, starts_time = excluded.starts_time,
-         ends_time = excluded.ends_time, description = excluded.description, sold_out = excluded.sold_out, seen_at = excluded.seen_at`,
+         ends_time = excluded.ends_time, ends_on = excluded.ends_on, description = excluded.description, sold_out = excluded.sold_out, seen_at = excluded.seen_at`,
     )
       .bind(
         source.tag,
@@ -167,6 +172,7 @@ export async function rememberNearby(env, source, feed, known = new Map()) {
         item.startsOn,
         item.startsTime ?? "",
         item.endsTime ?? "",
+        item.endsOn ?? "",
         clip(item.description, 1000),
         item.soldOut ? 1 : 0,
       )
@@ -198,6 +204,7 @@ export function mapNearbyEvent(row) {
     startsOn: String(row.starts_on ?? "").slice(0, 10),
     startsTime: String(row.starts_time ?? ""),
     endsTime: String(row.ends_time ?? ""),
+    endsOn: String(row.ends_on ?? ""),
     description: String(row.description ?? ""),
     published: !asBool(row.hidden),
     link: String(row.link ?? ""),
@@ -214,9 +221,9 @@ export function mapNearbyEvent(row) {
   };
 }
 
-// Akce z okolí od `from` do `to` (včetně). `radiusKm` vynechá vzdálenější, schované jen s `withHidden`.
+// Akce z okolí, které od `from` do `to` (včetně) probíhají. `radiusKm` vynechá vzdálenější, schované jen s `withHidden`.
 export async function loadNearbyEvents(env, { from, to = "9999-12-31", radiusKm = null, withHidden = false, limit = 400 } = {}) {
-  const where = ["starts_on >= ?", "starts_on <= ?"];
+  const where = [`${LAST_DAY} >= ?`, "starts_on <= ?"];
   const binds = [from, to];
   if (radiusKm) {
     where.push("km <= ?");
@@ -241,7 +248,7 @@ export async function hideNearbyEvent(env, request, id, hidden) {
 
 // Kolik budoucích akcí má každý zdroj (pro redakci).
 export async function countBySource(env, today) {
-  const rows = await env.DB.prepare("select source, count(*) as n from okoli_events where starts_on >= ? group by source").bind(today).all();
+  const rows = await env.DB.prepare(`select source, count(*) as n from okoli_events where ${LAST_DAY} >= ? group by source`).bind(today).all();
   const counts = Object.fromEntries((rows.results ?? []).map((row) => [String(row.source), Number(row.n)]));
   return NEARBY_SOURCES.map((source) => ({ ...source, upcoming: counts[source.tag] ?? 0 }));
 }

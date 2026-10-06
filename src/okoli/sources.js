@@ -3,6 +3,7 @@
 // `fetchEvents({ env, fetchImpl, known })` vrací { ok, items, listed, seen, complete, warning, error } s položkami
 // jako parseKzmj (src/okoli/kzmj.js); co v `known` (guid → stamp) je a nezměnilo se, znovu nečte.
 import { anteeReader } from "./antee.js";
+import { fetchJicinOrg } from "./jicin-org.js";
 import { fetchKzmj } from "./kzmj.js";
 
 export const NEARBY_SOURCES = [
@@ -14,12 +15,21 @@ export const NEARBY_SOURCES = [
     home: "https://kzmj.cz/",
     town: "Jičín",
     // Po silnici z Kopidla.
-    km: 13,
+    km: 15,
     fetchEvents: fetchKzmj,
+  },
+  {
+    tag: "jicinorg",
+    name: "Jičín.org",
+    title: "kalendář akcí Městského informačního centra Jičín",
+    home: "https://www.jicin.org/kalendar-akci",
+    town: "Jičín",
+    km: 15,
+    fetchEvents: fetchJicinOrg,
   },
 ];
 
-// Obce na Antee: pozvánky z aktualit (src/okoli/antee.js). Nová obec je nový řádek.
+// Obce na Antee: pozvánky z aktualit (src/okoli/antee.js). Nová obec je nový řádek; `about` místo „obce {town}“.
 const ANTEE_TOWNS = [
   {
     tag: "liban",
@@ -29,6 +39,35 @@ const ANTEE_TOWNS = [
     feed: "https://www.mestoliban.cz/aktuality?action=atom",
     town: "Libáň",
     km: 8,
+  },
+  {
+    tag: "jicineves",
+    name: "Obec Jičíněves",
+    title: "aktuality obce Jičíněves",
+    home: "https://www.jicineves.cz/",
+    feed: "https://www.jicineves.cz/aktuality?action=atom",
+    town: "Jičíněves",
+    km: 7,
+  },
+  {
+    tag: "vitineves",
+    name: "Obec Vitiněves",
+    title: "aktuality obce Vitiněves",
+    home: "https://www.vitineves.cz/",
+    feed: "https://www.vitineves.cz/aktuality?action=atom",
+    town: "Vitiněves",
+    km: 11,
+  },
+  {
+    tag: "marianskazahrada",
+    name: "Mariánská zahrada",
+    title: "akce mikroregionu Mariánská zahrada (obce kolem Kopidla)",
+    home: "https://www.marianskazahrada.cz/akce-v-mz",
+    feed: "https://www.marianskazahrada.cz/akce-v-mz?action=atom",
+    // Mikroregion, ne obec: akce bývají v Kopidle i v obcích kolem, místo vytáhne Haiku.
+    town: "Mariánská zahrada",
+    about: "mikroregionu Mariánská zahrada (Kopidlno a obce kolem: Dětenice, Ostružno, Libáň, Žeretice…)",
+    km: 5,
   },
 ];
 

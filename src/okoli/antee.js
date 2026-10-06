@@ -13,7 +13,7 @@ export const MAX_READS = 8;
 // Položka bez termínu v kalendáři obce se bere jen tolik dní po zveřejnění.
 const FRESH_DAYS = 30;
 
-const EXTRACT_RULES = `Dostaneš jednu položku z aktualit na webu obce {TOWN}, případně s plakátem. Rozhodni, jestli je to pozvánka na konkrétní akci pro veřejnost (koncert, divadlo, přednáška, zábava, ples, výlet, procházka, sportovní akce, trhy, výstava, slavnost).
+const EXTRACT_RULES = `Dostaneš jednu položku z aktualit na webu {ABOUT}, případně s plakátem. Rozhodni, jestli je to pozvánka na konkrétní akci pro veřejnost (koncert, divadlo, přednáška, zábava, ples, výlet, procházka, sportovní akce, trhy, výstava, slavnost).
 Akce to není: uzavírka, odstávka, svoz odpadu, úřední oznámení, poplatky, nabídka práce, reklama a nabídky firem, nábor do kroužku nebo oddílu, vítání občánků a jiné akce jen pro pozvané.
 Když je to akce, vyplň (údaje z textu i z plakátu):
 - title: krátký název akce přesně podle zdroje, normálně (ne celé velkými písmeny), bez slova „Pozvánka“.
@@ -24,7 +24,7 @@ Když je to akce, vyplň (údaje z textu i z plakátu):
 Údaje ber jen ze zdroje, nic nevymýšlej. Když to akce není, dej is_event false a ostatní pole prázdná.`;
 
 export function extractPrompt(source) {
-  return EXTRACT_RULES.replace("{TOWN}", source.town);
+  return EXTRACT_RULES.replace("{ABOUT}", source.about ?? `obce ${source.town}`);
 }
 
 export const EXTRACT_SCHEMA = {
