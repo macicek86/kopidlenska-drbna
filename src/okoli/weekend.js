@@ -2,6 +2,7 @@
 // na období (víkend, volno se svátkem nebo samostatný svátek, src/okoli/outings.js) a napíše jeden článek.
 // Kopidlno vždy první, z okolí jen výběr.
 import { saveBotArticle } from "../bot-article.js";
+import { publishNote } from "../publish-time.js";
 import { callClaude } from "../claude.js";
 import { loadDrbena } from "../drbena-db.js";
 import { DEFAULT_VOICE, voiceFor } from "../drbena.js";
@@ -175,8 +176,9 @@ export async function writeWeekend(env, settings, weekend, { ask = callClaude } 
     image: await pickStockImage(env, result.imageTopic),
     sourceHtml: weekendSource(nearby),
     autoPublish: settings.autoPublish,
+    publishTime: weekend.manual ? "" : settings.publishTime,
     rubric,
   });
-  const where = made.articleId ? "vyšel" : "čeká jako návrh";
+  const where = made.articleId ? publishNote(made.publishedAt) : "čeká jako návrh";
   return { ok: true, note: `Článek „${result.article.title}“ ${where}. ${result.reason}`.trim(), ...made };
 }

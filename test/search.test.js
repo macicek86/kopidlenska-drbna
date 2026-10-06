@@ -38,7 +38,7 @@ async function freshEnv(extra = {}) {
   await env.DB.prepare(
     `create table articles (id integer primary key autoincrement, slug text not null, title text not null, excerpt text not null,
       body text not null, category text not null default 'Zprávy', rubric_id integer, keywords text not null default '',
-      published integer not null default 1, created_at text not null)`,
+      published integer not null default 1, created_at text not null, published_at text not null default '')`,
   ).run();
   return env;
 }

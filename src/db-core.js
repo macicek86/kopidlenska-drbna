@@ -26,27 +26,35 @@ export async function reopenImports(env, { articleId = 0, proposalIds = [] } = {
   }
 }
 
-// Zpráva je na webu, když je zveřejněná a její den už nastal: datum v budoucnu je plánované zveřejnění.
-// Starší zprávy mají v `created_at` i čas, proto se porovná jen den. Dnešek je vždy YYYY-MM-DD z pragueNow.
-export function liveArticle(alias = "a", today = pragueNow().date) {
-  return `${alias}.published = 1 and substr(${alias}.created_at, 1, 10) <= '${today}'`;
+// Zpráva je na webu, když je zveřejněná, její den už nastal (datum v budoucnu je plánované zveřejnění) a nastal
+// i okamžik `published_at` (článek z nočního cronu jde na web až v nastavenou hodinu, src/publish-time.js).
+// Starší zprávy mají v `created_at` i čas, proto se porovná jen den; bez `published_at` platí jen den.
+export function liveArticle(alias = "a", now = new Date()) {
+  return `${alias}.published = 1 and substr(${alias}.created_at, 1, 10) <= '${pragueNow(now).date}'
+    and coalesce(${alias}.published_at, '') <= '${sqlStamp(now)}'`;
 }
 
-function sqlStamp(date) {
+export function sqlStamp(date) {
   return date.toISOString().slice(0, 19).replace("T", " ");
+}
+
+// Pražský den a čas („HH:MM“) jako UTC „YYYY-MM-DD HH:MM:SS“ (letní i zimní čas).
+export function pragueStamp(day, time = "00:00") {
+  const [y, m, d] = day.split("-").map(Number);
+  const [hh, mm] = time.split(":").map(Number);
+  for (const hours of [1, 2]) {
+    const candidate = new Date(Date.UTC(y, m - 1, d, hh, mm) - hours * 3_600_000);
+    const local = pragueNow(candidate);
+    if (local.date === day && local.time === time) return sqlStamp(candidate);
+  }
+  return sqlStamp(new Date(Date.UTC(y, m - 1, d, hh, mm)));
 }
 
 // Okamžik, kdy zpráva vyšla na web (`articles.published_at`, UTC „YYYY-MM-DD HH:MM:SS“): s dnešním datem teď,
 // s jiným půlnoc toho dne v Praze (naplánovaná zpráva se tehdy objeví, starší datum zvolila redakce).
 export function publishMoment(day, now = new Date()) {
   if (!day || day === pragueNow(now).date) return sqlStamp(now);
-  const [y, m, d] = day.split("-").map(Number);
-  for (const hours of [1, 2]) {
-    const candidate = new Date(Date.UTC(y, m - 1, d) - hours * 3_600_000);
-    const local = pragueNow(candidate);
-    if (local.date === day && local.time === "00:00") return sqlStamp(candidate);
-  }
-  return sqlStamp(new Date(Date.UTC(y, m - 1, d)));
+  return pragueStamp(day);
 }
 
 export function clip(value, max) {

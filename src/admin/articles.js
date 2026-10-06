@@ -1,6 +1,7 @@
 // Sekce Zprávy: hlavní redaktor píše zprávy a schvaluje návrhy, přispěvatel viz `articles-contributor.js`.
 import { byline } from "../db.js";
 import { formatLong, formatShort } from "../format.js";
+import { pendingTime } from "../publish-time.js";
 import { pragueNow } from "../waste.js";
 import { rubricLabel } from "../rubrics.js";
 import { credit, esc } from "../view.js";
@@ -63,11 +64,12 @@ function chiefArticles(ctx, data, message, query) {
   const today = pragueNow().date;
   const rows = data.articles.map((row) => {
     const planned = row.published && row.createdOn > today;
-    const live = row.published && !planned;
+    const later = row.published && !planned ? pendingTime(row.publishedAt) : "";
+    const live = row.published && !planned && !later;
     return item({
       title: row.title,
       meta: [esc(rubricLabel(row)), esc(credit(row)), row.createdOn ? esc(formatLong(row.createdOn)) : ""].filter(Boolean).join(" · "),
-      badges: `${planned ? badge(`Vyjde ${formatShort(row.createdOn)}`, "warn") : live ? badge("Na webu", "ok") : badge("Skrytá", "off")}${row.redacted ? badge("Redigováno") : ""}`,
+      badges: `${planned ? badge(`Vyjde ${formatShort(row.createdOn)}`, "warn") : later ? badge(`Vyjde v ${later}`, "warn") : live ? badge("Na webu", "ok") : badge("Skrytá", "off")}${row.redacted ? badge("Redigováno") : ""}`,
       actions: `${modalLink(`${BASE}?id=${row.id}`, "Upravit")}
         ${live && row.slug ? `<a class="btn btn-sm btn-ghost" href="/zpravy/${esc(row.slug)}" target="_blank" rel="noopener">Zobrazit</a>` : ""}
         ${modalLink(`${BASE}?smazat=${row.id}`, "Smazat", "btn-ghost btn-danger-text")}`,

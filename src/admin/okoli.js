@@ -6,6 +6,7 @@ import { periodLabel } from "../okoli/weekend.js";
 import { pragueNow } from "../waste.js";
 import { esc } from "../view.js";
 import { madeLinks, stamp, VOICE_NOTE } from "./imports.js";
+import { atTime, publishTimeField } from "./publish-time.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, field, formFoot, icon, input, item, list, modal, pageHead, panel, postButton } from "./ui.js";
 
@@ -22,6 +23,7 @@ function settingsForm(settings) {
     </fieldset>
     <p class="hint">Nejdřív akce v Kopidlně z kalendáře, pak výběr z okolí. Když se nic nekoná, článek nevyjde.</p>
     ${check("autoPublish", "1", settings.autoPublish, "Článek rovnou zveřejnit", "Bez zaškrtnutí čeká jako návrh ke schválení.")}
+    ${publishTimeField(settings.publishTime, "Drběna píše v noci, na web článek půjde až v tuhle hodinu. Prázdné: hned. Článek napsaný tlačítkem vyjde vždy hned.")}
     ${field("Okruh v km", `<input class="${input}" type="number" name="radiusKm" min="1" max="100" required value="${settings.radiusKm}">`, "Zdroje dál od Kopidla Drběna do článku nebere.")}
     ${VOICE_NOTE}
     ${formFoot("Uložit", cancelLink(BASE))}
@@ -40,14 +42,15 @@ function nextLine(settings, today = pragueNow().date) {
   if (!next) return "";
   const holidays = next.holidays.map((holiday) => holiday.name).join(", ");
   const range = next.from === next.to ? czechDay(next.from) : `${czechDay(next.from)} až ${czechDay(next.to)}`;
-  return `Příští článek: ${czechDay(next.write)} na ${periodLabel(next)} ${range}${holidays ? ` (${holidays})` : ""}.`;
+  const when = settings.autoPublish ? ` (vyjde${atTime(settings.publishTime)})` : "";
+  return `Příští článek: ${czechDay(next.write)}${when} na ${periodLabel(next)} ${range}${holidays ? ` (${holidays})` : ""}.`;
 }
 
 function statusPanel(data, settings) {
   const checked = settings.checkedAt ? `Naposledy načteno ${stamp(settings.checkedAt)}.` : "Ještě se nenačítalo.";
   const fetching = settings.enabled ? "Stahuje se automaticky." : "Stahuje se jen tlačítkem.";
   const weekly = settings.weekly || settings.autoVolno || settings.autoSvatek
-    ? `Článek píše sama, ${settings.autoPublish ? "rovnou na web" : "jako návrh"}.`
+    ? `Článek píše sama, ${settings.autoPublish ? `rovnou na web${atTime(settings.publishTime)}` : "jako návrh"}.`
     : "Víkendový článek je vypnutý.";
   const keyWarn = data.hasApiKey ? "" : callout("Chybí klíč pro Claude (<code>ANTHROPIC_API_KEY</code>), článek se nenapíše.", "warn");
   const busy = okoliRunning(settings) ? `<p class="status-sub">Drběna teď s akcemi pracuje.</p>` : "";

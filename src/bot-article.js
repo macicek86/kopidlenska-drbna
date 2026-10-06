@@ -3,8 +3,10 @@
 // `image` je { key, focus, caption } (fotka ze zdroje nebo z knihovny obrázků), nebo null.
 // `article.keywords` jsou klíčová slova (src/keywords.js), `followsId` zpráva, na kterou článek navazuje.
 // `attachments` jsou přílohy pod článek ([{ key, caption }], src/attachments.js).
+// `publishTime` („HH:MM“) u zveřejnění rovnou: na web až v tu hodinu (src/publish-time.js), výsledek nese `publishedAt`.
 // `article.recall` je akce, na kterou Drběna v článku vzpomněla; podruhé už na ni nevzpomene (src/drbena-memory.js).
-import { publishMoment, slugify, uniqueSlug } from "./db-core.js";
+import { slugify, uniqueSlug } from "./db-core.js";
+import { scheduledMoment } from "./publish-time.js";
 import { pragueNow } from "./waste.js";
 import { ensureBot } from "./munipolis/store.js";
 import { prepareArticleBody } from "./rich.js";
@@ -13,7 +15,7 @@ import { markRecalled } from "./drbena-memory.js";
 import { auditBot } from "./audit.js";
 import { notifyEditors } from "./notify.js";
 
-export async function saveBotArticle(env, { article, image, attachments = [], sourceHtml, autoPublish, rubric, publishOn = "", followsId = null }) {
+export async function saveBotArticle(env, { article, image, attachments = [], sourceHtml, autoPublish, rubric, publishOn = "", publishTime = "", followsId = null }) {
   const bot = await ensureBot(env);
   const body = prepareArticleBody(`${article.body}${sourceHtml}`).html;
   const imageKey = image?.key ?? null;
@@ -24,15 +26,17 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
   if (article.recall) await markRecalled(env, article.recall);
   if (autoPublish) {
     const slug = await uniqueSlug(env, slugify(article.title));
+    const day = publishOn || pragueNow().date;
+    const publishedAt = scheduledMoment(day, publishTime);
     const result = await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, published, created_at, author_id, author_name, redacted,
          keywords, follows_id, published_at)
        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 0, ?, ?, ?)`,
     )
-      .bind(slug, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached, publishOn || pragueNow().date, bot.id, bot.name, keywords, followsId, publishMoment(publishOn || pragueNow().date))
+      .bind(slug, article.title, article.excerpt, body, rubric.name, rubric.id, imageKey, focus, caption, attached, day, bot.id, bot.name, keywords, followsId, publishedAt)
       .run();
     await auditBot(env, bot, { title: article.title, published: true }).catch(() => {});
-    return { articleId: Number(result.meta.last_row_id) };
+    return { articleId: Number(result.meta.last_row_id), publishedAt };
   }
   const result = await env.DB.prepare(
     `insert into proposals (

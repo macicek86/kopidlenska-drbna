@@ -4,6 +4,7 @@
 import { lockHeld, lockRow, unlockRow } from "../background.js";
 import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { NEARBY_SOURCES, nearbySource } from "./sources.js";
+import { publishTimeColumn, readPublishTime } from "../publish-time.js";
 
 export const DEFAULT_RADIUS = 25;
 // Poslední den akce: u vícedenní `ends_on`, jinak den začátku.
@@ -57,6 +58,8 @@ export async function ensureOkoliTables(env) {
   const settingsNames = new Set((settingsInfo.results ?? []).map((row) => row.name));
   await addColumn(env, settingsNames, "auto_volno", "alter table okoli_settings add column auto_volno integer not null default 0");
   await addColumn(env, settingsNames, "auto_svatek", "alter table okoli_settings add column auto_svatek integer not null default 0");
+  // V kolik článek z nočního cronu vyjde (src/publish-time.js).
+  await addColumn(env, settingsNames, "publish_time", publishTimeColumn("okoli_settings"));
   await env.DB.prepare("create index if not exists okoli_events_day on okoli_events (starts_on)").run();
   // Přečtené položky zdrojů, které akcí nejsou (nebo už proběhly a akce se smazala), ať se nečtou znovu.
   await env.DB.prepare(
@@ -82,6 +85,7 @@ function mapSettings(row) {
     autoVolno: asBool(row?.auto_volno),
     autoSvatek: asBool(row?.auto_svatek),
     autoPublish: asBool(row?.auto_publish),
+    publishTime: readPublishTime(row?.publish_time),
     radiusKm: readRadius(row?.radius_km),
     checkedAt: row?.checked_at ? String(row.checked_at) : "",
     status: String(row?.status ?? ""),
@@ -101,8 +105,8 @@ export async function loadOkoliSettings(env) {
 export async function saveOkoliSettings(env, request, input) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return gate;
-  await env.DB.prepare("update okoli_settings set enabled = ?, weekly = ?, auto_volno = ?, auto_svatek = ?, auto_publish = ?, radius_km = ? where id = 1")
-    .bind(input.enabled ? 1 : 0, input.weekly ? 1 : 0, input.autoVolno ? 1 : 0, input.autoSvatek ? 1 : 0, input.autoPublish ? 1 : 0, readRadius(input.radiusKm))
+  await env.DB.prepare("update okoli_settings set enabled = ?, weekly = ?, auto_volno = ?, auto_svatek = ?, auto_publish = ?, publish_time = ?, radius_km = ? where id = 1")
+    .bind(input.enabled ? 1 : 0, input.weekly ? 1 : 0, input.autoVolno ? 1 : 0, input.autoSvatek ? 1 : 0, input.autoPublish ? 1 : 0, readPublishTime(input.publishTime), readRadius(input.radiusKm))
     .run();
   return { ok: true };
 }
