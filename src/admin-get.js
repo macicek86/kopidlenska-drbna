@@ -47,7 +47,7 @@ import { continueSkola } from "./skola/run.js";
 import { SCHOOL_LIST, SCHOOLS } from "./skola/sources.js";
 import { loadSkolaSettings } from "./skola/store.js";
 import { countBySource, loadNearbyEvents, loadOkoliSettings } from "./okoli/store.js";
-import { shiftDay } from "./okoli/weekend.js";
+import { shiftDay } from "./okoli/outings.js";
 import { loadAssistAdmin } from "./assist/store.js";
 import { chatEnabled, loadChatAdmin } from "./chat/store.js";
 import { pragueNow } from "./waste.js";

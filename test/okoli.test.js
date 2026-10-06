@@ -3,7 +3,10 @@ import test from "node:test";
 import { adminOkoli } from "../src/admin/index.js";
 import { fetchKzmj, parseEventPage, parseKzmjPost } from "../src/okoli/kzmj.js";
 import { mapNearbyEvent } from "../src/okoli/store.js";
-import { kopidlnoLink, readWeekend, weekendDue, weekendFor, weekendSchema, weekendSource, weekendText } from "../src/okoli/weekend.js";
+import { easterSunday, holidayName, outingDue, outingFor, outingsFrom } from "../src/okoli/outings.js";
+import { kopidlnoLink, readWeekend, weekendSchema, weekendSource, weekendText } from "../src/okoli/weekend.js";
+
+const weekendFor = outingFor;
 
 // Výřez skutečné stránky akce na kzmj.cz (tlačítko „do kalendáře“).
 const PAGE = `<div class="detail-info-col">19.12.2026 - 16:00 (sobota) <add-to-calendar-button
@@ -74,21 +77,54 @@ test("KZMJ: stránku akce stahuje jen u nové nebo změněné akce", async () =>
   assert.ok(calls.every((url) => !url.includes("repriza")));
 });
 
-test("víkend: od pondělí do čtvrtka ten příští, v pátek až neděli ten právě běžící", () => {
-  assert.deepEqual(weekendFor("2026-10-07"), { friday: "2026-10-09", from: "2026-10-09", to: "2026-10-11" });
-  assert.deepEqual(weekendFor("2026-10-09"), { friday: "2026-10-09", from: "2026-10-09", to: "2026-10-11" });
-  assert.deepEqual(weekendFor("2026-10-10"), { friday: "2026-10-09", from: "2026-10-10", to: "2026-10-11" });
-  assert.deepEqual(weekendFor("2026-10-11"), { friday: "2026-10-09", from: "2026-10-11", to: "2026-10-11" });
+test("svátky: pevné i velikonoční", () => {
+  assert.equal(easterSunday(2026), "2026-04-05");
+  assert.equal(easterSunday(2027), "2027-03-28");
+  assert.equal(holidayName("2026-04-03"), "Velký pátek");
+  assert.equal(holidayName("2026-04-06"), "Velikonoční pondělí");
+  assert.equal(holidayName("2026-10-28"), "Den vzniku samostatného československého státu");
+  assert.equal(holidayName("2026-10-27"), "");
 });
 
-test("víkendový článek: cron ho píše v pátek ráno a jen jednou", () => {
+test("období: víkend, volno se svátkem a samostatný svátek", () => {
+  const brief = (period) => [period.kind, period.from, period.to, period.write];
+  // Běžný víkend: od pátku, píše se v pátek.
+  assert.deepEqual(brief(outingFor("2026-10-07")), ["vikend", "2026-10-09", "2026-10-11", "2026-10-09"]);
+  assert.deepEqual(brief(outingFor("2026-10-10")), ["vikend", "2026-10-10", "2026-10-11", "2026-10-09"]);
+  assert.equal(outingFor("2026-10-10").key, "2026-10-09");
+  // Středa 28. 10.: krátký článek v úterý, pak běžný víkend.
+  const october = outingsFrom("2026-10-26").filter((period) => period.to >= "2026-10-26").map(brief);
+  assert.deepEqual(october.slice(0, 2), [["svatek", "2026-10-28", "2026-10-28", "2026-10-27"], ["vikend", "2026-10-30", "2026-11-01", "2026-10-30"]]);
+  // Velikonoce 2026: Velký pátek až pondělí, píše se ve čtvrtek.
+  assert.deepEqual(brief(outingFor("2026-03-31")), ["volno", "2026-04-03", "2026-04-06", "2026-04-02"]);
+  // Vánoce 2026: čtvrtek 24. 12. až neděle, píše se ve středu; Nový rok v pátek, píše se ve čtvrtek 31. 12.
+  const winter = outingsFrom("2026-12-21").filter((period) => period.to >= "2026-12-21").map(brief);
+  assert.deepEqual(winter.slice(0, 2), [["volno", "2026-12-24", "2026-12-27", "2026-12-23"], ["volno", "2027-01-01", "2027-01-03", "2026-12-31"]]);
+  // Pondělní svátek prodlouží víkend, píše se dál v pátek (5. a 6. 7. 2027 je pondělí a úterý).
+  assert.deepEqual(brief(outingFor("2027-06-30")), ["volno", "2027-07-02", "2027-07-06", "2027-07-02"]);
+  assert.deepEqual(outingFor("2027-06-30").holidays.map((holiday) => holiday.day), ["2027-07-05", "2027-07-06"]);
+});
+
+test("článek Kam vyrazit: cron ho píše v den období, ráno a jednou", () => {
   const on = { weekly: true, weekendOn: "" };
-  assert.equal(weekendDue(on, { date: "2026-10-08", time: "10:15" }), null);
-  assert.equal(weekendDue(on, { date: "2026-10-09", time: "02:15" }), null);
-  assert.equal(weekendDue(on, { date: "2026-10-09", time: "06:15" }).friday, "2026-10-09");
-  assert.equal(weekendDue(on, { date: "2026-10-09", time: "18:15" }), null);
-  assert.equal(weekendDue({ ...on, weekendOn: "2026-10-09" }, { date: "2026-10-09", time: "10:15" }), null);
-  assert.equal(weekendDue({ ...on, weekly: false }, { date: "2026-10-09", time: "10:15" }), null);
+  assert.equal(outingDue(on, { date: "2026-10-08", time: "10:15" }), null);
+  assert.equal(outingDue(on, { date: "2026-10-09", time: "02:15" }), null);
+  assert.equal(outingDue(on, { date: "2026-10-09", time: "06:15" }).key, "2026-10-09");
+  assert.equal(outingDue(on, { date: "2026-10-09", time: "18:15" }), null);
+  assert.equal(outingDue({ ...on, weekendOn: "2026-10-09" }, { date: "2026-10-09", time: "10:15" }), null);
+  assert.equal(outingDue({ ...on, weekly: false }, { date: "2026-10-09", time: "10:15" }), null);
+  // Úterý před svátkem 28. 10. i čtvrtek před Velkým pátkem.
+  assert.equal(outingDue(on, { date: "2026-10-27", time: "06:15" }).kind, "svatek");
+  assert.equal(outingDue(on, { date: "2026-04-02", time: "06:15" }).from, "2026-04-03");
+  assert.equal(outingDue(on, { date: "2026-04-03", time: "06:15" }), null);
+});
+
+test("podklady na svátek: Drběna ví, jaký je", () => {
+  const holiday = outingFor("2026-10-27");
+  const text = weekendText({ today: "2026-10-27", weekend: holiday, home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.match(text, /samostatný svátek uprostřed týdne: středa 28\. 10\. 2026\. Svátek: Den vzniku samostatného československého státu/);
+  const easter = weekendText({ today: "2026-04-02", weekend: outingFor("2026-04-02"), home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.match(easter, /volno se svátkem: pátek 3\. 4\. až pondělí 6\. 4\. 2026\. Svátky: Velký pátek \(pátek 3\. 4\.\), Velikonoční pondělí/);
 });
 
 const nearby = mapNearbyEvent({
@@ -138,7 +174,8 @@ test("redakce: stránka Akce v okolí", () => {
   assert.match(page, /mimo okruh/);
   assert.match(page, /name="kind" value="ukazat"/);
   assert.match(page, /navrh=3|navrh:3/);
-  assert.match(page, /Každý pátek napsat článek/);
+  assert.match(page, /Psát článek Kam vyrazit na víkendy a svátky/);
+  assert.match(page, /Příští článek: /);
 });
 
 test("obce na Antee: termín, čerstvost a odpověď modelu", async () => {

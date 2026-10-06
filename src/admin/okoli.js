@@ -1,7 +1,9 @@
 // Redakce: akce z okolí (programy kulturních domů a měst kolem Kopidla) a týdenní článek „Kam vyrazit“.
 import { formatShort } from "../format.js";
 import { okoliRunning } from "../okoli/store.js";
-import { czechDay } from "../okoli/weekend.js";
+import { czechDay, outingsFrom } from "../okoli/outings.js";
+import { periodLabel } from "../okoli/weekend.js";
+import { pragueNow } from "../waste.js";
 import { esc } from "../view.js";
 import { madeLinks, stamp, VOICE_NOTE } from "./imports.js";
 import { adminShell } from "./shell.js";
@@ -13,7 +15,7 @@ const KIND_LABEL = { divadlo: "divadlo", kino: "kino", akce: "akce" };
 function settingsForm(settings) {
   return `<form class="form" method="post" action="${BASE}/ulozit">
     ${check("enabled", "1", settings.enabled, "Stahovat akce z okolí automaticky", "Drbna se na weby zdrojů podívá každé čtyři hodiny. Akce se na webu samy neukážou, jsou jen podkladem pro víkendový článek.")}
-    ${check("weekly", "1", settings.weekly, "Každý pátek napsat článek Kam vyrazit o víkendu", "Drběna ho napíše v pátek ráno na pátek až neděli: nejdřív akce v Kopidlně z kalendáře, pak výběr z okolí. Když se nic nekoná, článek nevyjde.")}
+    ${check("weekly", "1", settings.weekly, "Psát článek Kam vyrazit na víkendy a svátky", "Drběna ho napíše v pátek ráno na pátek až neděli. Volno se svátkem (Velikonoce, prodloužený víkend) vezme celé a napíše den před ním, k samostatnému svátku uprostřed týdne napíše den předem krátký článek. Nejdřív akce v Kopidlně z kalendáře, pak výběr z okolí. Když se nic nekoná, článek nevyjde.")}
     ${check("autoPublish", "1", settings.autoPublish, "Článek rovnou zveřejnit", "Bez zaškrtnutí čeká jako návrh ke schválení.")}
     ${field("Okruh v km", `<input class="${input}" type="number" name="radiusKm" min="1" max="100" required value="${settings.radiusKm}">`, "Zdroje dál od Kopidla Drběna do článku nebere.")}
     ${VOICE_NOTE}
@@ -24,14 +26,23 @@ function settingsForm(settings) {
 function weekendLine(settings) {
   if (!settings.weekendOn) return "Víkendový článek se ještě nepsal.";
   const made = madeLinks({ articleId: settings.weekendArticleId, proposalId: settings.weekendProposalId });
-  return `Víkend od ${esc(formatShort(settings.weekendOn))}: ${esc(settings.weekendNote)}${made.length ? ` ${made.join(" · ")}` : ""}`;
+  return `Naposledy na dny od ${esc(formatShort(settings.weekendOn))}: ${esc(settings.weekendNote)}${made.length ? ` ${made.join(" · ")}` : ""}`;
+}
+
+// Kdy a na co Drběna napíše příští článek (svátky počítá src/okoli/outings.js).
+function nextLine(settings, today = pragueNow().date) {
+  const next = outingsFrom(today).find((period) => period.write >= today && period.key !== settings.weekendOn);
+  if (!next) return "";
+  const holidays = next.holidays.map((holiday) => holiday.name).join(", ");
+  const range = next.from === next.to ? czechDay(next.from) : `${czechDay(next.from)} až ${czechDay(next.to)}`;
+  return `Příští článek: ${czechDay(next.write)} na ${periodLabel(next)} ${range}${holidays ? ` (${holidays})` : ""}.`;
 }
 
 function statusPanel(data, settings) {
   const checked = settings.checkedAt ? `Naposledy načteno ${stamp(settings.checkedAt)}.` : "Ještě se nenačítalo.";
   const fetching = settings.enabled ? "Stahuje se automaticky." : "Stahuje se jen tlačítkem.";
   const weekly = settings.weekly
-    ? `Článek píše každý pátek ráno, ${settings.autoPublish ? "rovnou na web" : "jako návrh"}.`
+    ? `Článek píše na víkendy a svátky, ${settings.autoPublish ? "rovnou na web" : "jako návrh"}.`
     : "Víkendový článek je vypnutý.";
   const keyWarn = data.hasApiKey ? "" : callout("Chybí klíč pro Claude (<code>ANTHROPIC_API_KEY</code>), článek se nenapíše.", "warn");
   const busy = okoliRunning(settings) ? `<p class="status-sub">Drběna teď s akcemi pracuje.</p>` : "";
@@ -47,8 +58,8 @@ function statusPanel(data, settings) {
     ${settings.note ? (settings.status === "ok" ? `<p class="status-sub">${esc(settings.note)}</p>` : callout(esc(settings.note), settings.status === "error" ? "bad" : "warn")) : ""}
     <div class="status-line">
       <span class="status-ico">${icon("pen")}</span>
-      <div><p class="status-sub">${weekendLine(settings)}</p></div>
-      <form method="post" action="${BASE}/napsat"><button class="btn btn-line" type="submit" data-busy="Drběna píše, trvá to asi minutu…">Napsat článek na víkend</button></form>
+      <div><p class="status-sub">${weekendLine(settings)}</p><p class="status-sub">${esc(nextLine(settings))}</p></div>
+      <form method="post" action="${BASE}/napsat"><button class="btn btn-line" type="submit" data-busy="Drběna píše, trvá to asi minutu…">Napsat článek teď</button></form>
     </div>
     ${busy}${keyWarn}
   </section>`;
@@ -93,7 +104,7 @@ export function adminOkoli(ctx, data, message, query = {}) {
   const { settings } = okoli;
   const body = `${pageHead(
     "Akce v okolí",
-    "Koza Drběna stahuje program akcí z webů v okolí a každý pátek ráno z nich a z kalendáře drbny napíše článek, kam o víkendu vyrazit. Akci, kterou do článku nechcete, schovejte.",
+    "Koza Drběna stahuje program akcí z webů v okolí a před víkendem nebo svátkem z nich a z kalendáře drbny napíše článek, kam vyrazit. Akci, kterou do článku nechcete, schovejte.",
     `<a class="btn btn-line" href="${BASE}?nastaveni=1" data-open="nastaveni">Nastavení</a>`,
   )}
     ${statusPanel(data, settings)}

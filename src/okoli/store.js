@@ -106,10 +106,10 @@ export async function writeOkoliStatus(env, { status, note }) {
     .run();
 }
 
-// Víkend (pátek), na který Drběna článek napsala nebo zjistila, že není o čem.
-export async function saveWeekendResult(env, { friday, note, articleId = null, proposalId = null }) {
+// Období (jeho začátek, src/okoli/outings.js), na které Drběna článek napsala nebo zjistila, že není o čem.
+export async function saveWeekendResult(env, { key, note, articleId = null, proposalId = null }) {
   await env.DB.prepare("update okoli_settings set weekend_on = ?, weekend_note = ?, weekend_article_id = ?, weekend_proposal_id = ? where id = 1")
-    .bind(friday, clip(note, 400), articleId, proposalId)
+    .bind(key, clip(note, 400), articleId, proposalId)
     .run();
 }
 
