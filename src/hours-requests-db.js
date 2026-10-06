@@ -5,6 +5,7 @@
 // Každá sekce dává `actions`: { [akce]: { read(input) → hodnota | {error}, target(env, id) → bool, apply(env, id, hodnota, userId) } }.
 import { addColumn, clip, requireChief, requireUser, userCan } from "./db-core.js";
 import { notifyEditors } from "./notify.js";
+import { answerRequester, mailReplyText } from "./mailin/answer.js";
 
 // Klíč je adresa sekce v redakci.
 export const REQUEST_SECTIONS = {
@@ -80,6 +81,8 @@ export async function ensureRequestTables(env) {
   const names = new Set((info.results ?? []).map((row) => row.name));
   await addColumn(env, names, "link_id", "alter table hours_requests add column link_id integer");
   await addColumn(env, names, "author_name", "alter table hours_requests add column author_name text not null default ''");
+  // Žádost z e-mailu na otevírací dobu (src/mailin/): komu po rozhodnutí odepsat (JSON s adresou a vláknem).
+  await addColumn(env, names, "mail_reply", "alter table hours_requests add column mail_reply text not null default ''");
 }
 
 // Kdo žádost z odkazu pro správce poslal, jak ho ukázat v redakci.
@@ -122,8 +125,14 @@ function mapRequest(row) {
     createdBy: Number(row.created_by) || null,
     linkId: row.link_id == null ? null : Number(row.link_id),
     author: row.link_id != null ? linkAuthor(row.author_name, row.link_label) : String(row.author ?? row.author_name ?? ""),
+    mailReply: String(row.mail_reply ?? ""),
     createdAt: String(row.created_at ?? ""),
   };
+}
+
+async function rowName(env, section, targetId) {
+  const row = await env.DB.prepare(`select name from ${REQUEST_ROWS[section]} where id = ?`).bind(targetId).first();
+  return String(row?.name ?? "");
 }
 
 // Hlavní redaktor vidí všechno, co čeká, ostatní své čekající i zamítnuté. Jen sekce, které člověk vidí.
@@ -156,7 +165,7 @@ export async function submitHours(env, request, { section, actions, action, targ
 
 // Společné pro redakci, odkaz pro správce (`linkId`) a e-mail na otevírací dobu (src/mailin/): bez `userId`
 // je `author` jméno, které se uloží k žádosti (žadatel ho napsal, nebo je to adresa e-mailu).
-export async function fileHours(env, { section, actions, action, targetId, input, mode, userId = null, author = "", linkId = null, linkLabel = "" }) {
+export async function fileHours(env, { section, actions, action, targetId, input, mode, userId = null, author = "", linkId = null, linkLabel = "", mailReply = null }) {
   const spec = actions[action];
   if (!spec) return { ok: false, error: "Tahle změna tu nejde." };
   const value = spec.read(input);
@@ -167,9 +176,9 @@ export async function fileHours(env, { section, actions, action, targetId, input
     `delete from hours_requests where status = 'rejected' and created_at < datetime('now', '-${KEEP_REJECTED_DAYS} days')`,
   ).run();
   const created = await env.DB.prepare(
-    "insert into hours_requests (section, action, target_id, payload, created_by, link_id, author_name) values (?, ?, ?, ?, ?, ?, ?)",
+    "insert into hours_requests (section, action, target_id, payload, created_by, link_id, author_name, mail_reply) values (?, ?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, userId ? "" : clip(author, 160))
+    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, userId ? "" : clip(author, 160), mailReplyText(mailReply))
     .run();
   await requestNotice(env, linkId ? linkAuthor(author, linkLabel) : author, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0) });
   return { ok: true, requested: true, value };
@@ -197,6 +206,10 @@ export async function approveRequest(env, request, { section, actions, id, input
   const result = await spec.apply(env, found.targetId, value, found.createdBy);
   if (!result.ok) return result;
   await env.DB.prepare("delete from hours_requests where id = ?").bind(found.id).run();
+  if (found.mailReply && found.action !== "zrusit") {
+    const name = await rowName(env, section, found.targetId);
+    await answerRequester(env, { mailReply: found.mailReply, section, action: found.action, value, name, approved: true });
+  }
   return { ok: true, value };
 }
 
@@ -206,6 +219,10 @@ export async function rejectRequest(env, request, { section, id, reply }) {
   const found = await pendingRequest(env, section, id);
   if (!found) return { ok: false, error: "Tahle žádost už nečeká." };
   await env.DB.prepare("update hours_requests set status = 'rejected', reply = ? where id = ?").bind(clip(reply, 400), found.id).run();
+  if (found.mailReply && found.action !== "zrusit") {
+    const name = await rowName(env, section, found.targetId);
+    await answerRequester(env, { mailReply: found.mailReply, section, action: found.action, value: found.value, name, approved: false, reason: clip(reply, 400) });
+  }
   return { ok: true };
 }
 

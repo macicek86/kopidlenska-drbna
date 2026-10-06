@@ -21,9 +21,22 @@ function mailHtml(text) {
     .join("\n");
 }
 
+// Vlákno: odpověď navazuje na e-mail odesílatele, ať ji jeho pošta ukáže pod ním.
+function threadHeaders(mail) {
+  const id = String(mail.messageId ?? "").trim();
+  if (!/^<[^<>\s]+>$/.test(id)) return undefined;
+  const references = [...String(mail.references ?? "").split(/\s+/).filter((ref) => /^<[^<>]+>$/.test(ref)).slice(-10), id].join(" ");
+  return { "In-Reply-To": id, References: references };
+}
+
+// Odpovídá z adresy na otevírací dobu, ať odpověď na otázku Drběny přijde zase sem. Když ji Email Service
+// odmítne (adresa není povolená k odesílání), jde odpověď z adresy redakce s „Odpovědět“ na otevírací dobu, bez hlaviček vlákna.
 export async function replyTo(env, mail, paragraphs) {
   const text = [...paragraphs.filter(Boolean), SIGN].join("\n\n");
-  return sendMail(env, { to: mail.from, subject: subjectOf(mail.subject), text, html: mailHtml(text) });
+  const letter = { to: mail.from, subject: subjectOf(mail.subject), text, html: mailHtml(text), headers: threadHeaders(mail) };
+  const sent = await sendMail(env, { ...letter, from: { email: MAILIN_ADDRESS, name: MAIL_FROM.name } });
+  if (sent.ok) return sent;
+  return sendMail(env, { ...letter, headers: undefined, replyTo: MAILIN_ADDRESS });
 }
 
 const PAGES = { "oteviraci-doba": "/oteviraci-doba", lekari: "/lekari", dvory: "/sberne-dvory" };

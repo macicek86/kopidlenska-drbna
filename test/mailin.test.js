@@ -3,10 +3,11 @@ import { createServer } from "node:http";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { ensureAuditTables } from "../src/audit-db.js";
-import { ensureRequestTables, loadRequests } from "../src/hours-requests-db.js";
+import { approveRequest, ensureRequestTables, loadRequests, rejectRequest } from "../src/hours-requests-db.js";
+import { PLACE_ACTIONS } from "../src/places-db.js";
 import { ensureLinkTables } from "../src/hours-links-db.js";
 import { ensureLoginTables, sha256 } from "../src/login-db.js";
-import { changeInput } from "../src/mailin/ai.js";
+import { calendarText, changeInput } from "../src/mailin/ai.js";
 import { authVerdict, automatic, freshText } from "../src/mailin/parse.js";
 import { receiveMail } from "../src/mailin/run.js";
 import { ensureMailinTables, loadMailAdmin, saveSender } from "../src/mailin/store.js";
@@ -36,6 +37,7 @@ const PASSED = "ARC-Authentication-Results: i=1; mx.cloudflare.net; dkim=pass he
 
 function rawMail({ from = "knihovna@kopidlno.cz", subject = "Zavřeno", text = "15.8 kvc zavřeno", auth = PASSED, extra = "" } = {}) {
   const headers = [auth, "Received: from mail.kopidlno.cz by mx.cloudflare.net", extra, `From: Knihovna <${from}>`, "To: oteviracidoba@kopidlenskadrbna.org", `Subject: ${subject}`, "Content-Type: text/plain; charset=utf-8"];
+  headers.push(`Message-ID: <${subject.length}-${text.length}@kopidlno.cz>`);
   return `${headers.filter(Boolean).join("\r\n")}\r\n\r\n${text}`;
 }
 
@@ -45,6 +47,7 @@ function message(raw, to = "oteviracidoba@kopidlenskadrbna.org") {
 
 // Falešný Claude: na každý dotaz vrátí připravenou odpověď a dotaz si zapamatuje.
 async function fakeClaude(answer) {
+  const answers = Array.isArray(answer) ? [...answer] : null;
   const seen = [];
   const server = createServer((req, res) => {
     let body = "";
@@ -52,7 +55,7 @@ async function fakeClaude(answer) {
     req.on("end", () => {
       seen.push(JSON.parse(body));
       res.setHeader("content-type", "application/json");
-      res.end(JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-4-5", stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(answer) }], usage: { input_tokens: 10, output_tokens: 10 } }));
+      res.end(JSON.stringify({ id: "msg_1", type: "message", role: "assistant", model: "claude-haiku-4-5", stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(answers ? answers.shift() : answer) }], usage: { input_tokens: 10, output_tokens: 10 } }));
     });
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -207,4 +210,88 @@ test("stránka redakce ukáže adresy a zaškrtnutá místa", async () => {
   assert.match(page, /oteviracidoba@kopidlenskadrbna\.org/);
   assert.match(page, new RegExp(`value="oteviraci-doba:${place.id}" checked`));
   assert.match(page, /Ke schválení/);
+});
+
+test("kalendář: příští týden je pondělí až neděle", () => {
+  // 2026-10-06 je úterý.
+  const text = calendarText("2026-10-06", 2);
+  assert.match(text, /Tento týden: 2026-10-06 až 2026-10-11\. Příští týden: 2026-10-12 až 2026-10-18\./);
+  assert.match(text, /pátek 2026-10-09/);
+  assert.match(calendarText("2026-10-11", 0), /Příští týden: 2026-10-12 až 2026-10-18/);
+  assert.match(calendarText("2026-10-12", 1), /Příští týden: 2026-10-19 až 2026-10-25/);
+});
+
+test("odpověď na otázku Drběny: další e-mail dostane i předchozí a otázku; odpovídá z adresy na otevírací dobu ve vlákně", async () => {
+  const claude = await fakeClaude([
+    { verdict: "nejasne", question: "Který den bude zavřeno?", changes: [] },
+    { verdict: "zmeny", question: "", changes: [{ target: "misto:1", kind: "zavreno", starts_on: "2026-10-12", ends_on: "2026-10-18", note: "", slots: [] }] },
+  ]);
+  try {
+    const { env, sent, place } = await freshEnv(claude.url);
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "duhovka", direct: true, targets: [`oteviraci-doba:${place.id}`] });
+    await receiveMail(message(rawMail({ subject: "Duhovka", text: "Dobrý den, příští týden bude mít duhovka zavřeno" })), env);
+    // Napřed jde upozornění redakci, pak odpověď odesílateli.
+    const replies = () => sent.filter((mail) => mail.to === "knihovna@kopidlno.cz");
+    assert.equal(replies()[0].from.email, "oteviracidoba@kopidlenskadrbna.org");
+    assert.match(replies()[0].headers["In-Reply-To"], /^<.+@kopidlno\.cz>$/);
+    assert.match(replies()[0].text, /Který den/);
+
+    await receiveMail(message(rawMail({ subject: "Re: Duhovka", text: "celý týden" })), env);
+    const prompt = JSON.stringify(claude.seen[1]);
+    assert.match(prompt, /příští týden bude mít duhovka zavřeno/);
+    assert.match(prompt, /Moje otázka na něj: Který den/);
+    const change = await env.DB.prepare("select starts_on, ends_on from place_changes").first();
+    assert.deepEqual({ ...change }, { starts_on: "2026-10-12", ends_on: "2026-10-18" });
+    assert.equal(replies()[1].subject, "Re: Duhovka");
+  } finally {
+    claude.close();
+  }
+});
+
+test("když Email Service adresu na otevírací dobu odmítne, odpoví redakce s Odpovědět na ni", async () => {
+  const claude = await fakeClaude({ verdict: "neni_doba", question: "", changes: [] });
+  try {
+    const { env, sent, place } = await freshEnv(claude.url);
+    env.EMAIL.send = async (mail) => {
+      if (mail.from.email !== "redakce@kopidlenskadrbna.org") throw Object.assign(new Error("no"), { code: "E_SENDER_NOT_VERIFIED" });
+      sent.push(mail);
+    };
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "", direct: true, targets: [`oteviraci-doba:${place.id}`] });
+    await receiveMail(message(rawMail({ text: "Pozvánka" })), env);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].replyTo, "oteviracidoba@kopidlenskadrbna.org");
+    assert.equal(sent[0].headers, undefined);
+  } finally {
+    claude.close();
+  }
+});
+
+test("změna z e-mailu ke schválení: po schválení i zamítnutí přijde odesílateli odpověď ve vlákně", async () => {
+  const claude = await fakeClaude({ verdict: "zmeny", question: "", changes: [{ target: "misto:1", kind: "zavreno", starts_on: "2026-10-12", ends_on: "2026-10-18", note: "dovolená", slots: [] }] });
+  try {
+    const { env, sent, place } = await freshEnv(claude.url);
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "duhovka", direct: false, targets: [`oteviraci-doba:${place.id}`] });
+    const replies = () => sent.filter((mail) => mail.to === "knihovna@kopidlno.cz");
+    await receiveMail(message(rawMail({ subject: "Duhovka" })), env);
+    assert.match(replies()[0].text, /ke schválení/);
+    assert.match(replies()[0].text, /pondělí 12\. října až neděle 18\. října, zavřeno \(dovolená\)/);
+
+    const chiefUser = { id: 1, role: "hlavni", permissions: [] };
+    let [request] = (await loadRequests(env, chiefUser))["oteviraci-doba"];
+    const input = { kind: "docasna", startsOn: "2026-10-12", endsOn: "2026-10-16", changeNote: "dovolená", doctorWeek: [], placeId: place.id };
+    assert.equal((await approveRequest(env, chief(), { section: "oteviraci-doba", actions: PLACE_ACTIONS, id: request.id, input })).ok, true);
+    const approved = replies()[1];
+    assert.match(approved.text, /Redakce změnu schválila/);
+    // Redakce období zkrátila: odpověď říká, co se opravdu zapsalo.
+    assert.match(approved.text, /pátek 16\. října/);
+    assert.equal(approved.subject, "Re: Duhovka");
+    assert.match(approved.headers["In-Reply-To"], /@kopidlno\.cz>$/);
+
+    await receiveMail(message(rawMail({ subject: "Duhovka" })), env);
+    [request] = (await loadRequests(env, chiefUser))["oteviraci-doba"];
+    assert.equal((await rejectRequest(env, chief(), { section: "oteviraci-doba", id: request.id, reply: "Už je zapsané." })).ok, true);
+    assert.match(replies().at(-1).text, /nezapsala[\s\S]*Důvod: Už je zapsané\./);
+  } finally {
+    claude.close();
+  }
 });

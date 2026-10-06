@@ -3,9 +3,7 @@
 // z odkazu pro správce (`fileHours`): rovnou, když to adresa má zapnuté a e-mail prošel ověřením, jinak ke schválení.
 // Odesílateli přijde odpověď, co se zapsalo; e-mail, který o otevírací době není, dostane odpověď, kam psát.
 import { auditFinish, auditStart } from "../audit.js";
-import { hoursSummary, periodClosed, spanSummary } from "../doctors.js";
 import { loadDoctors } from "../doctors-db.js";
-import { formatLong } from "../format.js";
 import { fileHours } from "../hours-requests-db.js";
 import { MANAGE_SECTIONS } from "../manage/sections.js";
 import { notifyEditors } from "../notify.js";
@@ -13,11 +11,11 @@ import { OK } from "../ok-messages.js";
 import { loadPlaces } from "../places-db.js";
 import { pragueNow } from "../waste.js";
 import { loadYards } from "../yards-db.js";
-import { hoursSummary as yardHours } from "../yards.js";
 import { askDrbena, changeInput, mailContent } from "./ai.js";
+import { describeChange } from "./describe.js";
 import { authVerdict, automatic, readMail } from "./parse.js";
 import { MAILIN_ADDRESS, NOT_HOURS, UNKNOWN_SENDER, pageLinks, replyTo } from "./reply.js";
-import { answeredToday, countSenderUse, logMail, senderByEmail, senderHasRoom } from "./store.js";
+import { answeredToday, countSenderUse, earlierQuestion, logMail, senderByEmail, senderHasRoom } from "./store.js";
 
 // Větší e-mail (fotky, přílohy) Cloudflare rovnou odmítne, změna hodin je pár řádků.
 const MAX_SIZE = 2_000_000;
@@ -42,27 +40,6 @@ function rowName(allowed, change) {
   return list.find((row) => row.id === change.targetId)?.name ?? "";
 }
 
-function day(iso) {
-  const text = formatLong(iso);
-  return text.charAt(0).toLowerCase() + text.slice(1);
-}
-
-function whenText(change) {
-  const { startsOn, endsOn } = change.span;
-  if (change.kind === "trvala") return `od ${day(startsOn)}`;
-  return startsOn === endsOn ? day(startsOn) : `${day(startsOn)} až ${day(endsOn)}`;
-}
-
-function whatText(change) {
-  const { input } = change;
-  if (change.section === "dvory") return change.action === "uzavreni" ? `zavřeno (${input.reason})` : `nová běžná doba: ${yardHours({ week: input.week })}`;
-  const week = input.doctorWeek;
-  if (change.kind === "trvala") return `nová běžná doba: ${hoursSummary({ week }, "")}`;
-  const period = { startsOn: change.span.startsOn, endsOn: change.span.endsOn, week };
-  const note = input.changeNote ? ` (${input.changeNote})` : "";
-  return periodClosed(period) ? `zavřeno${note}` : `${spanSummary(period)}${note}`;
-}
-
 // Běžné hodiny lékaře a dvora se přepíšou hned. Novou dobu od pozdějšího dne proto zapíše až redakce.
 function laterRegular(change, today) {
   return change.action === "hodiny" && change.span.startsOn > today;
@@ -72,7 +49,7 @@ function redirectFor(okKey) {
   return new Response(null, { status: 303, headers: { location: `/x?ok=${okKey}` } });
 }
 
-async function fileChange(env, change, { who, direct }) {
+async function fileChange(env, change, { who, direct, mail }) {
   const spec = MANAGE_SECTIONS[change.section];
   const input = { ...change.input, [spec.idField]: change.targetId };
   const auditPath = `/redakce/${change.section}${spec.audit[change.action]}`;
@@ -85,6 +62,7 @@ async function fileChange(env, change, { who, direct }) {
     input,
     mode: direct ? "direct" : "request",
     author: who,
+    mailReply: { email: mail.from, subject: mail.subject, messageId: mail.messageId, references: mail.references },
   });
   if (result.ok) await auditFinish(env, watch, redirectFor(result.requested ? "zadost" : spec.ok(change.action, result.value)), OK).catch(() => {});
   return result;
@@ -103,7 +81,7 @@ async function tellEditors(env, mail, why) {
 }
 
 // Zapíše změny z odpovědi Drběny. Vrací řádky do odpovědi odesílateli a stav do záznamu.
-async function applyChanges(env, { raw, allowed, sender, verified, today, who }) {
+async function applyChanges(env, { raw, allowed, sender, verified, today, who, mail }) {
   const tags = new Set([
     ...allowed.places.map((row) => `misto:${row.id}`),
     ...allowed.doctors.map((row) => `lekar:${row.id}`),
@@ -119,13 +97,17 @@ async function applyChanges(env, { raw, allowed, sender, verified, today, who })
       failed.push(`${String(item?.target ?? "").replace(/^\[|\]$/g, "")}: ${change.error}`);
       continue;
     }
-    const line = `• ${rowName(allowed, change)}: ${whenText(change)}, ${whatText(change)}`;
     const direct = verified && sender.direct && !laterRegular(change, today);
-    const result = await fileChange(env, change, { who, direct });
-    if (!result.ok) failed.push(`${rowName(allowed, change)}: ${result.error}`);
-    else if (result.requested) asked.push(line);
+    const result = await fileChange(env, change, { who, direct, mail });
+    if (!result.ok) {
+      failed.push(`${rowName(allowed, change)}: ${result.error}`);
+      continue;
+    }
+    const since = change.action === "hodiny" ? { startsOn: change.span.startsOn } : {};
+    const line = `• ${describeChange(change.section, change.action, { ...result.value, ...since }, rowName(allowed, change))}`;
+    if (result.requested) asked.push(line);
     else done.push(line);
-    if (result.ok) sections.push(change.section);
+    sections.push(change.section);
   }
   return { done, asked, failed, sections };
 }
@@ -194,7 +176,8 @@ export async function receiveMail(message, env) {
   }
 
   const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
-  const answer = await askDrbena(env, mailContent({ today, weekday, sender, mail, allowed }));
+  const earlier = await earlierQuestion(env, sender.id);
+  const answer = await askDrbena(env, mailContent({ today, weekday, sender, mail, allowed, earlier }));
   if (!answer.ok) {
     await logMail(env, { ...entry, status: "chyba", result: answer.error });
     await tellEditors(env, mail, answer.error);
@@ -209,7 +192,7 @@ export async function receiveMail(message, env) {
     return;
   }
   const who = `${sender.label || mail.from} (e-mail)`;
-  const outcome = verdict === "zmeny" ? await applyChanges(env, { raw: answer.raw?.changes, allowed, sender, verified, today, who }) : { done: [], asked: [], failed: [], sections: [] };
+  const outcome = verdict === "zmeny" ? await applyChanges(env, { raw: answer.raw?.changes, allowed, sender, verified, today, who, mail }) : { done: [], asked: [], failed: [], sections: [] };
   const wrote = outcome.done.length + outcome.asked.length;
   if (!wrote) {
     const ask = question || "Nepoznala jsem, co přesně se mění. Napište mi prosím, které místo, který den (nebo od kdy do kdy) a jestli je zavřeno, nebo jaké jsou časy.";

@@ -89,5 +89,6 @@ export async function readMail(raw) {
     text: freshText(body),
     headers: email.headers ?? [],
     messageId: String(email.messageId ?? ""),
+    references: String((email.headers ?? []).find((header) => String(header.key).toLowerCase() === "references")?.value ?? ""),
   };
 }

@@ -8,10 +8,11 @@ export function mailReady(env) {
   return typeof env?.EMAIL?.send === "function";
 }
 
-export async function sendMail(env, { to, subject, text, html }) {
+// `from`, `replyTo` a `headers` (In-Reply-To, References) jen u odpovědí na e-mail na otevírací dobu (src/mailin/reply.js).
+export async function sendMail(env, { to, subject, text, html, from = MAIL_FROM, replyTo, headers }) {
   if (!mailReady(env)) return { ok: false, error: "Odesílání e-mailů není nastavené." };
   try {
-    await env.EMAIL.send({ from: MAIL_FROM, to, subject, text, html });
+    await env.EMAIL.send({ from, to, subject, text, html, ...(replyTo ? { replyTo } : {}), ...(headers ? { headers } : {}) });
     return { ok: true };
   } catch (error) {
     const code = error?.code ? ` (${error.code})` : "";

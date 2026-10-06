@@ -4,6 +4,7 @@ import { callClaude } from "../claude.js";
 import { changeSpan, normalizeWeek } from "../doctors.js";
 import { formatLong } from "../format.js";
 import { isoDate } from "../notices.js";
+import { addDays } from "../waste.js";
 import { hoursSummary as yardHours, parseTime } from "../yards.js";
 
 const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
@@ -20,7 +21,10 @@ question piš česky, vykej, jednou nebo dvěma větami.
 Pravidla:
 - target je jen značka z přehledu ([misto:ID], [lekar:ID], [dvur:ID]). Jiná místa odesílatel měnit nesmí. Když e-mail mluví o místě, které v přehledu není, nezapisuj ho a zmiň to v question.
 - Když je v přehledu jediný řádek a e-mail místo nejmenuje, myslí ten. Zkratky a hovorové názvy (kvc, knihovna, obecňák, doktorka…) přiřaď podle přehledu; když by mohly patřit ke dvěma řádkům, je to "nejasne".
-- Datum bez roku je nejbližší takový den od dneška (dnešek včetně). Den v týdnu („v pátek“, „příští středu“) a slova „zítra“, „o víkendu“ počítej od dneška. Data piš jako RRRR-MM-DD.
+- Datum bez roku je nejbližší takový den od dneška (dnešek včetně). Den v týdnu („v pátek“, „příští středu“) a slova „zítra“, „o víkendu“ počítej od dneška. Data ber z kalendáře v zadání, nepočítej je sám. Data piš jako RRRR-MM-DD.
+- „Příští týden“ je celý příští týden od pondělí do neděle, „tento týden“ od dneška do neděle, „do konce měsíce“ od dneška do posledního dne měsíce. Na nic se v tom případě neptej, zapiš celé období.
+- Ptej se ("nejasne") jen tehdy, když opravdu nejde poznat místo, kdy, nebo jaké časy. Co jde rozumně odvodit, odvoď a zapiš.
+- Když zadání obsahuje předchozí e-mail a tvou otázku, nový e-mail je odpověď na ni: spoj oba dohromady (místo nebo důvod může být jen v tom předchozím).
 - kind "zavreno": v těch dnech má zavřeno (slots nech prázdné). kind "docasna": v těch dnech má jinou dobu, do slots dej jen časy, kdy je v tom období otevřeno. Platí od starts_on do ends_on (u jednoho dne stejné datum).
 - kind "trvala": nová běžná otevírací doba natrvalo („od září máme nově…“). Do starts_on den, od kdy platí (když ho e-mail neříká, dnešek), do slots celý nový týden, i dny, které se nemění (vezmi je z přehledu).
 - Sběrný dvůr umí jen "zavreno" a "trvala" (jeden úsek denně). Jinou dobu na pár dní u dvora nezapisuj a zmiň to v question.
@@ -91,13 +95,36 @@ export function allowedContext(allowed) {
   return parts.join("\n\n");
 }
 
-export function mailContent({ today, weekday, sender, mail, allowed }) {
+// Kalendář na tři týdny dopředu, ať model data nepočítá (u „příští týden“ a dnů v týdnu se plete).
+export function calendarText(today, weekday) {
+  const toMonday = (8 - weekday) % 7 || 7;
+  const nextMonday = addDays(today, toMonday);
+  const thisSunday = addDays(nextMonday, -1);
+  const days = [];
+  for (let step = 0; step < 21; step += 1) {
+    const iso = addDays(today, step);
+    days.push(`${DAY_NAMES[(weekday + step) % 7]} ${iso}`);
+  }
+  return [
+    `Tento týden: ${today} až ${thisSunday}. Příští týden: ${nextMonday} až ${addDays(nextMonday, 6)}.`,
+    `Kalendář: ${days.join(", ")}`,
+  ].join("\n");
+}
+
+export function mailContent({ today, weekday, sender, mail, allowed, earlier = null }) {
+  const before = earlier
+    ? `Předchozí e-mail od stejného odesílatele (${earlier.subject || "bez předmětu"}):\n${earlier.text}\n\nMoje otázka na něj: ${earlier.question}`
+    : "";
   return [
     `Dnes je ${DAY_NAMES[weekday]} ${today} (${formatLong(today)}).`,
+    calendarText(today, weekday),
     `Odesílatel: ${sender.label ? `${sender.label}, ` : ""}${mail.from}`,
     `Co smí měnit:\n${allowedContext(allowed)}`,
+    before,
     `Předmět: ${mail.subject || "(bez předmětu)"}\n\nText e-mailu:\n${mail.text || "(prázdný)"}`,
-  ].join("\n\n");
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function askDrbena(env, content) {

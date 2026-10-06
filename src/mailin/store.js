@@ -198,3 +198,15 @@ export async function answeredToday(env, email) {
     .first();
   return Boolean(row);
 }
+
+// Na co se Drběna tohoto odesílatele naposledy ptala, když jí od té doby nic dalšího nenapsal (nejvýš 3 dny zpátky).
+// Další e-mail je nejspíš odpověď a Drběna ho dostane spolu s tím předchozím.
+export async function earlierQuestion(env, senderId) {
+  const row = await env.DB.prepare(
+    "select subject, excerpt, result, status from mail_log where sender_id = ? and created_at >= datetime('now', '-3 days') order by id desc limit 1",
+  )
+    .bind(senderId)
+    .first();
+  if (row?.status !== "nejasne") return null;
+  return { subject: String(row.subject ?? ""), text: String(row.excerpt ?? ""), question: String(row.result ?? "") };
+}
