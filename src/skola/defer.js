@@ -1,8 +1,10 @@
 // Web města zve na akce s velkým předstihem (i dva měsíce). Akce jde do kalendáře hned, pozvánku Drběna napíše až
 // `ahead_days` dní před ní: položka čeká jako `odlozeno` s dnem `write_on` a ten den ji cron vezme znovu jako čerstvou.
 // Do té doby mezitím třeba přijde stejná pozvánka z Munipolisu a Drběna ji pozná jako duplicitu.
+// Plakáty, které Drběna při prvním čtení viděla, počkají v R2 (`kept_images`), při psaní pozvánky se berou odtud.
 // Akce, které podle termínu ve zdroji už proběhly, automatika přeskočí bez Claude. Platí pro zdroje s `defer` (`sources.js`).
 import { readFreshDays } from "../background.js";
+import { releaseImage, storeImageBytes } from "../images.js";
 
 export const DEFAULT_AHEAD_DAYS = 10;
 export const PAST_REASON = "Akce podle termínu na webu už proběhla, pozvánka nemá smysl.";
@@ -53,11 +55,30 @@ export async function reopenDeferred(env, source, today) {
     .run();
 }
 
-export async function deferSkolaItem(env, source, id, { writeOn, eventId, reason }) {
+export async function deferSkolaItem(env, source, id, { writeOn, eventId, reason, images = [] }) {
+  const kept = [];
+  for (const image of images) kept.push(await storeImageBytes(env, image));
   await env.DB.prepare(
     `update ${source.itemsTable} set status = 'odlozeno', write_on = ?, event_id = ?, reason = ?, duplicate_of = '', article_id = null, proposal_id = null,
-       manual = 0, attempts = 0, processed_at = datetime('now') where id = ?`,
+       kept_images = ?, manual = 0, attempts = 0, processed_at = datetime('now') where id = ?`,
   )
-    .bind(writeOn, eventId ?? null, String(reason ?? "").slice(0, 400), id)
+    .bind(writeOn, eventId ?? null, String(reason ?? "").slice(0, 400), JSON.stringify(kept), id)
     .run();
+}
+
+// Uložené plakáty jako obrázky pro Claude ({ type, bytes, key }). Co v R2 chybí, vynechá; prázdný seznam = stáhnout znovu.
+export async function loadKeptImages(env, keys) {
+  const images = [];
+  for (const key of keys) {
+    const object = await env.BUCKET.get(key);
+    if (object) images.push({ type: String(object.httpMetadata?.contentType ?? ""), bytes: new Uint8Array(await object.arrayBuffer()), key });
+  }
+  return images;
+}
+
+// Po napsání pozvánky (nebo duplicitě) uložené plakáty smaže, kromě toho, který zpráva či návrh použili (`releaseImage`).
+export async function releaseKeptImages(env, source, item) {
+  if (!item.keptImages?.length) return;
+  for (const key of item.keptImages) await releaseImage(env, key);
+  await env.DB.prepare(`update ${source.itemsTable} set kept_images = '[]' where id = ?`).bind(item.id).run();
 }

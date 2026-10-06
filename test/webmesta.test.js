@@ -9,7 +9,7 @@ import { parseSchoolFeed } from "../src/skola/feed.js";
 import { photoCaption, skolaSource } from "../src/skola/run.js";
 import { SCHOOLS } from "../src/skola/sources.js";
 import { DatabaseSync } from "node:sqlite";
-import { deferDay, deferSkolaItem, laterNote, reopenDeferred, termDays, termOver } from "../src/skola/defer.js";
+import { deferDay, deferSkolaItem, laterNote, loadKeptImages, releaseKeptImages, reopenDeferred, termDays, termOver } from "../src/skola/defer.js";
 import { schoolTables, waitingSkolaItems } from "../src/skola/store.js";
 
 const WEB = SCHOOLS.webmesta;
@@ -202,4 +202,37 @@ test("odložená položka čeká a v den psaní se vrátí do fronty jako automa
   await reopenDeferred(env, WEB, "2026-11-13");
   const [item] = await waitingSkolaItems(env, WEB, 5);
   assert.deepEqual([item.status, item.manual, item.writeOn, item.eventId], ["nove", false, "2026-11-13", 11]);
+});
+
+test("plakáty odložené položky počkají v R2, po pozvánce zůstane jen ten, který zpráva použila", async () => {
+  const db = new DatabaseSync(":memory:");
+  const statement = (sql, values = []) => ({
+    bind: (...next) => statement(sql, next),
+    run: async () => ({ meta: { changes: Number(db.prepare(sql).run(...values).changes) } }),
+    first: async () => db.prepare(sql).get(...values) ?? null,
+    all: async () => ({ results: db.prepare(sql).all(...values) }),
+  });
+  const files = new Map();
+  const BUCKET = {
+    put: async (key, bytes, { httpMetadata }) => files.set(key, { bytes: new Uint8Array(bytes), httpMetadata }),
+    get: async (key) => (files.has(key) ? { httpMetadata: files.get(key).httpMetadata, arrayBuffer: async () => files.get(key).bytes.buffer } : null),
+    delete: async (key) => files.delete(key),
+  };
+  const env = { DB: { prepare: (sql) => statement(sql) }, BUCKET };
+  for (const sql of schoolTables(WEB)) db.exec(sql);
+  for (const table of ["stock_images", "articles", "proposals", "ads", "ad_proposals"]) db.exec(`create table ${table} (image_key text, attachments text default '')`);
+  db.exec(`insert into ${WEB.itemsTable} (guid, title, status) values ('a', 'Drakiáda', 'nove')`);
+  const poster = { type: "image/webp", bytes: new Uint8Array([1, 2, 3]).buffer };
+  await deferSkolaItem(env, WEB, 1, { writeOn: "2026-11-12", eventId: 13, reason: "", images: [poster, poster] });
+  await reopenDeferred(env, WEB, "2026-11-12");
+  const [item] = await waitingSkolaItems(env, WEB, 1);
+  assert.equal(item.keptImages.length, 2);
+  const images = await loadKeptImages(env, item.keptImages);
+  assert.deepEqual([...images[0].bytes], [1, 2, 3]);
+  assert.equal(images[0].key, item.keptImages[0]);
+  db.prepare("insert into proposals (image_key) values (?)").run(item.keptImages[0]);
+  await releaseKeptImages(env, WEB, item);
+  assert.deepEqual([...files.keys()], [item.keptImages[0]]);
+  const [after] = (await waitingSkolaItems(env, WEB, 1)) ?? [];
+  assert.deepEqual(after.keptImages, []);
 });

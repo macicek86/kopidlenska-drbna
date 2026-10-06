@@ -26,7 +26,7 @@ import { pragueNow } from "../waste.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { askSkola } from "./ai.js";
 import { DESK_SECTION, fetchDocuments } from "./deska.js";
-import { deferDay, deferSkolaItem, laterNote, PAST_REASON, reopenDeferred, termOver } from "./defer.js";
+import { deferDay, deferSkolaItem, laterNote, loadKeptImages, PAST_REASON, releaseKeptImages, reopenDeferred, termOver } from "./defer.js";
 import { SCHOOLS } from "./sources.js";
 import {
   countWaitingSkola,
@@ -66,17 +66,24 @@ async function downloadImages(env, urls, fetchImpl) {
 }
 
 // Fotku z webu zdroje jen se zapnutým nastavením a když ji Drběna vybrala (i pěkný plakát, ořízne se jako fotka), jinak ilustrační z knihovny.
+// Plakát uložený při odložení (`key`) se nenahrává znovu.
 export async function skolaImage(env, article, images, ownPhotos, source = SCHOOLS.skola) {
   const [own] = visibleImages(images);
   if (ownPhotos && article.imageUse !== "knihovna" && own) {
-    return { key: await storeImageBytes(env, own), focus: "", caption: photoCaption(article.imageCaption, source) };
+    return { key: own.key ?? (await storeImageBytes(env, own)), focus: "", caption: photoCaption(article.imageCaption, source) };
   }
   return pickStockImage(env, article.imageTopic);
 }
 
 // Ručně vybraný článek Drběna zpracuje vždy (redakce rozhodla) a zpráva dostane datum ze zdroje. Cron píše s dnešním datem,
-// stejně jako odloženou pozvánku (`defer.js`), i když ji redakce pustí dřív.
-export async function processSkolaItem(env, source, item, settings, { fetchImpl = fetch, ask = askSkola } = {}) {
+// stejně jako odloženou pozvánku (`defer.js`), i když ji redakce pustí dřív. Uložené plakáty odložené položky se po zpracování uklidí.
+export async function processSkolaItem(env, source, item, settings, options = {}) {
+  const result = await handleSkolaItem(env, source, item, settings, options);
+  if (result.ok) await releaseKeptImages(env, source, item);
+  return result;
+}
+
+async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch, ask = askSkola } = {}) {
   const today = pragueNow().date;
   if (source.defer && !item.manual && termOver(item.term, today)) {
     await finishSkolaItem(env, source, item.id, { status: "preskoceno", reason: PAST_REASON });
@@ -84,7 +91,8 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   }
   const publishOn = item.manual && !item.writeOn ? importSourceDate(item, today) : "";
   const rubrics = await rubricMap(env);
-  const images = await downloadImages(env, item.images, fetchImpl);
+  const kept = item.keptImages?.length ? await loadKeptImages(env, item.keptImages) : [];
+  const images = kept.length ? kept : await downloadImages(env, item.images, fetchImpl);
   const documents = item.documents?.length ? await fetchDocuments(item.documents, { fetchImpl }) : [];
   if (item.documents?.length && !documents.length) {
     const reason = "Přílohu z úřední desky nejde stáhnout. Zkusí se to příště.";
@@ -138,7 +146,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   const later = source.defer && answer.event ? deferDay(item, answer.event.startsOn, settings.aheadDays, today) : "";
   if (later) {
     const eventId = await saveBotEvent(env, answer.event, { existingId: item.eventId, published: settings.autoPublish });
-    await deferSkolaItem(env, source, item.id, { writeOn: later, eventId, reason: noteReads(answer.reason, answer) });
+    await deferSkolaItem(env, source, item.id, { writeOn: later, eventId, reason: noteReads(answer.reason, answer), images });
     return { ok: true, status: "odlozeno", usage: answer.usage };
   }
 

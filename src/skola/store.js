@@ -40,6 +40,7 @@ export const schoolTables = (source) => [
     notice_id integer,
     manual integer not null default 0,
     write_on text not null default '',
+    kept_images text not null default '[]',
     attempts integer not null default 0,
     created_at text not null default (datetime('now')),
     processed_at text
@@ -55,6 +56,7 @@ export async function ensureSkolaTables(env) {
     await addColumn(env, names, "documents", `alter table ${source.itemsTable} add column documents text not null default '[]'`);
     // Odložená pozvánka na akci (`defer.js`).
     await addColumn(env, names, "write_on", `alter table ${source.itemsTable} add column write_on text not null default ''`);
+    await addColumn(env, names, "kept_images", `alter table ${source.itemsTable} add column kept_images text not null default '[]'`);
     const settingsInfo = await env.DB.prepare(`pragma table_info(${source.settingsTable})`).all();
     const settingsNames = new Set((settingsInfo.results ?? []).map((row) => row.name));
     await addColumn(env, settingsNames, "ahead_days", `alter table ${source.settingsTable} add column ahead_days integer not null default ${DEFAULT_AHEAD_DAYS}`);
@@ -92,7 +94,7 @@ export async function loadSkolaSettings(env, source) {
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, write_on, attempts, processed_at, created_at";
+  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, write_on, kept_images, attempts, processed_at, created_at";
 
 function parseDocuments(text) {
   try {
@@ -104,7 +106,7 @@ function parseDocuments(text) {
 }
 
 function mapSkolaItem(row) {
-  return { ...mapImportItem(row), documents: parseDocuments(row.documents), section: String(row.section ?? ""), term: String(row.term ?? ""), writeOn: String(row.write_on ?? "") };
+  return { ...mapImportItem(row), documents: parseDocuments(row.documents), section: String(row.section ?? ""), term: String(row.term ?? ""), writeOn: String(row.write_on ?? ""), keptImages: parseDocuments(row.kept_images) };
 }
 
 export async function loadSkolaItems(env, source, limit = 40) {
