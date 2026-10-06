@@ -1,6 +1,8 @@
 // Weby z okolí, ze kterých drbna stahuje program akcí (pro víkendový článek „Kam vyrazit“, později i kalendář).
 // Každý zdroj je jedno místo (město) se vzdáleností od Kopidla; okruh v redakci ho podle ní bere, nebo ne.
-// `fetchEvents(options)` vrací { ok, items, error } s položkami jako parseKzmj (src/okoli/kzmj.js).
+// `fetchEvents({ env, fetchImpl, known })` vrací { ok, items, listed, seen, complete, warning, error } s položkami
+// jako parseKzmj (src/okoli/kzmj.js); co v `known` (guid → stamp) je a nezměnilo se, znovu nečte.
+import { anteeReader } from "./antee.js";
 import { fetchKzmj } from "./kzmj.js";
 
 export const NEARBY_SOURCES = [
@@ -16,6 +18,21 @@ export const NEARBY_SOURCES = [
     fetchEvents: fetchKzmj,
   },
 ];
+
+// Obce na Antee: pozvánky z aktualit (src/okoli/antee.js). Nová obec je nový řádek.
+const ANTEE_TOWNS = [
+  {
+    tag: "liban",
+    name: "Město Libáň",
+    title: "aktuality města Libáň",
+    home: "https://www.mestoliban.cz/",
+    feed: "https://www.mestoliban.cz/aktuality?action=atom",
+    town: "Libáň",
+    km: 8,
+  },
+];
+
+for (const town of ANTEE_TOWNS) NEARBY_SOURCES.push({ ...town, fetchEvents: anteeReader(town) });
 
 export function nearbySource(tag) {
   return NEARBY_SOURCES.find((source) => source.tag === tag) ?? null;

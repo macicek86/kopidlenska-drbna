@@ -3,7 +3,7 @@ import { CLICK_LOCK_SECONDS, CRON_LOCK_SECONDS } from "../background.js";
 import { requireChief } from "../db-core.js";
 import { pragueNow } from "../waste.js";
 import { NEARBY_SOURCES } from "./sources.js";
-import { knownStamps, loadOkoliSettings, lockOkoli, rememberNearby, saveWeekendResult, unlockOkoli, writeOkoliStatus } from "./store.js";
+import { knownStamps, loadOkoliSettings, lockOkoli, pruneNearby, rememberNearby, saveWeekendResult, unlockOkoli, writeOkoliStatus } from "./store.js";
 import { weekendDue, weekendFor, writeWeekend } from "./weekend.js";
 
 const BUSY = "Drběna už s akcemi z okolí pracuje. Zkuste to za chvíli.";
@@ -15,7 +15,7 @@ export async function collectNearby(env, { fetchImpl = fetch } = {}) {
   const problems = [];
   for (const source of NEARBY_SOURCES) {
     const known = await knownStamps(env, source);
-    const feed = await source.fetchEvents({ fetchImpl, known });
+    const feed = await source.fetchEvents({ env, fetchImpl, known });
     if (!feed.ok) {
       problems.push(`${source.name}: ${feed.error}`);
       continue;
@@ -25,6 +25,7 @@ export async function collectNearby(env, { fetchImpl = fetch } = {}) {
     added += saved.added;
     removed += saved.removed;
   }
+  await pruneNearby(env, pragueNow().date);
   const found = added ? `Nových akcí: ${added}.` : "Nic nového.";
   const gone = removed ? ` Zrušených: ${removed}.` : "";
   const note = `${found}${gone}${problems.length ? ` Nejde: ${problems.join(" ")}` : ""}`;

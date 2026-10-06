@@ -48,6 +48,15 @@ export async function ensureOkoliTables(env) {
     )`,
   ).run();
   await env.DB.prepare("create index if not exists okoli_events_day on okoli_events (starts_on)").run();
+  // Přečtené položky zdrojů, které akcí nejsou (nebo už proběhly a akce se smazala), ať se nečtou znovu.
+  await env.DB.prepare(
+    `create table if not exists okoli_seen (
+      guid text primary key,
+      source text not null,
+      stamp text not null default '',
+      seen_at text not null default (datetime('now'))
+    )`,
+  ).run();
   await env.DB.prepare("insert into okoli_settings (id) select 1 where not exists (select 1 from okoli_settings where id = 1)").run();
 }
 
@@ -103,9 +112,29 @@ export const lockOkoli = (env, seconds) => lockRow(env, "okoli_settings", second
 export const unlockOkoli = (env, token) => unlockRow(env, "okoli_settings", token);
 export const okoliRunning = (settings, now = new Date()) => lockHeld(settings.runningAt, now);
 
+// Co už drbna ze zdroje má: akce i přečtené položky, které akcí nejsou.
 export async function knownStamps(env, source) {
-  const rows = await env.DB.prepare("select guid, stamp from okoli_events where source = ?").bind(source.tag).all();
+  const rows = await env.DB.prepare(
+    "select guid, stamp from okoli_seen where source = ? union all select guid, stamp from okoli_events where source = ?",
+  )
+    .bind(source.tag, source.tag)
+    .all();
   return new Map((rows.results ?? []).map((row) => [String(row.guid), String(row.stamp)]));
+}
+
+// Akce starší než `days` dní se smažou, ale zůstanou mezi přečtenými, ať je zdroj, který je pořád ukazuje, nečte znovu.
+// Přečtené položky se zapomenou po roce.
+export async function pruneNearby(env, today, days = 60) {
+  const limit = new Date(`${today}T12:00:00Z`);
+  limit.setUTCDate(limit.getUTCDate() - days);
+  const before = limit.toISOString().slice(0, 10);
+  await env.DB.prepare(
+    `insert or replace into okoli_seen (guid, source, stamp) select guid, source, stamp from okoli_events where starts_on < ?`,
+  )
+    .bind(before)
+    .run();
+  await env.DB.prepare("delete from okoli_events where starts_on < ?").bind(before).run();
+  await env.DB.prepare("delete from okoli_seen where seen_at < datetime('now', '-365 days')").run();
 }
 
 // Uloží, co zdroj poslal. Změněná akce (jiný termín, místo) se přepíše, schovaná zůstane schovaná.
@@ -143,13 +172,17 @@ export async function rememberNearby(env, source, feed, known = new Map()) {
       )
       .run();
   }
+  for (const guid of feed.seen ?? []) {
+    await env.DB.prepare("insert or ignore into okoli_seen (guid, source) values (?, ?)").bind(guid, source.tag).run();
+  }
   let removed = 0;
   if (feed.complete) {
     const listed = new Set(feed.listed ?? []);
     for (const guid of known.keys()) {
       if (listed.has(guid)) continue;
-      await env.DB.prepare("delete from okoli_events where guid = ?").bind(guid).run();
-      removed += 1;
+      const gone = await env.DB.prepare("delete from okoli_events where guid = ?").bind(guid).run();
+      await env.DB.prepare("delete from okoli_seen where guid = ?").bind(guid).run();
+      removed += Number(gone?.meta?.changes ?? 0);
     }
   }
   return { added, removed };

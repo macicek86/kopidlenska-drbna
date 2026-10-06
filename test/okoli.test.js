@@ -140,3 +140,55 @@ test("redakce: stránka Akce v okolí", () => {
   assert.match(page, /navrh=3|navrh:3/);
   assert.match(page, /Každý pátek napsat článek/);
 });
+
+test("obce na Antee: termín, čerstvost a odpověď modelu", async () => {
+  const { isCurrent, readExtract, termDays } = await import("../src/okoli/antee.js");
+  assert.deepEqual(termDays("21. 9. 2026 až 2. 10. 2026"), { first: "2026-09-21", last: "2026-10-02" });
+  assert.equal(termDays(""), null);
+  assert.equal(isCurrent({ term: "14. 11. 2026" }, "2026-10-06"), true);
+  assert.equal(isCurrent({ term: "1. 9. 2026" }, "2026-10-06"), false);
+  const source = { town: "Libáň" };
+  assert.equal(readExtract({ is_event: false }, source), null);
+  assert.equal(readExtract({ is_event: true, title: "Zábava", date: "14. 11." }, source), null);
+  assert.deepEqual(readExtract({ is_event: true, title: "Hubertská zábava", date: "2026-11-14", time: "9:00", place: "", description: "Hraje Bylo nás pět." }, source), {
+    title: "Hubertská zábava", startsOn: "2026-11-14", startsTime: "09:00", endsTime: "", place: "Libáň", description: "Hraje Bylo nás pět.", kind: "akce", soldOut: false,
+  });
+});
+
+test("obce na Antee: model čte jen nové a aktuální položky", async () => {
+  const { anteeReader } = await import("../src/okoli/antee.js");
+  const entry = (slug, title, term) => `<item><title>${title}</title><link>https://www.mestoliban.cz/aktuality/${slug}</link>
+    <pubDate>Mon, 05 Oct 2026 09:00:07 +0200</pubDate><description>${title}</description><dueDate>${term}</dueDate></item>`;
+  const rss = `<?xml version="1.0"?><rss><channel>${[
+    entry("hubert", "POZVÁNKA - HUBERTSKÁ ZÁBAVA", "14. 11. 2026"),
+    entry("uzavirka", "INFORMACE - UZAVÍRKA", "21. 9. 2026 až 19. 10. 2026"),
+    entry("stara", "POZVÁNKA - LETNÍ KINO", "1. 8. 2026"),
+    entry("znama", "POZVÁNKA - KONCERT", "17. 10. 2026"),
+  ].join("")}</channel></rss>`;
+  const asked = [];
+  const ask = async (_env, _source, item) => {
+    asked.push(item.title);
+    return { ok: true, raw: /HUBERT/.test(item.title) ? { is_event: true, title: "Hubertská zábava", date: "2026-11-14", time: "19:00", place: "Kulturní dům Libáň", description: "" } : { is_event: false } };
+  };
+  const read = anteeReader({ tag: "liban", town: "Libáň", feed: "https://www.mestoliban.cz/aktuality?action=atom" });
+  const feed = await read({
+    env: { ANTHROPIC_API_KEY: "x" },
+    fetchImpl: async () => new Response(rss),
+    known: new Map([["liban:www.mestoliban.cz/znama", ""]]),
+    ask,
+    today: "2026-10-06",
+  });
+  assert.equal(feed.ok, true);
+  assert.equal(feed.complete, false);
+  assert.deepEqual(asked, ["POZVÁNKA - HUBERTSKÁ ZÁBAVA", "INFORMACE - UZAVÍRKA"]);
+  assert.deepEqual(feed.items.map((item) => [item.guid, item.startsOn, item.startsTime, item.place]), [["liban:www.mestoliban.cz/hubert", "2026-11-14", "19:00", "Kulturní dům Libáň"]]);
+  assert.deepEqual(feed.seen.sort(), ["liban:www.mestoliban.cz/stara", "liban:www.mestoliban.cz/uzavirka"]);
+});
+
+test("obce na Antee: plakát v plné velikosti, každý jednou", async () => {
+  const { posterUrls } = await import("../src/okoli/antee.js");
+  assert.deepEqual(
+    posterUrls(["https://www.mestoliban.cz/image.php?nid=777&oid=1", "https://www.mestoliban.cz/image.php?nid=777&oid=1&width=624&height=936", "https://www.mestoliban.cz/image.php?nid=777&oid=2&width=624"]),
+    ["https://www.mestoliban.cz/image.php?nid=777&oid=1", "https://www.mestoliban.cz/image.php?nid=777&oid=2"],
+  );
+});
