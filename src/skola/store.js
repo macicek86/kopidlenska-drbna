@@ -1,6 +1,6 @@
 // Import z webů škol v D1: nastavení a zapamatované články. Každá škola (`sources.js`) má vlastní dvě tabulky.
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
-import { asBool, clip, requireChief } from "../db-core.js";
+import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { MAX_ATTEMPTS, mapImportItem } from "../munipolis/store.js";
 import { readFeedUrls } from "./feed.js";
 import { SCHOOL_LIST } from "./sources.js";
@@ -25,6 +25,7 @@ export const schoolTables = (source) => [
     title text not null,
     text text not null default '',
     images text not null default '[]',
+    documents text not null default '[]',
     section text not null default '',
     term text not null default '',
     published_at text not null default '',
@@ -45,6 +46,10 @@ export const schoolTables = (source) => [
 export async function ensureSkolaTables(env) {
   for (const source of SCHOOL_LIST) {
     for (const sql of schoolTables(source)) await env.DB.prepare(sql).run();
+    const info = await env.DB.prepare(`pragma table_info(${source.itemsTable})`).all();
+    const names = new Set((info.results ?? []).map((row) => row.name));
+    // PDF z úřední desky (zatím jen web města, `deska.js`).
+    await addColumn(env, names, "documents", `alter table ${source.itemsTable} add column documents text not null default '[]'`);
     await env.DB.prepare(`insert into ${source.settingsTable} (id) select 1 where not exists (select 1 from ${source.settingsTable} where id = 1)`).run();
   }
 }
@@ -78,10 +83,19 @@ export async function loadSkolaSettings(env, source) {
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at, created_at";
+  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, attempts, processed_at, created_at";
+
+function parseDocuments(text) {
+  try {
+    const list = JSON.parse(text || "[]");
+    return Array.isArray(list) ? list.filter((url) => typeof url === "string") : [];
+  } catch {
+    return [];
+  }
+}
 
 function mapSkolaItem(row) {
-  return { ...mapImportItem(row), section: String(row.section ?? ""), term: String(row.term ?? "") };
+  return { ...mapImportItem(row), documents: parseDocuments(row.documents), section: String(row.section ?? ""), term: String(row.term ?? "") };
 }
 
 export async function loadSkolaItems(env, source, limit = 40) {
@@ -109,8 +123,8 @@ export async function rememberSkolaItems(env, source, items, { manual = false, i
   for (const item of items) {
     const status = manual ? "nacteno" : isOld(item) ? "stare" : "nove";
     const result = await env.DB.prepare(
-      `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, section, term, published_at, status, reason)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, documents, section, term, published_at, status, reason)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         item.guid,
@@ -118,6 +132,7 @@ export async function rememberSkolaItems(env, source, items, { manual = false, i
         item.title,
         item.text,
         JSON.stringify(item.images),
+        JSON.stringify(item.documents ?? []),
         item.section,
         item.term,
         item.publishedAt,

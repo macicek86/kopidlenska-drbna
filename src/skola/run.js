@@ -25,6 +25,7 @@ import { visibleImages } from "../munipolis/ai.js";
 import { pragueNow } from "../waste.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { askSkola } from "./ai.js";
+import { DESK_SECTION, fetchDocuments } from "./deska.js";
 import { SCHOOLS } from "./sources.js";
 import {
   countWaitingSkola,
@@ -42,9 +43,10 @@ export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
 const BUSY = "Drběna už ten web čte. Počkejte, stránka se sama obnoví.";
 
-// Zdroj pod čarou (src/article-source.js).
-export function skolaSource(link, source = SCHOOLS.skola) {
-  return sourceEntry(`web ${source.name}`, link);
+// Zdroj pod čarou (src/article-source.js). Dokument z úřední desky se jmenuje podle desky.
+export function skolaSource(link, source = SCHOOLS.skola, section = "") {
+  const label = section === DESK_SECTION ? `úřední deska ${source.name}` : `web ${source.name}`;
+  return sourceEntry(label, link);
 }
 
 // Fotka je z webu zdroje, i když ji škole (městu) dal někdo jiný (autora uvede Drběna v popisku, když ho škola zmíní).
@@ -76,6 +78,12 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   const today = pragueNow().date;
   const rubrics = await rubricMap(env);
   const images = await downloadImages(env, item.images, fetchImpl);
+  const documents = item.documents?.length ? await fetchDocuments(item.documents, { fetchImpl }) : [];
+  if (item.documents?.length && !documents.length) {
+    const reason = "Přílohu z úřední desky nejde stáhnout. Zkusí se to příště.";
+    await finishSkolaItem(env, source, item.id, { status: "chyba", reason });
+    return { ok: false, error: reason };
+  }
   const drbena = await loadDrbena(env);
   const memory = memoryOn(drbena, item.manual ? importSourceDate(item, today) : "", today);
   const answer = await ask(env, {
@@ -83,6 +91,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
     item,
     known: await knownContent(env, { itemId: item.id, today, table: source.itemsTable, recall: memory, about: item }),
     images,
+    documents,
     topics: await loadStockTopics(env),
     rubricSlugs: [...rubrics.keys()],
     voice: withMemory(voiceFor(drbena), memory),
@@ -97,7 +106,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
   if (answer.decision === "doplneni") {
     const made = await saveFollowup(env, answer, {
       image: await pickStockImage(env, answer.article.imageTopic),
-      source: skolaSource(item.link, source),
+      source: skolaSource(item.link, source, item.section),
       autoPublish: settings.autoPublish,
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
@@ -124,7 +133,7 @@ export async function processSkolaItem(env, source, item, settings, { fetchImpl 
       await saveBotArticle(env, {
         article: answer.article,
         image: await skolaImage(env, answer.article, images, settings.ownPhotos, source),
-        source: skolaSource(item.link, source),
+        source: skolaSource(item.link, source, item.section),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
         publishOn: item.manual ? importSourceDate(item, today) : "",

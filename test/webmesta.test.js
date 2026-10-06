@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { adminSkola } from "../src/admin/index.js";
 import { refLink } from "../src/admin/imports.js";
-import { skolaPrompt, skolaText } from "../src/skola/ai.js";
+import { skolaContent, skolaPrompt, skolaText } from "../src/skola/ai.js";
+import { contentText } from "../src/import-overview.js";
+import { DESK_FEED, DESK_SECTION, fetchDocuments, parseDeskFeed } from "../src/skola/deska.js";
 import { parseSchoolFeed } from "../src/skola/feed.js";
 import { photoCaption, skolaSource } from "../src/skola/run.js";
 import { SCHOOLS } from "../src/skola/sources.js";
@@ -84,4 +86,70 @@ test("redakce má stránku Web města", () => {
   assert.match(page, /Články z webu města/);
   assert.match(page, /kopidlno\.cz\/aktuality\?action=atom<\/textarea>/);
   assert.match(page, /action="\/redakce\/webmesta\/ulozit"/);
+});
+
+// Výřez skutečného kanálu z kopidlno.cz/uredni-deska?action=atom: jen nadpis a odkazy na přílohy.
+const DESK = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+ <channel>
+  <title>Úřední deska | Město Kopidlno</title>
+  <description>Úřední deska</description>
+  <item>
+   <title>Usnesení ze 101. schůze Rady města Kopidlna</title>
+   <link>https://www.kopidlno.cz/uredni-deska?id=550&amp;utm_source=%C3%9A%C5%99edn%C3%AD_deska&amp;utm_medium=rss&amp;utm_campaign=550&amp;action=detail</link>
+   <description>
+Přílohy: 
+https://www.kopidlno.cz/file.php?oid=13904853&amp;utm_source=Úřední_deska&amp;utm_medium=rss&amp;utm_campaign=550 
+</description>
+   <guid>https://www.kopidlno.cz/uredni-deska?id=550&amp;action=detail</guid>
+   <pubDate>Tue, 29 Sep 2026 00:00:00 +0200</pubDate>
+  </item>
+  <item>
+   <title>Rozpočtové opatření č. 15/2026</title>
+   <link>https://www.kopidlno.cz/uredni-deska?id=549&amp;action=detail</link>
+   <description>Přílohy: https://www.kopidlno.cz/file.php?oid=13904000</description>
+   <guid>https://www.kopidlno.cz/uredni-deska?id=549&amp;action=detail</guid>
+   <pubDate>Mon, 28 Sep 2026 00:00:00 +0200</pubDate>
+  </item>
+ </channel>
+</rss>`;
+
+test("z úřední desky jen usnesení a zápisy, klíčem je id dokumentu, přílohy bez utm", () => {
+  const { ok, items } = parseDeskFeed(DESK);
+  assert.ok(ok);
+  assert.equal(items.length, 1);
+  const [item] = items;
+  assert.equal(item.guid, "www.kopidlno.cz/uredni-deska/550");
+  assert.equal(item.link, "https://www.kopidlno.cz/uredni-deska?id=550&action=detail");
+  assert.deepEqual(item.documents, ["https://www.kopidlno.cz/file.php?oid=13904853"]);
+  assert.equal(item.section, DESK_SECTION);
+  assert.equal(item.publishedAt, "2026-09-28T22:00:00.000Z");
+});
+
+test("web města čte aktuality i úřední desku, stačí jedno z nich", async () => {
+  const fetchImpl = async (url) => {
+    if (url === DESK_FEED) return new Response(DESK);
+    return new Response("nic", { status: 500 });
+  };
+  const result = await WEB.fetchItems(WEB.defaultFeeds, { fetchImpl });
+  assert.ok(result.ok);
+  assert.deepEqual(result.items.map((item) => item.guid), ["www.kopidlno.cz/uredni-deska/550"]);
+  assert.match(result.warning, /500/);
+});
+
+test("PDF z desky jde Claudovi jako dokument, zdroj je úřední deska", async () => {
+  const pdf = new TextEncoder().encode("%PDF-1.7 usnesení");
+  const docs = await fetchDocuments(["https://www.kopidlno.cz/file.php?oid=1", "https://www.kopidlno.cz/file.php?oid=2"], {
+    fetchImpl: async (url) => (url.endsWith("=1") ? new Response(pdf) : new Response("<html>")),
+  });
+  assert.equal(docs.length, 1);
+  const item = { title: "Usnesení ze 101. schůze", text: "", documents: ["https://www.kopidlno.cz/file.php?oid=1"], section: DESK_SECTION, publishedAt: "2026-09-29T00:00:00Z" };
+  const content = skolaContent(item, {}, { today: "2026-10-06", source: WEB, documents: docs });
+  assert.ok(content.some((block) => block.type === "document" && block.source.media_type === "application/pdf"));
+  assert.match(contentText(content), /v přiloženém dokumentu \(PDF\)/);
+  assert.equal(
+    skolaSource("https://www.kopidlno.cz/uredni-deska?id=550&action=detail", WEB, DESK_SECTION),
+    "úřední deska města Kopidlna https://www.kopidlno.cz/uredni-deska?id=550&action=detail",
+  );
+  assert.match(skolaPrompt("", { source: WEB }), /Jména lidí, kteří od města kupují/);
 });

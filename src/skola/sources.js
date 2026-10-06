@@ -3,6 +3,7 @@
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { DEFAULT_FEEDS, fetchSchoolFeeds } from "./feed.js";
 import { fetchWordpressPosts } from "./wordpress.js";
+import { fetchCityItems } from "./deska.js";
 
 const ZS_RULES = `Dostaneš jeden článek z webu Základní a mateřské školy Kopidlno a přehled toho, co už na webu Kopidlenská drbna je.
 
@@ -43,7 +44,12 @@ ${FOLLOWUP_DECISION}
 
 Co vytvořit:
 - Akce pro veřejnost s datem: event a k tomu krátký článek s pozvánkou. Termín z kalendáře města je u článku uvedený zvlášť.
-- Cokoli jiného: článek.`;
+- Cokoli jiného: článek.
+
+Úřední deska (rubrika Úřední deska): odtud drbna bere jen usnesení a zápisy rady a zastupitelstva města a pozvánky na zasedání zastupitelstva. Text je v přiloženém PDF.
+- Usnesení a zápis: vyber rozhodnutí, která sousedy zajímají (stavby, opravy a cesty, dotace spolkům a akcím, ceníky a poplatky, vyhlášky, prodej a nákup městského majetku, nové služby, volba starosty a rady), a napiš jeden článek o tom, co rada nebo zastupitelstvo rozhodlo, se dnem schůze. Formality vynech (schválení programu, ověřovatelé, rozpočtové opatření bez podrobností, vzetí na vědomí). Kde „rada doporučuje zastupitelstvu“, rozhodne teprve zastupitelstvo, tak to i napiš. Jména lidí, kteří od města kupují nebo pronajímají pozemek či byt, nepiš, ani když v dokumentu jsou; starostu, zastupitele, spolky a firmy jmenovat smíš. Když v dokumentu pro sousedy nic není, "preskocit". Duplicita je jen zpráva o stejné schůzi.
+- Pozvánka na zasedání zastupitelstva: event (zasedání je veřejné, den, čas a místo z pozvánky) a krátký článek s body programu, které sousedy zajímají.
+- Rubrika "zpravy", pokud je v seznamu.`;
 
 export const SCHOOLS = {
   skola: {
@@ -89,7 +95,8 @@ export const SCHOOLS = {
     // Projekty jsou povinné texty k dotacím, ty Drběna ani nečte.
     fetchItems: (urls, options) => fetchWordpressPosts(urls, { ...options, skip: ["Projekty"] }),
   },
-  // Web města je na stejném Antee jako ZŠ. Úřední deska v RSS nese jen nadpis, proto jen aktuality.
+  // Web města je na stejném Antee jako ZŠ. K aktualitám úřední deska (`deska.js`): jen usnesení, zápisy a pozvánky na zastupitelstvo,
+  // text v PDF z přílohy.
   webmesta: {
     tag: "webmesta",
     name: "města Kopidlna",
@@ -109,8 +116,8 @@ export const SCHOOLS = {
     freshDays: 14,
     rules: WEB_MESTA_RULES,
     people: "lidé při akci, místo ve městě, koncert, výstava",
-    intro: "Koza Drběna čte aktuality na webu města kopidlno.cz. Akce a novinky pro sousedy napíše po svém, s odkazem na článek města. Co už přišlo z Munipolisu nebo jinak na drbně je, pozná a nechá být.",
-    fetchItems: fetchSchoolFeeds,
+    intro: "Koza Drběna čte aktuality na webu města kopidlno.cz a z úřední desky usnesení a zápisy rady a zastupitelstva. Akce, novinky a to, co město rozhodlo, napíše po svém, s odkazem na zdroj. Co už přišlo z Munipolisu nebo jinak na drbně je, pozná a nechá být.",
+    fetchItems: fetchCityItems,
   },
 };
 
