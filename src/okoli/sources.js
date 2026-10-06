@@ -98,6 +98,15 @@ const GALILEO_TOWNS = [
     town: "Dymokury",
     km: 12,
   },
+  {
+    tag: "mestec",
+    name: "Město Městec Králové",
+    title: "kalendář akcí města Městec Králové",
+    home: "https://www.mesteckralove.cz/prakticke-informace/aktualne/kalendar-akci/",
+    list: "https://www.mesteckralove.cz/prakticke-informace/aktualne/kalendar-akci/",
+    town: "Městec Králové",
+    km: 19,
+  },
 ];
 
 for (const town of GALILEO_TOWNS) NEARBY_SOURCES.push({ ...town, fetchEvents: galileoReader(town) });
