@@ -7,7 +7,7 @@ import { DEFAULT_VOICE } from "../drbena.js";
 import { HOURS_RULES, hoursSchema, readHours } from "./hours.js";
 import { contentText, importContent } from "../import-overview.js";
 import { importLookup, withLookups } from "../import-tools.js";
-import { topicsText } from "../stock.js";
+import { OWN_PHOTO_RULE, topicsText } from "../stock.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
@@ -23,7 +23,7 @@ const MAX_IMAGES_BYTES = 18_000_000;
 
 // Obrázek u článku: vlastní fotka jen když stojí za to, jinak ilustrační z knihovny obrázků.
 const IMAGE_RULES = `- Obrázky jsou očíslované (Obrázek 1, 2…). Vlastní fotka nebo plakát je vždy Obrázek 1.
-- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu.
+- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná nebo zajímavá (lidé, místo, akce, příroda) a nese málo textu. ${OWN_PHOTO_RULE}
   "plakat", když je přiložený pěkně udělaný plakát nebo pozvánka na akci, kde aspoň zhruba třetinu plochy zabírají fotky nebo kresby. Delší odstavce textu nevadí, rozhodují obrázky. Oznámení, která nezvou na akci (zavřeno, změna, upozornění), jsou "knihovna", i když mají pěkné malované pozadí nebo ozdoby.
   "knihovna" u plakátu nebo letáku, na kterém fotky a kresby skoro nejsou, nebo jsou jen malé (logo, ikonka, drobný obrázek v rohu), a u vyhlášky, tabulky, mapy nebo loga, i když jsou barevné. Když nic přiložené není, taky "knihovna".
 - image_topic: téma z knihovny obrázků, které ke zprávě nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.

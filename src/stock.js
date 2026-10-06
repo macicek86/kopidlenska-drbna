@@ -31,6 +31,10 @@ export function stockCaption(caption) {
 export const TOPIC_RULE =
   "Téma vyber podle toho, čeho se článek týká (akce, místo, událost), ne podle praktické podrobnosti kolem. Parkování, objížďka nebo autobus k výstavě je pořád článek o výstavě. Silnice, dopravu a podobně vyber jen tehdy, když jsou samy hlavní zprávou.";
 
+// Vlastní fotka ze zdroje: obecná k tématu projde, portrét člověka, o kterém zpráva není, ne.
+export const OWN_PHOTO_RULE =
+  'Fotka nemusí ukazovat přesně tu věc, o které článek je, stačí, když k tématu sedí (třeba záhony nebo květiny k zahradnické akci). Když je na ní ale zblízka konkrétní člověk (portrét, reklamní snímek) a článek není o něm ani o akci, kde ho vyfotili, dej "knihovna": čtenář by si myslel, že ten člověk se zprávou souvisí.';
+
 // Témata pro Claude: značka, název a kdy téma použít.
 export function topicsText(topics) {
   if (!topics.length) return "Témata knihovny obrázků: (žádná, image_topic nech prázdné)";

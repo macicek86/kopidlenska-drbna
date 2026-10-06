@@ -7,7 +7,7 @@ import { KEYWORDS_RULE } from "../keywords.js";
 import { contentText, importContent } from "../import-overview.js";
 import { importLookup, withLookups } from "../import-tools.js";
 import { base64, LINK_RULE, outputSchema, readArticle, readDecision, visibleImages } from "../munipolis/ai.js";
-import { topicsText } from "../stock.js";
+import { OWN_PHOTO_RULE, topicsText } from "../stock.js";
 import { SCHOOLS } from "./sources.js";
 
 const RULES = `{SOURCE}
@@ -28,7 +28,7 @@ ${KEYWORDS_RULE}
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná. Odstávky a uzavírky (notice) z tohoto zdroje drbna nebere, notice nech vždy include false.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
 
-const OWN_IMAGES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná ({PEOPLE}) a nese málo textu.
+const OWN_IMAGES = `- image_use: "vlastni" jen tehdy, když je přiložená skutečná fotka, která je sama o sobě pěkná ({PEOPLE}) a nese málo textu. ${OWN_PHOTO_RULE}
   "plakat", když je přiložený pěkně udělaný plakát nebo pozvánka na akci, kde aspoň zhruba třetinu plochy zabírají fotky nebo kresby. Delší odstavce textu nevadí, rozhodují obrázky. Oznámení, která nezvou na akci (zavřeno, změna, upozornění), jsou "knihovna", i když mají pěkné malované pozadí nebo ozdoby.
   "knihovna" u plakátu nebo letáku, na kterém fotky a kresby skoro nejsou, nebo jsou jen malé (logo, ikonka, drobný obrázek v rohu), a u loga, tabulky nebo koláže s textem. Když nic přiložené není, taky "knihovna".
 - image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Použije se, když vlastní fotka není. Když nesedí žádné, nech prázdné.
