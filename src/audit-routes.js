@@ -178,6 +178,11 @@ const ROUTES = {
   ...importRoutes("/redakce/denik", "denik_settings"),
   ...Object.assign({}, ...SCHOOL_LIST.map((source) => importRoutes(`/redakce/${source.tag}`, source.settingsTable))),
 
+  "/redakce/okoli/ulozit": [single("okoli_settings", "nastavení")],
+  "/redakce/okoli/nacist": "always",
+  "/redakce/okoli/napsat": "always",
+  "/redakce/okoli/schovat": [existing("okoli_events", "id")],
+
   "/redakce/drbena/ulozit": [single("drbena_settings", "nastavení")],
   "/redakce/drbena/navazujici": [single("drbena_settings", "nastavení")],
   "/redakce/drbena/pamet": [single("drbena_settings", "nastavení")],

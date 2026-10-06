@@ -14,6 +14,7 @@ import {
   adminFootball,
   adminDenik,
   adminSkola,
+  adminOkoli,
   adminOutages,
   adminPlaces,
   adminOverview,
@@ -45,6 +46,8 @@ import { loadDenikSettings } from "./denik/store.js";
 import { continueSkola } from "./skola/run.js";
 import { SCHOOL_LIST, SCHOOLS } from "./skola/sources.js";
 import { loadSkolaSettings } from "./skola/store.js";
+import { countBySource, loadNearbyEvents, loadOkoliSettings } from "./okoli/store.js";
+import { shiftDay } from "./okoli/weekend.js";
 import { loadAssistAdmin } from "./assist/store.js";
 import { chatEnabled, loadChatAdmin } from "./chat/store.js";
 import { pragueNow } from "./waste.js";
@@ -54,7 +57,7 @@ import { loadFeedSettings } from "./feeds/settings.js";
 export async function renderAdmin(env, url, ctx, data, execution) {
   const tab = url.pathname.replace(/\/+$/, "").slice("/redakce/".length);
   const message = messageFrom(url);
-  const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "drbena", "chat", "odber", "historie"]);
+  const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "drbena", "chat", "odber", "historie"]);
   if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
     return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
   }
@@ -125,6 +128,14 @@ export async function renderAdmin(env, url, ctx, data, execution) {
       data.schools = { ...data.schools, [tab]: { ...data.schools?.[tab], settings: await loadSkolaSettings(env, source) } };
     }
     return html(adminSkola(ctx, data, message, query, source));
+  }
+  if (tab === "okoli") {
+    if (data.signedIn) {
+      const today = pragueNow().date;
+      const [settings, sources, events] = await Promise.all([loadOkoliSettings(env), countBySource(env, today), loadNearbyEvents(env, { from: today, to: shiftDay(today, 27), withHidden: true })]);
+      data.okoli = { settings, sources, events };
+    }
+    return html(adminOkoli(ctx, data, message, query));
   }
   if (tab === "drbena") {
     if (data.signedIn) data.assist = await loadAssistAdmin(env, pragueNow().date);

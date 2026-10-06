@@ -115,6 +115,8 @@ export async function formFields(request) {
     phone: text("phone"),
     link: text("link"),
     enabled: form.get("enabled") === "1",
+    // Akce v okolí: každý čtvrtek napsat víkendový článek.
+    weekly: form.get("weekly") === "1",
     closureId: text("closureId"),
     manual: text("manual"),
     radiusKm: text("radiusKm"),

@@ -66,6 +66,8 @@ import { footballPost } from "./post-fotbal.js";
 import { denikPost } from "./post-denik.js";
 import { runDenik } from "./denik/run.js";
 import { skolaPost } from "./post-skola.js";
+import { okoliPost } from "./post-okoli.js";
+import { runOkoli } from "./okoli/run.js";
 import { runSkola } from "./skola/run.js";
 import { SCHOOL_LIST } from "./skola/sources.js";
 import { runFootball } from "./fotbal/run.js";
@@ -311,6 +313,7 @@ async function handlePost(request, env, path, fields, execution) {
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??
     (await skolaPost(path, request, env, fields, execution)) ??
+    (await okoliPost(path, request, env, fields)) ??
     (await drbenaPost(path, request, env, fields, ctxFor(request, "/redakce/drbena"))) ??
     (await chatAdminPost(path, request, env, fields)) ??
     (await feedsPost(path, request, env, fields)) ??
@@ -356,6 +359,7 @@ export default {
     ctx.waitUntil(runDenik(env).catch(() => {}));
     for (const source of SCHOOL_LIST) ctx.waitUntil(runSkola(env, source).catch(() => {}));
     ctx.waitUntil(runNdic(env).catch(() => {}));
+    ctx.waitUntil(runOkoli(env).catch(() => {}));
     ctx.waitUntil(fillKeywords(env).catch(() => {}));
     ctx.waitUntil(syncSearch(env).catch(() => {}));
     ctx.waitUntil(pruneAudit(env).catch(() => {}));

@@ -13,6 +13,7 @@ import { ensureImportTables } from "./munipolis/store.js";
 import { ensureFootballTables } from "./fotbal/store.js";
 import { ensureDenikTables } from "./denik/store.js";
 import { ensureSkolaTables } from "./skola/store.js";
+import { ensureOkoliTables } from "./okoli/store.js";
 import { ensureDrbenaTable } from "./drbena-db.js";
 import { ensureEventColumns } from "./events-db.js";
 import { ensureUserColumns } from "./users-db.js";
@@ -30,7 +31,7 @@ import { ensureLoginTables } from "./login-db.js";
 import { ensureNotifyTables } from "./notify.js";
 import { ensureSearchTables } from "./search/store.js";
 
-export const SCHEMA_VERSION = 34;
+export const SCHEMA_VERSION = 35;
 
 let schemaReady = false;
 
@@ -293,6 +294,15 @@ async function seedClubRubrics(env) {
   }
 }
 
+// Rubrika pro víkendový článek z akcí v Kopidlně a okolí (src/okoli/weekend.js).
+async function seedWeekendRubric(env) {
+  await env.DB.prepare(
+    `insert into rubrics (parent_id, name, slug, sort_order)
+     select null, 'Kam vyrazit', 'kam-vyrazit', 35
+     where not exists (select 1 from rubrics where slug = 'kam-vyrazit')`,
+  ).run();
+}
+
 async function seedDoctors(env) {
   const info = await env.DB.prepare("pragma table_info(settings)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
@@ -411,6 +421,7 @@ async function migrateSchema(env) {
   await ensureFootballTables(env);
   await ensureDenikTables(env);
   await ensureSkolaTables(env);
+  await ensureOkoliTables(env);
   await ensureDrbenaTable(env);
   await ensurePlaceTables(env);
   await ensureVisitTables(env);
@@ -460,6 +471,7 @@ async function migrateSchema(env) {
     await seedRubrics(env);
     await seedSchoolRubric(env);
     await seedClubRubrics(env);
+    await seedWeekendRubric(env);
   }
   await env.DB.prepare(
     `insert into users (login, name, password_hash, role)

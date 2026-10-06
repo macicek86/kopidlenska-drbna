@@ -10,6 +10,7 @@ import { DRBENA_OK } from "./post-drbena.js";
 import { FOOTBALL_OK } from "./post-fotbal.js";
 import { DENIK_OK } from "./post-denik.js";
 import { SKOLA_OK } from "./post-skola.js";
+import { OKOLI_OK } from "./post-okoli.js";
 import { CHAT_OK } from "./post-chat.js";
 import { MESSAGES_OK } from "./post-messages.js";
 import { ARTICLES_OK } from "./post-articles.js";
@@ -48,6 +49,7 @@ export const OK = {
   ...FOOTBALL_OK,
   ...DENIK_OK,
   ...SKOLA_OK,
+  ...OKOLI_OK,
   ...CHAT_OK,
   ...MESSAGES_OK,
 };
