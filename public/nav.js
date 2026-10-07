@@ -12,11 +12,10 @@ if (more) {
   });
 }
 
-// Zpráva: „Zpět na zprávy“ vrátí čtenáře na výpis zpráv, ze kterého přišel (i s rubrikou), i když mezitím
-// přešel na další zprávu, a výpis sjede na zprávu, kterou z něj otevřel. Když přišel odjinud z drbny
-// (titulka, akce, jiná zpráva), vede odkaz tam, odkud přišel („Zpět na akce“, u ostatních stránek jen „Zpět“),
-// a vedle něj se ukáže „Všechny zprávy“. Zvenku, přímým odkazem nebo bez JS vede na /zpravy.
-const BACK_KEY = "drbna:zpet";
+// Zpráva: odkaz zpět vede tam, odkud čtenář přišel (podle document.referrer), krokem zpět v historii.
+// Z výpisu zpráv je to „Zpět na zprávy“ (i s rubrikou) a výpis sjede na zprávu, kterou z něj otevřel.
+// Odjinud z drbny podle stránky („Zpět na akce“, z jiné zprávy a ostatních stránek jen „Zpět“) a vedle
+// se ukáže „Všechny zprávy“. Zvenku, přímým odkazem nebo bez JS vede na /zpravy.
 const CARD_KEY = "drbna:zpet-zprava";
 const RETURN_KEY = "drbna:zpet-navrat";
 const isArticle = /^\/zpravy\/./.test(location.pathname);
@@ -27,7 +26,7 @@ function store(key, value) {
     if (value === null) sessionStorage.removeItem(key);
     else sessionStorage.setItem(key, value);
   } catch {
-    // Bez sessionStorage odkaz prostě vede na /zpravy.
+    // Bez sessionStorage se výpis jen neposune ke zprávě.
   }
 }
 
@@ -40,7 +39,6 @@ function stored(key) {
 }
 
 if (isList) {
-  store(BACK_KEY, location.pathname + location.search);
   document.addEventListener("click", (event) => {
     const card = event.target.closest?.('a.story[href^="/zpravy/"]');
     if (card) store(CARD_KEY, card.getAttribute("href"));
@@ -54,42 +52,26 @@ if (isList) {
     const card = href && document.querySelector(`a.story[href="${CSS.escape(href)}"]`);
     if (card) card.scrollIntoView({ block: "center", behavior: "instant" });
   });
-} else if (!isArticle) {
-  store(BACK_KEY, null);
-  store(CARD_KEY, null);
 }
 
 const back = isArticle && document.querySelector("[data-back]");
-const target = stored(BACK_KEY);
-if (back && target) {
-  back.href = target;
-  back.addEventListener("click", (event) => {
-    store(RETURN_KEY, "1");
-    // Přišel přímo z výpisu: krok zpět v historii, ať nepřibude další záznam.
-    const from = document.referrer && new URL(document.referrer);
-    if (from && from.origin === location.origin && from.pathname + from.search === target) {
+const from = back && document.referrer && new URL(document.referrer);
+if (from && from.origin === location.origin && from.pathname + from.search !== location.pathname + location.search) {
+  const fromList = from.pathname === "/zpravy";
+  const labels = backLabels(back);
+  const label = fromList ? back.textContent : labels["/" + from.pathname.split("/")[1]] ?? labels[""];
+  if (label) {
+    back.href = from.pathname + from.search + from.hash;
+    back.textContent = label;
+    const all = !fromList && document.querySelector("[data-back-all]");
+    if (all) all.hidden = false;
+    back.addEventListener("click", (event) => {
+      if (fromList) store(RETURN_KEY, "1");
+      // V nové kartě historie není, tam odkaz prostě otevře stránku, odkud přišel.
+      if (history.length < 2) return;
       event.preventDefault();
       history.back();
-    }
-  });
-} else if (back) {
-  const from = document.referrer && new URL(document.referrer);
-  if (from && from.origin === location.origin && from.pathname + from.search !== location.pathname + location.search) {
-    const labels = backLabels(back);
-    const section = "/" + from.pathname.split("/")[1];
-    const label = labels[section] ?? labels[""];
-    if (label) {
-      back.href = from.pathname + from.search + from.hash;
-      back.textContent = label;
-      const all = document.querySelector("[data-back-all]");
-      if (all) all.hidden = false;
-      back.addEventListener("click", (event) => {
-        // V nové kartě historie není, tam odkaz prostě otevře stránku, odkud přišel.
-        if (history.length < 2) return;
-        event.preventDefault();
-        history.back();
-      });
-    }
+    });
   }
 }
 
