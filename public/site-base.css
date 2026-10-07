@@ -965,6 +965,10 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 
 .card-title .share-drop { right: 0; left: auto; }
 
+.share .share-drop.to-left { right: 0; left: auto; }
+
+.share .share-drop.to-right { left: 0; right: auto; }
+
 .share-touch { display: none; }
 
 @media (hover: none) and (pointer: coarse) {

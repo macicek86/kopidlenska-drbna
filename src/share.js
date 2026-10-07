@@ -2,7 +2,7 @@
 // ťuknutím se rozbalí vlastní nabídka (ne systémová nabídka telefonu).
 // Jen obyčejné odkazy, žádný skript Facebooku, takže čtenáře nikdo nesleduje. Náhled dají značky og:* zprávy.
 // Bez JS funguje <details> sám, chybí jen „Kopírovat odkaz“ (public/share.js ho ukáže a zavírá nabídku).
-// Messenger jde jen z aplikace v telefonu, na počítači ho CSS schová (.share-touch). Na mobilu, který umí
+// Messenger a WhatsApp jsou jen na mobilu, na počítači je CSS schová (.share-touch). Na mobilu, který umí
 // navigator.share, public/share.js místo E-mailu ukáže „Další…“ se systémovou nabídkou (e-mail je v ní taky).
 import { shareInfo, sharePath } from "./hours-share.js";
 import { esc } from "./html.js";
@@ -14,7 +14,7 @@ export function shareLinks(url, title) {
   return [
     ["Facebook", `https://www.facebook.com/sharer/sharer.php?u=${u}`],
     ["Messenger", `fb-messenger://share/?link=${u}`, "share-touch"],
-    ["WhatsApp", `https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`],
+    ["WhatsApp", `https://wa.me/?text=${encodeURIComponent(`${title} ${url}`)}`, "share-touch"],
     ["E-mail", `mailto:?subject=${encodeURIComponent(title)}&body=${u}`, "share-mail"],
   ];
 }

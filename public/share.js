@@ -1,10 +1,21 @@
-// Sdílení zprávy a karet otevírací doby (src/share.js): „Kopírovat odkaz“, na mobilu „Další…“ se systémovou
-// nabídkou místo E-mailu, zavření nabídky klikem jinam, po výběru nebo Esc.
+// Sdílení zprávy a karet otevírací doby (src/share.js): „Kopírovat odkaz“, na mobilu místo E-mailu a kopírování
+// „Další…“ se systémovou nabídkou (obojí v ní je), zavření nabídky klikem jinam, po výběru nebo Esc.
 const touch = matchMedia("(hover: none) and (pointer: coarse)").matches;
+
+// Nabídka se rozbalí tam, kde je místo: když by přetekla z okna doprava, otočí se doleva, a naopak.
+function fit(share) {
+  const drop = share.querySelector(".share-drop");
+  drop.classList.remove("to-left", "to-right");
+  const box = drop.getBoundingClientRect();
+  const width = document.documentElement.clientWidth;
+  if (box.right > width - 8) drop.classList.add("to-left");
+  else if (box.left < 8) drop.classList.add("to-right");
+}
 
 function setup(share) {
   const more = share.querySelector("[data-share-more]");
-  if (more && touch && navigator.share) {
+  const system = Boolean(more && touch && navigator.share);
+  if (system) {
     more.hidden = false;
     share.querySelector(".share-mail")?.setAttribute("hidden", "");
     more.addEventListener("click", () => {
@@ -14,7 +25,7 @@ function setup(share) {
     });
   }
   const copy = share.querySelector("[data-share-copy]");
-  if (copy && navigator.clipboard) {
+  if (copy && navigator.clipboard && !system) {
     copy.hidden = false;
     copy.addEventListener("click", async () => {
       try {
@@ -31,7 +42,9 @@ function setup(share) {
   }
   share.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => (share.open = false)));
   share.addEventListener("toggle", () => {
-    if (share.open) shares.forEach((other) => other !== share && (other.open = false));
+    if (!share.open) return;
+    shares.forEach((other) => other !== share && (other.open = false));
+    fit(share);
   });
   document.addEventListener("click", (event) => {
     if (share.open && !share.contains(event.target)) share.open = false;
