@@ -3,6 +3,7 @@ import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
 import { yardLd } from "./hours-ld.js";
 import { shareLayout, sharedRow } from "./hours-share.js";
+import { rowShare } from "./share.js";
 import { addDays, civilWeekday } from "./waste.js";
 import { coversDay, homeStatus, statusLine } from "./yards.js";
 import { askLine, clockOf, closureLabel, dayLabel, layout, siteOrigin } from "./view.js";
@@ -70,7 +71,7 @@ export function yardsPage(data, ctx, params) {
           return `<article class="card yard${several ? " place-card" : ""}" id="dvur-${yard.id}">
             <div class="place-head">
               <p class="kicker">${esc(yard.place)}</p>
-              <h2>${esc(yard.name)}</h2>
+              <div class="card-title"><h2>${esc(yard.name)}</h2>${rowShare("dvur", yard, today, siteOrigin(ctx.origin, ctx.mainOrigin))}</div>
               ${now ? yardStatusHtml(yard, now) : ""}
               <p class="kicker">${esc(tx(ctx.copy, "yards_accepts"))}</p>
               <p class="keep-lines">${esc(yard.accepts)}</p>
@@ -86,6 +87,7 @@ export function yardsPage(data, ctx, params) {
     ...ctx,
     title: `${tx(ctx.copy, "yards_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "yards_description"),
+    script: `<script src="/share.js" defer></script>`,
     ...shareLayout("dvur", sharedRow("dvur", yards, params), today, tx(ctx.copy, "site_name")),
     jsonLd: ctx.feedOn?.hoursLd === false ? [] : yards.map((yard) => yardLd(siteOrigin(ctx.origin, ctx.mainOrigin), yard)),
     feeds: [["/oteviraci-doba/feed.xml", "Změny otevírací doby"]],

@@ -958,6 +958,13 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 
 .share-item:hover { background: var(--paper-deep); }
 
+/* Karta místa, lékaře či dvora: ikonka vpravo u názvu, nabídka se rozbalí doleva, ať nepřeteče z karty. */
+.card-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem; }
+
+.card-title .share { margin-top: 0.3rem; }
+
+.card-title .share-drop { right: 0; left: auto; }
+
 .share-touch { display: none; }
 
 @media (hover: none) and (pointer: coarse) {

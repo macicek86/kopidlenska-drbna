@@ -8,6 +8,7 @@ import { placeNotices } from "./places.js";
 import { changesSoon } from "./hours-days.js";
 import { doctorLd, placeLd } from "./hours-ld.js";
 import { shareLayout, sharedRow } from "./hours-share.js";
+import { rowShare } from "./share.js";
 import { askLine, layout, siteOrigin } from "./view.js";
 
 function phoneLink(phone) {
@@ -53,11 +54,13 @@ function hoursBlock(entity, today, ctx, keys) {
 // Změny hodin lékařů, míst i sběrných dvorů jsou v jednom feedu.
 export const HOURS_FEEDS = [["/oteviraci-doba/feed.xml", "Změny otevírací doby"]];
 
+const SHARE_SCRIPT = `<script src="/share.js" defer></script>`;
 const DOCTOR_KEYS = { prefix: "lekar", missing: "doctors_missing_hours", regular: "doctors_regular", changes: "doctors_changes" };
 const PLACE_KEYS = { prefix: "misto", missing: "places_missing_hours", regular: "places_regular", changes: "places_changes" };
 
 export function doctorsPage(data, ctx, params) {
   const today = data.waste.today;
+  const origin = siteOrigin(ctx.origin, ctx.mainOrigin);
   const cards = (data.doctors ?? []).length
     ? (data.doctors ?? [])
         .map((doctor) => {
@@ -65,7 +68,7 @@ export function doctorsPage(data, ctx, params) {
           const { days, more } = hoursBlock(doctor, today, ctx, DOCTOR_KEYS);
           return `<article class="card yard" id="lekar-${doctor.id}">
             <p class="kicker">${esc(doctor.specialty)}</p>
-            <h2>${esc(doctor.name)}</h2>
+            <div class="card-title"><h2>${esc(doctor.name)}</h2>${rowShare("lekar", doctor, today, origin)}</div>
             <p class="meta">${esc(doctor.place)}${phone ? ` · ${phone}` : ""}</p>
             <p class="kicker">${esc(tx(ctx.copy, "doctors_hours"))}</p>
             ${days}
@@ -78,6 +81,7 @@ export function doctorsPage(data, ctx, params) {
     ...ctx,
     title: `${tx(ctx.copy, "doctors_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "doctors_description"),
+    script: SHARE_SCRIPT,
     ...shareLayout("lekar", sharedRow("lekar", data.doctors, params), today, tx(ctx.copy, "site_name")),
     jsonLd: ctx.feedOn?.hoursLd === false ? [] : (data.doctors ?? []).map((doctor) => doctorLd(siteOrigin(ctx.origin, ctx.mainOrigin), doctor)),
     feeds: HOURS_FEEDS,
@@ -111,7 +115,7 @@ function placeCard(place, today, ctx) {
   return `<article class="card yard place-card" id="misto-${place.id}">
     <div class="place-head">
       ${place.label ? `<p class="kicker">${esc(place.label)}</p>` : ""}
-      <h2>${esc(place.name)}</h2>
+      <div class="card-title"><h2>${esc(place.name)}</h2>${rowShare("misto", place, today, siteOrigin(ctx.origin, ctx.mainOrigin))}</div>
       ${meta ? `<p class="meta">${meta}</p>` : ""}
       ${banners}
     </div>
@@ -140,6 +144,7 @@ export function placesPage(data, ctx, params) {
     ...ctx,
     title: `${tx(ctx.copy, "places_heading")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "places_description"),
+    script: SHARE_SCRIPT,
     ...shareLayout("misto", sharedRow("misto", places, params), today, tx(ctx.copy, "site_name")),
     jsonLd: ctx.feedOn?.hoursLd === false ? [] : places.map((place) => placeLd(siteOrigin(ctx.origin, ctx.mainOrigin), place, today)),
     feeds: HOURS_FEEDS,

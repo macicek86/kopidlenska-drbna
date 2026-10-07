@@ -63,3 +63,11 @@ test("redakce má u místa tlačítko a okno Sdílet", () => {
   assert.match(list, /value="https:\/\/www\.kopidlenskadrbna\.org\/oteviraci-doba\?misto=6&amp;v=[0-9a-z]+#misto-6"/);
   assert.match(list, /data-share-field="sdilet-odkaz"/);
 });
+
+test("veřejné karty mají ikonku sdílení se stejným odkazem jako redakce", () => {
+  const page = placesPage({ places: [closed], waste: { today: "2026-10-05" } }, ctx, new URLSearchParams());
+  assert.match(page, /aria-label="Sdílet: Knihovna"/);
+  assert.match(page, /data-share-copy="https:\/\/www\.kopidlenskadrbna\.org\/oteviraci-doba\?misto=6&amp;v=[0-9a-z]+#misto-6"/);
+  assert.match(page, /href="https:\/\/www\.facebook\.com\/sharer\/sharer\.php\?u=https%3A%2F%2Fwww\.kopidlenskadrbna\.org%2Foteviraci-doba%3Fmisto%3D6/);
+  assert.match(page, /<script src="\/share\.js" defer>/);
+});

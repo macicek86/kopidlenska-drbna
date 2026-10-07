@@ -1,7 +1,9 @@
-// Sdílení zprávy: ikonka vedle data, ťuknutím se rozbalí vlastní nabídka (ne systémová nabídka telefonu).
+// Sdílení zprávy a karty otevírací doby: ikonka (u zprávy vedle data, u místa, lékaře a dvora vedle názvu),
+// ťuknutím se rozbalí vlastní nabídka (ne systémová nabídka telefonu).
 // Jen obyčejné odkazy, žádný skript Facebooku, takže čtenáře nikdo nesleduje. Náhled dají značky og:* zprávy.
 // Bez JS funguje <details> sám, chybí jen „Kopírovat odkaz“ (public/share.js ho ukáže a zavírá nabídku).
 // Messenger jde jen z aplikace v telefonu, na počítači ho CSS schová (.share-touch).
+import { shareInfo, sharePath } from "./hours-share.js";
 import { esc } from "./html.js";
 
 const ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4"/></g></svg>`;
@@ -16,7 +18,7 @@ export function shareLinks(url, title) {
   ];
 }
 
-export function shareMenu(url, title) {
+export function shareMenu(url, title, label = "Sdílet zprávu") {
   const links = shareLinks(url, title)
     .map(([label, href, cls]) => {
       const web = href.startsWith("https:");
@@ -24,10 +26,15 @@ export function shareMenu(url, title) {
     })
     .join("");
   return `<details class="share" data-share>
-            <summary class="share-btn" aria-label="Sdílet zprávu" title="Sdílet">${ICON}</summary>
+            <summary class="share-btn" aria-label="${esc(label)}" title="Sdílet">${ICON}</summary>
             <div class="share-drop">
               ${links}
               <button class="share-item" type="button" data-share-copy="${esc(url)}" hidden>Kopírovat odkaz</button>
             </div>
           </details>`;
+}
+
+// Karta místa, lékaře či dvora: stejný odkaz jako tlačítko Sdílet v redakci (src/hours-share.js), s otiskem textu.
+export function rowShare(kind, row, today, origin) {
+  return shareMenu(`${origin}${sharePath(kind, row, today)}`, shareInfo(kind, row, today).title, `Sdílet: ${row.name}`);
 }
