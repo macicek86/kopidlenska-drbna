@@ -35,13 +35,18 @@ function nav(data) {
         ["zpravy", "Zprávy", "news", chief ? waiting : returned],
         chief && ["rubriky", "Rubriky", "folder"],
         chief && ["akce", "Akce", "calendar"],
+        (chief || userCan(data.user, "obrazky")) && ["obrazky", "Knihovna obrázků", "image"],
+        ["reklamy", "Reklamy", "megaphone", chief ? adWaiting : adReturned],
+      ],
+    },
+    {
+      name: "Importy",
+      links: [
         chief && ["munipolis", "Munipolis", "inbox", importFailed],
         chief && ["fotbal", "Fotbal", "ball", footballFailed],
         chief && ["denik", "Deník", "paper", denikFailed],
         ...SCHOOL_LIST.map((source) => chief && [source.tag, source.page, source.icon, schoolFailed(source.tag)]),
         chief && ["okoli", "Akce v okolí", "pin"],
-        (chief || userCan(data.user, "obrazky")) && ["obrazky", "Knihovna obrázků", "image"],
-        ["reklamy", "Reklamy", "megaphone", chief ? adWaiting : adReturned],
       ],
     },
     {
@@ -56,8 +61,19 @@ function nav(data) {
       ],
     },
     {
-      name: "Nastavení",
-      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["odber", "Odběr a data", "rss"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["stav", "Stav drbny", "pulse", problemCount(data.healthRows ?? [])], chief && ["historie", "Historie změn", "clock"], ["ucet", "Můj účet", "user"]],
+      name: "Drběna",
+      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"]],
+    },
+    {
+      name: "Správa",
+      links: [
+        chief && ["lide", "Lidé", "users"],
+        chief && ["odber", "Odběr a data", "rss"],
+        chief && ["texty", "Texty webu", "text"],
+        chief && ["stav", "Stav drbny", "pulse", problemCount(data.healthRows ?? [])],
+        chief && ["historie", "Historie změn", "clock"],
+        ["ucet", "Můj účet", "user"],
+      ],
     },
   ];
   return groups
@@ -65,20 +81,33 @@ function nav(data) {
     .filter((group) => group.links.length);
 }
 
-function navHtml(data, tab) {
-  return nav(data)
+const countBadge = (count) => (count ? `<b class="adm-count" aria-label="${count} čeká">${count}</b>` : "");
+
+// Skupiny jsou <details>: na mobilu se rozbalují, otevřená je ta s aktuální stránkou; na počítači jsou vidět vždy (admin.css).
+function navHtml(groups, tab) {
+  return groups
     .map((group) => {
       const links = group.links
         .map(([id, label, glyph, count]) => {
           const on = id === tab;
-          return `<a class="adm-link${on ? " is-on" : ""}" href="/redakce/${id}"${on ? ' aria-current="page"' : ""}>${icon(glyph)}<span>${esc(label)}</span>${
-            count ? `<b class="adm-count" aria-label="${count} čeká">${count}</b>` : ""
-          }</a>`;
+          return `<a class="adm-link${on ? " is-on" : ""}" href="/redakce/${id}"${on ? ' aria-current="page"' : ""}>${icon(glyph)}<span>${esc(label)}</span>${countBadge(count)}</a>`;
         })
         .join("");
-      return `<div class="adm-group">${group.name ? `<p class="adm-group-name">${esc(group.name)}</p>` : ""}${links}</div>`;
+      if (!group.name) return `<div class="adm-group">${links}</div>`;
+      const open = group.links.some(([id]) => id === tab);
+      const waiting = group.links.reduce((sum, link) => sum + (link[3] || 0), 0);
+      return `<details class="adm-group"${open ? " open" : ""}><summary class="adm-group-name"><span>${esc(group.name)}</span>${countBadge(waiting)}</summary>${links}</details>`;
     })
     .join("");
+}
+
+// Na mobilu je menu schované za tlačítkem s názvem aktuální stránky (zaškrtávátko, funguje i bez JS).
+function menuButton(groups, tab) {
+  const links = groups.flatMap((group) => group.links);
+  const current = links.find(([id]) => id === tab)?.[1] ?? "Menu";
+  const waiting = links.reduce((sum, link) => sum + (link[3] || 0), 0);
+  return `<input class="adm-menu-check" type="checkbox" id="adm-menu" aria-label="Menu redakce">
+    <label class="adm-menu-btn adm-only-mobile" for="adm-menu" aria-hidden="true">${icon("menu")}<span>${esc(current)}</span>${countBadge(waiting)}</label>`;
 }
 
 export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "emaily", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
@@ -99,6 +128,7 @@ export function adminShell(ctx, data, tab, message, inner, options = {}) {
   const name = data.user?.name ?? "";
   const initial = (byline(data.user) || name || "R").trim().charAt(0).toUpperCase();
   const home = ctx.mainOrigin || "/";
+  const groups = nav(data);
   return adminDocument({
     title: `${options.title ? `${options.title} · ` : ""}Redakce | Kopidlenská drbna`,
     rich: Boolean(options.rich),
@@ -110,7 +140,8 @@ export function adminShell(ctx, data, tab, message, inner, options = {}) {
       <a class="adm-icon-btn adm-only-mobile" href="${esc(home)}" target="_blank" rel="noopener" title="Otevřít web">${icon("external")}</a>
       <form class="adm-only-mobile" method="post" action="/redakce/odhlasit"><button class="adm-icon-btn" type="submit" title="Odhlásit">${icon("logout")}</button></form>
     </div>
-    <nav class="adm-nav" aria-label="Redakce">${navHtml(data, tab)}</nav>
+    ${menuButton(groups, tab)}
+    <nav class="adm-nav" aria-label="Redakce">${navHtml(groups, tab)}</nav>
     <div class="adm-me">
       <span class="adm-avatar" aria-hidden="true">${esc(initial)}</span>
       <span class="adm-me-text"><strong>${esc(name)}</strong><small>${who}</small></span>

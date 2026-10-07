@@ -502,6 +502,15 @@ cleanFlashFromUrl();
 bindForms(document);
 scheduleRefresh();
 continueQueue();
+// Prohlížeč bez ::details-content by na počítači sbalené skupiny menu schoval.
+if (!CSS.supports("selector(::details-content)") && matchMedia("(min-width: 900px)").matches) {
+  for (const group of document.querySelectorAll("details.adm-group")) group.open = true;
+}
+// Po návratu tlačítkem Zpět ať je menu na mobilu zase zavřené.
+addEventListener("pageshow", () => {
+  const menu = document.getElementById("adm-menu");
+  if (menu) menu.checked = false;
+});
 document.querySelector(".adm-link.is-on")?.scrollIntoView({ block: "nearest", inline: "center" });
 const first = document.querySelector("dialog[data-autoopen]");
 if (first) openDialog(first);
