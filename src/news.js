@@ -17,6 +17,30 @@ import { readCount } from "./visits.js";
 
 const SCRIPT = `<script src="/site.js" defer></script>`;
 
+// Odkud čtenář na zprávu přišel (první část adresy) a text odkazu zpět. Ostatní stránky drbny
+// (i jiná zpráva) dostanou „Zpět“ (klíč ""). Vybírá public/nav.js podle document.referrer.
+const BACK_FROM = [
+  ["/", "article_back_home"],
+  ["/akce", "article_back_events"],
+  ["/oteviraci-doba", "article_back_places"],
+  ["/lekari", "article_back_doctors"],
+  ["/sberne-dvory", "article_back_yards"],
+  ["/popelnice", "article_back_bins"],
+  ["/odstavky", "article_back_outages"],
+  ["/reklamy", "article_back_ads"],
+  ["/o-nas", "article_back_about"],
+  ["", "article_back_here"],
+];
+
+// Bez JS a zvenku vede odkaz na výpis zpráv; „Všechny zprávy“ ukáže skript, když odkaz vede jinam.
+function articleBack(copy) {
+  const labels = JSON.stringify(Object.fromEntries(BACK_FROM.map(([path, key]) => [path, tx(copy, key)])));
+  return `<div class="article-back">
+            <a class="back" href="/zpravy" data-back="${esc(labels)}">${esc(tx(copy, "article_back"))}</a>
+            <a class="back-all" href="/zpravy" data-back-all hidden>${esc(tx(copy, "article_back_all"))}</a>
+          </div>`;
+}
+
 function storyCard(article) {
   return `<a class="card story${article.imageKey ? " has-photo" : ""}" href="/zpravy/${esc(article.slug)}">
             ${storyPhoto(article, "story-photo")}
@@ -120,7 +144,7 @@ export function articlePage(article, ctx, extras = {}) {
     body: `
       <div class="article-page">
         <div class="article-main">
-          <a class="back" href="/zpravy" data-back>${esc(tx(ctx.copy, "article_back"))}</a>
+          ${articleBack(ctx.copy)}
           ${articleCrumbs(article)}
           <h1 class="article-title">${escTie(article.title)}</h1>
           ${articleMeta(article, extras.views)}

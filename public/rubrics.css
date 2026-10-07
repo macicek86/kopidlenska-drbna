@@ -175,8 +175,11 @@
   .rubric-sub-label { flex-basis: 100%; }
 }
 
-/* Na stránce zprávy: odkaz zpět, pod ním drobečky rubriky. */
-.back + .crumbs { margin-top: 1.1rem; }
+/* Na stránce zprávy: odkaz zpět (vpravo případně všechny zprávy), pod ním drobečky rubriky. */
+.article-back { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .4rem 1rem; }
+.back-all { color: var(--muted); font-size: .92em; font-weight: 600; }
+.back-all:hover { color: var(--brand); }
+.article-back + .crumbs { margin-top: 1.1rem; }
 
 /* Další zprávy vedle zprávy (na mobilu pod ní). */
 .more-news { margin-top: 1.6rem; }
