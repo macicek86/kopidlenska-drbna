@@ -32,7 +32,7 @@ import { ensureNotifyTables } from "./notify.js";
 import { ensureSearchTables } from "./search/store.js";
 import { ensureMailinTables } from "./mailin/store.js";
 
-export const SCHEMA_VERSION = 49;
+export const SCHEMA_VERSION = 50;
 
 let schemaReady = false;
 

@@ -71,7 +71,7 @@ export function contextSections(known) {
   const articles = [];
   addArticles((heading, rows) => articles.push(section(heading, rows)), known);
   const imports = section(
-    "Dřívější převzaté zprávy (Munipolis, Deník, školy, web města)",
+    "Dřívější převzaté zprávy (Munipolis, Deník, školy, web města, vložené příspěvky)",
     (known.imports ?? []).map((row) => `[${row.tag ?? "munipolis"}:${row.id}] ${row.publishedOn} · ${line(row.title, 140)} · ${row.outcome}`),
   );
   return { fixed: fixed.join("\n\n"), articles: articles.join("\n\n"), imports };

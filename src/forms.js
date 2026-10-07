@@ -33,6 +33,8 @@ export function adminQuery(url) {
     ndicClear: url.searchParams.has("ndic-smazat"),
     importId: positiveParam(url, "zprava"),
     importSettings: url.searchParams.has("nastaveni"),
+    // Vložené příspěvky: okno Vložit příspěvek.
+    paste: url.searchParams.has("vlozit"),
     // Akce v okolí: okno ručního článku Kam vyrazit.
     okoliWrite: url.searchParams.has("napsat"),
     topicId: positiveParam(url, "tema"),
@@ -214,6 +216,11 @@ export async function formFields(request) {
     freshDays: text("freshDays"),
     aheadDays: text("aheadDays"),
     images: form.getAll("images"),
+    // Vložený příspěvek (src/skola/paste.js).
+    postText: text("postText"),
+    postLink: text("postLink"),
+    postFrom: text("postFrom"),
+    postDate: text("postDate"),
     stockId: positive("stock_id"),
     topicId: positive("topicId"),
     hint: text("hint"),

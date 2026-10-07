@@ -20,6 +20,7 @@ export function refLink(ref) {
     skola: ["/redakce/skola?zprava=", "Článek školy"],
     zahradka: ["/redakce/zahradka?zprava=", "Článek zahradnické školy"],
     webmesta: ["/redakce/webmesta?zprava=", "Článek z webu města"],
+    vlozene: ["/redakce/vlozene?zprava=", "Vložený příspěvek"],
     misto: ["/redakce/oteviraci-doba?id=", "Místo"],
     lekar: ["/redakce/lekari?id=", "Ordinace"],
   };

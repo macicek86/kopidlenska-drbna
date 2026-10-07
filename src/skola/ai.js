@@ -9,6 +9,7 @@ import { contentText, importContent } from "../import-overview.js";
 import { importLookup, withLookups } from "../import-tools.js";
 import { base64, LINK_RULE, outputSchema, readArticle, readDecision, visibleImages } from "../munipolis/ai.js";
 import { OWN_PHOTO_RULE, topicsText } from "../stock.js";
+import { pastedFrom } from "./paste.js";
 import { SCHOOLS } from "./sources.js";
 
 const RULES = `{SOURCE}
@@ -55,7 +56,16 @@ export function skolaPrompt(voice, { ownPhotos = false, source = SCHOOLS.skola, 
   return `${rules}\n${EVENT_CHANGE_RULE}\n\nHlas a styl textů:\n${style}`;
 }
 
+// Vložený příspěvek nemá nadpis ani rubriku, jen odkud je a text.
+function pastedItemText(item, source) {
+  return [
+    `Příspěvek, který redakce vložila z: ${pastedFrom(source, item.section)} (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
+    `Text:\n${item.text || "(bez textu, údaje jsou možná jen na obrázku)"}`,
+  ].join("\n\n");
+}
+
 export function skolaItemText(item, source = SCHOOLS.skola) {
+  if (source.pasted) return pastedItemText(item, source);
   return [
     `Článek z webu ${source.name}${item.section ? `, rubrika ${item.section}` : ""} (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
     `Nadpis: ${item.title}`,

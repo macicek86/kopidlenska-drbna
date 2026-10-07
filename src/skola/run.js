@@ -27,6 +27,7 @@ import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { askSkola } from "./ai.js";
 import { DESK_SECTION, fetchDocuments } from "./deska.js";
 import { deferDay, deferSkolaItem, laterNote, loadKeptImages, PAST_REASON, releaseKeptImages, reopenDeferred, termOver } from "./defer.js";
+import { pastedFrom } from "./paste.js";
 import { SCHOOLS } from "./sources.js";
 import {
   countWaitingSkola,
@@ -44,15 +45,16 @@ export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
 const BUSY = "Drběna už ten web čte. Počkejte, stránka se sama obnoví.";
 
-// Zdroj pod čarou (src/article-source.js). Dokument z úřední desky se jmenuje podle desky.
+// Zdroj pod čarou (src/article-source.js). Dokument z úřední desky se jmenuje podle desky, vložený příspěvek podle toho, odkud je.
 export function skolaSource(link, source = SCHOOLS.skola, section = "") {
+  if (source.pasted) return sourceEntry(pastedFrom(source, section), link);
   const label = section === DESK_SECTION ? `úřední deska ${source.name}` : `web ${source.name}`;
   return sourceEntry(label, link);
 }
 
 // Fotka je z webu zdroje, i když ji škole (městu) dal někdo jiný (autora uvede Drběna v popisku, když ho škola zmíní).
-export function photoCaption(caption, source = SCHOOLS.skola) {
-  const credit = `foto: web ${source.name}`;
+export function photoCaption(caption, source = SCHOOLS.skola, section = "") {
+  const credit = source.pasted ? `foto: ${pastedFrom(source, section)}` : `foto: web ${source.name}`;
   return caption ? `${caption} (${credit})` : `F${credit.slice(1)}`;
 }
 
@@ -67,19 +69,20 @@ async function downloadImages(env, urls, fetchImpl) {
 
 // Fotku z webu zdroje jen se zapnutým nastavením a když ji Drběna vybrala (i pěkný plakát, ořízne se jako fotka), jinak ilustrační z knihovny.
 // Plakát uložený při odložení (`key`) se nenahrává znovu.
-export async function skolaImage(env, article, images, ownPhotos, source = SCHOOLS.skola) {
+export async function skolaImage(env, article, images, ownPhotos, source = SCHOOLS.skola, section = "") {
   const [own] = visibleImages(images);
   if (ownPhotos && article.imageUse !== "knihovna" && own) {
-    return { key: own.key ?? (await storeImageBytes(env, own)), focus: "", caption: photoCaption(article.imageCaption, source) };
+    return { key: own.key ?? (await storeImageBytes(env, own)), focus: "", caption: photoCaption(article.imageCaption, source, section) };
   }
   return pickStockImage(env, article.imageTopic);
 }
 
 // Ručně vybraný článek Drběna zpracuje vždy (redakce rozhodla) a zpráva dostane datum ze zdroje. Cron píše s dnešním datem,
 // stejně jako odloženou pozvánku (`defer.js`), i když ji redakce pustí dřív. Uložené plakáty odložené položky se po zpracování uklidí.
+// Fotky vloženého příspěvku jen po napsání zprávy: přeskočený nebo duplicitu jde pustit znovu i s nimi.
 export async function processSkolaItem(env, source, item, settings, options = {}) {
   const result = await handleSkolaItem(env, source, item, settings, options);
-  if (result.ok) await releaseKeptImages(env, source, item);
+  if (result.ok && (!source.pasted || result.status === "hotovo")) await releaseKeptImages(env, source, item);
   return result;
 }
 
@@ -159,7 +162,7 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
       made,
       await saveBotArticle(env, {
         article: answer.article,
-        image: await skolaImage(env, answer.article, images, settings.ownPhotos, source),
+        image: await skolaImage(env, answer.article, images, settings.ownPhotos, source, item.section),
         source: skolaSource(item.link, source, item.section),
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
@@ -196,11 +199,12 @@ async function collect(env, source, settings, fetchImpl) {
 }
 
 // Další článek z fronty. Automatický, který mezitím zestárl (třeba po dlouhé pauze), jde stranou mezi starší.
+// Vložený příspěvek vybrala redakce, ten se píše vždy.
 async function nextFresh(env, source, settings, manualOnly) {
   const today = pragueNow().date;
   for (;;) {
     const [item] = await waitingSkolaItems(env, source, 1, { manualOnly });
-    if (!item || item.manual || item.writeOn || isFresh(importSourceDate(item, today), today, settings.freshDays)) return item;
+    if (!item || source.pasted || item.manual || item.writeOn || isFresh(importSourceDate(item, today), today, settings.freshDays)) return item;
     await env.DB.prepare(`update ${source.itemsTable} set status = 'stare', reason = ? where id = ?`).bind(STALE_REASON, item.id).run();
   }
 }
@@ -219,17 +223,18 @@ async function writeBatch(env, source, settings, { added, warning = "", fetchImp
 }
 
 // Cron každé čtyři hodiny. Se zapnutým importem stáhne RSS a zpracuje nové články,
-// vždy dopíše to, co redakce ručně vybrala (s datem ze zdroje).
+// vždy dopíše to, co redakce ručně vybrala (s datem ze zdroje). Vložené příspěvky nic nestahují, cron jen dopíše frontu.
 export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola } = {}) {
   const settings = await loadSkolaSettings(env, source);
-  const manualWaiting = await countWaitingSkola(env, source, { manualOnly: true });
-  if (!settings.enabled && !manualWaiting) return { ok: true, skipped: true };
+  const reading = settings.enabled && !source.pasted;
+  const waiting = await countWaitingSkola(env, source, { manualOnly: !source.pasted });
+  if (!reading && !waiting) return { ok: true, skipped: true };
   const lock = await lockSkola(env, source, CRON_LOCK_SECONDS);
   if (!lock) return { ok: true, skipped: true };
   try {
     let added = 0;
     let warning = "";
-    if (settings.enabled) {
+    if (reading) {
       const collected = await collect(env, source, settings, fetchImpl);
       if (!collected.ok) return collected;
       ({ added, warning } = collected);
@@ -241,7 +246,7 @@ export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola 
       ask,
       budgetMs: CRON_BUDGET_MS,
       max: BATCH_CRON,
-      manualOnly: !settings.enabled,
+      manualOnly: !reading && !source.pasted,
     });
     return { ok: result.status !== "error", note: result.note };
   } finally {

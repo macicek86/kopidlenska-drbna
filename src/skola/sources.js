@@ -51,6 +51,22 @@ Co vytvořit:
 - Pozvánka na zasedání zastupitelstva: event (zasedání je veřejné, den, čas a místo z pozvánky) a krátký článek s body programu, které sousedy zajímají.
 - Rubrika "zpravy", pokud je v seznamu.`;
 
+const PASTED_RULES = `Dostaneš jeden příspěvek, který redakce ručně zkopírovala ze sociální sítě (nejčastěji z facebookové stránky Kopidlenských listů, kterou vede město), a přehled toho, co už na webu Kopidlenská drbna je. Odkud příspěvek je, stojí u něj.
+
+Město stejné věci často zveřejňuje i v Munipolisu a na webu kopidlno.cz, ze kterých drbna taky čte. V přehledu jsou jako zprávy, akce, návrhy a dřívější převzaté zprávy se značkou munipolis:… a webmesta:…. Než něco napíšeš, porovnej příspěvek s nimi.
+
+Rozhodni (pole decision):
+- "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, nebo ji město poslalo jinudy (značka munipolis:… či webmesta:…), i když jinými slovy. Do duplicate_of dej značku z přehledu, třeba "zprava:12" nebo "munipolis:40". Když příspěvek přináší podstatnou novinku (jiný termín, zrušení, program, výsledek, fotky z akce), není to duplicita: zvol "doplneni" (je-li o věci zpráva), jinak "vytvorit", a novinku zmiň v reason.
+${FOLLOWUP_DECISION}
+- "preskocit": jen když v příspěvku pro sousedy opravdu nic není (sdílení bez textu, přání bez dalšího obsahu, odkaz bez popisu). Redakce příspěvek vybrala, takže jinak piš.
+- "vytvorit": cokoli dalšího.
+
+Co vytvořit:
+- Akce pro veřejnost s datem: event a k tomu krátký článek s pozvánkou.
+- Cokoli jiného: článek. I odstávka, uzavírka nebo změna otevírací doby z tohoto zdroje je jen článek.
+
+Příspěvky na sociálních sítích bývají krátké, s emoji, hashtagy a výzvami ke sdílení. Nic z toho do článku nepřebírej. Údaje, které v textu chybí, bývají na přiložených obrázcích.`;
+
 export const SCHOOLS = {
   skola: {
     tag: "skola",
@@ -120,6 +136,29 @@ export const SCHOOLS = {
     people: "lidé při akci, místo ve městě, koncert, výstava",
     intro: "Koza Drběna čte aktuality na webu města kopidlno.cz a z úřední desky usnesení a zápisy rady a zastupitelstva. Akce, novinky a to, co město rozhodlo, napíše po svém, s odkazem na zdroj. Co už přišlo z Munipolisu nebo jinak na drbně je, pozná a nechá být.",
     fetchItems: fetchCityItems,
+  },
+  // Příspěvky, které redakce sama vloží (Facebook města API nepustí). Nic se nestahuje: položku založí formulář
+  // (`paste.js`), odkud je, nese `section`, fotky čekají v R2 v `kept_images`. Zpracuje se hned, i když je starší.
+  vlozene: {
+    tag: "vlozene",
+    pasted: true,
+    defaultFrom: "Facebook Kopidlenských listů",
+    name: "",
+    page: "Vložené příspěvky",
+    site: "příspěvek",
+    siteOf: "příspěvku",
+    term: "",
+    icon: "plus",
+    settingsTable: "vlozene_settings",
+    itemsTable: "vlozene_items",
+    rubric: "",
+    defaultFeeds: [],
+    feedField: false,
+    freshDays: 7,
+    rules: PASTED_RULES,
+    people: "lidé při akci, místo ve městě, koncert, výstava",
+    intro: "Příspěvek z Facebooku (nebo odjinud) sem zkopírujte i s fotkami. Koza Drběna ho zpracuje stejně jako zprávy města: pozná, jestli už to na drbně je, akci dá do kalendáře a napíše článek po svém.",
+    fetchItems: null,
   },
 };
 

@@ -51,6 +51,7 @@ export const IMPORT_SOURCES = [
   { table: "skola_items", tag: "skola", deferred: true },
   { table: "zahradka_items", tag: "zahradka", deferred: true },
   { table: "webmesta_items", tag: "webmesta", deferred: true },
+  { table: "vlozene_items", tag: "vlozene", deferred: true },
 ];
 
 async function pastImports(env, { table, tag, deferred = false }, itemTable, itemId, since) {

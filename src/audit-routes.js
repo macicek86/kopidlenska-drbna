@@ -186,6 +186,7 @@ const ROUTES = {
   ...importRoutes("/redakce/fotbal", "football_settings"),
   ...importRoutes("/redakce/denik", "denik_settings"),
   ...Object.assign({}, ...SCHOOL_LIST.map((source) => importRoutes(`/redakce/${source.tag}`, source.settingsTable))),
+  "/redakce/vlozene/vlozit": "always",
 
   "/redakce/okoli/ulozit": [single("okoli_settings", "nastavení")],
   "/redakce/okoli/nacist": "always",
