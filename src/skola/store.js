@@ -41,6 +41,11 @@ export const schoolTables = (source) => [
     manual integer not null default 0,
     write_on text not null default '',
     kept_images text not null default '[]',
+    draft text not null default '',
+    previous_draft text not null default '',
+    show_photos integer not null default 0,
+    redo_note text not null default '',
+    follow_of integer,
     attempts integer not null default 0,
     created_at text not null default (datetime('now')),
     processed_at text
@@ -57,6 +62,12 @@ export async function ensureSkolaTables(env) {
     // Odložená pozvánka na akci (`defer.js`).
     await addColumn(env, names, "write_on", `alter table ${source.itemsTable} add column write_on text not null default ''`);
     await addColumn(env, names, "kept_images", `alter table ${source.itemsTable} add column kept_images text not null default '[]'`);
+    // Vložený příspěvek (`paste.js`): koncept od Drběny, předchozí verze, poznámka k přepsání, fotky pro Claude, navázání.
+    await addColumn(env, names, "draft", `alter table ${source.itemsTable} add column draft text not null default ''`);
+    await addColumn(env, names, "previous_draft", `alter table ${source.itemsTable} add column previous_draft text not null default ''`);
+    await addColumn(env, names, "show_photos", `alter table ${source.itemsTable} add column show_photos integer not null default 0`);
+    await addColumn(env, names, "redo_note", `alter table ${source.itemsTable} add column redo_note text not null default ''`);
+    await addColumn(env, names, "follow_of", `alter table ${source.itemsTable} add column follow_of integer`);
     const settingsInfo = await env.DB.prepare(`pragma table_info(${source.settingsTable})`).all();
     const settingsNames = new Set((settingsInfo.results ?? []).map((row) => row.name));
     await addColumn(env, settingsNames, "ahead_days", `alter table ${source.settingsTable} add column ahead_days integer not null default ${DEFAULT_AHEAD_DAYS}`);
@@ -94,7 +105,7 @@ export async function loadSkolaSettings(env, source) {
 }
 
 const ITEM_FIELDS =
-  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, write_on, kept_images, attempts, processed_at, created_at";
+  "id, guid, link, title, text, images, documents, section, term, published_at, status, reason, duplicate_of, article_id, proposal_id, event_id, notice_id, manual, write_on, kept_images, draft, previous_draft, show_photos, redo_note, follow_of, attempts, processed_at, created_at";
 
 function parseDocuments(text) {
   try {
@@ -105,8 +116,34 @@ function parseDocuments(text) {
   }
 }
 
+function parseDraft(text) {
+  try {
+    const draft = JSON.parse(text || "null");
+    return draft && typeof draft === "object" && draft.article ? draft : null;
+  } catch {
+    return null;
+  }
+}
+
 function mapSkolaItem(row) {
-  return { ...mapImportItem(row), documents: parseDocuments(row.documents), section: String(row.section ?? ""), term: String(row.term ?? ""), writeOn: String(row.write_on ?? ""), keptImages: parseDocuments(row.kept_images) };
+  return {
+    ...mapImportItem(row),
+    documents: parseDocuments(row.documents),
+    section: String(row.section ?? ""),
+    term: String(row.term ?? ""),
+    writeOn: String(row.write_on ?? ""),
+    keptImages: parseDocuments(row.kept_images),
+    draft: parseDraft(row.draft),
+    previousDraft: parseDraft(row.previous_draft),
+    showPhotos: asBool(row.show_photos),
+    redoNote: String(row.redo_note ?? ""),
+    followOf: row.follow_of == null ? null : Number(row.follow_of),
+  };
+}
+
+export async function loadSkolaItem(env, source, id) {
+  const row = await env.DB.prepare(`select ${ITEM_FIELDS} from ${source.itemsTable} where id = ?`).bind(id).first();
+  return row ? mapSkolaItem(row) : null;
 }
 
 export async function loadSkolaItems(env, source, limit = 40) {

@@ -5,6 +5,8 @@ import { adminSkola } from "../src/admin/index.js";
 import { refLink } from "../src/admin/imports.js";
 import { skolaPrompt, skolaText } from "../src/skola/ai.js";
 import { pastedTitle, readPostDate, savePastedItem } from "../src/skola/paste.js";
+import { chosenImage, readSchedule, redoText } from "../src/skola/paste-run.js";
+import { pastedDetail } from "../src/admin/paste.js";
 import { photoCaption, skolaSource } from "../src/skola/run.js";
 import { SCHOOLS } from "../src/skola/sources.js";
 import { schoolTables, waitingSkolaItems } from "../src/skola/store.js";
@@ -93,6 +95,65 @@ test("Drběna dostane příspěvek bez nadpisu a pokyn porovnat s Munipolisem a 
   assert.match(prompt, /emoji, hashtagy/);
 });
 
+const DRAFT = {
+  decision: "vytvorit",
+  reason: "Pozvánka na drakiádu.",
+  duplicateOf: "",
+  article: { title: "Draci nad rozhlednou", excerpt: "V sobotu drakiáda.", body: "<p>Přijďte.</p>", rubric: "komunita", imageTopic: "deti", keywords: "drakiáda" },
+  event: { title: "Drakiáda", startsOn: "2026-10-10", startsTime: "14:00", place: "u rozhledny" },
+  eventChange: null,
+  target: null,
+};
+
+function entry(fields) {
+  return { id: 7, title: "Drakiáda", text: "Drakiáda v sobotu", section: "Facebook Kopidlenských listů", link: "", status: "nove", reason: "", duplicateOf: "", keptImages: [], attempts: 0, manual: false, draft: null, previousDraft: null, ...fields };
+}
+
+test("napsat znovu: Drběna dostane předchozí verzi a poznámku redakce", () => {
+  assert.equal(redoText(entry({})), "");
+  const text = redoText(entry({ previousDraft: DRAFT, redoNote: "Piš kratší." }));
+  assert.match(text, /předchozí verze:\nNadpis: Draci nad rozhlednou/);
+  assert.match(text, /Redakce k tomu píše: Piš kratší\./);
+  assert.match(redoText(entry({ previousDraft: DRAFT })), /Redakce chce jinou verzi/);
+});
+
+test("naplánovat jde jen na den a čas v budoucnu", () => {
+  const now = new Date("2026-10-07T10:00:00Z");
+  assert.deepEqual(readSchedule({ publishDate: "2026-10-08", publishTime: "7:30" }, now), { day: "2026-10-08", time: "07:30" });
+  assert.ok(readSchedule({ publishDate: "2026-10-07", publishTime: "11:00" }, now).error);
+  assert.ok(readSchedule({ publishDate: "", publishTime: "11:00" }, now).error);
+  assert.ok(readSchedule({ publishDate: "2026-10-08", publishTime: "" }, now).error);
+});
+
+test("fotka ke zprávě: vložená s popiskem odkud, cizí klíč neprojde, bez fotky nic", async () => {
+  const item = entry({ keptImages: ["clanky/a.webp"], draft: DRAFT });
+  assert.deepEqual(await chosenImage({}, PASTED, item, { photoChoice: "vlozena:clanky/a.webp", photoCaption: "Draci" }), {
+    key: "clanky/a.webp",
+    focus: "",
+    caption: "Draci (foto: Facebook Kopidlenských listů)",
+  });
+  assert.ok((await chosenImage({}, PASTED, item, { photoChoice: "vlozena:clanky/cizi.webp" })).error);
+  assert.equal(await chosenImage({}, PASTED, item, { photoChoice: "bez" }), null);
+});
+
+test("okno: Drběna píše, hotový koncept se zveřejněním, duplicita s navazující zprávou", () => {
+  const data = { rubrics: [{ id: 3, slug: "komunita", name: "Komunita" }], stock: { topics: [] } };
+  assert.match(pastedDetail(PASTED, entry({}), data), /Drběna píše/);
+  const ready = pastedDetail(PASTED, entry({ status: "napsano", draft: DRAFT, keptImages: ["clanky/a.webp"], previousDraft: { ...DRAFT, article: { ...DRAFT.article, title: "Starší" } } }), data);
+  assert.match(ready, /<h3 class="paste-title">Draci nad rozhlednou<\/h3>/);
+  assert.match(ready, /Do kalendáře: <b>Drakiáda<\/b>/);
+  assert.match(ready, /<option value="3" selected>Komunita<\/option>/);
+  assert.match(ready, /value="vlozena:clanky\/a.webp" checked/);
+  assert.match(ready, /value="tema"/);
+  for (const action of ["zverejnit", "naplanovat", "upravit"]) assert.match(ready, new RegExp(`name="pasteAction" value="${action}"`));
+  assert.match(ready, /Předchozí verze: Starší/);
+  assert.match(ready, /action="\/redakce\/vlozene\/zahodit"/);
+  const double = pastedDetail(PASTED, entry({ status: "duplicita", duplicateOf: "zprava:12", reason: "Už je." }), data);
+  assert.match(double, /value="navazat"/);
+  assert.match(double, /value="nova"/);
+  assert.doesNotMatch(double, /value="zverejnit"/);
+});
+
 test("redakce má stránku Vložené příspěvky s oknem na vložení místo kontroly webu", () => {
   const html = adminSkola({}, { signedIn: true, user: { role: "chief" }, hasApiKey: true, schools: { vlozene: { settings: { autoPublish: false, ownPhotos: false }, items: [] } } }, "", { paste: true }, PASTED);
   assert.match(html, /<dialog[^>]*id="vlozit"[^>]*data-autoopen/);
@@ -100,4 +161,6 @@ test("redakce má stránku Vložené příspěvky s oknem na vložení místo ko
   assert.match(html, /name="postFrom"[^>]*value="Facebook Kopidlenských listů"/);
   assert.doesNotMatch(html, /Zkontrolovat teď/);
   assert.doesNotMatch(html, /name="enabled"/);
+  assert.match(html, /name="showPhotos" value="1">/);
+  assert.doesNotMatch(html, /data-open="nastaveni"/);
 });

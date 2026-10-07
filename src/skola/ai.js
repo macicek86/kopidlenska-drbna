@@ -91,6 +91,25 @@ export function skolaText(item, known, { images = 0, ...options }) {
   return contentText(skolaContent(item, known, { ...options, images: fake }));
 }
 
+function followupFor(env, decision, { system, source, item, rubricSlugs, topics, today, extra = "" }) {
+  return writeFollowup(env, decision, {
+    system,
+    sourceText: [skolaItemText(item, source), extra].filter(Boolean).join("\n\n"),
+    articleSchema: outputSchema(rubricSlugs, { topics: topics.map((topic) => topic.slug), ownImage: false }).properties.article,
+    readArticle: (raw) => readArticle(raw, rubricSlugs),
+    topics,
+    today,
+  });
+}
+
+// Navazující zprávu ke zprávě `followOf` chce redakce sama (vložený příspěvek, který Drběna měla za duplicitu).
+// `extra` je poznámka redakce k přepsání.
+export function followSkola(env, { source, item, followOf, rubricSlugs, topics = [], voice, today, extra = "" }) {
+  const decision = { ok: true, decision: "doplneni", reason: "Redakce chtěla navazující zprávu.", duplicateOf: `zprava:${followOf}`, followOf, event: null, eventChange: null };
+  const system = skolaPrompt(voice, { ownPhotos: false, source, rubricSlugs });
+  return followupFor(env, decision, { system, source, item, rubricSlugs, topics, today, extra });
+}
+
 // Jedno volání Claude. Obrázky vidí vždy (plakát nese údaje), vybrat vlastní fotku smí jen s `ownPhotos`.
 // `documents` jsou PDF z úřední desky ({ type, bytes }).
 export async function askSkola(env, { source = SCHOOLS.skola, item, known, images = [], documents = [], topics = [], rubricSlugs, voice, today, force = false, later = "", ownPhotos = false }) {
@@ -103,14 +122,7 @@ export async function askSkola(env, { source = SCHOOLS.skola, item, known, image
   if (!answer.ok) return answer;
   const decision = withLookups(readDecision(answer.raw, { rubricSlugs, force }), answer);
   if (decision.ok && decision.decision === "doplneni") {
-    const written = await writeFollowup(env, decision, {
-      system,
-      sourceText: skolaItemText(item, source),
-      articleSchema: outputSchema(rubricSlugs, { topics: slugs, ownImage: false }).properties.article,
-      readArticle: (raw) => readArticle(raw, rubricSlugs),
-      topics,
-      today,
-    });
+    const written = await followupFor(env, decision, { system, source, item, rubricSlugs, topics, today });
     return withLookups(written, decision);
   }
   if (!decision.ok || decision.decision !== "vytvorit") return decision;

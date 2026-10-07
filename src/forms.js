@@ -221,6 +221,13 @@ export async function formFields(request) {
     postLink: text("postLink"),
     postFrom: text("postFrom"),
     postDate: text("postDate"),
+    showPhotos: form.get("showPhotos") === "1",
+    // Okno s konceptem: co udělat, fotka, den zveřejnění (čas je publishTime, rubrika rubric_id) a poznámka k přepsání.
+    pasteAction: text("pasteAction"),
+    photoChoice: text("photoChoice"),
+    photoCaption: text("photoCaption"),
+    publishDate: text("publishDate"),
+    redoNote: text("redoNote"),
     stockId: positive("stock_id"),
     topicId: positive("topicId"),
     hint: text("hint"),

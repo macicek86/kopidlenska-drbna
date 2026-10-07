@@ -16,6 +16,9 @@ export const STATUS = {
   chyba: "Chyba",
   smazano: "Zpráva smazaná",
   odlozeno: "Akce v kalendáři, pozvánka počká",
+  // Vložený příspěvek (src/skola/paste-run.js).
+  napsano: "Napsáno, čeká na vás",
+  zruseno: "Zahozeno",
 };
 export const MAX_ATTEMPTS = 3;
 export const DEFAULT_FRESH_DAYS = 3;

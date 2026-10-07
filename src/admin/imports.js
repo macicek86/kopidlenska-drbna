@@ -5,7 +5,7 @@ import { esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { badge, callout, item, modalLink } from "./ui.js";
 
-export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad", smazano: "off", odlozeno: "info" };
+export const TONE = { nacteno: "warn", nove: "info", stare: "off", hotovo: "ok", preskoceno: "off", duplicita: "warn", chyba: "bad", smazano: "off", odlozeno: "info", napsano: "warn", zruseno: "off" };
 
 // Kam vede značka, kterou Claude použil v duplicate_of nebo kterou zpráva vytvořila.
 export function refLink(ref) {
@@ -102,23 +102,24 @@ export function madeLinks(entry) {
 }
 
 // Kdy drbna položku stáhla a kdy vyšla ve zdroji (`source` je už naformátované datum zdroje).
-export function entryDates(entry, source = stamp(entry.publishedAt)) {
+// Vložený příspěvek (`fetchedLabel` „vloženo“) se nestahuje.
+export function entryDates(entry, source = stamp(entry.publishedAt), fetchedLabel = "staženo") {
   const fetched = stamp(entry.fetchedAt);
-  return [fetched && `staženo ${fetched}`, source && `ve zdroji ${source}`].filter(Boolean);
+  return [fetched && `${fetchedLabel} ${fetched}`, source && `ve zdroji ${source}`].filter(Boolean);
 }
 
-export function entryDatesLine(entry, source) {
-  const dates = entryDates(entry, source);
+export function entryDatesLine(entry, source, fetchedLabel) {
+  const dates = entryDates(entry, source, fetchedLabel);
   return dates.length ? `<span class="item-sub">${esc(dates.join(" · "))}</span>` : "";
 }
 
 // Řádek převzaté zprávy v seznamu (Munipolis, Deník).
-export function importEntryItem(entry, base) {
+export function importEntryItem(entry, base, fetchedLabel) {
   const made = madeLinks(entry);
   const duplicate = entry.duplicateOf ? refLink(entry.duplicateOf) : "";
   return item({
     title: entry.title,
-    meta: [...entryDates(entry).map(esc), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
+    meta: [...entryDates(entry, undefined, fetchedLabel).map(esc), entry.reason ? esc(entry.reason) : ""].filter(Boolean).join(" · "),
     badges: `${statusBadge(entry)}${made.length ? `<span class="item-sub">${made.join(" · ")}</span>` : ""}${duplicate ? `<span class="item-sub">Stejné jako ${duplicate}</span>` : ""}`,
     actions: modalLink(`${base}?zprava=${entry.id}`, "Detail"),
     search: `${entry.title} ${entry.reason}`,

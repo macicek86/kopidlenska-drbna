@@ -28,6 +28,7 @@ import { askSkola } from "./ai.js";
 import { DESK_SECTION, fetchDocuments } from "./deska.js";
 import { deferDay, deferSkolaItem, laterNote, loadKeptImages, PAST_REASON, releaseKeptImages, reopenDeferred, termOver } from "./defer.js";
 import { pastedFrom } from "./paste.js";
+import { draftPastedItem } from "./paste-run.js";
 import { SCHOOLS } from "./sources.js";
 import {
   countWaitingSkola,
@@ -79,10 +80,11 @@ export async function skolaImage(env, article, images, ownPhotos, source = SCHOO
 
 // Ručně vybraný článek Drběna zpracuje vždy (redakce rozhodla) a zpráva dostane datum ze zdroje. Cron píše s dnešním datem,
 // stejně jako odloženou pozvánku (`defer.js`), i když ji redakce pustí dřív. Uložené plakáty odložené položky se po zpracování uklidí.
-// Fotky vloženého příspěvku jen po napsání zprávy: přeskočený nebo duplicitu jde pustit znovu i s nimi.
+// Vložený příspěvek dostane jen koncept (`paste-run.js`), fotky počkají, až ho redakce zveřejní nebo zahodí.
 export async function processSkolaItem(env, source, item, settings, options = {}) {
+  if (source.pasted) return draftPastedItem(env, source, item, options);
   const result = await handleSkolaItem(env, source, item, settings, options);
-  if (result.ok && (!source.pasted || result.status === "hotovo")) await releaseKeptImages(env, source, item);
+  if (result.ok) await releaseKeptImages(env, source, item);
   return result;
 }
 

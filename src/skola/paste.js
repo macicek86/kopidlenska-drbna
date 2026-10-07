@@ -1,6 +1,6 @@
 // Vložený příspěvek: redakce zkopíruje text (a fotky) třeba z Facebooku města, kam se drbna sama nedostane.
-// Položka jde do fronty zdroje s `pasted` (`sources.js`) a Drběna ji zpracuje stejně jako článek z webu města.
-// Fotky čekají v R2 v `kept_images` (`defer.js`), po zpracování zůstane jen ta, kterou zpráva použila.
+// Položka jde do fronty zdroje s `pasted` (`sources.js`) a Drběna z ní napíše koncept (`paste-run.js`).
+// Fotky čekají v R2 v `kept_images` (`defer.js`); Claude je vidí jen se `show_photos`, ke zprávě je vybírá redakce.
 import { readSource } from "../article-source.js";
 import { clip, requireChief } from "../db-core.js";
 import { releaseImage, shrinkImage, storeImageBytes } from "../images.js";
@@ -75,9 +75,9 @@ export async function savePastedItem(env, source, input, { today = pragueNow().d
   const publishedAt = day === today ? new Date().toISOString() : `${day}T10:00:00Z`;
   const from = clip(readSource(input.postFrom), FROM_MAX) || source.defaultFrom;
   const result = await env.DB.prepare(
-    `insert into ${source.itemsTable} (guid, link, title, text, section, published_at, status, kept_images) values (?, ?, ?, ?, ?, ?, 'nove', ?)`,
+    `insert into ${source.itemsTable} (guid, link, title, text, section, published_at, status, kept_images, show_photos) values (?, ?, ?, ?, ?, ?, 'nove', ?, ?)`,
   )
-    .bind(`vlozeno:${crypto.randomUUID()}`, link, pastedTitle(text), text, from, publishedAt, JSON.stringify(photos.keys))
+    .bind(`vlozeno:${crypto.randomUUID()}`, link, pastedTitle(text), text, from, publishedAt, JSON.stringify(photos.keys), input.showPhotos && photos.keys.length ? 1 : 0)
     .run();
   return { ok: true, id: Number(result?.meta?.last_row_id ?? 0) };
 }

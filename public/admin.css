@@ -665,3 +665,16 @@ html { font-size: 100%; }
 .feed-switch { padding: 0.55rem 0; border-bottom: 1px solid var(--line-2); }
 .feed-switch:has(+ .form-foot) { border-bottom: 0; }
 .feed-switch .check-hint a { overflow-wrap: anywhere; }
+
+/* Vložené příspěvky: koncept od Drběny v okně (src/admin/paste.js) */
+.paste-preview { padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-2); }
+.paste-preview > * { margin: 0 0 0.6rem; }
+.paste-preview > :last-child { margin-bottom: 0; }
+.paste-title { font-size: 1.15rem; line-height: 1.3; }
+.paste-lede { font-weight: 600; }
+.paste-body p, .paste-body ul { margin: 0 0 0.6rem; }
+.paste-body > :last-child { margin-bottom: 0; }
+.paste-photo { display: grid; gap: 0.6rem; }
+.paste-restore { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.paste-redo > summary, .paste-source > summary { cursor: pointer; font-weight: 700; }
+.paste-redo[open] > summary, .paste-source[open] > summary { margin-bottom: 0.6rem; }
