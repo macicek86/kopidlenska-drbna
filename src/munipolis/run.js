@@ -19,6 +19,7 @@ import { voiceFor } from "../drbena.js";
 import { memoryOn, withMemory } from "../drbena-memory.js";
 import { fetchImage, storeImageBytes } from "../images.js";
 import { noteReads } from "../import-tools.js";
+import { noteOff, noteSource } from "../health/store.js";
 import { importSourceDate, importSummary, knownContent, outcomeOf, rubricMap } from "../import-context.js";
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
@@ -43,6 +44,8 @@ import {
 // Kolik zpráv se zpracuje najednou. Cron má času dost, po kliknutí v redakci se píše na pozadí jen chvilku.
 export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
+// Řádek na stránce Stav (src/health/).
+const HEALTH = { key: "munipolis", label: "Munipolis", page: "/redakce/munipolis" };
 const BUSY = "Drběna už zprávy města čte. Počkejte, stránka se sama obnoví.";
 
 // Zdroj pod čarou (src/article-source.js).
@@ -165,6 +168,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
 // Stáhne RSS a nové zprávy si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
 async function collect(env, settings, fetchImpl) {
   const feed = await fetchFeed(settings.feedUrl, { fetchImpl });
+  await noteSource(env, { ...HEALTH, items: feed.ok ? feed.items.length : null, error: feed.ok ? "" : feed.error });
   if (!feed.ok) {
     await writeImportStatus(env, { status: "error", note: feed.error });
     return feed;
@@ -201,6 +205,7 @@ async function writeBatch(env, settings, { added, fetchImpl, ask, budgetMs, max,
 export async function runImport(env, { fetchImpl = fetch, ask = askClaude } = {}) {
   const settings = await loadImportSettings(env);
   const manualWaiting = await countWaitingItems(env, { manualOnly: true });
+  if (!settings.enabled) await noteOff(env, HEALTH.key);
   if (!settings.enabled && !manualWaiting) return { ok: true, skipped: true };
   const lock = await lockImport(env, CRON_LOCK_SECONDS);
   if (!lock) return { ok: true, skipped: true };

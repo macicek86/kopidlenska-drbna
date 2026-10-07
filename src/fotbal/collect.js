@@ -148,5 +148,5 @@ export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
     else if (off) await rememberFootballItem(env, item, { status: "preskoceno", reason: "Tenhle druh aktualit je v nastavení vypnutý." });
     else if (await rememberFootballItem(env, item)) added += 1;
   }
-  return { ok: true, added };
+  return { ok: true, added, listed: news.length };
 }

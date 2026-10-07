@@ -14,6 +14,7 @@ export const NOTIFY_TOPICS = {
   drbena: { who: "hlavni", label: "Návrh zprávy od Drběny (z importů)", path: "/redakce/zpravy" },
   hodiny: { who: "hlavni", label: "Změna u dvorů, lékařů nebo otevírací doby ke schválení", path: "/redakce/prehled" },
   posta: { who: "hlavni", label: "E-mail na otevírací dobu, který Drběna nezapsala", path: "/redakce/emaily" },
+  stav: { who: "hlavni", label: "Zdroj nebo úloha drbny přestala fungovat (a zase jde)", path: "/redakce/stav" },
 };
 
 export const NOTIFY_TABLES = [

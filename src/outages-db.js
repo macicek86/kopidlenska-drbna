@@ -1,5 +1,6 @@
 // Odstávky elektřiny v D1: hlídané obce a uložený přehled z widgetu ČEZ.
 import { asBool, requireChief, wrote } from "./db-core.js";
+import { noteOff, noteSource } from "./health/store.js";
 import { MAX_AREAS, buildBoard, fetchAreaOutages, mergeFresh, parseAreaInput, refreshNote } from "./outages.js";
 
 export function emptyOutageBoard() {
@@ -73,6 +74,9 @@ async function writeOutageFeed(env, { fetchedAt, status, note, payload }) {
     .run();
 }
 
+// Řádek na stránce Stav (src/health/).
+const OUTAGE_HEALTH = { key: "elektrina", label: "Odstávky elektřiny (ČEZ)", page: "/redakce/odstavky" };
+
 export async function refreshOutages(env, request = null, options = {}) {
   if (request) {
     const gate = await requireChief(env, request);
@@ -84,6 +88,7 @@ export async function refreshOutages(env, request = null, options = {}) {
     const enabled = (await loadOutageAreas(env)).filter((area) => area.enabled).slice(0, MAX_AREAS);
     const fetchedAt = new Date().toISOString();
     if (!enabled.length) {
+      await noteOff(env, OUTAGE_HEALTH.key);
       await writeOutageFeed(env, { fetchedAt, status: "ok", note: "", payload: [] });
       return { ok: true, partial: false, count: 0 };
     }
@@ -94,6 +99,8 @@ export async function refreshOutages(env, request = null, options = {}) {
     const summary = refreshNote(results);
     const payload = mergeFresh(previous, results);
     await writeOutageFeed(env, { fetchedAt, status: summary.status, note: summary.note, payload });
+    // Odstávek často žádná není, proto allowEmpty.
+    await noteSource(env, { ...OUTAGE_HEALTH, items: summary.status === "error" ? null : payload.length, error: summary.status === "ok" ? "" : summary.note, allowEmpty: true });
     if (summary.status === "error") return { ok: false, kept: true, error: summary.note };
     return { ok: true, partial: summary.status === "partial", note: summary.note, count: payload.length };
   } finally {

@@ -2,6 +2,7 @@ import { hoursMode, REQUEST_SECTIONS } from "../hours-requests-db.js";
 import { formatLong } from "../format.js";
 import { credit, esc } from "../view.js";
 import { requestItems } from "./hours-requests.js";
+import { problemCount } from "../health/rules.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, icon, item, list, modalLink, pageHead, panel } from "./ui.js";
 
@@ -113,7 +114,13 @@ export function adminOverview(ctx, data, message) {
     ? callout(`Drběna vám z chatu předala ${fresh === 1 ? "1 nový vzkaz" : fresh < 5 ? `${fresh} nové vzkazy` : `${fresh} nových vzkazů`}. <a href="/redakce/vzkazy">Přečíst</a>`, "warn")
     : "";
 
+  const broken = chief ? problemCount(data.healthRows ?? []) : 0;
+  const health = broken
+    ? callout(`${broken === 1 ? "Jedna věc nefunguje" : broken < 5 ? `${broken} věci nefungují` : `${broken} věcí nefunguje`} (zdroj nebo úloha na pozadí). <a href="/redakce/stav">Podívat se</a>`, "bad")
+    : "";
+
   const body = `${pageHead(first ? `Ahoj, ${first}` : "Přehled", chief ? "Co čeká na vás a co se chystá." : "Vaše návrhy a co se chystá.")}
+    ${health}
     ${messages}
     <div class="stats">${stats.join("")}</div>
     <div class="quick">${actions}</div>

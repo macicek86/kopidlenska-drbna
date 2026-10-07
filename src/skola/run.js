@@ -30,6 +30,7 @@ import { deferDay, deferSkolaItem, laterNote, loadKeptImages, PAST_REASON, relea
 import { pastedFrom } from "./paste.js";
 import { draftPastedItem } from "./paste-run.js";
 import { SCHOOLS } from "./sources.js";
+import { noteOff, noteSource } from "../health/store.js";
 import {
   countWaitingSkola,
   finishSkolaItem,
@@ -44,6 +45,11 @@ import {
 
 export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
+// Řádek na stránce Stav (src/health/).
+function healthRow(source) {
+  return { key: source.tag, label: source.page, page: `/redakce/${source.tag}` };
+}
+
 const BUSY = "Drběna už ten web čte. Počkejte, stránka se sama obnoví.";
 
 // Zdroj pod čarou (src/article-source.js). Dokument z úřední desky se jmenuje podle desky, vložený příspěvek podle toho, odkud je.
@@ -189,6 +195,7 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
 // Stáhne RSS a nové články si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
 async function collect(env, source, settings, fetchImpl) {
   const feed = await source.fetchItems(settings.feedUrls, { fetchImpl });
+  await noteSource(env, { ...healthRow(source), items: feed.ok ? feed.items.length : null, error: feed.ok ? feed.warning ?? "" : feed.error });
   if (!feed.ok) {
     await writeSkolaStatus(env, source, { status: "error", note: feed.error });
     return feed;
@@ -229,6 +236,7 @@ async function writeBatch(env, source, settings, { added, warning = "", fetchImp
 export async function runSkola(env, source, { fetchImpl = fetch, ask = askSkola } = {}) {
   const settings = await loadSkolaSettings(env, source);
   const reading = settings.enabled && !source.pasted;
+  if (!settings.enabled && !source.pasted) await noteOff(env, source.tag);
   const waiting = await countWaitingSkola(env, source, { manualOnly: !source.pasted });
   if (!reading && !waiting) return { ok: true, skipped: true };
   const lock = await lockSkola(env, source, CRON_LOCK_SECONDS);

@@ -22,6 +22,7 @@ import { importSourceDate, importSummary, knownContent, rubricMap } from "../imp
 import { insertNotice } from "../notices-db.js";
 import { pragueNow } from "../waste.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
+import { noteOff, noteSource } from "../health/store.js";
 import { askDenik } from "./ai.js";
 import { fetchArticle, fetchDenikFeed } from "./feed.js";
 import {
@@ -39,6 +40,8 @@ import {
 
 export const BATCH_CRON = 5;
 export const BATCH_CLICK = 2;
+// Řádek na stránce Stav (src/health/).
+const HEALTH = { key: "denik", label: "Jičínský deník", page: "/redakce/denik" };
 const BUSY = "Drběna už Deník čte. Počkejte, stránka se sama obnoví.";
 
 // Odkaz na zdroj jen tehdy, když ho redakce v nastavení zapne. Deník se nejmenuje ani tady, pod čarou je jen „původní článek“.
@@ -131,6 +134,8 @@ export async function processDenikItem(env, item, settings, { fetchImpl = fetch,
 
 async function collect(env, settings, fetchImpl) {
   const feed = await fetchDenikFeed(settings.feedUrl, { fetchImpl, football: settings.football });
+  // Ve stavu je celé RSS: článků z Kopidla bývá i několik dní žádný.
+  await noteSource(env, { ...HEALTH, items: feed.ok ? feed.total : null, error: feed.ok ? "" : feed.error });
   if (!feed.ok) {
     await writeDenikStatus(env, { status: "error", note: feed.error });
     return feed;
@@ -166,6 +171,7 @@ async function writeBatch(env, settings, { added, fetchImpl, ask, budgetMs, max,
 export async function runDenik(env, { fetchImpl = fetch, ask = askDenik } = {}) {
   const settings = await loadDenikSettings(env);
   const manualWaiting = await countWaitingDenik(env, { manualOnly: true });
+  if (!settings.enabled) await noteOff(env, HEALTH.key);
   if (!settings.enabled && !manualWaiting) return { ok: true, skipped: true };
   const lock = await lockDenik(env, CRON_LOCK_SECONDS);
   if (!lock) return { ok: true, skipped: true };

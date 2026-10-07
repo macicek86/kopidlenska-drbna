@@ -78,6 +78,8 @@ import { chatPublic } from "./chat/store.js";
 import { turnstileConfig } from "./chat/pass.js";
 import { chatAdminPost } from "./post-chat.js";
 import { messagesPost } from "./post-messages.js";
+import { noteCron, statusResponse, trackJob } from "./health/store.js";
+import { checkHealth } from "./health/check.js";
 import { articlesPost } from "./post-articles.js";
 import { adsPost } from "./post-ads.js";
 import { eventsPost } from "./post-events.js";
@@ -160,6 +162,8 @@ async function renderGet(request, env, url, execution) {
     });
   }
 
+  // Hlídání zvenku: běží cron? (src/health/store.js)
+  if (path === "/stav.json") return statusResponse(env);
   if (path === "/robots.txt") return plain(robotsTxt(url.origin), "text/plain");
   if (path === "/sitemap.xml") {
     return plain(sitemapXml(url.origin, await loadSitemap(env)), "application/xml");
@@ -364,16 +368,23 @@ export default {
   },
   async scheduled(_event, env, ctx) {
     await ensureSchema(env);
-    ctx.waitUntil(refreshOutages(env).catch(() => {}));
-    ctx.waitUntil(runImport(env).catch(() => {}));
-    ctx.waitUntil(runFootball(env).catch(() => {}));
-    ctx.waitUntil(runDenik(env).catch(() => {}));
-    for (const source of SCHOOL_LIST) ctx.waitUntil(runSkola(env, source).catch(() => {}));
-    ctx.waitUntil(runNdic(env).catch(() => {}));
-    ctx.waitUntil(runOkoli(env).catch(() => {}));
-    ctx.waitUntil(fillKeywords(env).catch(() => {}));
-    ctx.waitUntil(syncSearch(env).catch(() => {}));
-    ctx.waitUntil(pruneAudit(env).catch(() => {}));
-    ctx.waitUntil(pruneLogin(env).catch(() => {}));
+    await noteCron(env);
+    // Stav z minulých běhů: co se rozbilo nebo zase jde, napíše hlavnímu redaktorovi (src/health/check.js).
+    ctx.waitUntil(checkHealth(env).catch(() => {}));
+    // Výjimku úlohy si zapíše stav drbny (stránka Stav v redakci).
+    const jobs = [
+      [{ key: "odstavky", label: "Odstávky elektřiny" }, () => refreshOutages(env)],
+      [{ key: "munipolis", label: "Import z Munipolisu" }, () => runImport(env)],
+      [{ key: "fotbal", label: "Fotbal" }, () => runFootball(env)],
+      [{ key: "denik", label: "Import z Deníku" }, () => runDenik(env)],
+      ...SCHOOL_LIST.map((source) => [{ key: source.tag, label: source.page }, () => runSkola(env, source)]),
+      [{ key: "ndic", label: "Uzavírky z NDIC" }, () => runNdic(env)],
+      [{ key: "okoli", label: "Akce v okolí" }, () => runOkoli(env)],
+      [{ key: "klicova-slova", label: "Klíčová slova" }, () => fillKeywords(env)],
+      [{ key: "hledani", label: "Index hledání" }, () => syncSearch(env)],
+      [{ key: "historie", label: "Úklid historie změn" }, () => pruneAudit(env)],
+      [{ key: "prihlaseni", label: "Úklid přihlášení" }, () => pruneLogin(env)],
+    ];
+    for (const [job, work] of jobs) ctx.waitUntil(trackJob(env, job, work));
   },
 };

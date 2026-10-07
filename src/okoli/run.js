@@ -2,12 +2,25 @@
 import { CLICK_LOCK_SECONDS, CRON_LOCK_SECONDS } from "../background.js";
 import { requireChief } from "../db-core.js";
 import { pragueNow } from "../waste.js";
+import { noteOff, noteSource } from "../health/store.js";
 import { NEARBY_SOURCES } from "./sources.js";
 import { knownStamps, loadOkoliSettings, lockOkoli, pruneNearby, rememberNearby, saveWeekendResult, unlockOkoli, writeOkoliStatus } from "./store.js";
 import { outingDue, periodBetween } from "./outings.js";
 import { writeWeekend } from "./weekend.js";
 
 const BUSY = "Drběna už s akcemi z okolí pracuje. Zkuste to za chvíli.";
+
+// Řádek zdroje na stránce Stav (src/health/). Volá ho i příjem od úlohy na GitHubu (relay.js).
+export function noteNearby(env, source, feed) {
+  return noteSource(env, {
+    key: `okoli:${source.tag}`,
+    label: `Okolí: ${source.name}`,
+    page: "/redakce/okoli",
+    items: feed.ok ? (feed.listed?.length || feed.total || feed.items.length) : null,
+    error: feed.ok ? feed.warning ?? "" : feed.error,
+    allowEmpty: Boolean(source.mayBeEmpty),
+  });
+}
 
 // Projde všechny zdroje. Zdroj, který nejde, ostatní nezastaví.
 export async function collectNearby(env, { fetchImpl = fetch } = {}) {
@@ -19,6 +32,7 @@ export async function collectNearby(env, { fetchImpl = fetch } = {}) {
     if (source.relay) continue;
     const known = await knownStamps(env, source);
     const feed = await source.fetchEvents({ env, fetchImpl, known });
+    await noteNearby(env, source, feed);
     if (!feed.ok) {
       problems.push(`${source.name}: ${feed.error}`);
       continue;
@@ -51,6 +65,7 @@ async function finishWeekend(env, weekend, result) {
 export async function runOkoli(env, { fetchImpl = fetch, ask, now = pragueNow() } = {}) {
   const settings = await loadOkoliSettings(env);
   const weekend = outingDue(settings, now);
+  if (!settings.enabled) await noteOff(env, NEARBY_SOURCES.map((source) => `okoli:${source.tag}`));
   if (!settings.enabled && !weekend) return { ok: true, skipped: true };
   const lock = await lockOkoli(env, CRON_LOCK_SECONDS);
   if (!lock) return { ok: true, skipped: true };

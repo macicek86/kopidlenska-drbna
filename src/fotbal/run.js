@@ -21,6 +21,7 @@ import { MAX_ATTEMPTS } from "../munipolis/store.js";
 import { pragueNow } from "../waste.js";
 import { askFootball } from "./ai.js";
 import { collectNews, footballSourceDate } from "./collect.js";
+import { noteOff, noteSource } from "../health/store.js";
 import { checkDates } from "./dates.js";
 import {
   countWaiting,
@@ -145,6 +146,18 @@ async function writeBatch(env, settings, { added, checked, fetchImpl, ask, budge
   return result;
 }
 
+// Řádek na stránce Stav (src/health/): web klubu, jak často se stahuje, říká nastavení.
+function noteClub(env, settings, collected) {
+  return noteSource(env, {
+    key: "fotbal",
+    label: "Web FK Kopidlno",
+    page: "/redakce/fotbal",
+    items: collected.ok ? collected.listed : null,
+    error: collected.ok ? "" : collected.error,
+    everyHours: settings.intervalHours,
+  });
+}
+
 const BUSY = "Drběna už na fotbale pracuje. Počkejte, stránka se sama obnoví.";
 
 // Tlačítko „Zkontrolovat teď“ udělá totéž co cron: stáhne nové aktuality, starší odloží stranou. Čerstvé pak píše
@@ -157,6 +170,7 @@ export async function checkFootballNow(env, request, { fetchImpl = fetch } = {})
   if (!lock) return { ok: false, error: BUSY };
   try {
     const collected = await collectNews(env, settings, { fetchImpl });
+    await noteClub(env, settings, collected);
     if (!collected.ok) {
       await writeFootballStatus(env, { status: "error", note: collected.error });
       return collected;
@@ -199,6 +213,7 @@ export async function selectFootball(env, request, ids) {
 export async function runFootball(env, { fetchImpl = fetch, ask = askFootball } = {}) {
   const settings = await loadFootballSettings(env);
   const manualWaiting = await countWaiting(env, MAX_ATTEMPTS, { manualOnly: true });
+  if (!settings.enabled) await noteOff(env, "fotbal");
   if (!settings.enabled && !manualWaiting) return { ok: true, skipped: true };
   const lock = await lockFootball(env, CRON_LOCK_SECONDS);
   if (!lock) return { ok: true, skipped: true };
@@ -207,6 +222,7 @@ export async function runFootball(env, { fetchImpl = fetch, ask = askFootball } 
     const checked = footballDue(settings);
     if (checked) {
       const collected = await collectNews(env, settings, { fetchImpl, env });
+      await noteClub(env, settings, collected);
       if (!collected.ok) {
         await writeFootballStatus(env, { status: "error", note: collected.error });
         return { ok: false, error: collected.error };

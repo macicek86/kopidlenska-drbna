@@ -5,6 +5,7 @@
 // Přihlášení tajemstvím OKOLI_RELAY_TOKEN (Bearer); bez něj adresa vrací 503.
 import { NEARBY_SOURCES } from "./sources.js";
 import { knownStamps, rememberNearby } from "./store.js";
+import { noteNearby } from "./run.js";
 
 export const RELAY_PATH = "/okoli/prijem";
 const MAX_BODY = 3_000_000;
@@ -86,6 +87,8 @@ export async function okoliRelay(request, env) {
   } catch {
     return json({ error: "Zpráva není JSON." }, 400);
   }
-  const saved = await rememberNearby(env, source, readRelayFeed(body, source), known);
+  const feed = readRelayFeed(body, source);
+  await noteNearby(env, source, feed);
+  const saved = await rememberNearby(env, source, feed, known);
   return json({ ok: true, ...saved });
 }

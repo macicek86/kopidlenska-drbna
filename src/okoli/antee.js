@@ -140,6 +140,7 @@ export function anteeReader(source) {
       else seen.push(guid);
     }
     const warning = errors.length ? errors[0] : !env?.ANTHROPIC_API_KEY ? "Chybí klíč ANTHROPIC_API_KEY, pozvánky se nečtou." : "";
-    return { ok: true, items, listed: [], seen, complete: false, warning };
+    // `total`: kolik položek v RSS je (pro stránku Stav, nové jsou jen v items a seen).
+    return { ok: true, items, listed: [], seen, total: feed.items.length, complete: false, warning };
   };
 }

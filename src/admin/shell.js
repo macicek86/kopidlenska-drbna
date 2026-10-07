@@ -1,5 +1,6 @@
 import { byline, userCan } from "../db.js";
 import { canSeeHours } from "../hours-requests-db.js";
+import { problemCount } from "../health/rules.js";
 import { SCHOOL_LIST } from "../skola/sources.js";
 import { esc, flashOf } from "../view.js";
 import { adminDocument } from "./document.js";
@@ -56,7 +57,7 @@ function nav(data) {
     },
     {
       name: "Nastavení",
-      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["odber", "Odběr a data", "rss"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["historie", "Historie změn", "clock"], ["ucet", "Můj účet", "user"]],
+      links: [chief && ["drbena", "Koza Drběna", "pen"], chief && ["chat", "Chat s Drběnou", "chat"], chief && ["odber", "Odběr a data", "rss"], chief && ["texty", "Texty webu", "text"], chief && ["lide", "Lidé", "users"], chief && ["stav", "Stav drbny", "pulse", problemCount(data.healthRows ?? [])], chief && ["historie", "Historie změn", "clock"], ["ucet", "Můj účet", "user"]],
     },
   ];
   return groups

@@ -109,7 +109,8 @@ const GALILEO_TOWNS = [
   },
 ];
 
-for (const town of GALILEO_TOWNS) NEARBY_SOURCES.push({ ...town, fetchEvents: galileoReader(town) });
+// Přehled ukazuje jen budoucí akce, u malé obce v něm někdy nic není (`mayBeEmpty`, stránka Stav to nehlásí).
+for (const town of GALILEO_TOWNS) NEARBY_SOURCES.push({ ...town, mayBeEmpty: true, fetchEvents: galileoReader(town) });
 
 export function nearbySource(tag) {
   return NEARBY_SOURCES.find((source) => source.tag === tag) ?? null;

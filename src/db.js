@@ -38,6 +38,7 @@ import { countNewMessages } from "./messages-db.js";
 import { canSeeHours, loadRequests } from "./hours-requests-db.js";
 import { loadLinks } from "./hours-links-db.js";
 import { loadUsers } from "./users-db.js";
+import { loadHealthRows } from "./health/store.js";
 import { loginState } from "./login.js";
 import { SEED_RUBRICS, deleteRubricError, parseRubricInput } from "./rubrics.js";
 
@@ -333,7 +334,7 @@ async function loadSchools(env) {
 
 // Části redakce jen pro hlavního redaktora.
 async function loadChiefDesk(env) {
-  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, schools, drbena, events, users] =
+  const [outageAreas, outages, notices, ndicSettings, closures, importSettings, importItems, footballSettings, footballItems, denikSettings, denikItems, schools, drbena, events, users, healthRows] =
     await Promise.all([
       loadOutageAreas(env),
       loadOutageBoard(env),
@@ -350,6 +351,7 @@ async function loadChiefDesk(env) {
       loadDrbena(env),
       loadEvents(env),
       loadUsers(env),
+      loadHealthRows(env),
     ]);
   return {
     outageAreas,
@@ -366,6 +368,8 @@ async function loadChiefDesk(env) {
     drbena,
     events,
     users,
+    // Stav drbny: počet problémů v menu a na Přehledu (src/health/).
+    healthRows,
   };
 }
 

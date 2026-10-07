@@ -3,6 +3,7 @@ export { adminArticles } from "./articles.js";
 export { adminAudit } from "./audit.js";
 export { adminChat } from "./chat.js";
 export { adminDoctors } from "./doctors.js";
+export { adminHealth } from "./health.js";
 export { adminDenik } from "./denik.js";
 export { adminSkola } from "./skola.js";
 export { adminOkoli } from "./okoli.js";

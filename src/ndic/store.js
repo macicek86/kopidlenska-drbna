@@ -2,6 +2,7 @@
 import { addColumn, asBool, requireChief } from "../db-core.js";
 import { lockRow, unlockRow } from "../background.js";
 import { closureKind, closureNotice, closureTitle, closureWatched, DEFAULT_RADIUS_KM, distanceKm, KEEP_RADIUS_KM, MAX_RADIUS_KM, recordEnded } from "./closures.js";
+import { noteSource } from "../health/store.js";
 
 export const NDIC_TABLES = [
   `create table if not exists road_closures (
@@ -241,6 +242,8 @@ export async function noteReceived(env, { situations = 0, kept = 0, error = "" }
   )
     .bind(situations, kept, String(error).slice(0, 300))
     .run();
+  // Stránka Stav (src/health/). Jak často NDIC posílá, nevíme, proto se nehlídá, že dlouho nic nepřišlo.
+  await noteSource(env, { key: "ndic", label: "Uzavírky z NDIC", page: "/redakce/odstavky", items: error ? null : situations, error, everyHours: 0, allowEmpty: true });
 }
 
 export async function saveNdicSettings(env, request, input) {

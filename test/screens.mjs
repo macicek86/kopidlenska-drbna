@@ -37,6 +37,7 @@ const TABS = [
   "odber",
   "lide",
   "historie",
+  "stav",
   "ucet",
   // Otevřená okna. Název souboru je adresa bez lomítek.
   "chat?nastaveni=1",
