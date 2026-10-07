@@ -55,6 +55,17 @@ export async function reopenDeferred(env, source, today) {
     .run();
 }
 
+// Po změně `ahead_days` dostanou čekající pozvánky nový den psaní podle dne akce v kalendáři (i když se akce mezitím
+// přesunula). Bez akce v kalendáři zůstane den původní. Co už má psát, vrátí do fronty `reopenDeferred` při příštím stažení.
+export async function rescheduleDeferred(env, source, aheadDays) {
+  await env.DB.prepare(
+    `update ${source.itemsTable} set write_on = coalesce((select date(e.starts_on, ?) from events e where e.id = ${source.itemsTable}.event_id), write_on)
+     where status = 'odlozeno'`,
+  )
+    .bind(`-${aheadDays} days`)
+    .run();
+}
+
 export async function deferSkolaItem(env, source, id, { writeOn, eventId, reason, images = [] }) {
   const kept = [];
   for (const image of images) kept.push(await storeImageBytes(env, image));

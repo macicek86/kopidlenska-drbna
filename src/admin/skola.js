@@ -38,7 +38,7 @@ function aheadField(source, settings) {
   return field(
     "Pozvánku na akci psát dní předem",
     `<input class="${input}" type="number" name="aheadDays" min="1" max="60" required value="${settings.aheadDays ?? DEFAULT_AHEAD_DAYS}">`,
-    "Akce, která je dál, jde do kalendáře hned (zveřejněná, i když se jinak schvaluje) a pozvánku Drběna napíše až tolik dní před ní. Pozná tak i pozvánku, kterou město mezitím poslalo přes Munipolis. Akce, které už proběhly, automatika přeskočí.",
+    "Akce, která je dál, jde do kalendáře hned (zveřejněná, i když se jinak schvaluje) a pozvánku Drběna napíše až tolik dní před ní. Pozná tak i pozvánku, kterou město mezitím poslalo přes Munipolis. Změna posune i pozvánky, které už čekají. Akce, které už proběhly, automatika přeskočí.",
   );
 }
 

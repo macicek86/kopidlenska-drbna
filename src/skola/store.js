@@ -2,7 +2,7 @@
 import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays, STALE_REASON, unlockRow } from "../background.js";
 import { addColumn, asBool, clip, requireChief } from "../db-core.js";
 import { MAX_ATTEMPTS, mapImportItem } from "../munipolis/store.js";
-import { DEFAULT_AHEAD_DAYS, readAheadDays } from "./defer.js";
+import { DEFAULT_AHEAD_DAYS, readAheadDays, rescheduleDeferred } from "./defer.js";
 import { readFeedUrls } from "./feed.js";
 import { SCHOOL_LIST } from "./sources.js";
 
@@ -192,6 +192,8 @@ export async function saveSkolaSettings(env, request, source, input) {
   // Škola bez pole adres (WordPress) má adresu pevnou.
   const urls = source.feedField ? readFeedUrls(input.feedUrls, source.defaultFeeds) : [];
   if (!urls) return { ok: false, error: "Každá adresa RSS musí začínat https://." };
+  const aheadDays = readAheadDays(input.aheadDays);
+  const before = await loadSkolaSettings(env, source);
   await env.DB.prepare(
     `update ${source.settingsTable} set enabled = ?, feed_urls = ?, auto_publish = ?, fresh_days = ?, own_photos = ?, ahead_days = ? where id = 1`,
   )
@@ -201,8 +203,9 @@ export async function saveSkolaSettings(env, request, source, input) {
       input.autoPublish ? 1 : 0,
       readFreshDays(input.freshDays, source.freshDays),
       input.ownPhotos ? 1 : 0,
-      readAheadDays(input.aheadDays),
+      aheadDays,
     )
     .run();
+  if (source.defer && aheadDays !== before.aheadDays) await rescheduleDeferred(env, source, aheadDays);
   return { ok: true };
 }

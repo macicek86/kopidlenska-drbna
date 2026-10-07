@@ -9,7 +9,7 @@ import { parseSchoolFeed } from "../src/skola/feed.js";
 import { photoCaption, skolaSource } from "../src/skola/run.js";
 import { SCHOOLS } from "../src/skola/sources.js";
 import { DatabaseSync } from "node:sqlite";
-import { deferDay, deferSkolaItem, laterNote, loadKeptImages, releaseKeptImages, reopenDeferred, termDays, termOver } from "../src/skola/defer.js";
+import { deferDay, deferSkolaItem, laterNote, loadKeptImages, releaseKeptImages, reopenDeferred, rescheduleDeferred, termDays, termOver } from "../src/skola/defer.js";
 import { schoolTables, waitingSkolaItems } from "../src/skola/store.js";
 
 const WEB = SCHOOLS.webmesta;
@@ -202,6 +202,23 @@ test("odložená položka čeká a v den psaní se vrátí do fronty jako automa
   await reopenDeferred(env, WEB, "2026-11-13");
   const [item] = await waitingSkolaItems(env, WEB, 5);
   assert.deepEqual([item.status, item.manual, item.writeOn, item.eventId], ["nove", false, "2026-11-13", 11]);
+});
+
+test("změna dní předem přepočítá den psaní čekajících pozvánek podle dne akce", async () => {
+  const db = new DatabaseSync(":memory:");
+  const statement = (sql, values = []) => ({
+    bind: (...next) => statement(sql, next),
+    run: async () => ({ meta: { changes: Number(db.prepare(sql).run(...values).changes) } }),
+  });
+  const env = { DB: { prepare: (sql) => statement(sql) } };
+  for (const sql of schoolTables(WEB)) db.exec(sql);
+  db.exec("create table events (id integer primary key, starts_on text)");
+  db.exec("insert into events values (11, '2026-11-23'), (12, '2026-12-05')");
+  db.exec(`insert into ${WEB.itemsTable} (guid, title, status, write_on, event_id) values
+    ('a', 'Dušedílna', 'odlozeno', '2026-11-13', 11), ('b', 'Mikuláš', 'hotovo', '2026-11-25', 12), ('c', 'Bez akce', 'odlozeno', '2026-11-20', 99)`);
+  await rescheduleDeferred(env, WEB, 5);
+  const days = db.prepare(`select write_on from ${WEB.itemsTable} order by id`).all().map((row) => row.write_on);
+  assert.deepEqual(days, ["2026-11-18", "2026-11-25", "2026-11-20"]);
 });
 
 test("plakáty odložené položky počkají v R2, po pozvánce zůstane jen ten, který zpráva použila", async () => {
