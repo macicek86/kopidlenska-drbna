@@ -89,6 +89,9 @@ export async function formFields(request) {
     remember: text("neodhlasovat") === "1",
     // Odběr a data: zaškrtnuté vypínače feedů (src/feeds/settings.js).
     feedSwitches: form.getAll("feed").map(String),
+    // Odběr a data: upozornění (src/push/store.js), vypínač a zapnutá témata.
+    pushEnabled: text("push_enabled") === "1",
+    pushTopics: form.getAll("push_topic").map(String),
     // E-mail na otevírací dobu: zaškrtnutá místa, lékaři a dvory adresy („sekce:id“, src/mailin/store.js).
     mailTargets: form.getAll("radek").map(String),
     // Můj účet: zaškrtnutá upozornění e-mailem (src/notify.js).

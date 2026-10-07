@@ -32,8 +32,9 @@ import { ensureNotifyTables } from "./notify.js";
 import { ensureSearchTables } from "./search/store.js";
 import { ensureMailinTables } from "./mailin/store.js";
 import { ensureHealthTables } from "./health/store.js";
+import { ensurePushTables } from "./push/store.js";
 
-export const SCHEMA_VERSION = 52;
+export const SCHEMA_VERSION = 53;
 
 let schemaReady = false;
 
@@ -450,6 +451,7 @@ async function migrateSchema(env) {
   await ensureNotifyTables(env);
   await ensureMailinTables(env);
   await ensureHealthTables(env);
+  await ensurePushTables(env);
   await retireLoadedItems(env);
   const settingsReady = await env.DB.prepare(
     "select 1 as ok from sqlite_master where type = 'table' and name = 'settings'",

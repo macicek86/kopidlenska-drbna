@@ -46,6 +46,8 @@ import { loadAssistAdmin } from "./assist/store.js";
 import { chatEnabled, loadChatAdmin } from "./chat/store.js";
 import { pragueNow } from "./waste.js";
 import { loadFeedSettings } from "./feeds/settings.js";
+import { loadPushStats } from "./push/store.js";
+import { vapidReady } from "./push/crypto.js";
 import { loadMailAdmin } from "./mailin/store.js";
 import { loadHealthRows } from "./health/store.js";
 import { loadQueues } from "./health/queues.js";
@@ -136,7 +138,10 @@ export async function renderAdmin(env, url, ctx, data) {
     return html(adminChat(ctx, data, message, query));
   }
   if (tab === "odber") {
-    if (data.signedIn) data.feedSettings = await loadFeedSettings(env);
+    if (data.signedIn) {
+      [data.feedSettings, data.push] = await Promise.all([loadFeedSettings(env), loadPushStats(env)]);
+      data.push.ready = vapidReady(env);
+    }
     return html(adminFeeds(ctx, data, message));
   }
   if (tab === "emaily") {

@@ -18,6 +18,9 @@ preview_urls = false
 # a TURNSTILE_SECRET z widgetu Turnstile v Cloudflare (npx wrangler secret put …). Bez nich chrání chat i přihlášení
 # jen limity.
 #
+# Upozornění do prohlížeče (stránka /upozorneni, src/push/): tajemství VAPID_PUBLIC_KEY a VAPID_PRIVATE_KEY,
+# vyrobí je `node scripts/vapid-keys.mjs`. Bez nich se upozornění nezapnou ani neposílají.
+#
 # Uzavírky z Dopravního info (NDIC): NDIC_PUSH_USER a NDIC_PUSH_PASSWORD jsou jméno a heslo, kterým se NDIC
 # hlásí na /ndic/uzavirky (stejné se zadají u odběru v portálu mobilitydata.rsd.cz). Bez nich je příjem vypnutý.
 
@@ -62,4 +65,5 @@ binding = "VECTORS"
 index_name = "kopidlenska-drbna-zpravy"
 
 [triggers]
-crons = ["15 */4 * * *"]
+# Druhý řádek jsou upozornění do prohlížeče (src/push/dispatch.js): novinky do 15 minut a večerní připomínky.
+crons = ["15 */4 * * *", "*/15 * * * *"]

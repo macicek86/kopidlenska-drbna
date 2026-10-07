@@ -155,6 +155,7 @@ const ROUTES = {
 
   "/redakce/svoz/ulozit": [single("settings", "nastavení")],
   "/redakce/odber/ulozit": [single("feed_settings", "nastavení odběru")],
+  "/redakce/odber/upozorneni": [single("push_settings", "nastavení upozornění")],
   "/redakce/emaily/ulozit": [by("mail_senders", "id"), mailTargets],
   "/redakce/emaily/smazat": [existing("mail_senders", "id"), mailTargets],
   "/redakce/texty/ulozit": [copyTexts, single("settings", "nastavení")],

@@ -86,6 +86,8 @@ import { eventsPost } from "./post-events.js";
 import { feedsPost } from "./post-feeds.js";
 import { mailinPost } from "./post-mailin.js";
 import { receiveMail } from "./mailin/run.js";
+import { PUSH_PAGE, pushPageHtml, pushPost } from "./push/routes.js";
+import { PUSH_CRON, runPush } from "./push/dispatch.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
@@ -191,6 +193,8 @@ async function renderGet(request, env, url, execution) {
   const ctx = { ...base, copy, feedOn, chat: chat ? { ...chat, siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
   if (path === "/popelnice") return html(binsPage(data.waste, ctx));
+  // Upozornění do prohlížeče (src/push/): zatím bez odkazu na webu.
+  if (path === PUSH_PAGE) return pushPageHtml(env, ctx);
   if (path === "/") {
     kickOutageRefresh(env, execution, data.outages);
     const ad = chooseAd(request, data.ads);
@@ -264,6 +268,8 @@ async function renderPost(request, env, url, execution) {
   if (chat) return chat;
   const assist = await assistPost(path, request, env);
   if (assist) return assist;
+  const push = await pushPost(path, request, env);
+  if (push) return push;
 
   // Texty webu čtou formulář samy (pole podle seznamu textů).
   const fields = path === "/redakce/texty/ulozit" ? {} : await formFields(request);
@@ -366,8 +372,13 @@ export default {
     await ensureSchema(env);
     await receiveMail(message, env);
   },
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
     await ensureSchema(env);
+    // Upozornění mají vlastní cron každých 15 minut (src/push/dispatch.js), ostatní úlohy běží jednou za 4 hodiny.
+    if (event?.cron === PUSH_CRON) {
+      ctx.waitUntil(trackJob(env, { key: "upozorneni", label: "Upozornění" }, () => runPush(env)));
+      return;
+    }
     await noteCron(env);
     // Stav z minulých běhů: co se rozbilo nebo zase jde, napíše hlavnímu redaktorovi (src/health/check.js).
     ctx.waitUntil(checkHealth(env).catch(() => {}));

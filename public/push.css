@@ -1,0 +1,24 @@
+/* Stránka Upozornění (/upozorneni). */
+.push [hidden] { display: none !important; }
+.push { display: grid; gap: 1.2rem; margin-top: 1.2rem; }
+.push-head .row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.push-head .row:has(> :not([hidden])) { margin-top: 0.4rem; }
+.push-msg { margin: 0; font-weight: 600; }
+.push.is-on .push-msg { color: var(--brand); }
+.push-ios { margin-top: 0.8rem; padding: 0.8rem 1rem; border: 1px solid var(--line); border-radius: 1rem; }
+.push-ios p { margin: 0 0 0.4rem; }
+.push-ios ol { margin: 0; padding-left: 1.3rem; line-height: 1.6; }
+.push-topics h2 { margin: 0 0 0.6rem; font-size: 1.2rem; }
+.push-list { display: grid; gap: 0.5rem; }
+.push-topic { padding: 0.7rem 0.9rem; border: 1px solid var(--line); border-radius: 1rem; }
+.push-check { display: flex; align-items: flex-start; gap: 0.6rem; cursor: pointer; }
+.push-check input { width: 1.2rem; height: 1.2rem; margin: 0.15rem 0 0; flex: none; accent-color: var(--brand); }
+.push-main span { display: grid; gap: 0.15rem; }
+.push-main small { color: var(--muted); font-size: 0.92rem; line-height: 1.4; }
+.push-pick { margin: 0.5rem 0 0 1.8rem; }
+.push-pick summary { cursor: pointer; color: var(--brand); font-size: 0.95rem; }
+.push-pick .muted { margin: 0.4rem 0; font-size: 0.9rem; }
+.push-pick ul { display: grid; gap: 0.35rem; }
+.push-sub { padding-left: 1.6rem; }
+.push-saved { min-height: 1.4em; margin: 0.6rem 0 0; color: var(--muted); font-size: 0.92rem; }
+.push-fine { margin-top: 1rem; }
