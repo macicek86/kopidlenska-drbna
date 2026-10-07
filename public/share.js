@@ -1,5 +1,18 @@
-// Sdílení zprávy a karet otevírací doby (src/share.js): „Kopírovat odkaz“, zavření nabídky klikem jinam, po výběru nebo Esc.
+// Sdílení zprávy a karet otevírací doby (src/share.js): „Kopírovat odkaz“, na mobilu „Další…“ se systémovou
+// nabídkou místo E-mailu, zavření nabídky klikem jinam, po výběru nebo Esc.
+const touch = matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 function setup(share) {
+  const more = share.querySelector("[data-share-more]");
+  if (more && touch && navigator.share) {
+    more.hidden = false;
+    share.querySelector(".share-mail")?.setAttribute("hidden", "");
+    more.addEventListener("click", () => {
+      share.open = false;
+      // Zavřená systémová nabídka vrátí chybu AbortError, to je v pořádku.
+      navigator.share({ title: more.dataset.shareTitle, url: more.dataset.shareMore }).catch(() => {});
+    });
+  }
   const copy = share.querySelector("[data-share-copy]");
   if (copy && navigator.clipboard) {
     copy.hidden = false;
