@@ -13,6 +13,7 @@ import { articleInRubric, findRubric, rubricLabel, rubricScope, rubricsFrom } fr
 import { articleCrumbsLd, articleImage, articleLd, articlePublished } from "./seo.js";
 import { escTie, tieHtml } from "./typo.js";
 import { adPanel, layout, signedWhen, siteOrigin } from "./view.js";
+import { shareMenu } from "./share.js";
 import { readCount } from "./visits.js";
 
 const SCRIPT = `<script src="/site.js" defer></script>`;
@@ -138,6 +139,7 @@ export function articlePage(article, ctx, extras = {}) {
     published: articlePublished(article),
     jsonLd: [articleLd(base, article, ctx.copy), articleCrumbsLd(base, article, ctx.copy)],
     script: [
+      `<script src="/share.js" defer></script>`,
       article.imageKey ? `<script src="/article.js" defer></script>` : "",
       article.attachments?.length ? `<script src="/attachments.js" defer></script>` : "",
     ].join(""),
@@ -147,7 +149,10 @@ export function articlePage(article, ctx, extras = {}) {
           ${articleBack(ctx.copy)}
           ${articleCrumbs(article)}
           <h1 class="article-title">${escTie(article.title)}</h1>
-          ${articleMeta(article, extras.views)}
+          <div class="article-meta">
+            ${articleMeta(article, extras.views)}
+            ${shareMenu(`${base}/zpravy/${encodeURIComponent(article.slug)}`, article.title)}
+          </div>
           <div class="article-body${article.imageKey ? " has-photo" : ""}">
             ${articleFigure(article)}
             <div class="prose">${tieHtml(renderArticleHtml(article.body))}</div>

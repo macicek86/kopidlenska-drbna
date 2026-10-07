@@ -905,3 +905,61 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
 }
 .yard-home-name .notice-link:hover { text-decoration-color: var(--brand); }
 .yard-home-name .notice-link::after { content: "›"; display: inline-block; margin-left: 0.3em; color: var(--brand); text-decoration: none; }
+
+/* Sdílení zprávy (src/share.js): ikonka vedle data a vlastní nabídka. Messenger jen na dotykových zařízeních. */
+.article-meta { display: flex; align-items: center; gap: 0.6rem; }
+
+.share { position: relative; }
+
+.share summary { list-style: none; }
+
+.share summary::-webkit-details-marker { display: none; }
+
+.share-btn {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.share-btn:hover, .share[open] .share-btn { background: var(--paper-deep); }
+
+.share-btn svg { width: 1.15rem; height: 1.15rem; }
+
+.share-drop {
+  position: absolute;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: 0.1rem;
+  min-width: 12rem;
+  margin-top: 0.3rem;
+  padding: 0.4rem;
+  border-radius: 1rem;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.share-item {
+  padding: 0.6rem 0.8rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.share-item:hover { background: var(--paper-deep); }
+
+.share-touch { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+  .share-touch { display: block; }
+}
