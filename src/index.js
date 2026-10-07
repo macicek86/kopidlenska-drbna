@@ -88,6 +88,7 @@ import { mailinPost } from "./post-mailin.js";
 import { receiveMail } from "./mailin/run.js";
 import { PUSH_PAGE, pushPageHtml, pushPost } from "./push/routes.js";
 import { PUSH_CRON, runPush } from "./push/dispatch.js";
+import { MANIFEST_PATH, manifestResponse } from "./manifest.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
 
@@ -343,6 +344,8 @@ export default {
     const moved = url.pathname === NDIC_PUSH_PATH || url.pathname === RELAY_PATH ? null : hostRedirect(request);
     if (moved) return moved;
     try {
+      // Manifest skládá Worker podle prohlížeče (src/manifest.js), databázi nepotřebuje.
+      if ((request.method === "GET" || request.method === "HEAD") && url.pathname === MANIFEST_PATH) return manifestResponse(request);
       // Statické soubory databázi nepotřebují.
       if ((request.method === "GET" || request.method === "HEAD") && !url.pathname.startsWith("/media/") && ASSET.test(url.pathname)) {
         const asset = await env.ASSETS.fetch(request);

@@ -149,3 +149,22 @@ test("stránka Upozornění: noindex, vypnutá témata chybí, bez klíčů nejd
   assert.match(page, /name="places" value="1"/);
   assert.doesNotMatch(pushPage(ctx, { lists, settings, publicKey: "" }), /data-push /);
 });
+
+test("manifest: Safari dostane standalone kvůli upozorněním na iPhonu, ostatní browser, ať se drbna nenabízí k instalaci", async () => {
+  const { manifestFor, manifestResponse } = await import("../src/manifest.js");
+  const UA = {
+    iphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1",
+    chromeIos: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/138.0 Mobile/15E148 Safari/604.1",
+    ipadDesktop: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15",
+    chromeMac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+    edge: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0",
+    android: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+    firefoxMac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:131.0) Gecko/20100101 Firefox/131.0",
+  };
+  for (const key of ["iphone", "chromeIos", "ipadDesktop"]) assert.equal(manifestFor(UA[key]).display, "standalone", key);
+  for (const key of ["chromeMac", "edge", "android", "firefoxMac"]) assert.equal(manifestFor(UA[key]).display, "browser", key);
+  assert.equal(manifestFor("").display, "browser");
+  const response = manifestResponse(new Request("https://drbna.test/site.webmanifest", { headers: { "user-agent": UA.android } }));
+  assert.equal(response.headers.get("vary"), "User-Agent");
+  assert.equal((await response.json()).icons.length, 3);
+});
