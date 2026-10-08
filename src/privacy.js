@@ -1,8 +1,10 @@
+// Zásady soukromí a pokyny ke smazání dat v podrobném znění pro kontrolu Mety (Facebook Pages).
+// Zatím jen na přímé adrese: mimo patičku i sitemap, `noindex`. Pro čtenáře bude jiná, kratší verze.
 import { layout } from "./view.js";
 
 const CONTACT = `<a href="mailto:redakce@kopidlenskadrbna.org">redakce@kopidlenskadrbna.org</a>`;
 function page(ctx, title, text) {
-  return layout({ ...ctx, title: `${title} | Kopidlenská drbna`, description: title,
+  return layout({ ...ctx, title: `${title} | Kopidlenská drbna`, description: title, noindex: true,
     body: `<section class="privacy"><p class="eyebrow">Kopidlenská drbna</p><h1>${title}</h1>${text}</section>` });
 }
 

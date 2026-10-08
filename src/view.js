@@ -172,7 +172,6 @@ export function layout({
       ${facebook ? `<p><a href="${esc(facebook)}" rel="noopener">${esc(tx(copy, "footer_facebook"))}</a></p>` : ""}
       ${anyFeedOn(switches) ? `<p><a href="/odber">${esc(tx(copy, "footer_feeds"))}</a></p>` : ""}
       <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
-      <p><a href="/soukromi">Soukromí</a> · <a href="/smazani-dat">Smazání dat</a></p>
       <a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>
     </footer>
   </div>
