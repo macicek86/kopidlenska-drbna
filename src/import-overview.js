@@ -35,7 +35,7 @@ export function recentSection(rows) {
 
 // Zprávy a návrhy z přehledu (sdílí je i fotbal).
 export function addArticles(add, known) {
-  add("Zprávy na webu za poslední týdny", (known.articles ?? []).map((row) => articleLine(row, "zprava")));
+  add("Zprávy na webu za poslední týdny (datum je den, kdy zpráva vyšla na drbně, ne kdy se věc stala; smí být „v září o tom drbna psala“, ne „v září se to stalo“)", (known.articles ?? []).map((row) => articleLine(row, "zprava")));
   if (known.older?.length) add("Starší zprávy (jen nadpis a klíčová slova)", known.older.map((row) => articleLine(row, "zprava")));
   add("Návrhy, které čekají na schválení", (known.proposals ?? []).map((row) => articleLine(row, "navrh")));
 }
