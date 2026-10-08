@@ -32,7 +32,7 @@ function entryDetail(source, entry) {
 function feedField(source, settings) {
   if (!source.feedField) return "";
   const urls = (settings.feedUrls?.length ? settings.feedUrls : source.defaultFeeds).join("\n");
-  return field("Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, source.feedHint);
+  return field(source.feedLabel ?? "Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, source.feedHint);
 }
 
 function aheadField(source, settings) {

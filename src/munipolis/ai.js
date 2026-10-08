@@ -207,7 +207,7 @@ function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|webmesta|vlozene|misto|lekar):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|webmesta|vlozene|facebook|misto|lekar):\d+$/;
 
 // Článek z odpovědi Claude, nebo null, když ho nechtěl napsat nebo v něm něco chybí. Sdílí ho i Deník a NDIC.
 export function readArticle(raw, rubricSlugs) {

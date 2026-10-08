@@ -60,8 +60,6 @@ import { yardsPost } from "./post-yards.js";
 import { doctorsPost } from "./post-doctors.js";
 import { stockPost } from "./post-stock.js";
 import { munipolisPost } from "./post-munipolis.js";
-import { facebookPost } from "./post-facebook.js";
-import { pruneFacebookPosts } from "./facebook/store.js";
 import { drbenaPost } from "./post-drbena.js";
 import { fillKeywords } from "./keywords.js";
 import { syncSearch } from "./search/store.js";
@@ -334,7 +332,6 @@ async function handlePost(request, env, path, fields, execution) {
     (await doctorsPost(path, request, env, fields)) ??
     (await stockPost(path, request, env, fields)) ??
     (await munipolisPost(path, request, env, fields, execution)) ??
-    (await facebookPost(path, request, env, fields)) ??
     (await footballPost(path, request, env, fields, execution)) ??
     (await denikPost(path, request, env, fields, execution)) ??
     (await skolaPost(path, request, env, fields, execution)) ??
@@ -408,7 +405,6 @@ export default {
       [{ key: "klicova-slova", label: "Klíčová slova" }, () => fillKeywords(env)],
       [{ key: "hledani", label: "Index hledání" }, () => syncSearch(env)],
       [{ key: "historie", label: "Úklid historie změn" }, () => pruneAudit(env)],
-      [{ key: "facebook-podklady", label: "Úklid podkladů z Facebooku" }, () => pruneFacebookPosts(env)],
       [{ key: "prihlaseni", label: "Úklid přihlášení" }, () => pruneLogin(env)],
     ];
     for (const [job, work] of jobs) ctx.waitUntil(trackJob(env, job, work));

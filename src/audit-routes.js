@@ -123,12 +123,6 @@ function importRoutes(base, settingsTable) {
 }
 
 const ROUTES = {
-  "/redakce/facebook/pridat": [fresh("facebook_pages")],
-  "/redakce/facebook/smazat": [existing("facebook_pages", "id")],
-  // Do historie nepatří kopie zdrojových textů s kratší dobou uchování.
-  "/redakce/facebook/nacist": "always",
-  "/redakce/facebook/navrh": "always",
-  "/redakce/facebook/vymazat": "always",
   "/redakce/zpravy/ulozit": [by("articles", "id")],
   "/redakce/zpravy/smazat": [existing("articles", "id")],
   "/redakce/zpravy/hned": [existing("articles", "id")],

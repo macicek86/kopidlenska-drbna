@@ -13,7 +13,6 @@ import {
   adminEvents,
   adminMessages,
   adminMunipolis,
-  adminFacebook,
   adminFootball,
   adminDenik,
   adminSkola,
@@ -51,14 +50,13 @@ import { loadPushStats } from "./push/store.js";
 import { vapidReady } from "./push/crypto.js";
 import { loadMailAdmin } from "./mailin/store.js";
 import { loadHealthRows } from "./health/store.js";
-import { loadFacebook } from "./facebook/store.js";
 import { loadQueues } from "./health/queues.js";
 
 // `data` je loadAdmin. Neznámá stránka: null.
 export async function renderAdmin(env, url, ctx, data) {
   const tab = url.pathname.replace(/\/+$/, "").slice("/redakce/".length);
   const message = messageFrom(url);
-  const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "facebook", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "drbena", "chat", "odber", "emaily", "historie", "stav"]);
+  const chiefOnly = new Set(["akce", "texty", "svoz", "lide", "odstavky", "rubriky", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "drbena", "chat", "odber", "emaily", "historie", "stav"]);
   if (data.signedIn && data.user?.role !== "hlavni" && chiefOnly.has(tab)) {
     return redirect(`/redakce/prehled?chyba=${encodeURIComponent("Tohle mění jen hlavní redaktor.")}`);
   }
@@ -112,10 +110,6 @@ export async function renderAdmin(env, url, ctx, data) {
   if (tab === "odstavky") return html(adminOutages(ctx, data, message, query));
   if (tab === "munipolis") {
     return html(adminMunipolis(ctx, data, message, query));
-  }
-  if (tab === "facebook") {
-    if (data.signedIn) data.facebook = await loadFacebook(env);
-    return html(adminFacebook(ctx, data, message, query));
   }
   if (tab === "fotbal") {
     return html(adminFootball(ctx, data, message, query));

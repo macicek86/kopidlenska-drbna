@@ -14,7 +14,6 @@ export { adminMailin } from "./mailin.js";
 export { adminFootball } from "./fotbal.js";
 export { adminMessages } from "./messages.js";
 export { adminMunipolis } from "./munipolis.js";
-export { adminFacebook } from "./facebook.js";
 export { adminOutages } from "./outages.js";
 export { adminOverview } from "./overview.js";
 export { adminPeople } from "./people.js";

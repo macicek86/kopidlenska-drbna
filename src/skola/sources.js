@@ -4,6 +4,7 @@ import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { DEFAULT_FEEDS, fetchSchoolFeeds } from "./feed.js";
 import { fetchWordpressPosts } from "./wordpress.js";
 import { fetchCityItems } from "./deska.js";
+import { FACEBOOK_SOURCE } from "../facebook/source.js";
 
 const ZS_RULES = `Dostaneš jeden článek z webu Základní a mateřské školy Kopidlno a přehled toho, co už na webu Kopidlenská drbna je.
 
@@ -160,6 +161,8 @@ export const SCHOOLS = {
     intro: "Příspěvek z Facebooku (nebo odjinud) sem zkopírujte i s fotkami. Koza Drběna ho zpracuje stejně jako zprávy města: pozná, jestli už to na drbně je, akci dá do kalendáře a napíše článek po svém.",
     fetchItems: null,
   },
+  // Facebook Pages přes Graph API (src/facebook/).
+  facebook: FACEBOOK_SOURCE,
 };
 
 export const SCHOOL_LIST = Object.values(SCHOOLS);

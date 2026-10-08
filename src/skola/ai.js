@@ -71,7 +71,7 @@ function pastedItemText(item, source) {
 export function skolaItemText(item, source = SCHOOLS.skola) {
   if (source.pasted) return pastedItemText(item, source);
   return [
-    `Článek z webu ${source.name}${item.section ? `, rubrika ${item.section}` : ""} (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
+    `${source.itemHead ? source.itemHead(item.section) : `Článek z webu ${source.name}${item.section ? `, rubrika ${item.section}` : ""}`} (zveřejněno ${item.publishedAt ? item.publishedAt.slice(0, 10) : "neznámo kdy"}):`,
     `Nadpis: ${item.title}`,
     item.term ? `${source.term}: ${item.term}` : "",
     item.documents?.length ? "Text: v přiloženém dokumentu (PDF)." : `Text:\n${item.text || "(bez textu, údaje jsou možná jen na obrázku)"}`,

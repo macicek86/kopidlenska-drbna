@@ -4,12 +4,11 @@ Implementace ručního importu je v `/redakce/facebook` (jen hlavní redaktor). 
 
 ## Připravené chování
 
-- Výchozí zdroje: `kopidlenskelisty` a `JicinevesCZ`. Přidávají se pouze při prvním založení tabulek, odebrané zdroje se při dalších migracích nevracejí.
-- Načíst příspěvky provede nejvýš dvě stránky Graph API po 25 položkách. Bere jen veřejné publikované textové příspěvky s permalinkem; žádné fotografie, komentáře, reakce nebo soukromé zprávy. Načítání probíhá ručně, cron pouze uklízí podklady.
-- Připravit shrnutí předá název zdroje, datum a text službě Anthropic. Vytvoří **čekající návrh**, nikdy článek rovnou na web. Odkaz na původní příspěvek ukládá aplikace do zdroje článku.
-- Souběžné zpracování jedné položky blokuje zámek v D1. Existující návrh se dohledá podle zdrojového permalinku i po úklidu cache nebo po chybě při dokončení zápisu.
-- Texty podkladů se uklízejí 30 dní po posledním načtení. Jednotlivý podklad nebo celou Page lze s potvrzením smazat. Redakční návrhy a články jsou samostatný archiv: případnou žádost o výmaz je potřeba vyřídit také v sekci Zprávy a v související historii změn.
-- Nová migrace má verzi 57. Záznamy importu v historii změn neobsahují kopii zdrojového textu.
+- Facebook je zdroj importu jako web města a školy (`src/facebook/`: `api.js` Graph API, `source.js` pravidla pro Drběnu; fronta, zpracování a stránka redakce jsou společné v `src/skola/`). Redakce `/redakce/facebook` (jen hlavní redaktor), tabulky `facebook_settings` a `facebook_items`.
+- Pages jsou v nastavení zdroje, jeden odkaz na řádek. Výchozí `kopidlenskelisty` a `JicinevesCZ`. Jedna nefunkční Page ostatní nezastaví.
+- Z každé Page nejvýš dvě stránky Graph API po 25 příspěvcích. Bere jen zveřejněné příspěvky s textem a permalinkem, k nim až 3 fotky (stahují se až při zpracování přes `fetchImage`). Komentáře, reakce ani soukromé zprávy ne.
+- S „Kontrolovat Facebook automaticky“ se cron dívá každé 4 h a čerstvé příspěvky Drběna zpracuje jako ostatní importy: porovná s přehledem (Munipolis, web města, vložené příspěvky), napíše článek, akci dá do kalendáře, nebo přeskočí. Rovnou na web, nebo jako návrh podle nastavení. Pro kontrolu Meta doporučeno **jako návrh**, ať je vidět schválení redaktorem.
+- Zdroj pod zprávou je „<Page> na Facebooku“ s odkazem na příspěvek, fotka (jen se zapnutým „Brát fotky z Facebooku“) má stejný popisek.
 
 ## Nastavení serveru
 
@@ -17,7 +16,7 @@ Přístupový token patří do tajemství Cloudflare Workeru `FACEBOOK_ACCESS_TO
 
 Použitá výchozí verze je `v26.0`, volitelně ji lze změnit proměnnou `FACEBOOK_GRAPH_VERSION`. Volání jsou pouze na `https://graph.facebook.com`; token je v hlavičce Authorization. Skript neotevírá URL `paging.next` (mohla by obsahovat token), použije jen kurzor na stejném hostu.
 
-Pro přípravu shrnutí se používá existující `ANTHROPIC_API_KEY` a společné volání Claude. Bez tajemství jsou příslušná tlačítka vypnutá. Žádná tajemství nejsou součástí této změny.
+Články píše Drběna přes existující `ANTHROPIC_API_KEY`. Bez `FACEBOOK_ACCESS_TOKEN` stav importu ukáže chybu a nic se nestahuje. Žádná tajemství nejsou součástí této změny.
 
 Místní náhled:
 
@@ -43,13 +42,13 @@ Po schválení a nasazení změn doplnit do Meta:
 
 Anglický popis zamýšleného použití:
 
-> Kopidlenská drbna is a local editorial news service for residents of Kopidlno and nearby communities. Its editor selects official municipal and local organization Facebook Pages, including facebook.com/kopidlenskelisty and facebook.com/JicinevesCZ. The app reads their public text posts through the Graph API to identify local events, road closures, public notices and other relevant community news. The editor selects a post, the app prepares a concise draft summary, and the editor reviews and approves it before publication. Each published summary includes a link to the original post. We request Page Public Content Access because these source Pages are administered by independent municipalities and organizations rather than our app operator. The feature does not read personal profiles, private messages, comments or follower lists, and visitors do not sign in with Facebook. Cloudflare hosts the service and stores the editorial source cache; Anthropic processes selected source text to prepare draft summaries. Raw cached source text is removed 30 days after its last retrieval; editorial drafts and published articles are managed separately by the editor.
+> Kopidlenská drbna is a local editorial news service for residents of Kopidlno and nearby communities. Its editor selects official municipal and local organization Facebook Pages, including facebook.com/kopidlenskelisty and facebook.com/JicinevesCZ. The app reads their public posts (text and attached photos) through the Graph API to identify local events and other relevant community news. For each new post the app prepares a short draft article, and the editor reviews and approves it before publication. Each published article includes a link to the original post and credits the Page for any photo used. We request Page Public Content Access because these source Pages are administered by independent municipalities and organizations rather than our app operator. The feature does not read personal profiles, private messages, comments or follower lists, and visitors do not sign in with Facebook. Cloudflare hosts the service and stores the editorial source cache; Anthropic processes selected source text to prepare draft summaries. Source posts are kept as editorial material and removed on request.
 
 ## Skutečná ukázka pro App Review
 
 Před schválením cizích Pages použít skutečnou testovací Page, kterou spravuje správce aplikace, a token s potřebným přístupem. Nelze vydávat ručně vložená nebo simulovaná data za úspěšné volání Graph API.
 
-Video musí ukázat přihlášení do redakce, sekci Facebook Pages, načtení skutečného veřejného testovacího příspěvku, jeho datum/text/permalink, přípravu návrhu, redakční schválení a zdrojový odkaz u článku. Token nesmí být na videu. Konkrétní požadavky na přístup kontrolora a video ověřit v aktuální žádosti Meta.
+Video musí ukázat přihlášení do redakce, stránku Facebook (nastavení Pages, „jako návrh“), Zkontrolovat teď, načtený skutečný testovací příspěvek s datem, textem a odkazem, návrh od Drběny, schválení v Zprávách a zdrojový odkaz u článku. Token nesmí být na videu. Konkrétní požadavky na přístup kontrolora a video ověřit v aktuální žádosti Meta.
 
 Kontrolor potřebuje přístup ke skutečné funkci. Pro něj připravit oddělené testovací nasazení s vlastní databází a testovacím účtem hlavního redaktora; produkční účet ani jeho přihlašovací kód nesdílet. Tento commit nevytváří testovací účet ani nenahrává video. Bez platného testovacího tokenu nelze doložit živé načtení.
 

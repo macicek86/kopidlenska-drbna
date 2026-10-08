@@ -10,7 +10,6 @@ import { SEED_RUBRICS } from "./rubrics.js";
 import { CLUB_PARENT, CLUBS } from "./clubs.js";
 import { ensureNoticeTables } from "./notices-db.js";
 import { ensureImportTables } from "./munipolis/store.js";
-import { ensureFacebookTables } from "./facebook/store.js";
 import { ensureFootballTables } from "./fotbal/store.js";
 import { ensureDenikTables } from "./denik/store.js";
 import { ensureSkolaTables } from "./skola/store.js";
@@ -35,7 +34,7 @@ import { ensureMailinTables } from "./mailin/store.js";
 import { ensureHealthTables } from "./health/store.js";
 import { ensurePushTables } from "./push/store.js";
 
-export const SCHEMA_VERSION = 57;
+export const SCHEMA_VERSION = 58;
 
 let schemaReady = false;
 
@@ -435,7 +434,6 @@ async function migrateSchema(env) {
   await createDeskTables(env);
   await ensureNoticeTables(env);
   await ensureImportTables(env);
-  await ensureFacebookTables(env);
   await ensureFootballTables(env);
   await ensureDenikTables(env);
   await ensureSkolaTables(env);

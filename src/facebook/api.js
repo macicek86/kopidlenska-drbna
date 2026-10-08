@@ -1,16 +1,21 @@
-// Jen Graph API: token v hlavičce, veřejné příspěvky vybrané Page. Bez stahování webu Facebooku.
+// Facebook Pages přes Graph API: token v hlavičce, jen veřejné příspěvky vybraných Pages. Bez stahování webu Facebooku.
+// `fetchFacebookPages` vrací položky ve tvaru zdrojů v src/skola/sources.js (guid, link, title, text, images, section…).
+import { pastedTitle } from "../skola/paste.js";
+
 export const GRAPH_VERSION = "v26.0";
-export const POST_FIELDS = "id,message,created_time,permalink_url,is_published";
+export const POST_FIELDS = "id,message,created_time,permalink_url,is_published,attachments{media,subattachments{media}}";
 const GRAPH = "https://graph.facebook.com";
 const MAX_PAGES = 2;
 const PAGE_SIZE = 25;
+const MAX_IMAGES = 3;
+const FACEBOOK_HOSTS = ["facebook.com", "www.facebook.com", "m.facebook.com"];
 
 export function pageIdentifier(value) {
   let text = String(value ?? "").trim();
   if (/^https?:\/\//i.test(text)) {
     let url;
     try { url = new URL(text); } catch { return ""; }
-    if (url.protocol !== "https:" || !["facebook.com", "www.facebook.com", "m.facebook.com"].includes(url.hostname) || url.username || url.password || url.port) return "";
+    if (url.protocol !== "https:" || !FACEBOOK_HOSTS.includes(url.hostname) || url.username || url.password || url.port) return "";
     text = url.pathname === "/profile.php" ? url.searchParams.get("id") ?? "" : url.pathname.replace(/^\/+|\/+$/g, "");
   }
   if (!/^[a-z\d](?:[a-z\d.]{0,78}[a-z\d])?$/i.test(text) || /^(me|feed|posts|groups|reel|watch|search|pages|events)$/i.test(text)) return "";
@@ -45,43 +50,82 @@ async function graph(env, node, params, fetchImpl) {
   }
 }
 
-export function publicPost(row, pageId) {
-  if (!row || row.is_published !== true || !new RegExp(`^${pageId}_\\d+$`).test(String(row.id))) return null;
-  const message = typeof row.message === "string" ? row.message.trim() : "";
-  const at = Date.parse(row.created_time);
-  if (!message || !Number.isFinite(at)) return null;
-  let link;
-  try { link = new URL(row.permalink_url); } catch { return null; }
-  if (link.protocol !== "https:" || !["facebook.com", "www.facebook.com", "m.facebook.com"].includes(link.hostname) || link.username || link.password || link.port) return null;
-  // Z URL ponecháme jen veřejný permalink. API token nikdy není součástí uloženého odkazu.
-  if (link.searchParams.has("access_token") || link.href.length > 400) return null;
-  return { postId: String(row.id), text: message.slice(0, 10_000), publishedAt: new Date(at).toISOString(), link: link.href };
+// Fotky z příspěvku (jedna nebo album). Stahuje je až zpracování přes fetchImage, adresy z CDN Facebooku po pár dnech vyprší.
+function postImages(row) {
+  const media = [];
+  for (const attachment of row.attachments?.data ?? []) {
+    media.push(attachment?.media);
+    for (const sub of attachment?.subattachments?.data ?? []) media.push(sub?.media);
+  }
+  const urls = media.map((item) => String(item?.image?.src ?? "")).filter((src) => /^https:\/\/[^/\s]+\/\S+$/i.test(src) && src.length <= 2000);
+  return [...new Set(urls)].slice(0, MAX_IMAGES);
 }
 
-export async function fetchPagePosts(env, identifier, { fetchImpl = fetch } = {}) {
+function secureLink(value) {
+  let link;
+  try { link = new URL(value); } catch { return ""; }
+  if (link.protocol !== "https:" || !FACEBOOK_HOSTS.includes(link.hostname) || link.username || link.password || link.port) return "";
+  // Token nikdy nesmí skončit v uloženém odkazu.
+  if (link.searchParams.has("access_token") || link.href.length > 300) return "";
+  return link.href;
+}
+
+// Jen zveřejněný příspěvek té Page s textem a veřejným odkazem.
+export function publicPost(row, page) {
+  if (!row || row.is_published !== true || !new RegExp(`^${page.id}_\\d+$`).test(String(row.id))) return null;
+  const text = typeof row.message === "string" ? row.message.replace(/\r\n?/g, "\n").trim().slice(0, 10_000) : "";
+  const at = Date.parse(row.created_time);
+  const link = secureLink(row.permalink_url);
+  if (!text || !Number.isFinite(at) || !link) return null;
+  return {
+    guid: String(row.id),
+    link,
+    title: pastedTitle(text),
+    text,
+    images: postImages(row),
+    section: page.name,
+    term: "",
+    publishedAt: new Date(at).toISOString(),
+  };
+}
+
+async function fetchPage(env, identifier, fetchImpl) {
   const key = pageIdentifier(identifier);
-  if (!key) return { ok: false, error: "Zadejte ID Page nebo její přímý odkaz na Facebooku." };
+  if (!key) return { ok: false, error: `${identifier} není odkaz na Facebook Page.` };
   const page = await graph(env, key, { fields: "id,name,category" }, fetchImpl);
   if (!page.ok) return page;
-  // category je pole Page; osobní profil ani /me nejsou povoleným zdrojem.
-  if (!/^\d+$/.test(String(page.data?.id)) || !page.data?.name || typeof page.data.category !== "string") return { ok: false, error: "Zdroj se nepodařilo ověřit jako Facebook Page." };
-  const pageId = String(page.data.id);
-  const items = new Map();
+  // category má jen Page; osobní profil ani /me zdrojem být nesmí.
+  if (!/^\d+$/.test(String(page.data?.id)) || !page.data?.name || typeof page.data.category !== "string") return { ok: false, error: `${key} není Facebook Page.` };
+  const info = { id: String(page.data.id), name: String(page.data.name).replace(/\s+/g, " ").trim().slice(0, 80) };
+  const items = [];
   let after = "";
   const cursors = new Set();
   for (let n = 0; n < MAX_PAGES; n++) {
-    const response = await graph(env, `${pageId}/posts`, { fields: POST_FIELDS, limit: String(PAGE_SIZE), ...(after ? { after } : {}) }, fetchImpl);
+    const response = await graph(env, `${info.id}/posts`, { fields: POST_FIELDS, limit: String(PAGE_SIZE), ...(after ? { after } : {}) }, fetchImpl);
     if (!response.ok) return response;
     if (!Array.isArray(response.data?.data)) return { ok: false, error: "Facebook vrátil neúplný seznam příspěvků." };
     for (const row of response.data.data) {
-      const item = publicPost(row, pageId);
-      if (item) items.set(item.postId, item);
+      const item = publicPost(row, info);
+      if (item) items.push(item);
     }
-    // paging.next se neotevírá: mohl by přenést token jinam. Použije se pouze kurzor na stejném Graph hostu.
+    // paging.next se neotevírá, mohl by nést token jinam. Jen kurzor na stejném Graph API.
     const next = response.data.paging?.cursors?.after;
     if (!response.data.paging?.next || typeof next !== "string" || !next || next.length > 1000 || cursors.has(next)) break;
     after = next;
     cursors.add(next);
   }
-  return { ok: true, pageId, name: String(page.data.name).slice(0, 120), items: [...items.values()] };
+  return { ok: true, items };
+}
+
+// `urls` jsou adresy Pages z nastavení zdroje. Jedna nefunkční Page ostatní nezastaví (warning jako u RSS).
+export async function fetchFacebookPages(urls, { env = {}, fetchImpl = fetch } = {}) {
+  if (!env.FACEBOOK_ACCESS_TOKEN) return { ok: false, error: "Chybí přístup k Facebooku (tajemství FACEBOOK_ACCESS_TOKEN).", items: [] };
+  const results = [];
+  for (const url of urls) results.push(await fetchPage(env, url, fetchImpl));
+  const working = results.filter((result) => result.ok);
+  if (!working.length) return { ok: false, error: results[0]?.error ?? "Není nastavená žádná Page.", items: [] };
+  const seen = new Set();
+  const items = working.flatMap((result) => result.items).filter((item) => !seen.has(item.guid) && seen.add(item.guid));
+  const failed = results.find((result) => !result.ok);
+  return { ok: true, error: "", warning: failed ? failed.error : "", items };
 }

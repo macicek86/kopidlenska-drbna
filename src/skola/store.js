@@ -228,7 +228,7 @@ export async function saveSkolaSettings(env, request, source, input) {
   if (!gate.ok) return gate;
   // Škola bez pole adres (WordPress) má adresu pevnou.
   const urls = source.feedField ? readFeedUrls(input.feedUrls, source.defaultFeeds) : [];
-  if (!urls) return { ok: false, error: "Každá adresa RSS musí začínat https://." };
+  if (!urls) return { ok: false, error: "Každá adresa musí začínat https://." };
   const aheadDays = readAheadDays(input.aheadDays);
   const before = await loadSkolaSettings(env, source);
   await env.DB.prepare(

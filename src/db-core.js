@@ -6,7 +6,7 @@ import { pragueNow } from "./waste.js";
 const COOKIE = "drbna_editor";
 
 // Tabulky importů (Munipolis, fotbal, Deník): položka zdroje a zpráva nebo návrh, který z ní vznikl.
-export const IMPORT_ITEM_TABLES = ["import_items", "football_items", "denik_items", "skola_items", "zahradka_items", "webmesta_items", "vlozene_items"];
+export const IMPORT_ITEM_TABLES = ["import_items", "football_items", "denik_items", "skola_items", "zahradka_items", "webmesta_items", "vlozene_items", "facebook_items"];
 
 export const REOPENED_REASON = "Redakce zprávu smazala. Jde zpracovat znovu.";
 
