@@ -181,6 +181,10 @@ test("zvoneček a nabídka jen se zapnutými upozorněními, v patičce odkaz ne
   assert.doesNotMatch(on, /<footer>[\s\S]*upozorneni[\s\S]*<\/footer>/);
   assert.match(on, /<template data-push-offer>/);
   assert.match(on, /push-bell\.js/);
+  // Na stránce Upozornění zvoneček ano, nabídka ne.
+  const own = layout({ ...base, path: "/upozorneni", push: { enabled: true } });
+  assert.match(own, /data-push-bell/);
+  assert.doesNotMatch(own, /data-push-offer/);
   for (const push of [null, { enabled: false }]) {
     const page = layout({ ...base, push });
     assert.doesNotMatch(page, /data-push-bell|upozorneni|push-bell/);

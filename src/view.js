@@ -9,6 +9,7 @@ import { jsonLdTag } from "./seo.js";
 import { welcomeTemplate } from "./welcome.js";
 import { anyFeedOn, feedOn } from "./feeds/settings.js";
 import { pushBell, pushOffer, pushOffered } from "./push/promo.js";
+import { PUSH_PAGE } from "./push/routes.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
 export const FAVICON_TAGS = `<link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -176,7 +177,7 @@ export function layout({
   </div>
   ${script}
   <script src="/nav.js" defer></script>
-  ${offered ? `${pushOffer(copy)}<script src="/push-bell.js" defer></script>` : ""}
+  ${offered ? `${path === PUSH_PAGE ? "" : pushOffer(copy)}<script src="/push-bell.js" defer></script>` : ""}
   ${welcome ? `${welcome}<script src="/welcome.js" defer></script>` : ""}
   ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}" data-ideas="${esc(JSON.stringify(chat.ideas ?? []))}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>

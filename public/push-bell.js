@@ -68,7 +68,8 @@
   }
 
   function offer() {
-    if (location.pathname === "/upozorneni") return;
+    // Na stránce Upozornění nabídka nedává smysl (server ji tam ani nevkládá), i s lomítkem na konci.
+    if (location.pathname.replace(/\/+$/, "") === "/upozorneni") return;
     if (supported && Notification.permission === "denied") return;
     const today = new Date().toLocaleDateString("sv");
     const past = offered();
