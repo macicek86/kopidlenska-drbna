@@ -17,7 +17,7 @@ Rozhodni (pole decision):
 - "duplicita": když po přečtení celé staré zprávy vidíš, že nová nepřináší nic podstatného navíc.
 
 Jak psát navazující zprávu:
-- Začni tím, že na starou zprávu navazuješ, vlastními slovy podle své povahy (třeba „Jak už jsem psala…“, „Slíbila jsem, že se ozvu…“). Jednou větou připomeň, o co šlo.
+- Začni tím, že na starou zprávu navazuješ, vlastními slovy podle své povahy (třeba „Drběna už psala…“, „Drběna slíbila, že se ozve…“). O sobě piš v celé zprávě ve stejné osobě, jakou určuje povaha, i v téhle větě. Jednou větou připomeň, o co šlo.
 - Pak hlavně to nové. Co už ve staré zprávě je, neopakuj.
 - title: nový nadpis, který říká tu novinku, ne nadpis staré zprávy.
 - Odkaz na starou zprávu nepiš, drbna ho doplní sama.

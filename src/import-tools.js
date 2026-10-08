@@ -13,6 +13,8 @@ const SOURCE_MAX = 5000;
 export const MAX_READS = 4;
 const SEARCH_HITS = 6;
 
+// Nástroje bez `strict`: se schématem odpovědi Munipolisu (hodiny, přílohy) by API odmítlo příliš velkou gramatiku (400).
+// Vstup se čte opatrně, chybějící pole nevadí.
 export const IMPORT_TOOLS = [
   {
     name: "hledat_zpravy",
@@ -31,7 +33,6 @@ export const IMPORT_TOOLS = [
       required: ["dotaz", "slova"],
       additionalProperties: false,
     },
-    strict: true,
   },
   {
     name: "precist_zpravu",
@@ -43,7 +44,6 @@ export const IMPORT_TOOLS = [
       required: ["znacka"],
       additionalProperties: false,
     },
-    strict: true,
   },
   {
     name: "precist_zdroj",
@@ -55,7 +55,6 @@ export const IMPORT_TOOLS = [
       required: ["znacka"],
       additionalProperties: false,
     },
-    strict: true,
   },
 ];
 

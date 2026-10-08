@@ -91,7 +91,7 @@ test("schéma Munipolisu chce přílohy, ostatní importy ne; pokyny o uzavírce
   const system = systemPrompt("");
   assert.match(system, /attachments:/);
   assert.match(system, /Nevysvětluj, co zavřené není/);
-  assert.match(system, /Nepiš, že město nebo radnice něco oznámila/);
+  assert.match(system, /Nepiš, že město, radnice, škola, spolek nebo klub něco oznámili/);
 });
 
 test("Claude uvidí nejvýš 8 obrázků a dohromady rozumně velkých", () => {

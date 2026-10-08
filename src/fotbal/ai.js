@@ -1,7 +1,7 @@
 // Claude napíše z aktuality FK Kopidlno článek hlasem kozy Drběny: zprávu po zápase, pozvánku nebo klubovou novinku.
 import { callClaude } from "../claude.js";
 import { prepareArticleBody } from "../rich.js";
-import { DEFAULT_FOOTBALL_VOICE } from "../drbena.js";
+import { DEFAULT_FOOTBALL_VOICE, QUOTE_RULE } from "../drbena.js";
 import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
 import { readRecall } from "../drbena-memory.js";
 import { addArticles, recentSection, relatedSection } from "../import-overview.js";
@@ -29,6 +29,7 @@ Pravidla:
 - Taková věta a vzpomínka na akci (když ji pokyny dovolují) dohromady nanejvýš jednou v článku.
 - Víkend: když je v přehledu zpráva (zprava:…) nebo čekající návrh (navrh:…) o jiném zápase Kopidla ze stejného víkendu (třeba sobotní, a ty píšeš o nedělním, klidně jiného týmu), navaž na ni jednou větou. Platí to po zápase („Po sobotní výhře áčka si v neděli zahrálo i béčko.“) i u pozvánek („V sobotu hraje doma céčko, v neděli ho na hřišti vystřídá béčko.“). Ber jen fakta z jejího nadpisu a perexu. Do follows dej její značku, drbna pod článek přidá odkaz. Jinak nech follows prázdné. Tahle věta se do limitu výše nepočítá.
 - Kopidlno může hrát doma i venku. Kdo je domácí, poznáš podle pořadí v nadpisu (první je domácí).
+${QUOTE_RULE}
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny. U zápasu ať je v nadpisu výsledek nebo soupeř.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
