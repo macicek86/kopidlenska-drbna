@@ -8,7 +8,7 @@ import { WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
 import { welcomeTemplate } from "./welcome.js";
 import { anyFeedOn, feedOn } from "./feeds/settings.js";
-import { pushBell, pushFooterLink, pushOffer, pushOffered } from "./push/promo.js";
+import { pushBell, pushOffer, pushOffered } from "./push/promo.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
 export const FAVICON_TAGS = `<link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -102,7 +102,7 @@ export function layout({
   // Na mobilu jsou služby na konci pod nadpisem, ať k nim nepatří Reklamy a O nás.
   const mobileLinks = `${NAV.filter((entry) => entry !== PRACTICAL).map(link).join("")}<p class="nav-head">${practical}</p>${PRACTICAL.map(link).join("")}`;
   const welcome = welcomeTemplate(copy, Boolean(chat));
-  // Upozornění do prohlížeče (src/push/promo.js): zvoneček, odkaz v patičce, jednorázová nabídka.
+  // Upozornění do prohlížeče (src/push/promo.js): zvoneček a jednorázová nabídka.
   const offered = pushOffered(push);
   const headerNav = `<div class="top-end">
        <nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
@@ -170,7 +170,6 @@ export function layout({
       <p>${esc(tx(copy, "footer_copy"))}</p>
       ${facebook ? `<p><a href="${esc(facebook)}" rel="noopener">${esc(tx(copy, "footer_facebook"))}</a></p>` : ""}
       ${anyFeedOn(switches) ? `<p><a href="/odber">${esc(tx(copy, "footer_feeds"))}</a></p>` : ""}
-      ${offered ? pushFooterLink(copy) : ""}
       <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
       <a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>
     </footer>

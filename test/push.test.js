@@ -173,12 +173,12 @@ test("manifest: Safari dostane standalone kvůli upozorněním na iPhonu, ostatn
   assert.equal((await response.json()).icons.length, 3);
 });
 
-test("zvoneček, odkaz v patičce a nabídka jen se zapnutými upozorněními", async () => {
+test("zvoneček a nabídka jen se zapnutými upozorněními, v patičce odkaz není", async () => {
   const { layout } = await import("../src/view.js");
   const base = { title: "T", description: "D", path: "/", origin: "https://drbna.test", mainOrigin: "https://drbna.test", body: "", copy: {} };
   const on = layout({ ...base, push: { enabled: true } });
   assert.match(on, /data-push-bell/);
-  assert.match(on, /href="\/upozorneni">Upozornění do telefonu/);
+  assert.doesNotMatch(on, /<footer>[\s\S]*upozorneni[\s\S]*<\/footer>/);
   assert.match(on, /<template data-push-offer>/);
   assert.match(on, /push-bell\.js/);
   for (const push of [null, { enabled: false }]) {

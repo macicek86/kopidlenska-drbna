@@ -1,4 +1,4 @@
-// Upozornění na webu: zvoneček v hlavičce, odkaz v patičce a jednorázová nabídka dole na stránce.
+// Upozornění na webu: zvoneček v hlavičce a jednorázová nabídka dole na stránce.
 // Ukazují se jen se zapnutými upozorněními (redakce i klíče VAPID). Co prohlížeč umí a jestli už odebírá,
 // řeší public/push-bell.js: zvoneček schová, kde upozornění nejdou, a vyplní ho, když jsou zapnutá.
 import { text as tx } from "../copy.js";
@@ -16,10 +16,6 @@ export function pushBell(copy, path) {
   const label = tx(copy, "push_bell");
   const on = path === PUSH_PAGE ? " is-current" : "";
   return `<a class="push-bell${on}" href="${PUSH_PAGE}" title="${esc(label)}" aria-label="${esc(label)}" data-push-bell>${BELL_ICON}</a>`;
-}
-
-export function pushFooterLink(copy) {
-  return `<p><a href="${PUSH_PAGE}">${esc(tx(copy, "footer_push"))}</a></p>`;
 }
 
 // Na počítači okénko vlevo dole, na mobilu bublina, kterou říká Drběna z tlačítka chatu vpravo dole
