@@ -27,7 +27,7 @@ Pravidla:
 - Skóre piš jako 7:6, poločas v závorce (3:3). Jména hráčů piš tak, jak jsou ve zdroji.
 - V přehledu a v oddílu „Možná souvisí“ (když je, ukazuje starší zprávy z archivu drbny) najdeš i dřívější zápasy. U zápasu smíš jednou větou připomenout předchozí zápas stejného týmu (A, B, nebo C) se stejným soupeřem, třeba „Na podzim Céčko Libuň doma porazilo 3:1.“ Řekni, kdy to bylo, a ber jen výsledek a fakta z nadpisu a perexu té zprávy. Když si nejsi jistá, že jde o stejný tým i soupeře, nepiš to. Výsledek dnešního zápasu má vždy přednost.
 - Taková věta a vzpomínka na akci (když ji pokyny dovolují) dohromady nanejvýš jednou v článku.
-- Víkend: když je v přehledu zpráva (zprava:…) o jiném zápase Kopidla ze stejného víkendu (třeba sobotní, a ty píšeš o nedělním, klidně jiného týmu), navaž na ni jednou větou, třeba „Po sobotní výhře áčka si v neděli zahrálo i béčko.“ Ber jen výsledek a fakta z jejího nadpisu a perexu. Do follows dej její značku, drbna pod článek přidá odkaz. Jinak nech follows prázdné. Tahle věta se do limitu výše nepočítá.
+- Víkend: když je v přehledu zpráva (zprava:…) nebo čekající návrh (navrh:…) o jiném zápase Kopidla ze stejného víkendu (třeba sobotní, a ty píšeš o nedělním, klidně jiného týmu), navaž na ni jednou větou. Platí to po zápase („Po sobotní výhře áčka si v neděli zahrálo i béčko.“) i u pozvánek („V sobotu hraje doma céčko, v neděli ho na hřišti vystřídá béčko.“). Ber jen fakta z jejího nadpisu a perexu. Do follows dej její značku, drbna pod článek přidá odkaz. Jinak nech follows prázdné. Tahle věta se do limitu výše nepočítá.
 - Kopidlno může hrát doma i venku. Kdo je domácí, poznáš podle pořadí v nadpisu (první je domácí).
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny. U zápasu ať je v nadpisu výsledek nebo soupeř.
 - excerpt: jedna až dvě věty, do 220 znaků.
@@ -109,10 +109,10 @@ function clean(value, max) {
 
 const REF = /^(zprava|navrh|fotbal):\d+$/;
 
-// Zpráva ze stejného víkendu, na kterou článek navazuje („zprava:12“ → 12), jinak null.
+// Zpráva nebo návrh ze stejného víkendu, na který článek navazuje („zprava:12“ → { kind: "zprava", id: 12 }), jinak null.
 function readFollows(value) {
-  const match = String(value ?? "").trim().match(/^zprava:(\d+)$/);
-  return match ? Number(match[1]) : null;
+  const match = String(value ?? "").trim().match(/^(zprava|navrh):(\d+)$/);
+  return match ? { kind: match[1], id: Number(match[2]) } : null;
 }
 
 export function readFootballDecision(raw, { force = false } = {}) {
@@ -134,7 +134,7 @@ export function readFootballDecision(raw, { force = false } = {}) {
     decision,
     reason,
     duplicateOf: "",
-    article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords), recall: readRecall(raw.recall), followsId: readFollows(raw.follows) },
+    article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords), recall: readRecall(raw.recall), follows: readFollows(raw.follows) },
   };
 }
 

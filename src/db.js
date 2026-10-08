@@ -21,6 +21,7 @@ import {
   reopenImports,
   requireChief,
   slugify,
+  sqlStamp,
   uniqueSlug,
   userCan,
 } from "./db-core.js";
@@ -63,9 +64,14 @@ export { ensureSchema } from "./schema.js";
 export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
 export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.published_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, a.source, f.slug as follows_slug, f.title as follows_title, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.published_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, a.source, f.slug as follows_slug, f.title as follows_title, f.created_at as follows_created, f.published_at as follows_published_at, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 // Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
 const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "").replace("a.attachments, ", "");
+function followsLive(row, now = new Date()) {
+  if (!row.follows_slug) return false;
+  return String(row.follows_created ?? "").slice(0, 10) <= pragueNow(now).date && String(row.follows_published_at ?? "") <= sqlStamp(now);
+}
+
 const ARTICLE_FROM =
   "articles a left join users u on u.id = a.author_id left join rubrics r on r.id = a.rubric_id left join rubrics parent on parent.id = r.parent_id" +
   // Zpráva, na kterou tahle navazuje: odkaz pod čarou jen na tu, která je zveřejněná.
@@ -118,8 +124,9 @@ function mapArticle(row) {
     signedDrbena: asBool(row.signed_drbena),
     redacted: asBool(row.redacted),
     source: String(row.source ?? ""),
-    followsSlug: row.follows_slug ? String(row.follows_slug) : "",
-    followsTitle: row.follows_slug ? String(row.follows_title ?? "") : "",
+    // Odkaz pod čarou jen na zprávu, která už je na webu (může ještě čekat ve frontě zveřejnění).
+    followsSlug: followsLive(row) ? String(row.follows_slug) : "",
+    followsTitle: followsLive(row) ? String(row.follows_title ?? "") : "",
   };
 }
 

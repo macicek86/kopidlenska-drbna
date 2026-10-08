@@ -34,7 +34,7 @@ import { ensureMailinTables } from "./mailin/store.js";
 import { ensureHealthTables } from "./health/store.js";
 import { ensurePushTables } from "./push/store.js";
 
-export const SCHEMA_VERSION = 55;
+export const SCHEMA_VERSION = 56;
 
 let schemaReady = false;
 
@@ -208,6 +208,8 @@ async function ensureArticleColumns(env) {
   await addColumn(env, names, "published_at", "alter table articles add column published_at text not null default ''");
   // Zdroj zprávy pod čarou (src/article-source.js), dřív byl na konci textu.
   await addColumn(env, names, "source", "alter table articles add column source text not null default ''");
+  // Navazuje na návrh, který ještě čeká (fotbal: nedělní na sobotní). Schválením se z něj stane follows_id.
+  await addColumn(env, names, "follows_proposal", "alter table articles add column follows_proposal integer");
 }
 
 async function ensureProposalColumns(env) {
@@ -222,6 +224,7 @@ async function ensureProposalColumns(env) {
   await addColumn(env, names, "follows_id", "alter table proposals add column follows_id integer");
   await addColumn(env, names, "attachments", "alter table proposals add column attachments text not null default ''");
   await addColumn(env, names, "source", "alter table proposals add column source text not null default ''");
+  await addColumn(env, names, "follows_proposal", "alter table proposals add column follows_proposal integer");
 }
 
 // Bod výřezu fotky u reklamy, stejně jako u zprávy.

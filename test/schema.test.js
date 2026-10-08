@@ -7,7 +7,7 @@ import { SCHEMA_VERSION } from "../src/schema.js";
 
 // Otisk migrací. Když test spadne: zvedni SCHEMA_VERSION v src/schema.js a sem napiš novou verzi a otisk,
 // jinak produkce migraci nespustí (databáze se starší verzí ji nespustí, novější verzi nikdo nezapíše).
-const KNOWN = { version: 55, fingerprint: "a17a8e4d1145b5af" };
+const KNOWN = { version: 56, fingerprint: "3b04f5b10a03256a" };
 
 function sources(dir) {
   return readdirSync(dir, { withFileTypes: true })

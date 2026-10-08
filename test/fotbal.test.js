@@ -158,11 +158,12 @@ test("Drběna dostane aktualitu s doplňky a její odpověď se ověří", () =>
   assert.equal(made.ok, true);
   assert.equal(made.article.title, "Gólová přestřelka");
   assert.equal(made.article.recall, "");
-  assert.equal(made.article.followsId, null);
+  assert.equal(made.article.follows, null);
   // Nedělní zápas navazuje na sobotní: jen značka zprávy, nic jiného.
   const weekend = { decision: "vytvorit", reason: "", duplicate_of: "", title: "Béčko v neděli", excerpt: "Béčko vyhrálo.", body_html: "<p>Góly.</p>" };
-  assert.equal(readFootballDecision({ ...weekend, follows: "zprava:12" }).article.followsId, 12);
-  assert.equal(readFootballDecision({ ...weekend, follows: "navrh:12" }).article.followsId, null);
+  assert.deepEqual(readFootballDecision({ ...weekend, follows: "zprava:12" }).article.follows, { kind: "zprava", id: 12 });
+  assert.deepEqual(readFootballDecision({ ...weekend, follows: "navrh:12" }).article.follows, { kind: "navrh", id: 12 });
+  assert.equal(readFootballDecision({ ...weekend, follows: "akce:12" }).article.follows, null);
   assert.equal(readFootballDecision({ decision: "vytvorit", reason: "", duplicate_of: "", title: "Gólová přestřelka", excerpt: "Béčko vyhrálo.", body_html: "<p>Sedm gólů.</p>", recall: "akce:7" }).article.recall, "akce:7");
   assert.doesNotMatch(made.article.body, /script/);
   const duplicate = readFootballDecision({ decision: "duplicita", reason: "Už je.", duplicate_of: "zprava:4", title: "", excerpt: "", body_html: "" });

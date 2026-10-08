@@ -67,11 +67,13 @@ async function articleImage(env, item, settings, fetchImpl) {
   return key;
 }
 
-// Zpráva ze stejného víkendu, na kterou Drběna navázala, jen když opravdu existuje.
-async function knownArticleId(env, id) {
-  if (!id) return null;
-  const row = await env.DB.prepare("select id from articles where id = ?").bind(id).first();
-  return row ? id : null;
+// Zpráva nebo čekající návrh ze stejného víkendu, na který Drběna navázala, jen když opravdu existuje.
+// Návrh se po schválení promění v odkaz na zprávu (src/proposals-db.js).
+async function weekendFollow(env, follows) {
+  if (!follows) return {};
+  const sql = follows.kind === "zprava" ? "select id from articles where id = ?" : "select id from proposals where id = ? and status = 'pending' and article_id is null";
+  if (!(await env.DB.prepare(sql).bind(follows.id).first())) return {};
+  return follows.kind === "zprava" ? { followsId: follows.id } : { followsProposal: follows.id };
 }
 
 // Ručně vybranou aktualitu Drběna napíše vždy (redakce rozhodla) a s datem ze zdroje. Cron píše s dnešním datem.
@@ -108,7 +110,7 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
     rubric: await targetRubric(env, settings),
     publishOn: item.manual ? footballSourceDate(item, today) : "",
     spread: !item.manual,
-    followsId: await knownArticleId(env, answer.article.followsId),
+    ...(await weekendFollow(env, answer.article.follows)),
   });
   const reason = [
     fixes.length ? `Opraveno podle fotbalunas.cz: ${fixes.join(" ")}` : "",

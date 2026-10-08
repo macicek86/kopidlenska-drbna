@@ -1,6 +1,8 @@
 // Návrhy zpráv: příspěvky přispěvatelů a kozy Drběny, které čekají na hlavního redaktora.
 // Návrhy od Drběny smí schválit i přispěvatel s oprávněním `drbena_navrhy`.
-import { asBool, clip, IMPORT_ITEM_TABLES, publishMoment, reopenImports, requireChief, requireUser, slugify, uniqueSlug, userCan } from "./db-core.js";
+import { asBool, clip, IMPORT_ITEM_TABLES, publishMoment, reopenImports, requireChief, requireUser, slugify, sqlStamp, uniqueSlug, userCan } from "./db-core.js";
+import { loadDrbena } from "./drbena-db.js";
+import { queuedMoment } from "./publish-queue.js";
 import { readArticle, readCreatedOn, redactedFlag, textWasEdited } from "./db.js";
 import { pragueNow } from "./waste.js";
 import { forgetProposal, linkEventsToArticle } from "./events-db.js";
@@ -179,7 +181,7 @@ export async function approveProposal(env, request, input) {
   if (!input.id) return { ok: false, error: "Ten návrh už tu není." };
   const proposal = await env.DB.prepare(
     `select p.id, p.article_id, p.author_id, p.author_name, p.image_key, p.attachments, p.submitted_title, p.submitted_excerpt,
-            p.submitted_body, p.submitted_category, p.status, p.publish_on, p.keywords, p.follows_id, u.login as author_login
+            p.submitted_body, p.submitted_category, p.status, p.publish_on, p.keywords, p.follows_id, p.follows_proposal, u.login as author_login
      from proposals p left join users u on u.id = p.author_id where p.id = ?`,
   )
     .bind(input.id)
@@ -191,7 +193,11 @@ export async function approveProposal(env, request, input) {
   // Datum nové zprávy: hlavní redaktor ho při schválení může změnit (i do budoucna), jinak datum ze zdroje nebo dnešek.
   const chosen = gate.user.role === "hlavni" ? readCreatedOn(input.createdOn) : { date: null };
   if (chosen.error) return { ok: false, error: chosen.error };
-  const createdOn = chosen.date ?? (proposal.publish_on ? String(proposal.publish_on) : pragueNow().date);
+  let createdOn = chosen.date ?? (proposal.publish_on ? String(proposal.publish_on) : pragueNow().date);
+  // Nový článek od Drběny s dnešním datem jde přes frontu zveřejnění (src/publish-queue.js), ať schválení
+  // několika návrhů za sebou nevypustí všechno najednou. Datum ze zdroje nebo jiné datum od redakce platí jako dřív.
+  const queued = !proposal.article_id && !proposal.publish_on && createdOn === pragueNow().date ? await queueBotProposal(env, proposal) : null;
+  if (queued) createdOn = queued.day;
 
   let article = null;
   if (proposal.article_id) {
@@ -260,8 +266,8 @@ export async function approveProposal(env, request, input) {
     const edited = textWasEdited(submitted, finalText);
     const inserted = await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source, published, created_at, author_id, author_name, redacted,
-         keywords, follows_id, published_at)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+         keywords, follows_id, follows_proposal, published_at)
+       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         slug,
@@ -282,9 +288,11 @@ export async function approveProposal(env, request, input) {
         // Upravený text dostane nová klíčová slova z cronu, neupravený si nechá ta od Drběny.
         edited ? "" : String(proposal.keywords ?? ""),
         proposal.follows_id ?? null,
-        publishMoment(createdOn),
+        proposal.follows_proposal ?? null,
+        queued?.publishedAt ?? publishMoment(createdOn),
       )
       .run();
+    await resolveFollows(env, proposal.id, Number(inserted.meta?.last_row_id));
     await linkImports(env, proposal.id, Number(inserted.meta?.last_row_id));
     await linkEventsToArticle(env, proposal.id, Number(inserted.meta?.last_row_id));
   }
@@ -313,7 +321,22 @@ export async function approveProposal(env, request, input) {
   for (const key of new Set([...attachments.removed, ...attachmentKeys(article?.attachments), ...attachmentKeys(proposal.attachments)])) {
     await releaseImage(env, key);
   }
-  return { ok: true, planned: !article && createdOn > pragueNow().date };
+  return { ok: true, planned: !article && createdOn > pragueNow().date, queued: Boolean(queued) && queued.publishedAt > sqlStamp(new Date()) };
+}
+
+// Zprávy a návrhy, které navazovaly na schválený návrh (`follows_proposal`), teď navazují na jeho zprávu.
+async function resolveFollows(env, proposalId, articleId) {
+  await env.DB.batch([
+    env.DB.prepare("update articles set follows_id = ?, follows_proposal = null where follows_proposal = ?").bind(articleId, proposalId),
+    env.DB.prepare("update proposals set follows_id = ?, follows_proposal = null where follows_proposal = ?").bind(articleId, proposalId),
+  ]);
+}
+
+// Čas ve frontě zveřejnění pro návrh od Drběny, nebo null (návrh od člověka, vypnutá fronta).
+async function queueBotProposal(env, proposal) {
+  if (String(proposal.author_login ?? "") !== BOT_LOGIN) return null;
+  const { spread } = await loadDrbena(env);
+  return spread.on ? queuedMoment(env, spread) : null;
 }
 
 export async function rejectProposal(env, request, input) {
