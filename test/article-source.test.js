@@ -33,9 +33,9 @@ test("řádek se zdrojem: odkazy, escapování, víc zdrojů", () => {
 test("patička: navazující zpráva, zdroj a další řádky, bez nich nic", () => {
   assert.deepEqual(footLines({ followsSlug: "", source: "" }), []);
   assert.equal(articleFoot({ followsSlug: "", source: "" }), "");
-  const foot = articleFoot({ followsSlug: "kvitek", source: "facebook" }, ["Pokecejte"]);
+  const foot = articleFoot({ followsSlug: "kvitek", followsTitle: "Kvítek & spol. otevírá", source: "facebook" }, ["Pokecejte"]);
   assert.equal(
     foot,
-    '<footer class="article-foot"><p>Kdo to minule propásl, <a href="/zpravy/kvitek">může si to přečíst tady</a>.</p><p>Zdroj: facebook</p><p>Pokecejte</p></footer>',
+    '<footer class="article-foot"><p>Minule jsem psala: <a href="/zpravy/kvitek">Kvítek &amp; spol. otevírá</a></p><p>Zdroj: facebook</p><p>Pokecejte</p></footer>',
   );
 });

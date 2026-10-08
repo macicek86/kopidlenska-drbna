@@ -53,14 +53,15 @@ export function sourceLine(text) {
   return `${parts.length > 1 ? "Zdroje" : "Zdroj"}: ${parts.map(partHtml).join(", ")}`;
 }
 
-export function followsLine(slug) {
+// Drběna si pamatuje, co minule psala: nadpis té zprávy celý jako odkaz (dlouhý se zalomí).
+export function followsLine(slug, title = "") {
   if (!slug) return "";
-  return `Kdo to minule propásl, <a href="/zpravy/${encodeURIComponent(slug)}">může si to přečíst tady</a>.`;
+  return `Minule jsem psala: <a href="/zpravy/${encodeURIComponent(slug)}">${esc(title || "tady")}</a>`;
 }
 
 // Řádky patičky jako HTML odstavce (web i feed). `extra` jsou další hotové řádky (pozvánka na Facebook).
 export function footLines(article, extra = []) {
-  return [followsLine(article.followsSlug), sourceLine(article.source), ...extra].filter(Boolean);
+  return [followsLine(article.followsSlug, article.followsTitle), sourceLine(article.source), ...extra].filter(Boolean);
 }
 
 export function articleFoot(article, extra = []) {

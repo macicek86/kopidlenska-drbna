@@ -63,7 +63,7 @@ export { ensureSchema } from "./schema.js";
 export { loadYards, removeClosure, removeYard, saveClosure, saveYard } from "./yards-db.js";
 export { loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorHours } from "./doctors-db.js";
 const ARTICLE_FIELDS =
-  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.published_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, a.source, f.slug as follows_slug, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
+  "a.id, a.slug, a.title, a.excerpt, a.body, a.category, a.rubric_id, a.image_key, a.image_focus, a.image_caption, a.attachments, a.published, a.created_at, a.published_at, a.author_id, a.author_name, a.redacted, a.signed_drbena, a.source, f.slug as follows_slug, f.title as follows_title, u.alias as author_alias, r.name as rubric_name, r.slug as rubric_slug, parent.name as parent_name, parent.slug as parent_slug";
 // Seznamy zpráv text nepotřebují, ten je jen v detailu a v redakci.
 const ARTICLE_LIST_FIELDS = ARTICLE_FIELDS.replace("a.body, ", "").replace("a.attachments, ", "");
 const ARTICLE_FROM =
@@ -119,6 +119,7 @@ function mapArticle(row) {
     redacted: asBool(row.redacted),
     source: String(row.source ?? ""),
     followsSlug: row.follows_slug ? String(row.follows_slug) : "",
+    followsTitle: row.follows_slug ? String(row.follows_title ?? "") : "",
   };
 }
 
