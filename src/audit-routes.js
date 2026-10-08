@@ -201,6 +201,7 @@ const ROUTES = {
   "/redakce/drbena/ulozit": [single("drbena_settings", "nastavení")],
   "/redakce/drbena/navazujici": [single("drbena_settings", "nastavení")],
   "/redakce/drbena/pamet": [single("drbena_settings", "nastavení")],
+  "/redakce/drbena/rozestup": [single("drbena_settings", "nastavení")],
   "/redakce/drbena/pomocnik": [single("assist_settings", "nastavení")],
   "/redakce/chat/ulozit": [single("chat_settings", "nastavení")],
   "/redakce/chat/smazat-otazky": "always",

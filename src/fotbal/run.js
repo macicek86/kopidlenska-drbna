@@ -67,6 +67,13 @@ async function articleImage(env, item, settings, fetchImpl) {
   return key;
 }
 
+// Zpráva ze stejného víkendu, na kterou Drběna navázala, jen když opravdu existuje.
+async function knownArticleId(env, id) {
+  if (!id) return null;
+  const row = await env.DB.prepare("select id from articles where id = ?").bind(id).first();
+  return row ? id : null;
+}
+
 // Ručně vybranou aktualitu Drběna napíše vždy (redakce rozhodla) a s datem ze zdroje. Cron píše s dnešním datem.
 // Když datum ve zdroji nesedí (den v týdnu, rozpis), článek jde jako návrh, i když se má rovnou zveřejňovat.
 // Co opravily oficiální údaje z fotbalunas.cz, návrh nevynutí: Drběna píše správně a redakce se to dozví v poznámce.
@@ -100,6 +107,8 @@ export async function processFootball(env, item, settings, { fetchImpl = fetch, 
     autoPublish: settings.autoPublish && !doubts.length,
     rubric: await targetRubric(env, settings),
     publishOn: item.manual ? footballSourceDate(item, today) : "",
+    spread: !item.manual,
+    followsId: await knownArticleId(env, answer.article.followsId),
   });
   const reason = [
     fixes.length ? `Opraveno podle fotbalunas.cz: ${fixes.join(" ")}` : "",

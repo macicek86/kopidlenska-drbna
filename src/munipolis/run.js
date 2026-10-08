@@ -118,6 +118,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
       autoPublish: settings.autoPublish,
       rubrics,
       publishOn: item.manual ? importSourceDate(item, today) : "",
+      spread: !item.manual,
     });
     const eventId = await saveFollowupEvent(env, answer, item, made, settings.autoPublish);
     await finishItem(env, item.id, { status: "hotovo", reason: noteReads(followupReason(answer), answer), duplicateOf: answer.duplicateOf, eventId, ...made });
@@ -141,6 +142,7 @@ export async function processItem(env, item, settings, { fetchImpl = fetch, ask 
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
         publishOn: item.manual ? importSourceDate(item, today) : "",
+        spread: !item.manual,
       }),
     );
   }

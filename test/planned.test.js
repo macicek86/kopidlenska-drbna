@@ -37,3 +37,36 @@ test("čas zveřejnění: pražská hodina, a když už minula, hned", () => {
   assert.equal(publishNote("2026-10-09 05:00:00", night), "vyjde v 7:00");
   assert.equal(publishNote("2026-10-09 08:15:00", late), "vyšel");
 });
+
+test("fronta zveřejnění: v noci napsané vyjdou ráno s rozestupem, přes den hned, večer až zítra", async () => {
+  const { spreadMoment, SPREAD_DEFAULTS } = await import("../src/publish-queue.js");
+  const settings = { ...SPREAD_DEFAULTS, gapMin: 40, gapMax: 120 };
+  const half = () => 0.5; // rozestup 80 minut
+  const night = new Date("2026-10-09T00:15:00Z"); // 2:15 v Praze
+  const first = spreadMoment([], night, settings, half);
+  assert.deepEqual(first, { day: "2026-10-09", publishedAt: "2026-10-09 05:00:00" });
+  const second = spreadMoment([first.publishedAt], night, settings, half);
+  assert.equal(second.publishedAt, "2026-10-09 06:20:00");
+  assert.equal(spreadMoment([first.publishedAt, second.publishedAt], night, settings, half).publishedAt, "2026-10-09 07:40:00");
+  // Přes den po dlouhé pauze hned (na celou minutu nahoru), těsně po jiné zprávě s rozestupem.
+  const noon = new Date("2026-10-09T10:15:30Z");
+  assert.equal(spreadMoment(["2026-10-09 07:40:00"], noon, settings, half).publishedAt, "2026-10-09 10:16:00");
+  assert.equal(spreadMoment(["2026-10-09 10:00:00"], noon, settings, half).publishedAt, "2026-10-09 11:20:00");
+  // Naplánovaná zpráva (Kam vyrazit v 7:00) se obejde, vzdálená nevadí.
+  assert.equal(spreadMoment(["2026-10-09 05:00:00"], night, settings, half).publishedAt, "2026-10-09 06:20:00");
+  assert.equal(spreadMoment(["2026-10-09 16:00:00"], night, settings, half).publishedAt, "2026-10-09 05:00:00");
+  // Večer po 21:00 se přesune na další den i s datem zprávy.
+  const late = new Date("2026-10-09T18:30:00Z"); // 20:30 v Praze
+  assert.deepEqual(spreadMoment(["2026-10-09 18:20:00"], late, settings, half), { day: "2026-10-10", publishedAt: "2026-10-10 05:00:00" });
+});
+
+test("fronta zveřejnění: nastavení z formuláře", async () => {
+  const { readSpreadInput } = await import("../src/drbena-db.js");
+  assert.deepEqual(readSpreadInput({ spread: true, spreadFrom: "7", spreadTo: "21:00", spreadMin: "40", spreadMax: "120" }), {
+    ok: true,
+    spread: { on: true, from: "07:00", to: "21:00", gapMin: 40, gapMax: 120 },
+  });
+  assert.equal(readSpreadInput({ spreadFrom: "21:00", spreadTo: "7:00", spreadMin: "40", spreadMax: "120" }).ok, false);
+  assert.equal(readSpreadInput({ spreadFrom: "7:00", spreadTo: "21:00", spreadMin: "90", spreadMax: "60" }).ok, false);
+  assert.equal(readSpreadInput({ spreadFrom: "7:00", spreadTo: "21:00", spreadMin: "1", spreadMax: "60" }).ok, false);
+});

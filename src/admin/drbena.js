@@ -3,6 +3,7 @@ import { DEFAULT_FOOTBALL, DEFAULT_PERSONA, FOOTBALL_MAX, PERSONA_MAX, ownFootba
 import { ASSIST_BOUNDS } from "../assist/store.js";
 import { TRY_DEMO, TRY_KINDS, TRY_TEXT_MAX } from "../drbena-try.js";
 import { NOTICE_KINDS } from "../notices.js";
+import { GAP_BOUNDS, SPREAD_DEFAULTS } from "../publish-queue.js";
 import { esc } from "../view.js";
 import { refLink } from "./imports.js";
 import { adminShell } from "./shell.js";
@@ -27,6 +28,27 @@ function followupPanel(drbena) {
       <header class="panel-head"><h2>Navazující zprávy</h2>${drbena.followupPublish ? badge("Rovnou na web", "info") : badge("Jako návrh")}</header>
       <p class="panel-note">Když o věci už na drbně zpráva je a Munipolis, Deník nebo škola přinesou něco nového (výsledek, jména, jiný termín), napíše Drběna navazující zprávu s odkazem na tu původní. K jedné zprávě nejvýš dvě.</p>
       ${check("followupPublish", "1", drbena.followupPublish, "Navazující zprávy rovnou zveřejňovat", "Jen u importů, které zveřejňují rovnou. Bez zaškrtnutí čeká každá navazující zpráva jako návrh.")}
+      <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
+    </form>`;
+}
+
+// Fronta zveřejnění (src/publish-queue.js): automatické zprávy s rozestupem a jen přes den.
+function spreadPanel(spread) {
+  const time = (name, value) => `<input class="${input}" type="time" name="${name}" value="${esc(value)}" required>`;
+  const minutes = (name, value) =>
+    `<input class="${input}" type="number" name="${name}" value="${value}" min="${GAP_BOUNDS.min}" max="${GAP_BOUNDS.max}" step="1" inputmode="numeric" required>`;
+  return `<form class="panel form" method="post" action="${BASE}/rozestup" data-dirty>
+      <header class="panel-head"><h2>Rozestup zveřejňování</h2>${spread.on ? badge("Zapnuto", "info") : badge("Vypnuto")}</header>
+      <p class="panel-note">Zprávy, které Drběna z Munipolisu, Deníku, škol, webu města a fotbalu zveřejňuje sama, nevyjdou všechny najednou. Každá dostane čas s náhodným rozestupem od ostatních, a jen přes den: co Drběna napíše v noci, vyjde ráno. Mimo frontu jde, co pustí redakce ručně, uzavírky silnic a Kam vyrazit (má vlastní čas).</p>
+      ${check("spread", "1", spread.on, "Zveřejňovat s rozestupem", "Bez zaškrtnutí jde zpráva na web hned, jak ji Drběna napíše.")}
+      <div class="pair">
+        ${field("Nejdřív v", time("spreadFrom", spread.from))}
+        ${field("Nejpozději v", time("spreadTo", spread.to), "Co by vyšlo později, vyjde druhý den ráno.")}
+      </div>
+      <div class="pair">
+        ${field("Rozestup nejméně (min)", minutes("spreadMin", spread.gapMin))}
+        ${field("Rozestup nejvíc (min)", minutes("spreadMax", spread.gapMax))}
+      </div>
       <div class="form-foot"><span class="form-foot-gap"></span><button class="btn btn-primary" type="submit">Uložit</button></div>
     </form>`;
 }
@@ -135,7 +157,7 @@ function samplePanel(trial, unsaved) {
 
 // `trial` je zkouška povahy: { input, result }. Povaha se pak ukáže tak, jak byla v polích.
 export function adminDrbena(ctx, data, message, trial = null) {
-  const drbena = data.drbena ?? { persona: "", football: "", followupPublish: false, memory: true };
+  const drbena = data.drbena ?? { persona: "", football: "", followupPublish: false, memory: true, spread: SPREAD_DEFAULTS };
   const persona = trial ? trial.input.persona.trim() || DEFAULT_PERSONA : drbena.persona || DEFAULT_PERSONA;
   const football = trial ? trial.input.football.trim() || DEFAULT_FOOTBALL : drbena.football || DEFAULT_FOOTBALL;
   const ownP = trial ? ownPersona(persona) : drbena.persona;
@@ -154,6 +176,7 @@ export function adminDrbena(ctx, data, message, trial = null) {
     </form>
     ${followupPanel(drbena)}
     ${memoryPanel(drbena)}
+    ${spreadPanel(drbena.spread ?? SPREAD_DEFAULTS)}
     ${assistPanel(data.assist)}
     ${tryPanel(trial?.input)}
     ${trial ? samplePanel(trial, unsaved) : ""}`;

@@ -139,6 +139,7 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
       autoPublish: settings.autoPublish,
       rubrics,
       publishOn,
+      spread: !item.manual,
     });
     await finishSkolaItem(env, source, item.id, {
       status: "hotovo",
@@ -175,6 +176,7 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
         autoPublish: settings.autoPublish,
         rubric: rubrics.get(answer.article.rubric),
         publishOn,
+        spread: !item.manual,
       }),
     );
   }

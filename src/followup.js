@@ -116,7 +116,7 @@ async function writeFollowupBase(env, decision, { system, sourceText, articleSch
 }
 
 // Uloží navazující zprávu. Odkaz na starou zprávu dá web pod čáru podle `follows_id` (src/article-source.js). Rovnou na web jen když import zveřejňuje rovnou a redakce to u doplnění dovolila.
-export async function saveFollowup(env, answer, { image, source, autoPublish, rubrics, publishOn = "" }) {
+export async function saveFollowup(env, answer, { image, source, autoPublish, rubrics, publishOn = "", spread = false }) {
   const { followupPublish } = await loadDrbena(env);
   const rubric = rubrics.get(answer.article.rubric) ?? rubrics.get(answer.target.rubricSlug) ?? [...rubrics.values()][0];
   return saveBotArticle(env, {
@@ -127,6 +127,7 @@ export async function saveFollowup(env, answer, { image, source, autoPublish, ru
     rubric,
     publishOn,
     followsId: answer.target.id,
+    spread,
   });
 }
 

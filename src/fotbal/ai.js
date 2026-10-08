@@ -27,13 +27,14 @@ Pravidla:
 - Skóre piš jako 7:6, poločas v závorce (3:3). Jména hráčů piš tak, jak jsou ve zdroji.
 - V přehledu a v oddílu „Možná souvisí“ (když je, ukazuje starší zprávy z archivu drbny) najdeš i dřívější zápasy. U zápasu smíš jednou větou připomenout předchozí zápas stejného týmu (A, B, nebo C) se stejným soupeřem, třeba „Na podzim Céčko Libuň doma porazilo 3:1.“ Řekni, kdy to bylo, a ber jen výsledek a fakta z nadpisu a perexu té zprávy. Když si nejsi jistá, že jde o stejný tým i soupeře, nepiš to. Výsledek dnešního zápasu má vždy přednost.
 - Taková věta a vzpomínka na akci (když ji pokyny dovolují) dohromady nanejvýš jednou v článku.
+- Víkend: když je v přehledu zpráva (zprava:…) o jiném zápase Kopidla ze stejného víkendu (třeba sobotní, a ty píšeš o nedělním, klidně jiného týmu), navaž na ni jednou větou, třeba „Po sobotní výhře áčka si v neděli zahrálo i béčko.“ Ber jen výsledek a fakta z jejího nadpisu a perexu. Do follows dej její značku, drbna pod článek přidá odkaz. Jinak nech follows prázdné. Tahle věta se do limitu výše nepočítá.
 - Kopidlno může hrát doma i venku. Kdo je domácí, poznáš podle pořadí v nadpisu (první je domácí).
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny. U zápasu ať je v nadpisu výsledek nebo soupeř.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li> a <h3>. Odkaz na zdroj nepiš, drbna ho doplní sama.
 ${KEYWORDS_RULE} U zápasu dej do nich soupeře, soutěž a datum zápasu.
 - recall: značka akce, na kterou v článku vzpomínáš (jen když to dovolují pravidla paměti), třeba "akce:12". Jinak prázdné.
-- U "preskocit" a "duplicita" nech článek prázdný.
+- U "preskocit" a "duplicita" nech článek prázdný i follows.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
 
 const FORCE = "Redakce chce tuhle aktualitu zpracovat, i když jsi ji předtím přeskočila nebo měla za duplicitu. Nevracej \"preskocit\" ani \"duplicita\".";
@@ -44,7 +45,7 @@ export function footballSchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords", "recall"],
+    required: ["decision", "reason", "duplicate_of", "title", "excerpt", "body_html", "keywords", "recall", "follows"],
     properties: {
       decision: { type: "string", enum: ["vytvorit", "preskocit", "duplicita"] },
       reason: { type: "string" },
@@ -54,6 +55,7 @@ export function footballSchema() {
       body_html: { type: "string" },
       keywords: keywordsSchema(),
       recall: { type: "string" },
+      follows: { type: "string" },
     },
   };
 }
@@ -107,6 +109,12 @@ function clean(value, max) {
 
 const REF = /^(zprava|navrh|fotbal):\d+$/;
 
+// Zpráva ze stejného víkendu, na kterou článek navazuje („zprava:12“ → 12), jinak null.
+function readFollows(value) {
+  const match = String(value ?? "").trim().match(/^zprava:(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
 export function readFootballDecision(raw, { force = false } = {}) {
   if (!raw || typeof raw !== "object") return { ok: false, error: "Claude nevrátil rozhodnutí." };
   let decision = ["vytvorit", "preskocit", "duplicita"].includes(raw.decision) ? raw.decision : "";
@@ -126,7 +134,7 @@ export function readFootballDecision(raw, { force = false } = {}) {
     decision,
     reason,
     duplicateOf: "",
-    article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords), recall: readRecall(raw.recall) },
+    article: { title, excerpt, body: prepared.html, keywords: readKeywords(raw.keywords), recall: readRecall(raw.recall), followsId: readFollows(raw.follows) },
   };
 }
 
