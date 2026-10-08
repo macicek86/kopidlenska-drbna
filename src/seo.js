@@ -7,7 +7,7 @@ import { rubricHref } from "./rubric-nav.js";
 const LOGO = "/kozel-maskot.webp";
 
 // Stránky webu, které mají být ve vyhledávači. Popelnicová subdoména má jen titulku.
-const PAGES = ["/", "/zpravy", "/akce", "/reklamy", "/popelnice", "/sberne-dvory", "/lekari", "/oteviraci-doba", "/odstavky", "/odber", "/o-nas"];
+const PAGES = ["/", "/zpravy", "/akce", "/reklamy", "/popelnice", "/sberne-dvory", "/lekari", "/oteviraci-doba", "/odstavky", "/odber", "/upozorneni", "/o-nas"];
 
 export function robotsTxt(origin) {
   return `User-agent: *

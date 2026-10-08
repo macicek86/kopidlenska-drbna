@@ -137,17 +137,19 @@ test("stav ze služby prohlížeče", () => {
   assert.equal(sendOutcome(0), "retry");
 });
 
-test("stránka Upozornění: noindex, vypnutá témata chybí, bez klíčů nejde zapnout", () => {
+test("stránka Upozornění: vypnutá témata chybí, bez klíčů nejde zapnout a nepatří do vyhledávačů", () => {
   const ctx = { path: "/upozorneni", origin: "https://drbna.test", mainOrigin: "https://drbna.test", copy: {} };
   const lists = { rubrics: [], places: [{ id: 1, label: "Úřad" }], doctors: [], yards: [] };
   const settings = mapPushSettings({ enabled: 1, topics_off: "svoz" });
   const page = pushPage(ctx, { lists, settings, publicKey: "KEY" });
-  assert.match(page, /<meta name="robots" content="noindex">/);
+  assert.doesNotMatch(page, /noindex/);
   assert.match(page, /data-key="KEY"/);
   assert.match(page, /value="hodiny"/);
   assert.doesNotMatch(page, /value="svoz"/);
   assert.match(page, /name="places" value="1"/);
-  assert.doesNotMatch(pushPage(ctx, { lists, settings, publicKey: "" }), /data-push /);
+  const off = pushPage(ctx, { lists, settings, publicKey: "" });
+  assert.doesNotMatch(off, /data-push /);
+  assert.match(off, /<meta name="robots" content="noindex">/);
 });
 
 test("manifest: Safari dostane standalone kvůli upozorněním na iPhonu, ostatní browser, ať se drbna nenabízí k instalaci", async () => {
@@ -167,4 +169,18 @@ test("manifest: Safari dostane standalone kvůli upozorněním na iPhonu, ostatn
   const response = manifestResponse(new Request("https://drbna.test/site.webmanifest", { headers: { "user-agent": UA.android } }));
   assert.equal(response.headers.get("vary"), "User-Agent");
   assert.equal((await response.json()).icons.length, 3);
+});
+
+test("zvoneček, odkaz v patičce a nabídka jen se zapnutými upozorněními", async () => {
+  const { layout } = await import("../src/view.js");
+  const base = { title: "T", description: "D", path: "/", origin: "https://drbna.test", mainOrigin: "https://drbna.test", body: "", copy: {} };
+  const on = layout({ ...base, push: { enabled: true } });
+  assert.match(on, /data-push-bell/);
+  assert.match(on, /href="\/upozorneni">Upozornění do telefonu/);
+  assert.match(on, /<template data-push-offer>/);
+  assert.match(on, /push-bell\.js/);
+  for (const push of [null, { enabled: false }]) {
+    const page = layout({ ...base, push });
+    assert.doesNotMatch(page, /data-push-bell|upozorneni|push-bell/);
+  }
 });

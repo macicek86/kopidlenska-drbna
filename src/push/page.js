@@ -1,5 +1,5 @@
-// Stránka /upozorneni: zapnutí upozornění v prohlížeči a výběr, co chodí. Zatím na ni nevede žádný odkaz
-// (noindex, není v sitemap), redakce ji zkouší přímo podle adresy. Chování je v public/push.js.
+// Stránka /upozorneni: zapnutí upozornění v prohlížeči a výběr, co chodí. Odkaz na ni je ve zvonečku v hlavičce
+// a v patičce (src/push/promo.js). Chování je v public/push.js.
 import { text as tx } from "../copy.js";
 import { esc } from "../html.js";
 import { layout } from "../view.js";
@@ -77,7 +77,8 @@ export function pushPage(ctx, { lists, settings, publicKey }) {
     ...ctx,
     title: `Upozornění | ${tx(ctx.copy, "site_name")}`,
     description: "Drbna vám dá vědět, když se mění otevírací doba, jde se do sběrného dvora, koná se akce nebo vyšla zpráva.",
-    noindex: true,
+    // Bez klíčů nebo s vypnutými upozorněními stránka nic neumí: do vyhledávačů nepatří.
+    noindex: !live,
     head: `<link rel="stylesheet" href="/push.css">`,
     script: live ? `<script src="/push.js" defer></script>` : "",
     body: `

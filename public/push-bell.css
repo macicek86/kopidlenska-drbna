@@ -1,0 +1,76 @@
+/* Zvoneček upozornění v hlavičce a jednorázová nabídka dole (src/push/promo.js, public/push-bell.js). */
+.top-end { display: flex; align-items: center; gap: 0.5rem; }
+.push-bell {
+  display: inline-grid;
+  place-items: center;
+  width: 2.6rem;
+  height: 2.6rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+}
+.push-bell[hidden] { display: none; }
+.push-bell svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.push-bell:hover, .push-bell.is-current { background: var(--paper-deep); }
+.push-bell.is-on { color: var(--brand); }
+.push-bell.is-on svg path:first-child { fill: currentColor; }
+
+/* Bublina, kterou říká Drběna z tlačítka chatu vpravo dole, ocáskem dolů k ní.
+   Ocásek míří na Drběnu: na počítači má tlačítko i nápis, `--push-tail` dopočítá public/push-bell.js. */
+.push-offer {
+  position: fixed;
+  right: 1rem;
+  bottom: 5.4rem;
+  z-index: 60;
+  display: grid;
+  gap: 0.75rem;
+  width: calc(100vw - 2rem);
+  max-width: 21rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 1.3rem;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  animation: push-offer-in 0.3s ease-out;
+  transform-origin: right bottom;
+}
+.push-offer::after {
+  content: "";
+  position: absolute;
+  right: var(--push-tail, 1.6rem);
+  bottom: -0.55rem;
+  width: 1rem;
+  height: 1rem;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  transform: rotate(45deg);
+}
+.push-offer-icon { display: none; }
+.push-offer p { margin: 0; line-height: 1.45; font-weight: 600; }
+.push-offer-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.push-offer-goat { display: none; }
+/* Bez chatu: Drběna stojí pod bublinou tam, kde jinak bývá tlačítko chatu. */
+.push-offer.with-goat .push-offer-goat {
+  display: block;
+  position: fixed;
+  right: 1.1rem;
+  bottom: 0.8rem;
+  width: 4.2rem;
+  height: 4.2rem;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.2));
+}
+/* Dvě bubliny najednou by byly moc: „Zeptej se mě!“ chatu počká. */
+body:has(.push-offer) .chat-hint { display: none; }
+
+@keyframes push-offer-in {
+  from { opacity: 0; transform: translateY(0.5rem) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .push-offer { animation: none; }
+}
+/* Otevřený chat má přednost, bublina počká pod ním. */
+body:has(.chat.is-open) .push-offer { display: none; }

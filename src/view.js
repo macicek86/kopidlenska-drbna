@@ -8,6 +8,7 @@ import { WEEK_DAYS } from "./yards.js";
 import { jsonLdTag } from "./seo.js";
 import { welcomeTemplate } from "./welcome.js";
 import { anyFeedOn, feedOn } from "./feeds/settings.js";
+import { pushBell, pushFooterLink, pushOffer, pushOffered } from "./push/promo.js";
 
 // Ikony webu (koza Drběna na minci): ICO pro staré prohlížeče a Windows, PNG pro ostatní, Apple zvlášť.
 export const FAVICON_TAGS = `<link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -78,6 +79,7 @@ export function layout({
   feeds = [],
   feedOn: switches = null,
   chat = null,
+  push = null,
 }) {
   const base = siteOrigin(origin, mainOrigin);
   const pagePath = typeof canonical === "string" && canonical.startsWith("/")
@@ -100,11 +102,16 @@ export function layout({
   // Na mobilu jsou služby na konci pod nadpisem, ať k nim nepatří Reklamy a O nás.
   const mobileLinks = `${NAV.filter((entry) => entry !== PRACTICAL).map(link).join("")}<p class="nav-head">${practical}</p>${PRACTICAL.map(link).join("")}`;
   const welcome = welcomeTemplate(copy, Boolean(chat));
-  const headerNav = `<nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
+  // Upozornění do prohlížeče (src/push/promo.js): zvoneček, odkaz v patičce, jednorázová nabídka.
+  const offered = pushOffered(push);
+  const headerNav = `<div class="top-end">
+       <nav class="nav" aria-label="Hlavní">${desktopLinks}</nav>
+       ${offered ? pushBell(copy, path) : ""}
        <details class="mobile-nav">
          <summary>${esc(tx(copy, "menu_label"))}</summary>
          <nav aria-label="Mobilní">${mobileLinks}</nav>
-       </details>`;
+       </details>
+     </div>`;
   return `<!doctype html>
 <html lang="cs">
 <head>
@@ -145,6 +152,7 @@ export function layout({
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,650&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/site.css">
   ${chat ? `<link rel="stylesheet" href="/chat.css">` : ""}
+  ${offered ? `<link rel="stylesheet" href="/push-bell.css">` : ""}
   ${head}
 </head>
 <body>
@@ -162,12 +170,14 @@ export function layout({
       <p>${esc(tx(copy, "footer_copy"))}</p>
       ${facebook ? `<p><a href="${esc(facebook)}" rel="noopener">${esc(tx(copy, "footer_facebook"))}</a></p>` : ""}
       ${anyFeedOn(switches) ? `<p><a href="/odber">${esc(tx(copy, "footer_feeds"))}</a></p>` : ""}
+      ${offered ? pushFooterLink(copy) : ""}
       <p class="fine">${esc(tx(copy, "footer_fine"))}</p>
       <a href="/redakce">${esc(tx(copy, "footer_admin"))}</a>
     </footer>
   </div>
   ${script}
   <script src="/nav.js" defer></script>
+  ${offered ? `${pushOffer(copy)}<script src="/push-bell.js" defer></script>` : ""}
   ${welcome ? `${welcome}<script src="/welcome.js" defer></script>` : ""}
   ${chat ? `<div class="chat" data-chat data-sitekey="${esc(chat.siteKey)}" data-ideas="${esc(JSON.stringify(chat.ideas ?? []))}"${facebook ? ` data-facebook="${esc(facebook)}"` : ""}></div><script src="/chat.js" defer></script>` : ""}
 </body>

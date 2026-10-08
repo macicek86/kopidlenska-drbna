@@ -88,6 +88,8 @@ import { mailinPost } from "./post-mailin.js";
 import { receiveMail } from "./mailin/run.js";
 import { PUSH_PAGE, pushPageHtml, pushPost } from "./push/routes.js";
 import { PUSH_CRON, runPush } from "./push/dispatch.js";
+import { loadPushSettings } from "./push/store.js";
+import { vapidReady } from "./push/crypto.js";
 import { MANIFEST_PATH, manifestResponse } from "./manifest.js";
 
 const ASSET = /\.(?:png|webp|svg|css|ico|js|jpg|jpeg|gif|woff2|webmanifest)$/i;
@@ -181,17 +183,20 @@ async function renderGet(request, env, url, execution) {
 
   // Texty a data stránky najednou: na sobě nezávisí.
   const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
-  const [copy, data, admin, story, chat, feedOn] = await Promise.all([
+  const [copy, data, admin, story, chat, feedOn, pushSettings] = await Promise.all([
     loadCopy(env),
     PUBLIC_PAGES.has(path) ? loadPublic(env) : null,
     path.startsWith("/redakce/") ? loadAdmin(env, request) : null,
     slug == null ? null : loadStory(env, slug, path),
     path.startsWith("/redakce") ? null : chatPublic(env),
     path.startsWith("/redakce") ? null : loadFeedSettings(env),
+    path.startsWith("/redakce") ? null : loadPushSettings(env),
   ]);
   // Okénko chatu s Drběnou: jen na hlavním webu, když ho redakce zapnula.
   // feedOn: které feedy redakce nechala zapnuté (odkazy v hlavičce, na stránkách a strukturovaná data hodin).
-  const ctx = { ...base, copy, feedOn, chat: chat ? { ...chat, siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
+  // push: zvoneček a nabídka upozornění (src/push/promo.js), jen když jdou zapnout.
+  const push = pushSettings && vapidReady(env) ? pushSettings : null;
+  const ctx = { ...base, copy, feedOn, push, chat: chat ? { ...chat, siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
   if (path === "/popelnice") return html(binsPage(data.waste, ctx));
   // Upozornění do prohlížeče (src/push/): zatím bez odkazu na webu.
