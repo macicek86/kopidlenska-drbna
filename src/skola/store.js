@@ -167,30 +167,28 @@ export const selectSkolaItems = (env, source, ids) => markManual(env, source.ite
 
 // Nové články si zapamatuje. Starší (`isOld`) jen odloží stranou.
 export async function rememberSkolaItems(env, source, items, { isOld = () => false } = {}) {
-  let added = 0;
-  for (const item of items) {
-    const status = isOld(item) ? "stare" : "nove";
-    const result = await env.DB.prepare(
-      `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, documents, section, term, published_at, status, reason)
-       values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-      .bind(
-        item.guid,
-        item.link,
-        item.title,
-        item.text,
-        JSON.stringify(item.images),
-        JSON.stringify(item.documents ?? []),
-        item.section,
-        item.term,
-        item.publishedAt,
-        status,
-        status === "stare" ? STALE_REASON : "",
-      )
-      .run();
-    if (Number(result?.meta?.changes ?? 0) > 0 && status !== "stare") added += 1;
-  }
-  return added;
+  if (!items.length) return 0;
+  // Jedním dávkovým dotazem: zdroj vrací desítky položek a většinu už drbna zná (insert or ignore).
+  const statuses = items.map((item) => (isOld(item) ? "stare" : "nove"));
+  const insert = `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, documents, section, term, published_at, status, reason)
+    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const statements = items.map((item, index) =>
+    env.DB.prepare(insert).bind(
+      item.guid,
+      item.link,
+      item.title,
+      item.text,
+      JSON.stringify(item.images),
+      JSON.stringify(item.documents ?? []),
+      item.section,
+      item.term,
+      item.publishedAt,
+      statuses[index],
+      statuses[index] === "stare" ? STALE_REASON : "",
+    ),
+  );
+  const results = await env.DB.batch(statements);
+  return results.filter((result, index) => Number(result?.meta?.changes ?? 0) > 0 && statuses[index] !== "stare").length;
 }
 
 export async function finishSkolaItem(env, source, id, fields) {
@@ -230,6 +228,8 @@ export async function saveSkolaSettings(env, request, source, input) {
   // Škola bez pole adres (WordPress) má adresu pevnou.
   const urls = source.feedField ? readFeedUrls(input.feedUrls, source.defaultFeeds) : [];
   if (!urls) return { ok: false, error: "Každá adresa musí začínat https://." };
+  const problem = source.feedProblem && urls.map(source.feedProblem).find(Boolean);
+  if (problem) return { ok: false, error: problem };
   const aheadDays = readAheadDays(input.aheadDays);
   const before = await loadSkolaSettings(env, source);
   await env.DB.prepare(

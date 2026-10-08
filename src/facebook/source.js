@@ -1,7 +1,7 @@
 // Facebook Pages jako zdroj importu (značka `facebook`, `/redakce/facebook`, tabulky `facebook_*`). Fronta, zpracování,
 // fotky a stránka redakce jsou společné se školami a webem města (src/skola/), tady je jen čtení a pravidla.
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
-import { fetchFacebookPages } from "./api.js";
+import { fetchFacebookPages, pageProblem } from "./api.js";
 
 export const DEFAULT_PAGES = ["https://www.facebook.com/kopidlenskelisty", "https://www.facebook.com/JicinevesCZ"];
 
@@ -47,4 +47,6 @@ export const FACEBOOK_SOURCE = {
   credit: (section) => `${section || "Facebook"}${section ? " na Facebooku" : ""}`,
   itemHead: (section) => `Příspěvek z facebookové stránky ${section || "neznámé"}`,
   fetchItems: fetchFacebookPages,
+  // Adresa, která není Page, se pozná hned při uložení nastavení.
+  feedProblem: pageProblem,
 };
