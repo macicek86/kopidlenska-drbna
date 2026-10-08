@@ -1,0 +1,12 @@
+.privacy {
+  max-width: 48rem;
+  margin: 2rem auto 4rem;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  background: var(--paper, #fffdf6);
+  border-radius: 1rem;
+}
+.privacy h1 { font-size: clamp(1.8rem, 5vw, 2.7rem); line-height: 1.15; }
+.privacy h2 { margin-top: 1.8rem; font-size: 1.35rem; }
+.privacy p, .privacy li { line-height: 1.65; overflow-wrap: anywhere; }
+.privacy li { margin-bottom: .75rem; }
+.privacy a { text-decoration: underline; text-underline-offset: .15em; }

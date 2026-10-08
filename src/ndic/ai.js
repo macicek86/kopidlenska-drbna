@@ -117,7 +117,7 @@ function clean(value, max) {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
-const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|webmesta|vlozene):\d+$/;
+const REF = /^(zprava|navrh|akce|odstavka|ndic|munipolis|denik|skola|zahradka|webmesta|vlozene|facebook):\d+$/;
 
 // Ověří odpověď. U duplicity stačí značka, jinak musí být aspoň nadpis oznámení.
 export function readNdicDecision(raw, { rubricSlugs, wantArticle }) {

@@ -7,12 +7,13 @@ import { SCHEMA_VERSION } from "../src/schema.js";
 
 // Otisk migrací. Když test spadne: zvedni SCHEMA_VERSION v src/schema.js a sem napiš novou verzi a otisk,
 // jinak produkce migraci nespustí (databáze se starší verzí ji nespustí, novější verzi nikdo nezapíše).
-const KNOWN = { version: 56, fingerprint: "3b04f5b10a03256a" };
+const KNOWN = { version: 58, fingerprint: "3b04f5b10a03256a" };
 
 function sources(dir) {
   return readdirSync(dir, { withFileTypes: true })
     .flatMap((entry) => (entry.isDirectory() ? sources(join(dir, entry.name)) : [join(dir, entry.name)]))
     .filter((file) => file.endsWith(".js"))
+    .map((file) => file.replace(/\\/g, "/"))
     .sort();
 }
 
@@ -36,7 +37,7 @@ function literals(text) {
 function fingerprint() {
   const hash = createHash("sha256");
   for (const file of sources("src")) {
-    const text = readFileSync(file, "utf8");
+    const text = readFileSync(file, "utf8").replace(/\r\n/g, "\n");
     if (file.endsWith("schema.js")) {
       hash.update(text.replace(/export const SCHEMA_VERSION = \d+;/, ""));
       continue;

@@ -54,6 +54,7 @@ const BUSY = "Drběna už ten web čte. Počkejte, stránka se sama obnoví.";
 
 // Zdroj pod čarou (src/article-source.js). Dokument z úřední desky se jmenuje podle desky, vložený příspěvek podle toho, odkud je.
 export function skolaSource(link, source = SCHOOLS.skola, section = "") {
+  if (source.credit) return sourceEntry(source.credit(section), link);
   if (source.pasted) return sourceEntry(pastedFrom(source, section), link);
   const label = section === DESK_SECTION ? `úřední deska ${source.name}` : `web ${source.name}`;
   return sourceEntry(label, link);
@@ -61,7 +62,7 @@ export function skolaSource(link, source = SCHOOLS.skola, section = "") {
 
 // Fotka je z webu zdroje, i když ji škole (městu) dal někdo jiný (autora uvede Drběna v popisku, když ho škola zmíní).
 export function photoCaption(caption, source = SCHOOLS.skola, section = "") {
-  const credit = source.pasted ? `foto: ${pastedFrom(source, section)}` : `foto: web ${source.name}`;
+  const credit = source.credit ? `foto: ${source.credit(section)}` : source.pasted ? `foto: ${pastedFrom(source, section)}` : `foto: web ${source.name}`;
   return caption ? `${caption} (${credit})` : `F${credit.slice(1)}`;
 }
 
@@ -196,7 +197,7 @@ async function handleSkolaItem(env, source, item, settings, { fetchImpl = fetch,
 
 // Stáhne RSS a nové články si zapamatuje. Rychlé, takže běží i přímo po kliknutí.
 async function collect(env, source, settings, fetchImpl) {
-  const feed = await source.fetchItems(settings.feedUrls, { fetchImpl });
+  const feed = await source.fetchItems(settings.feedUrls, { fetchImpl, env });
   await noteSource(env, { ...healthRow(source), items: feed.ok ? feed.items.length : null, error: feed.ok ? feed.warning ?? "" : feed.error });
   if (!feed.ok) {
     await writeSkolaStatus(env, source, { status: "error", note: feed.error });

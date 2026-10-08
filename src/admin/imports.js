@@ -21,6 +21,7 @@ export function refLink(ref) {
     zahradka: ["/redakce/zahradka?zprava=", "Článek zahradnické školy"],
     webmesta: ["/redakce/webmesta?zprava=", "Článek z webu města"],
     vlozene: ["/redakce/vlozene?zprava=", "Vložený příspěvek"],
+    facebook: ["/redakce/facebook?zprava=", "Příspěvek z Facebooku"],
     misto: ["/redakce/oteviraci-doba?id=", "Místo"],
     lekar: ["/redakce/lekari?id=", "Ordinace"],
   };

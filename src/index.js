@@ -30,6 +30,7 @@ import {
 } from "./view.js";
 import { binsPage } from "./bins-view.js";
 import { aboutPage } from "./about.js";
+import { privacyPage, deletionPage } from "./privacy.js";
 import { media } from "./images.js";
 import { articlePage, newsPage } from "./news.js";
 import { renderAdmin } from "./admin-get.js";
@@ -244,6 +245,8 @@ async function renderGet(request, env, url, execution) {
   if (path === "/o-nas") {
     return html(aboutPage(data, ctx));
   }
+  if (path === "/soukromi") return html(privacyPage(ctx));
+  if (path === "/smazani-dat") return html(deletionPage(ctx));
   if (path === "/sberne-dvory") {
     return html(yardsPage(data, ctx, url.searchParams));
   }

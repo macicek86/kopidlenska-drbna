@@ -32,7 +32,7 @@ function entryDetail(source, entry) {
 function feedField(source, settings) {
   if (!source.feedField) return "";
   const urls = (settings.feedUrls?.length ? settings.feedUrls : source.defaultFeeds).join("\n");
-  return field("Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, source.feedHint);
+  return field(source.feedLabel ?? "Adresy RSS", `<textarea class="${input}" name="feedUrls" rows="3" maxlength="2000">${esc(urls)}</textarea>`, source.feedHint);
 }
 
 function aheadField(source, settings) {
@@ -50,7 +50,7 @@ function settingsForm(source, settings) {
     ${check("enabled", "1", settings.enabled, `Kontrolovat ${source.site} automaticky`, "Drbna se podívá každé čtyři hodiny a nové články rovnou zpracuje s dnešním datem. Tlačítko Zkontrolovat teď udělá totéž hned.")}
     ${field("Automaticky jen články z posledních", `<input class="${input}" type="number" name="freshDays" min="1" max="60" required value="${settings.freshDays ?? source.freshDays}">`, `Dní podle data na ${source.siteOf}. Starší články automatika nechá být a počkají, až je pustíte ručně v detailu. Ty pak dostanou datum ze zdroje.`)}
     ${aheadField(source, settings)}
-    ${check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce jako skryté.")}
+    ${source.draftsOnly ? "" : check("autoPublish", "1", settings.autoPublish, "Rovnou zveřejňovat", "Bez zaškrtnutí čeká všechno na schválení: zprávy jako návrhy, akce jako skryté.")}
     ${check("ownPhotos", "1", settings.ownPhotos, `Brát fotky z ${source.siteOf}`, `Drběna vezme fotku od článku, když je pěkná (plakát ne), a pod ni napíše, odkud je. Bez zaškrtnutí dává vždy ilustrační fotku z knihovny obrázků.`)}
     ${feedField(source, settings)}
     ${VOICE_NOTE}
