@@ -20,7 +20,7 @@ export const COPY = [
   { group: "Hlavička a patička", key: "footer_feeds", label: "Odkaz na odběr (RSS a kalendář)", value: "Odebírat zprávy a akce (RSS, kalendář)", max: 80 },
   { group: "Hlavička a patička", key: "footer_push", label: "Odkaz na upozornění", value: "Upozornění do telefonu", max: 80 },
   { group: "Upozornění", key: "push_bell", label: "Zvoneček v hlavičce (popisek, když na něj někdo najede)", value: "Upozornění", max: 40 },
-  { group: "Upozornění", key: "push_offer_text", label: "Nabídka: co říká Drběna v bublině", value: "Mééé! Můžu vám dát vědět, když je otevřený sběrný dvůr, jede popelář nebo se v Kopidlně něco děje.", max: 240, long: true, hint: "Ukáže se jen jednou, při návštěvě v jiný den než první, a jen v prohlížeči, který upozornění umí. Pak už nikdy." },
+  { group: "Upozornění", key: "push_offer_text", label: "Nabídka: co říká Drběna v bublině", value: "Mééé! Můžu vám dát vědět, když je otevřený sběrný dvůr, jede popelář nebo se v Kopidlně něco děje.", max: 240, long: true, hint: "Ukáže se nejvýš dvakrát (podruhé nejdřív za dva týdny), poprvé při návštěvě v jiný den než první, a jen v prohlížeči, který upozornění umí." },
   { group: "Upozornění", key: "push_offer_yes", label: "Nabídka: tlačítko", value: "Chci upozornění", max: 40 },
   { group: "Upozornění", key: "push_offer_no", label: "Nabídka: odmítnutí", value: "Teď ne", max: 40 },
 

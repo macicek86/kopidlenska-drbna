@@ -1,11 +1,14 @@
 // Zvoneček upozornění v hlavičce a jednorázová nabídka (src/push/promo.js).
 // Kde prohlížeč upozornění neumí, zvoneček zmizí (iPhone ho vidí: na stránce se dozví, jak drbnu přidat na plochu).
-// Nabídka vyskočí jen jednou za život prohlížeče, až při návštěvě v jiný den než první (první den má uvítací okno),
-// ne tomu, kdo už odebírá, a ne do otevřeného chatu.
+// Nabídka vyskočí nejvýš OFFER_TIMES krát a znovu nejdřív po OFFER_GAP_DAYS dnech, poprvé až při návštěvě v jiný
+// den než první (první den má uvítací okno). Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“, a ne do otevřeného chatu.
 (() => {
   const bell = document.querySelector("[data-push-bell]");
   const FIRST = "drbna-push-first";
-  const DONE = "drbna-push-offer";
+  // Kolikrát a kdy naposledy se nabídka ukázala ({ n, last }), nebo { done: true } po „Chci upozornění“.
+  const OFFER = "drbna-push-offer";
+  const OFFER_TIMES = 2;
+  const OFFER_GAP_DAYS = 14;
   const store = {
     get: (key) => {
       try {
@@ -45,13 +48,29 @@
     if (fromRight > 12 && fromRight < bubble.width - 24) box.style.setProperty("--push-tail", `${fromRight}px`);
   }
 
+  function offered() {
+    try {
+      const value = JSON.parse(store.get(OFFER) || "{}");
+      return value && typeof value === "object" ? value : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function daysSince(day, today) {
+    return Math.round((Date.parse(today) - Date.parse(day)) / 86_400_000);
+  }
+
   function offer() {
-    if (location.pathname === "/upozorneni" || store.get(DONE)) return;
+    if (location.pathname === "/upozorneni") return;
     if (supported && Notification.permission === "denied") return;
     const today = new Date().toLocaleDateString("sv");
     const first = store.get(FIRST);
     if (!first) store.set(FIRST, today);
     if (!first || first === today) return;
+    const past = offered();
+    if (past.done || (past.n ?? 0) >= OFFER_TIMES) return;
+    if (past.last && daysSince(past.last, today) < OFFER_GAP_DAYS) return;
     const template = document.querySelector("template[data-push-offer]");
     if (!template) return;
     afterChatHint(() => show(template));
@@ -101,9 +120,11 @@
     // Bez chatu na stránce není Drběna, která by bublinu říkala: přijde s ní.
     if (!document.querySelector("[data-chat]")) box.classList.add("with-goat");
     box.querySelector("[data-push-offer-no]").addEventListener("click", () => box.remove());
+    box.querySelector("[data-push-offer-yes]").addEventListener("click", () => store.set(OFFER, JSON.stringify({ done: true })));
     document.body.append(box);
-    // Jednou a dost: ať na ni klikne, nebo ne, podruhé už nepřijde. Zvoneček v hlavičce zůstává.
-    store.set(DONE, "1");
+    // Počítá se každé ukázání, ať na ni klikne, nebo ne. Zvoneček v hlavičce zůstává vždycky.
+    const past = offered();
+    store.set(OFFER, JSON.stringify({ n: (past.n ?? 0) + 1, last: new Date().toLocaleDateString("sv") }));
     aimTail(box);
     // Tlačítko chatu staví public/chat.js, může přijít až po bublině.
     const chat = document.querySelector("[data-chat]");
@@ -132,7 +153,7 @@
       if (on) {
         bell?.classList.add("is-on");
         bell?.setAttribute("aria-label", "Upozornění jsou zapnutá");
-        store.set(DONE, "1");
+        store.set(OFFER, JSON.stringify({ done: true }));
       } else offer();
     })
     .catch(() => {});
