@@ -195,7 +195,7 @@ async function renderGet(request, env, url, execution) {
   // Okénko chatu s Drběnou: jen na hlavním webu, když ho redakce zapnula.
   // feedOn: které feedy redakce nechala zapnuté (odkazy v hlavičce, na stránkách a strukturovaná data hodin).
   // push: zvoneček a nabídka upozornění (src/push/promo.js), jen když jdou zapnout.
-  const push = pushSettings && vapidReady(env) ? pushSettings : null;
+  const push = pushSettings?.promo && vapidReady(env) ? pushSettings : null;
   const ctx = { ...base, copy, feedOn, push, chat: chat ? { ...chat, siteKey: turnstileConfig(env)?.siteKey ?? "" } : null };
 
   if (path === "/popelnice") return html(binsPage(data.waste, ctx));

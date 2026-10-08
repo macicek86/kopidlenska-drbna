@@ -7,7 +7,7 @@ import { rubricHref } from "./rubric-nav.js";
 const LOGO = "/kozel-maskot.webp";
 
 // Stránky webu, které mají být ve vyhledávači. Popelnicová subdoména má jen titulku.
-const PAGES = ["/", "/zpravy", "/akce", "/reklamy", "/popelnice", "/sberne-dvory", "/lekari", "/oteviraci-doba", "/odstavky", "/odber", "/upozorneni", "/o-nas"];
+const PAGES = ["/", "/zpravy", "/akce", "/reklamy", "/popelnice", "/sberne-dvory", "/lekari", "/oteviraci-doba", "/odstavky", "/odber", "/o-nas"];
 
 export function robotsTxt(origin) {
   return `User-agent: *
@@ -28,6 +28,7 @@ export function sitemapXml(origin, data) {
   const newest = data.articles[0]?.createdOn ?? "";
   const entries = [
     ...PAGES.map((path) => urlEntry(`${origin}${path}`, path === "/" || path === "/zpravy" ? newest : "")),
+    ...(data.pushPage ? [urlEntry(`${origin}/upozorneni`)] : []),
     ...data.rubrics.map((rubric) => urlEntry(`${origin}${rubricHref(rubric.slug)}`)),
     ...data.articles.map((article) => urlEntry(`${origin}/zpravy/${encodeURIComponent(article.slug)}`, article.createdOn)),
     ...data.ads.map((ad) => urlEntry(`${origin}/reklamy/${encodeURIComponent(ad.slug)}`, ad.createdOn)),

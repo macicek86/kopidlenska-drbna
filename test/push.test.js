@@ -140,7 +140,7 @@ test("stav ze služby prohlížeče", () => {
 test("stránka Upozornění: vypnutá témata chybí, bez klíčů nejde zapnout a nepatří do vyhledávačů", () => {
   const ctx = { path: "/upozorneni", origin: "https://drbna.test", mainOrigin: "https://drbna.test", copy: {} };
   const lists = { rubrics: [], places: [{ id: 1, label: "Úřad" }], doctors: [], yards: [] };
-  const settings = mapPushSettings({ enabled: 1, topics_off: "svoz" });
+  const settings = mapPushSettings({ enabled: 1, promo: 1, topics_off: "svoz" });
   const page = pushPage(ctx, { lists, settings, publicKey: "KEY" });
   assert.doesNotMatch(page, /noindex/);
   assert.match(page, /<meta property="og:image" content="https:\/\/drbna\.test\/og-upozorneni\.webp">/);
@@ -152,6 +152,10 @@ test("stránka Upozornění: vypnutá témata chybí, bez klíčů nejde zapnout
   const off = pushPage(ctx, { lists, settings, publicKey: "" });
   assert.doesNotMatch(off, /data-push /);
   assert.match(off, /<meta name="robots" content="noindex">/);
+  // Na webu schované (zkouší se): stránka funguje, ale do vyhledávačů nepatří.
+  const hidden = pushPage(ctx, { lists, settings: mapPushSettings({ enabled: 1, promo: 0 }), publicKey: "KEY" });
+  assert.match(hidden, /data-push /);
+  assert.match(hidden, /<meta name="robots" content="noindex">/);
 });
 
 test("manifest: Safari dostane standalone kvůli upozorněním na iPhonu, ostatní browser, ať se drbna nenabízí k instalaci", async () => {

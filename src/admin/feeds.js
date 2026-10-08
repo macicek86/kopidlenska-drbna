@@ -28,12 +28,13 @@ function pushPanel(push) {
   const facts = [`Odebírá: <strong>${total}</strong> ${total === 1 ? "prohlížeč" : total >= 2 && total <= 4 ? "prohlížeče" : "prohlížečů"}`, `Naposledy odeslané: ${esc(pushStamp(settings.lastSentAt))}`];
   if (waiting) facts.push(`Čeká na odeslání: ${waiting}`);
   return `<section class="panel">
-      <header class="panel-head"><h2>Upozornění</h2><p class="panel-note">${settings.enabled ? "Zapnuto" : "Vypnuto"}</p></header>
+      <header class="panel-head"><h2>Upozornění</h2><p class="panel-note">${!settings.enabled ? "Vypnuto" : settings.promo ? "Zapnuto" : "Zapnuto, na webu schované"}</p></header>
       <form class="form" method="post" action="${BASE}/upozorneni" data-dirty>
         ${ready ? "" : callout("Chybí tajemství VAPID_PUBLIC_KEY a VAPID_PRIVATE_KEY (vyrobí je <code>node scripts/vapid-keys.mjs</code>). Bez nich upozornění nejdou zapnout.", "warn")}
         <p>${facts.join(" · ")}</p>
-        <p class="hint">Stránka <a href="/upozorneni" target="_blank" rel="noopener">/upozorneni</a> zatím nikde na webu odkaz nemá. Číslo u tématu říká, kolik odběratelů ho má zaškrtnuté.</p>
+        <p class="hint">Číslo u tématu říká, kolik odběratelů ho má zaškrtnuté.</p>
         <div class="feed-switch">${check("push_enabled", "1", settings.enabled, "Posílat upozornění", "Vypnuté: nic neodchází a stránka Upozornění řekne, že teď nejdou zapnout.")}</div>
+        <div class="feed-switch">${check("push_promo", "1", settings.promo, "Ukazovat na webu", "Zvoneček v hlavičce a bublina s nabídkou. Vypnuté: na webu o upozorněních nikdo neví, ale stránka <a href=\"/upozorneni\" target=\"_blank\" rel=\"noopener\">/upozorneni</a> i rozesílání fungují dál, třeba na zkoušení.")}</div>
         ${rows}
         ${formFoot("Uložit")}
       </form>

@@ -77,8 +77,9 @@ export function pushPage(ctx, { lists, settings, publicKey }) {
     ...ctx,
     title: `Upozornění | ${tx(ctx.copy, "site_name")}`,
     description: "Drbna vám dá vědět, když se mění otevírací doba, jde se do sběrného dvora, koná se akce nebo vyšla zpráva.",
-    // Bez klíčů nebo s vypnutými upozorněními stránka nic neumí: do vyhledávačů nepatří.
-    noindex: !live,
+    // Bez klíčů nebo s vypnutými upozorněními stránka nic neumí, se schovaným zvonečkem se teprve zkouší:
+    // do vyhledávačů nepatří.
+    noindex: !live || !settings.promo,
     // Náhled při sdílení: Drběna s telefonem plným upozornění (1200 × 630 jako výchozí).
     image: "/og-upozorneni.webp",
     imageSize: true,

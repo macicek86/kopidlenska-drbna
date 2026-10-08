@@ -91,6 +91,7 @@ export async function formFields(request) {
     feedSwitches: form.getAll("feed").map(String),
     // Odběr a data: upozornění (src/push/store.js), vypínač a zapnutá témata.
     pushEnabled: text("push_enabled") === "1",
+    pushPromo: text("push_promo") === "1",
     pushTopics: form.getAll("push_topic").map(String),
     // E-mail na otevírací dobu: zaškrtnutá místa, lékaři a dvory adresy („sekce:id“, src/mailin/store.js).
     mailTargets: form.getAll("radek").map(String),

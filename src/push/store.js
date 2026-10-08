@@ -1,5 +1,5 @@
 // Upozornění v D1: odběry prohlížečů s nastavením, fronta k odeslání, co už odešlo, a nastavení redakce.
-import { requireChief, sqlStamp } from "../db-core.js";
+import { addColumn, requireChief, sqlStamp } from "../db-core.js";
 import { parsePrefs, readPrefs, TOPIC_KEYS } from "./topics.js";
 import { fromB64url } from "./crypto.js";
 
@@ -42,6 +42,11 @@ export const PUSH_TABLES = [
 export async function ensurePushTables(env) {
   for (const sql of PUSH_TABLES) await env.DB.prepare(sql).run();
   await env.DB.prepare("insert into push_settings (id) select 1 where not exists (select 1 from push_settings where id = 1)").run();
+  // promo: zvoneček v hlavičce a bublina s nabídkou. Ve výchozím stavu schované, ať si upozornění lidé nezapínají,
+  // dokud je redakce nevyzkouší; stránka /upozorneni i rozesílání běží i tak.
+  const info = await env.DB.prepare("pragma table_info(push_settings)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "promo", "alter table push_settings add column promo integer not null default 0");
 }
 
 // Služby prohlížečů, kam smí Worker posílat (Chrome a Android, Firefox, Edge, Safari a iPhone).
@@ -120,6 +125,7 @@ export function mapPushSettings(row) {
     .filter((key) => TOPIC_KEYS.includes(key));
   return {
     enabled: row ? Number(row.enabled) === 1 : true,
+    promo: Number(row?.promo) === 1,
     topicsOff: off,
     seeded: Number(row?.seeded) === 1,
     eveningOn: String(row?.evening_on ?? ""),
@@ -136,8 +142,8 @@ export async function savePushSettings(env, request, fields) {
   if (!gate.ok) return gate;
   const on = fields.pushTopics ?? [];
   const off = TOPIC_KEYS.filter((key) => !on.includes(key));
-  await env.DB.prepare("update push_settings set enabled = ?, topics_off = ? where id = 1")
-    .bind(fields.pushEnabled ? 1 : 0, off.join(","))
+  await env.DB.prepare("update push_settings set enabled = ?, promo = ?, topics_off = ? where id = 1")
+    .bind(fields.pushEnabled ? 1 : 0, fields.pushPromo ? 1 : 0, off.join(","))
     .run();
   return { ok: true };
 }
