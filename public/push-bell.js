@@ -1,10 +1,10 @@
 // Zvoneček upozornění v hlavičce a jednorázová nabídka (src/push/promo.js).
 // Kde prohlížeč upozornění neumí, zvoneček zmizí (iPhone ho vidí: na stránce se dozví, jak drbnu přidat na plochu).
-// Nabídka vyskočí nejvýš OFFER_TIMES krát a znovu nejdřív po OFFER_GAP_DAYS dnech, poprvé až při návštěvě v jiný
-// den než první (první den má uvítací okno). Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“, a ne do otevřeného chatu.
+// Nabídka vyskočí nejvýš OFFER_TIMES krát a znovu nejdřív po OFFER_GAP_DAYS dnech; při první návštěvě až po zavření
+// uvítacího okna, na mobilu jinak až po nápovědě chatu. Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“,
+// a ne do otevřeného chatu.
 (() => {
   const bell = document.querySelector("[data-push-bell]");
-  const FIRST = "drbna-push-first";
   // Kolikrát a kdy naposledy se nabídka ukázala ({ n, last }), nebo { done: true } po „Chci upozornění“.
   const OFFER = "drbna-push-offer";
   const OFFER_TIMES = 2;
@@ -65,23 +65,31 @@
     if (location.pathname === "/upozorneni") return;
     if (supported && Notification.permission === "denied") return;
     const today = new Date().toLocaleDateString("sv");
-    // Uvítací okno (public/welcome.js) má přednost: v den, kdy se ukazuje (i znovu všem po změně v redakci),
-    // bublina nepřijde, počítá se od toho dne znovu.
-    const welcome = document.querySelector("template[data-welcome]");
-    if (welcome && store.get("drbna-uvitani") !== welcome.dataset.welcome) {
-      store.set(FIRST, today);
-      return;
-    }
-    if (document.querySelector("dialog[open]")) return;
-    const first = store.get(FIRST);
-    if (!first) store.set(FIRST, today);
-    if (!first || first === today) return;
     const past = offered();
     if (past.done || (past.n ?? 0) >= OFFER_TIMES) return;
     if (past.last && daysSince(past.last, today) < OFFER_GAP_DAYS) return;
     const template = document.querySelector("template[data-push-offer]");
     if (!template) return;
-    afterChatHint(() => show(template));
+    if (welcomeDue()) afterWelcome(() => show(template));
+    else afterChatHint(() => show(template));
+  }
+
+  // Ukáže se na téhle stránce uvítací okno (public/welcome.js, i znovu všem po změně v redakci)?
+  function welcomeDue() {
+    const welcome = document.querySelector("template[data-welcome]");
+    return Boolean(welcome) && store.get("drbna-uvitani") !== welcome.dataset.welcome;
+  }
+
+  // Uvítací okno má přednost: bublina přijde chvíli po jeho zavření. Když se okno na téhle stránce
+  // neukáže (čtenář je zabraný v chatu), nepřijde ani bublina.
+  function afterWelcome(then) {
+    const watch = new MutationObserver(() => {
+      const dialog = document.querySelector("dialog.welcome");
+      if (!dialog) return;
+      watch.disconnect();
+      dialog.addEventListener("close", () => setTimeout(then, 1200), { once: true });
+    });
+    watch.observe(document.body, { childList: true });
   }
 
   // Na mobilu chat jednou za návštěvu řekne „Zeptej se mě!“ (public/chat.js). Bublina s upozorněním počká,
