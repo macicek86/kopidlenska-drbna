@@ -7,7 +7,7 @@ Implementace ručního importu je v `/redakce/facebook` (jen hlavní redaktor). 
 - Facebook je zdroj importu jako web města a školy (`src/facebook/`: `api.js` Graph API, `source.js` pravidla pro Drběnu; fronta, zpracování a stránka redakce jsou společné v `src/skola/`). Redakce `/redakce/facebook` (jen hlavní redaktor), tabulky `facebook_settings` a `facebook_items`.
 - Pages jsou v nastavení zdroje, jeden odkaz na řádek. Výchozí `kopidlenskelisty` a `JicinevesCZ`. Jedna nefunkční Page ostatní nezastaví.
 - Z každé Page nejvýš dvě stránky Graph API po 25 příspěvcích. Bere jen zveřejněné příspěvky s textem a permalinkem, k nim až 3 fotky (stahují se až při zpracování přes `fetchImage`). Komentáře, reakce ani soukromé zprávy ne.
-- S „Kontrolovat Facebook automaticky“ se cron dívá každé 4 h a čerstvé příspěvky Drběna zpracuje jako ostatní importy: porovná s přehledem (Munipolis, web města, vložené příspěvky), napíše článek, akci dá do kalendáře, nebo přeskočí. Rovnou na web, nebo jako návrh podle nastavení. Pro kontrolu Meta doporučeno **jako návrh**, ať je vidět schválení redaktorem.
+- S „Kontrolovat Facebook automaticky“ se cron dívá každé 4 h a čerstvé příspěvky Drběna zpracuje jako ostatní importy: porovná s přehledem (Munipolis, web města, vložené příspěvky), napíše článek, akci dá do kalendáře, nebo přeskočí. Zatím vždy **jako návrh** ke schválení redaktorem (`draftsOnly` v `source.js`, přepínač „Rovnou zveřejňovat“ stránka nemá).
 - Zdroj pod zprávou je „<Page> na Facebooku“ s odkazem na příspěvek, fotka (jen se zapnutým „Brát fotky z Facebooku“) má stejný popisek.
 
 ## Nastavení serveru

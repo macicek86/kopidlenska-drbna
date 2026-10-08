@@ -92,3 +92,10 @@ test("Facebook je zdroj importu: zdroj pod zprávou a u fotky podle Page, Drběn
   const text = skolaItemText({ ...publicPost(row, page), publishedAt: "2026-10-08T08:00:00.000Z" }, FACEBOOK_SOURCE);
   assert.match(text, /^Příspěvek z facebookové stránky Kopidlenské listy \(zveřejněno 2026-10-08\)/);
 });
+
+test("Facebook zatím píše jen návrhy: přepínač Rovnou zveřejňovat chybí a uložené zapnutí neplatí", async () => {
+  const { loadSkolaSettings } = await import("../src/skola/store.js");
+  const env = { DB: { prepare: () => ({ bind: () => ({ first: async () => ({ auto_publish: 1, enabled: 1 }) }), first: async () => ({ auto_publish: 1, enabled: 1 }) }) } };
+  assert.equal((await loadSkolaSettings(env, FACEBOOK_SOURCE)).autoPublish, false);
+  assert.equal(FACEBOOK_SOURCE.draftsOnly, true);
+});

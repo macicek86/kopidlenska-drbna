@@ -38,6 +38,8 @@ export const FACEBOOK_SOURCE = {
   feedLabel: "Facebook Pages",
   feedHint: "Odkaz na Page, jeden na řádek. Jen oficiální stránky měst a organizací, osobní profily nejdou. Prázdné pole vrátí Kopidlenské listy a Jičíněves.",
   freshDays: 7,
+  // Zatím všechno jen jako návrh ke schválení (i kvůli kontrole Mety). Pro rovnou zveřejňování smazat.
+  draftsOnly: true,
   rules: RULES,
   people: "lidé při akci, místo ve městě, koncert, výstava",
   intro: "Koza Drběna čte veřejné příspěvky vybraných facebookových stránek města a místních organizací (Graph API). Akce a novinky napíše po svém, s odkazem na původní příspěvek. Co už přišlo z Munipolisu, webu města nebo jinak na drbně je, pozná a nechá být.",

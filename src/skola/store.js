@@ -86,7 +86,8 @@ function mapSettings(row, source) {
   return {
     enabled: asBool(row?.enabled),
     feedUrls: splitUrls(row?.feed_urls, source),
-    autoPublish: asBool(row?.auto_publish),
+    // `draftsOnly`: zdroj zatím jen do návrhů, ať zůstane cokoli uloženého v tabulce.
+    autoPublish: !source.draftsOnly && asBool(row?.auto_publish),
     freshDays: readFreshDays(row?.fresh_days, source.freshDays),
     ownPhotos: asBool(row?.own_photos),
     aheadDays: readAheadDays(row?.ahead_days),
@@ -237,7 +238,7 @@ export async function saveSkolaSettings(env, request, source, input) {
     .bind(
       input.enabled ? 1 : 0,
       urls.join("\n"),
-      input.autoPublish ? 1 : 0,
+      input.autoPublish && !source.draftsOnly ? 1 : 0,
       readFreshDays(input.freshDays, source.freshDays),
       input.ownPhotos ? 1 : 0,
       aheadDays,
