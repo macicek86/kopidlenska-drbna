@@ -7,6 +7,9 @@ const QUESTION_MAX = 500;
 const HISTORY = 8;
 const HINT = "drbna-chat-napoveda";
 const MOBILE = "(max-width: 540px), (pointer: coarse) and (max-height: 540px)";
+// Pořadí: stránka s uvítacím oknem má jen to; na další „Zeptej se mě!“ a po ní bublina s upozorněním (public/push-bell.js).
+const HINT_DELAY = 2500;
+const HINT_SHOW = 5000;
 const TURNSTILE = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 const GREETING = "Ahoj, já jsem Drběna. Zeptejte se mě na cokoli z Kopidlna: kdy jede popelář, kdo má dnes otevřeno nebo co se chystá.";
 
@@ -378,25 +381,39 @@ function setup() {
     setTimeout(() => (hint.hidden = true), 300);
   }
 
-  function offerHint() {
-    // Při první návštěvě má přednost uvítací okno (public/welcome.js), bublina počká na další stránku.
-    if (!matchMedia(MOBILE).matches || state.messages.length || document.documentElement.dataset.welcome) return;
+  // Nápověda dořekla (nebo se tentokrát neukáže): další v řadě je bublina s upozorněním.
+  function hintDone() {
+    document.documentElement.dataset.chatHint = "done";
+    document.dispatchEvent(new Event("drbna:chat-hint-done"));
+  }
+
+  function showHint() {
+    if (!matchMedia(MOBILE).matches || state.messages.length || !panel.hidden) return hintDone();
     try {
-      if (sessionStorage.getItem(HINT)) return;
+      if (sessionStorage.getItem(HINT)) return hintDone();
       sessionStorage.setItem(HINT, "1");
     } catch {
-      return;
+      return hintDone();
     }
+    hint.hidden = false;
+    requestAnimationFrame(() => hint.classList.add("is-shown"));
     setTimeout(() => {
-      if (!panel.hidden) return;
-      hint.hidden = false;
-      requestAnimationFrame(() => hint.classList.add("is-shown"));
-      setTimeout(hideHint, 6000);
-    }, 2500);
+      hideHint();
+      setTimeout(hintDone, 300);
+    }, HINT_SHOW);
+  }
+
+  // Jednou za návštěvu, jen na mobilu. Stránka s uvítacím oknem (public/welcome.js) patří jen jemu:
+  // nápověda i bublina s upozorněním počkají na další stránku.
+  function offerHint() {
+    if (document.documentElement.dataset.welcome) return;
+    setTimeout(showHint, HINT_DELAY);
   }
 
   function open() {
     hideHint();
+    // Kdo si s Drběnou povídal, tomu už bublina s upozorněním na téhle stránce nevyskočí.
+    document.documentElement.dataset.chatUsed = "1";
     panel.hidden = false;
     fab.setAttribute("aria-expanded", "true");
     root.classList.add("is-open");

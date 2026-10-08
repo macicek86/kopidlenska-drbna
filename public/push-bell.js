@@ -1,7 +1,7 @@
 // Zvoneček upozornění v hlavičce a jednorázová nabídka (src/push/promo.js).
 // Kde prohlížeč upozornění neumí, zvoneček zmizí (iPhone ho vidí: na stránce se dozví, jak drbnu přidat na plochu).
-// Nabídka vyskočí nejvýš OFFER_TIMES krát a znovu nejdřív po OFFER_GAP_DAYS dnech; při první návštěvě až po zavření
-// uvítacího okna, na mobilu jinak až po nápovědě chatu. Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“,
+// Nabídka vyskočí nejvýš OFFER_TIMES krát a znovu nejdřív po OFFER_GAP_DAYS dnech, vždy až poslední v řadě:
+// stránka s uvítacím oknem má jen to, na další „Zeptej se mě!“ chatu (jen mobil) a po ní bublina. Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“,
 // a ne do otevřeného chatu.
 (() => {
   const bell = document.querySelector("[data-push-bell]");
@@ -9,6 +9,9 @@
   const OFFER = "drbna-push-offer";
   const OFFER_TIMES = 2;
   const OFFER_GAP_DAYS = 14;
+  // Mezera po nápovědě chatu a začátek na stránce bez chatu.
+  const PAUSE = 1000;
+  const QUIET_START = 2500;
   const store = {
     get: (key) => {
       try {
@@ -70,8 +73,7 @@
     if (past.last && daysSince(past.last, today) < OFFER_GAP_DAYS) return;
     const template = document.querySelector("template[data-push-offer]");
     if (!template) return;
-    if (welcomeDue()) afterWelcome(() => show(template));
-    else afterChatHint(() => show(template));
+    afterOthers(() => show(template));
   }
 
   // Ukáže se na téhle stránce uvítací okno (public/welcome.js, i znovu všem po změně v redakci)?
@@ -80,58 +82,21 @@
     return Boolean(welcome) && store.get("drbna-uvitani") !== welcome.dataset.welcome;
   }
 
-  // Uvítací okno má přednost: bublina přijde chvíli po jeho zavření. Když se okno na téhle stránce
-  // neukáže (čtenář je zabraný v chatu), nepřijde ani bublina.
-  function afterWelcome(then) {
-    const watch = new MutationObserver(() => {
-      const dialog = document.querySelector("dialog.welcome");
-      if (!dialog) return;
-      watch.disconnect();
-      dialog.addEventListener("close", () => setTimeout(then, 1200), { once: true });
-    });
-    watch.observe(document.body, { childList: true });
-  }
-
-  // Na mobilu chat jednou za návštěvu řekne „Zeptej se mě!“ (public/chat.js). Bublina s upozorněním počká,
-  // až dořekne, ať nemluví dvě najednou. Když se nápověda tentokrát neukáže, přijde bublina po chvíli sama.
-  function afterChatHint(then) {
-    const chat = document.querySelector("[data-chat]");
-    const mobile = matchMedia("(max-width: 540px), (pointer: coarse) and (max-height: 540px)").matches;
-    let hintDue = false;
-    try {
-      hintDue = !sessionStorage.getItem("drbna-chat-napoveda");
-    } catch {
-      hintDue = false;
-    }
-    if (!chat || !mobile || !hintDue) {
-      setTimeout(then, 1500);
-      return;
-    }
-    let seen = false;
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      watch.disconnect();
-      setTimeout(then, 1200);
-    };
-    const watch = new MutationObserver(() => {
-      const hint = chat.querySelector(".chat-hint");
-      if (!hint) return;
-      if (hint.classList.contains("is-shown")) seen = true;
-      else if (seen && hint.hidden) finish();
-    });
-    watch.observe(chat, { subtree: true, childList: true, attributes: true, attributeFilter: ["class", "hidden"] });
-    // Nápověda se ukáže po 2,5 s; když do 4 s nepřišla (otevřený chat, uvítací okno), nečeká se.
-    setTimeout(() => {
-      if (!seen) finish();
-    }, 4000);
+  // Bublina je poslední v řadě. Stránka s uvítacím oknem patří jen jemu, bublina počká na další stránku.
+  // S chatem čeká, až chat řekne, že „Zeptej se mě!“ dořekla (public/chat.js, na počítači hned).
+  function afterOthers(then) {
+    if (welcomeDue()) return;
+    const next = () => setTimeout(then, PAUSE);
+    if (document.querySelector("[data-chat]")) {
+      if (document.documentElement.dataset.chatHint === "done") next();
+      else document.addEventListener("drbna:chat-hint-done", next, { once: true });
+    } else setTimeout(then, QUIET_START);
   }
 
   function show(template) {
     // Kdo si zrovna povídá s Drběnou, toho nerušit: nabídka přijde při jiné stránce nebo návštěvě.
     const chatRoot = document.querySelector("[data-chat]");
-    if (chatRoot?.classList.contains("is-open")) return;
+    if (chatRoot?.classList.contains("is-open") || document.documentElement.dataset.chatUsed) return;
     const box = template.content.firstElementChild.cloneNode(true);
     // Bez chatu na stránce není Drběna, která by bublinu říkala: přijde s ní.
     if (!document.querySelector("[data-chat]")) box.classList.add("with-goat");
