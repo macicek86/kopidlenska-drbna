@@ -58,7 +58,7 @@ test("token jde jen v hlavičce a paging.next se neotevře", async () => {
     assert.equal(new URL(call.url).hostname, "graph.facebook.com");
     assert.equal(call.url.includes("secret"), false);
     assert.equal(call.options.headers.Authorization, "Bearer secret");
-    assert.equal(call.options.redirect, "error");
+    assert.equal(call.options.redirect, "manual");
   }
 });
 

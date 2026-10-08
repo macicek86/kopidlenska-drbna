@@ -38,9 +38,11 @@ async function graph(env, node, params, fetchImpl) {
   try {
     const response = await fetchImpl(url.href, {
       headers: { Authorization: `Bearer ${env.FACEBOOK_ACCESS_TOKEN}` },
-      redirect: "error",
+      // Workers neumí redirect: "error". Přesměrování se nesleduje a bere se jako chyba, ať token neodejde jinam.
+      redirect: "manual",
       signal: AbortSignal.timeout(20_000),
     });
+    if (response.status >= 300 && response.status < 400) return { ok: false, error: errorText(0) };
     const data = await response.json();
     // Zpráva Meta může obsahovat citlivé údaje. Do UI a logů jde jen naše vlastní vysvětlení.
     if (!response.ok || data?.error) return { ok: false, error: errorText(Number(data?.error?.code)) };
