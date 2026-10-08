@@ -180,6 +180,7 @@ export const COPY = [
   { group: "O nás", key: "about_places_link", label: "Odkaz na otevírací dobu", value: "Otevírací doba", max: 80 },
   { group: "O nás", key: "about_outages_link", label: "Odkaz na odstávky a uzavírky", value: "Odstávky a uzavírky", max: 80 },
   { group: "O nás", key: "about_ads_link", label: "Odkaz na reklamy", value: "Reklamy", max: 80 },
+  { group: "O nás", key: "about_deletion", label: "Odkaz na smazání dat", value: "Týkají se vás údaje na drbně? Napište nám podle pokynů ke smazání dat.", max: 200 },
 
   { group: "Reklamy", key: "ads_description", label: "Popis stránky reklam", value: "Neplacené místní reklamy z Kopidlna a jeho částí.", max: 240, long: true },
   { group: "Reklamy", key: "ads_eyebrow", label: "Malý nadpis stránky reklam", value: "Rubrika", max: 40 },

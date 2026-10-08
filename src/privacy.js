@@ -1,10 +1,10 @@
-// Zásady soukromí a pokyny ke smazání dat v podrobném znění pro kontrolu Mety (Facebook Pages).
-// Zatím jen na přímé adrese: mimo patičku i sitemap, `noindex`. Pro čtenáře bude jiná, kratší verze.
+// Zásady soukromí v podrobném znění pro kontrolu Mety (Facebook Pages): jen na přímé adrese, mimo patičku i sitemap, `noindex`.
+// Pro čtenáře bude jiná, kratší verze. Pokyny ke smazání dat jsou pro všechny (odkaz na stránce O nás, v sitemap).
 import { layout } from "./view.js";
 
 const CONTACT = `<a href="mailto:redakce@kopidlenskadrbna.org">redakce@kopidlenskadrbna.org</a>`;
-function page(ctx, title, text) {
-  return layout({ ...ctx, title: `${title} | Kopidlenská drbna`, description: title, noindex: true,
+function page(ctx, title, text, { noindex = false } = {}) {
+  return layout({ ...ctx, title: `${title} | Kopidlenská drbna`, description: title, noindex,
     body: `<section class="privacy"><p class="eyebrow">Kopidlenská drbna</p><h1>${title}</h1>${text}</section>` });
 }
 
@@ -26,7 +26,7 @@ export function privacyPage(ctx) {
     <p>Jde o globální poskytovatele a zpracování může probíhat i mimo Evropský hospodářský prostor. Informace o příjemcích a použitých zárukách pro konkrétní zpracování si můžete vyžádat u provozovatele. Podmínky ochrany dat zveřejňují <a href="https://www.cloudflare.com/cloudflare-customer-dpa/" rel="noopener">Cloudflare</a> a <a href="https://www.anthropic.com/legal/data-processing-addendum" rel="noopener">Anthropic</a>. Přístup k redakčním podkladům mají jen oprávnění redaktoři; zveřejněné články jsou veřejné.</p>
     <h2>Účely a vaše práva</h2>
     <p>Provoz, zabezpečení, vyřízení kontaktu a přiměřené místní zpravodajství vycházejí z oprávněného zájmu provozovatele a čtenářů. Tam, kde je zpracování nezbytné pro sjednanou službu nebo právní povinnost, se opírá o tento důvod. Dobrovolné upozornění zapínáte a odvoláváte svou volbou. AI pomáhá s texty; nerozhoduje o vašich právech ani nevytváří profily osob.</p>
-    <p>Podle okolností máte právo požádat o přístup, opravu, výmaz, omezení zpracování nebo přenositelnost údajů a vznést námitku proti zpracování z oprávněného zájmu. Souhlas lze odvolat bez vlivu na dřívější zpracování. Napište na ${CONTACT}; odpovíme zpravidla do jednoho měsíce. Pokud je potřeba prodloužení nebo žádosti nelze vyhovět, vysvětlíme důvod. Můžete se obrátit také na <a href="https://uoou.gov.cz/" rel="noopener">Úřad pro ochranu osobních údajů</a>.</p>`);
+    <p>Podle okolností máte právo požádat o přístup, opravu, výmaz, omezení zpracování nebo přenositelnost údajů a vznést námitku proti zpracování z oprávněného zájmu. Souhlas lze odvolat bez vlivu na dřívější zpracování. Napište na ${CONTACT}; odpovíme zpravidla do jednoho měsíce. Pokud je potřeba prodloužení nebo žádosti nelze vyhovět, vysvětlíme důvod. Můžete se obrátit také na <a href="https://uoou.gov.cz/" rel="noopener">Úřad pro ochranu osobních údajů</a>.</p>`, { noindex: true });
 }
 
 export function deletionPage(ctx) {
@@ -36,6 +36,5 @@ export function deletionPage(ctx) {
     <li>Popište, které údaje se vás týkají a co požadujete smazat nebo opravit.</li>
     <li>Redakce potvrdí přijetí a sdělí výsledek, případně důvod dalšího uchování. Odpovídáme zpravidla do jednoho měsíce; případné prodloužení a jeho důvod oznámíme.</li></ol>
     <p>Heslo, SMS kód ani kopii dokladu neposílejte. Pokud bude nezbytné ověřit souvislost žádosti s konkrétními údaji, domluvíme přiměřený postup.</p>
-    <p>Prověříme načtený podklad (text i fotky), redakční návrh i případný zveřejněný článek a smažeme nebo opravíme, co se vás týká. Smazání v Drbně neodstraní původní příspěvek na Facebooku; ten spravuje jeho vydavatel a Meta. Drbna nepoužívá přihlášení přes Facebook a pro žádost nevyžaduje účet na Facebooku.</p>
-    <p>Další informace najdete v <a href="/soukromi">zásadách soukromí</a>.</p>`);
+    <p>Prověříme načtený podklad (text i fotky), redakční návrh i případný zveřejněný článek a smažeme nebo opravíme, co se vás týká. Smazání v Drbně neodstraní původní příspěvek na Facebooku; ten spravuje jeho vydavatel a Meta. Drbna nepoužívá přihlášení přes Facebook a pro žádost nevyžaduje účet na Facebooku.</p>`);
 }

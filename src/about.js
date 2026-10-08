@@ -18,6 +18,7 @@ export function aboutPage(data, ctx) {
     lede && `<p class="lede">${esc(lede)}</p>`,
     ...rest.map((part) => `<p>${esc(part).replace(/\n/g, "<br>")}</p>`),
     data.contactNote && `<p class="about-contact">${esc(data.contactNote)}</p>`,
+    `<p><a href="/smazani-dat">${esc(tx(ctx.copy, "about_deletion"))}</a></p>`,
   ]
     .filter(Boolean)
     .join("\n          ");
