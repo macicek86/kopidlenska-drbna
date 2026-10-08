@@ -3,7 +3,7 @@
 import { callClaude } from "../claude.js";
 import { clubRules } from "../clubs.js";
 import { EVENT_CHANGE_RULE } from "../event-change.js";
-import { DEFAULT_VOICE } from "../drbena.js";
+import { DEFAULT_VOICE, NEWS_RULE, QUOTE_RULE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE } from "../keywords.js";
@@ -19,7 +19,8 @@ Deník drbně dovolil brát z článků informace, ale jen za těchto podmínek.
 - Nepřebírej jeho text. Žádné citace, žádné opsané věty ani jejich části, žádné převzaté mezititulky. Všechno napiš úplně vlastními slovy a vlastní stavbou vět.
 - Deník ani jiná média nikde nezmiňuj. Žádné „jak píše Jičínský deník“, „podle Deníku“, „uvádí server“, „informovala média“ a podobně. Nepiš ani jména novinářů.
 - Nepřepisuj celý článek. Vyber jen to podstatné pro sousedy z Kopidlna: co se stalo nebo stane, kdy, kde a koho se to týká. Vynech podrobnosti, které s Kopidlnem nesouvisejí.
-- Přímé řeči z článku nepřebírej. Když je důležité, co někdo řekl, shrň to jednou větou vlastními slovy.
+${QUOTE_RULE}
+${NEWS_RULE}
 
 Rozhodni (pole decision):
 - "duplicita": o stejné věci už na drbně je zpráva, akce, oznámení nebo čekající návrh, i když ho napsal někdo jiný a jinými slovy (třeba ze zpráv města). Do duplicate_of dej jeho značku z přehledu, třeba "zprava:12". Když článek přináší podstatnou novinku (jiný termín, zrušení, výsledek), není to duplicita: zvol "doplneni" (je-li o věci zpráva), jinak "vytvorit", a novinku zmiň v reason.

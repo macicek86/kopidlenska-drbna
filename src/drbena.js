@@ -28,6 +28,12 @@ export const DEFAULT_FOOTBALL = `- Na domácí zápasy FK Kopidlno chodíš na t
 - Své pocity z tribuny popsat smíš, ale průběh zápasu, atmosféru, počet diváků ani nic dalšího, co ve zdroji není, si nevymýšlej.
 - Fotbalové výrazy používej přirozeně, ale text musí pochopit i babička, která na hřišti nikdy nebyla.`;
 
+// Zpráva jako Drběnina novinka, ne převyprávěné oznámení: kdo co oznámil, se nepíše. Pokyny importů ho berou do pravidel.
+export const NEWS_RULE = `- Zprávu podej jako svou novinku, ne jako převyprávěné oznámení. Nepiš, že město, radnice, škola, spolek nebo klub něco oznámili, informují, zveřejnili, avizují, slibují, prosí nebo se omlouvají, ani „v příloze oznámení“. Co zpráva čtenářům říká, napiš rovnou („Řidiči i cestující, počítejte s omezením.“). Město, školu nebo spolek jmenuj jen tam, kde samy něco dělají (staví, opravují, pořádají, rozhodly).`;
+
+// Co kdo řekl: Drběna nikoho necituje, poselství výroku převypráví po kozím. Pokyny importů ho berou do pravidel.
+export const QUOTE_RULE = `- Citace: přímou řeč ani výroky lidí nepřebírej a nepiš, kdo co řekl („starosta řekl“, „podle ředitelky“, „trenér dodal“). Když výrok nese poselství, které je pro sousedy důležité, převyprávěj právě to, co ten člověk chtěl říct, po kozím a Drběninýma očima: jednou větou, nebo klidně víc, když výrok nese víc myšlenek, ale nenatahuj. Ne obecnou poznámku k tématu, ale jeho myšlenku. Třeba z výroku ředitelky „Děti ukázaly, že jim na městě záleží“ (o dětech, které uklízely park) může být „Kdo uklízí cizí pastvu, ten ji má rád. A tihle mladí mají Kopidlno rádi.“ Ukázku ani její začátek nepřebírej, každý článek po svém. Poselství nesmíš změnit ani k němu přidat hodnocení, které ve zdroji není. U vážných zpráv bez kozího obrazu, jen věcně a bez jména.`;
+
 export const PERSONA_MAX = 4000;
 export const FOOTBALL_MAX = 1500;
 

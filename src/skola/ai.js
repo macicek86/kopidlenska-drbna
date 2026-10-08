@@ -2,7 +2,7 @@
 import { callClaude } from "../claude.js";
 import { clubRules } from "../clubs.js";
 import { EVENT_CHANGE_RULE } from "../event-change.js";
-import { DEFAULT_VOICE } from "../drbena.js";
+import { DEFAULT_VOICE, NEWS_RULE, QUOTE_RULE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { KEYWORDS_RULE } from "../keywords.js";
 import { URGENT_RULE } from "../publish-queue.js";
@@ -21,6 +21,8 @@ Pravidla:
 - Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
 {RUBRIC}
 {IMAGES}{CLUBS}
+${QUOTE_RULE}
+${NEWS_RULE}
 - title: do 90 znaků, vlastní, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 ${LINK_RULE}

@@ -4,7 +4,7 @@ import { EVENT_CHANGE_RULE, eventChangeSchema, readEventChange } from "../event-
 import { clubRules } from "../clubs.js";
 import { prepareArticleBody } from "../rich.js";
 import { isoDate, clockTime, parseNoticeInput } from "../notices.js";
-import { DEFAULT_VOICE } from "../drbena.js";
+import { DEFAULT_VOICE, NEWS_RULE, QUOTE_RULE } from "../drbena.js";
 import { HOURS_RULES, hoursSchema, readHours } from "./hours.js";
 import { contentText, importContent } from "../import-overview.js";
 import { importLookup, withLookups } from "../import-tools.js";
@@ -58,12 +58,13 @@ ${HOURS_RULES}
 Pravidla:
 - Data, časy, místa, jména, ceny a telefony opiš přesně podle zdroje. Nic nevymýšlej. Když údaj chybí, nech pole prázdné. Rok doplň podle data zveřejnění zprávy.
 - Je-li přiložený plakát nebo fotka, vytáhni z něj údaje, které v textu chybí.
-- Zprávu podej jako svou novinku, ne jako převyprávěné oznámení. Nepiš, že město nebo radnice něco oznámila, informuje, zveřejnila, prosí nebo se omlouvá, ani „v příloze oznámení“. Co zpráva čtenářům říká, napiš rovnou („Řidiči i cestující, počítejte s omezením.“). Město jmenuj jen tam, kde samo něco dělá (opravuje, pořádá, rozhodlo). Odkaz na zdroj drbna přidá sama.
+${NEWS_RULE} Odkaz na zdroj drbna přidá sama.
 ${LINK_RULE}
 ${IMAGE_RULES}
 ${ATTACHMENT_RULES}
 ${KEYWORDS_RULE}
 ${URGENT_RULE}
+${QUOTE_RULE}
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až pět krátkých odstavců. Smíš použít jen <p>, <strong>, <em>, <ul>, <li>, <h3> a <a> s odkazem ze zdroje. Odkaz na zdroj nepiš, drbna ho doplní sama.
