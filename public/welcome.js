@@ -35,7 +35,11 @@ function show() {
     // Klik na tlačítko zavřít, nebo vedle okna (na ztmavené pozadí).
     if (event.target === dialog || event.target.closest("[data-welcome-close]")) dialog.close();
   });
-  dialog.addEventListener("close", () => dialog.remove());
+  dialog.addEventListener("close", () => {
+    dialog.remove();
+    // Na počítači po něm přijde bublina s upozorněním (public/push-bell.js).
+    document.dispatchEvent(new Event("drbna:welcome-closed"));
+  });
   dialog.showModal();
   // Fokus na okno samotné, ne na první odkaz: čtečka přečte nadpis a Tab vede dál do okna.
   dialog.focus();

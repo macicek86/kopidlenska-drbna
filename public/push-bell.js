@@ -1,7 +1,8 @@
 // Zvoneček upozornění v hlavičce a jednorázová nabídka (src/push/promo.js).
 // Kde prohlížeč upozornění neumí, zvoneček zmizí (iPhone ho vidí: na stránce se dozví, jak drbnu přidat na plochu).
 // Nabídka vyskočí nejvýš OFFER_TIMES krát a znovu nejdřív po OFFER_GAP_DAYS dnech, vždy až poslední v řadě:
-// stránka s uvítacím oknem má jen to, na další „Zeptej se mě!“ chatu (jen mobil) a po ní bublina. Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“,
+// na mobilu má stránka s uvítacím oknem jen to, na další „Zeptej se mě!“ chatu a po ní bublina; na počítači
+// bublina přijde chvíli po zavření uvítacího okna. Ne tomu, kdo už odebírá nebo ťukl na „Chci upozornění“,
 // a ne do otevřeného chatu.
 (() => {
   const bell = document.querySelector("[data-push-bell]");
@@ -12,6 +13,8 @@
   // Mezera po nápovědě chatu a začátek na stránce bez chatu.
   const PAUSE = 1000;
   const QUIET_START = 2500;
+  // Stejná hranice mobilu jako u chatu (public/chat.js).
+  const MOBILE = "(max-width: 540px), (pointer: coarse) and (max-height: 540px)";
   const store = {
     get: (key) => {
       try {
@@ -82,11 +85,15 @@
     return Boolean(welcome) && store.get("drbna-uvitani") !== welcome.dataset.welcome;
   }
 
-  // Bublina je poslední v řadě. Stránka s uvítacím oknem patří jen jemu, bublina počká na další stránku.
-  // S chatem čeká, až chat řekne, že „Zeptej se mě!“ dořekla (public/chat.js, na počítači hned).
+  // Bublina je poslední v řadě. Na mobilu patří stránka s uvítacím oknem jen jemu a bublina počká na další stránku,
+  // kde čeká, až chat řekne, že „Zeptej se mě!“ dořekla (public/chat.js). Na počítači nápověda chatu není,
+  // bublina tam přijde chvíli po zavření uvítacího okna.
   function afterOthers(then) {
-    if (welcomeDue()) return;
     const next = () => setTimeout(then, PAUSE);
+    if (welcomeDue()) {
+      if (!matchMedia(MOBILE).matches) document.addEventListener("drbna:welcome-closed", next, { once: true });
+      return;
+    }
     if (document.querySelector("[data-chat]")) {
       if (document.documentElement.dataset.chatHint === "done") next();
       else document.addEventListener("drbna:chat-hint-done", next, { once: true });
