@@ -43,6 +43,7 @@ function nav(data) {
       name: "Importy",
       links: [
         chief && ["munipolis", "Munipolis", "inbox", importFailed],
+        chief && ["facebook", "Facebook Pages", "inbox"],
         chief && ["fotbal", "Fotbal", "ball", footballFailed],
         chief && ["denik", "Deník", "paper", denikFailed],
         ...SCHOOL_LIST.map((source) => chief && [source.tag, source.page, source.icon, schoolFailed(source.tag)]),
@@ -110,7 +111,7 @@ function menuButton(groups, tab) {
     <label class="adm-menu-btn adm-only-mobile" for="adm-menu" aria-hidden="true">${icon("menu")}<span>${esc(current)}</span>${countBadge(waiting)}</label>`;
 }
 
-export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "emaily", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
+export const ADMIN_TABS = ["prehled", "vzkazy", "statistiky", "zpravy", "rubriky", "akce", "munipolis", "facebook", "fotbal", "denik", ...SCHOOL_LIST.map((source) => source.tag), "okoli", "obrazky", "reklamy", "svoz", "dvory", "lekari", "oteviraci-doba", "emaily", "odstavky", "drbena", "chat", "odber", "texty", "lide", "historie", "ucet"];
 
 export function toastHtml(flash) {
   if (!flash.text) return "";

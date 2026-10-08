@@ -10,6 +10,7 @@
 @import url("/notfound.css");
 @import url("/welcome.css");
 @import url("/feeds.css");
+@import url("/privacy.css");
 
 @media (min-width: 900px) {
   .hero {

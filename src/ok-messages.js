@@ -6,6 +6,7 @@ import { DOCTORS_OK } from "./post-doctors.js";
 import { REQUESTS_OK } from "./post-requests.js";
 import { STOCK_OK } from "./post-stock.js";
 import { IMPORT_OK } from "./post-munipolis.js";
+import { FACEBOOK_OK } from "./post-facebook.js";
 import { DRBENA_OK } from "./post-drbena.js";
 import { FOOTBALL_OK } from "./post-fotbal.js";
 import { DENIK_OK } from "./post-denik.js";
@@ -47,6 +48,7 @@ export const OK = {
   ...REQUESTS_OK,
   ...STOCK_OK,
   ...IMPORT_OK,
+  ...FACEBOOK_OK,
   ...DRBENA_OK,
   ...FOOTBALL_OK,
   ...DENIK_OK,
