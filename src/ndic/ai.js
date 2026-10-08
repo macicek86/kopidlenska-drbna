@@ -62,7 +62,7 @@ export function ndicSchema(rubricSlugs, topics = []) {
           note: stringField(),
         },
       },
-      article: outputSchema(rubricSlugs, { topics, ownImage: false }).properties.article,
+      article: outputSchema(rubricSlugs, { topics, ownImage: false, urgent: false }).properties.article,
     },
   };
 }

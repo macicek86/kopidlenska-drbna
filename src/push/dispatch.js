@@ -12,6 +12,10 @@ export const PUSH_CRON = "*/15 * * * *";
 // Večerní připomínky jdou v prvním běhu od 18:00; když cron do 22:00 nedoběhne, ten den se vynechají.
 export const EVENING_FROM = "18:00";
 const EVENING_TO = "22:00";
+// Noční klid: mezi 22:00 a 6:00 nic neodejde. Novinky z noci (i urgentní zpráva) se nezapíšou a pošle je první ranní běh.
+export const QUIET_FROM = "22:00";
+export const QUIET_TO = "06:00";
+export const quietTime = (time) => time >= QUIET_FROM || time < QUIET_TO;
 // Víc novinek najednou na jeden prohlížeč: poslední místo dostane souhrn „a další…“.
 export const MAX_PER_RUN = 4;
 const SEND_BATCH = 300;
@@ -115,6 +119,7 @@ export async function runPush(env, now = new Date()) {
     await env.DB.prepare("update push_settings set seeded = 1 where id = 1").run();
     return { sent: 0 };
   }
+  if (quietTime(time)) return { sent: 0 };
   const messages = [...news];
   if (time >= EVENING_FROM && time < EVENING_TO && settings.eveningOn !== today) {
     await env.DB.prepare("update push_settings set evening_on = ? where id = 1").bind(today).run();

@@ -7,6 +7,7 @@ import { DEFAULT_VOICE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE } from "../keywords.js";
+import { URGENT_RULE } from "../publish-queue.js";
 import { contentText, importContent } from "../import-overview.js";
 import { importLookup, withLookups } from "../import-tools.js";
 import { outputSchema, readArticle, readDecision } from "../munipolis/ai.js";
@@ -39,6 +40,7 @@ Pravidla:
 - body_html: jeden až tři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul> a <li>. Odkaz na zdroj nepiš.
 - event.description: prostý text, jedna až tři věty.
 ${KEYWORDS_RULE}
+${URGENT_RULE}
 - image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné. image_caption nech prázdné, fotky z Deníku se neberou.
 - Datum piš jako RRRR-MM-DD a čas jako HH:MM.
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná.

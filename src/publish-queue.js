@@ -2,8 +2,10 @@
 // nejdou na web najednou, ale s náhodným rozestupem a jen v denní době. Článek se uloží hned, `published_at` dostane
 // první volný okamžik (`liveArticle` ho do té doby schová). Volno je okamžik, kolem kterého žádná zpráva
 // nevyšla a nevyjde dřív než za `gapMin` minut; když se přisune k jiné, dostane od ní náhodně `gapMin` až `gapMax`.
-// Po `to` se přesune na další den od `from`. Co redakce pustí ručně, uzavírky z NDIC a Kam vyrazit (vlastní čas) jdou mimo frontu.
-import { pragueStamp, sqlStamp } from "./db-core.js";
+// Po `to` se přesune na další den od `from`. Co redakce pustí ručně, uzavírky z NDIC a Kam vyrazit (vlastní čas) jdou mimo frontu,
+// stejně jako zpráva, kterou Drběna označí jako spěchající (`article.urgent`, `URGENT_RULE`): ta jde ven hned, i v noci
+// (upozornění do prohlížeče počkají na ráno, src/push/dispatch.js). Redakce naplánovanou zprávu pustí tlačítkem `publishNow`.
+import { pragueStamp, requireChief, sqlStamp } from "./db-core.js";
 import { addDays, pragueNow } from "./waste.js";
 
 const MINUTE = 60_000;
@@ -41,4 +43,18 @@ export async function queuedMoment(env, settings, now = new Date()) {
     .bind(since)
     .all();
   return spreadMoment((rows.results ?? []).map((row) => row.published_at), now, settings);
+}
+
+// Pravidlo do pokynů importů (pole `urgent` u článku, `outputSchema` v src/munipolis/ai.js).
+export const URGENT_RULE = `- urgent: true jen u zprávy, která nesnese čekání pár hodin: havárie nebo odstávka vody či elektřiny dnes nebo zítra, uzavírka silnice od dneška nebo zítřka, varování (počasí, povodeň, nepitná voda, nebezpečí) a zrušení nebo změna akce, která je dnes nebo zítra. Taková zpráva vyjde hned, ostatní s rozestupem. Pozvánky, novinky, výsledky a všechno, co počká do zítřka, false. Když si nejsi jistá, false.`;
+
+// Naplánovanou zprávu pustí redakce na web hned: dnešní datum a teď.
+export async function publishNow(env, request, id, now = new Date()) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return gate;
+  const result = await env.DB.prepare("update articles set created_at = ?, published_at = ? where id = ? and published = 1 and published_at > ?")
+    .bind(pragueNow(now).date, sqlStamp(now), id, sqlStamp(now))
+    .run();
+  if (!Number(result.meta?.changes ?? 0)) return { ok: false, error: "Ta zpráva už na webu je, nebo není zveřejněná." };
+  return { ok: true };
 }

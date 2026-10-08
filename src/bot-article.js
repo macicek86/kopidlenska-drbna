@@ -7,6 +7,7 @@
 // `publishTime` („HH:MM“) u zveřejnění rovnou: na web až v tu hodinu (src/publish-time.js), výsledek nese `publishedAt`.
 // `spread` (automatika importů) zařadí zprávu do fronty zveřejnění (src/publish-queue.js): vyjde s rozestupem od ostatních
 // a jen přes den, i s jiným datem. Neplatí s `publishOn` ani `publishTime` a dá se vypnout na stránce Koza Drběna.
+// Spěchající zprávu (`article.urgent`) fronta pustí hned, i v noci.
 // `article.recall` je akce, na kterou Drběna v článku vzpomněla; podruhé už na ni nevzpomene (src/drbena-memory.js).
 import { slugify, uniqueSlug } from "./db-core.js";
 import { scheduledMoment } from "./publish-time.js";
@@ -35,7 +36,7 @@ export async function saveBotArticle(env, { article, image, attachments = [], so
   if (article.recall) await markRecalled(env, article.recall);
   if (autoPublish) {
     const slug = await uniqueSlug(env, slugify(article.title));
-    const queue = spread && !publishOn && !publishTime ? (await loadDrbena(env)).spread : null;
+    const queue = spread && !article.urgent && !publishOn && !publishTime ? (await loadDrbena(env)).spread : null;
     const { day, publishedAt } = queue?.on ? await queuedMoment(env, queue) : scheduledDay(publishOn || pragueNow().date, publishTime);
     const result = await env.DB.prepare(
       `insert into articles (slug, title, excerpt, body, category, rubric_id, image_key, image_focus, image_caption, attachments, source, published, created_at, author_id, author_name, redacted,

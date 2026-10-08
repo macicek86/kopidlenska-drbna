@@ -70,3 +70,12 @@ test("fronta zveřejnění: nastavení z formuláře", async () => {
   assert.equal(readSpreadInput({ spreadFrom: "7:00", spreadTo: "21:00", spreadMin: "90", spreadMax: "60" }).ok, false);
   assert.equal(readSpreadInput({ spreadFrom: "7:00", spreadTo: "21:00", spreadMin: "1", spreadMax: "60" }).ok, false);
 });
+
+test("spěchající zpráva: pole ve schématu importů (ne u NDIC) a přečtení z odpovědi", async () => {
+  const { outputSchema, readArticle } = await import("../src/munipolis/ai.js");
+  assert.ok(outputSchema(["zpravy"]).properties.article.required.includes("urgent"));
+  assert.ok(!outputSchema(["zpravy"], { urgent: false }).properties.article.required.includes("urgent"));
+  const raw = { include: true, title: "Neteče voda", excerpt: "Havárie na Husově.", body_html: "<p>Do večera.</p>", rubric: "zpravy" };
+  assert.equal(readArticle({ ...raw, urgent: true }, ["zpravy"]).urgent, true);
+  assert.equal(readArticle(raw, ["zpravy"]).urgent, false);
+});

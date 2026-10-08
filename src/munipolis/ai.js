@@ -14,6 +14,7 @@ import { FOLLOWUP_DECISION } from "../followup-rules.js";
 import { KEYWORDS_RULE, keywordsSchema, readKeywords } from "../keywords.js";
 import { MAX_ATTACHMENTS } from "../attachments.js";
 import { readRecall } from "../drbena-memory.js";
+import { URGENT_RULE } from "../publish-queue.js";
 
 export { MODEL, DEFAULT_VOICE };
 export { addArticles, articleLine, contextText } from "../import-overview.js";
@@ -62,6 +63,7 @@ ${LINK_RULE}
 ${IMAGE_RULES}
 ${ATTACHMENT_RULES}
 ${KEYWORDS_RULE}
+${URGENT_RULE}
 - title: do 90 znaků, bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: dva až pět krátkých odstavců. Smíš použít jen <p>, <strong>, <em>, <ul>, <li>, <h3> a <a> s odkazem ze zdroje. Odkaz na zdroj nepiš, drbna ho doplní sama.
@@ -80,7 +82,8 @@ function stringField() {
 // `ownImage` dovolí vybrat vlastní fotku (Deník fotky nedává, tam je obrázek vždy z knihovny),
 // `followup` přidá rozhodnutí „doplneni“ (navazující zpráva, src/followup.js).
 // `attachments` přidá k článku přílohy (obrázky ze zdroje pod článkem).
-export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true, followup = false, attachments = false } = {}) {
+// `urgent` (pole „spěchá“, src/publish-queue.js) mají importy, které jdou přes frontu zveřejnění; NDIC ne.
+export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage = true, followup = false, attachments = false, urgent = true } = {}) {
   const slugs = rubricSlugs.length ? rubricSlugs : ["zpravy"];
   const schema = {
     type: "object",
@@ -138,6 +141,10 @@ export function outputSchema(rubricSlugs, { hours = false, topics = [], ownImage
       },
     },
   };
+  if (urgent) {
+    schema.properties.article.required.push("urgent");
+    schema.properties.article.properties.urgent = { type: "boolean" };
+  }
   if (ownImage) {
     schema.properties.article.required.push("image_use");
     schema.properties.article.properties.image_use = { type: "string", enum: ["vlastni", "plakat", "knihovna"] };
@@ -220,6 +227,7 @@ export function readArticle(raw, rubricSlugs) {
     imageCaption: imageUse !== "knihovna" ? clean(raw.image_caption, 200) : "",
     keywords: readKeywords(raw.keywords),
     recall: readRecall(raw.recall),
+    urgent: raw.urgent === true,
     attachments: readAttachmentPicks(raw.attachments, imageUse),
   };
 }

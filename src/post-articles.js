@@ -2,11 +2,13 @@
 import { removeArticle, saveArticle } from "./db.js";
 import { approveProposal, discardProposal, rejectProposal, saveProposal, withdrawProposal } from "./proposals-db.js";
 import { redirect, withError } from "./http.js";
+import { publishNow } from "./publish-queue.js";
 
 export const ARTICLES_OK = {
   zprava: "Zpráva je uložená.",
   "zprava-upravena": "Zpráva je upravená.",
   "zprava-smazana": "Zpráva je smazaná.",
+  "zprava-hned": "Zpráva je na webu.",
   navrh: "Návrh čeká na schválení.",
   "navrh-upraven": "Návrh je upravený a pořád čeká na schválení.",
   "navrh-stazen": "Návrh je stažený.",
@@ -58,6 +60,11 @@ export async function articlesPost(path, request, env, fields) {
     if (!result.ok) return redirect(withError(forEvent ? `/redakce/zpravy?novy=1&akce=${fields.eventId}` : "/redakce/zpravy", result.error));
     if (forEvent) return redirect("/redakce/akce?ok=zprava-k-akci");
     return redirect(`/redakce/zpravy?ok=${fields.id ? "zprava-upravena" : "zprava"}`);
+  }
+  if (path === "/redakce/zpravy/hned") {
+    const result = await publishNow(env, request, Number(fields.id));
+    if (!result.ok) return redirect(withError("/redakce/zpravy", result.error));
+    return redirect("/redakce/zpravy?ok=zprava-hned");
   }
   if (path === "/redakce/zpravy/smazat") {
     if (!fields.confirm || !fields.id) return redirect("/redakce/zpravy");

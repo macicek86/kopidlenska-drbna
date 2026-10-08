@@ -125,6 +125,7 @@ function importRoutes(base, settingsTable) {
 const ROUTES = {
   "/redakce/zpravy/ulozit": [by("articles", "id")],
   "/redakce/zpravy/smazat": [existing("articles", "id")],
+  "/redakce/zpravy/hned": [existing("articles", "id")],
   "/redakce/zpravy/navrh": [ownProposal("proposals", "article_id")],
   "/redakce/zpravy/stahnout": [existing("proposals", "id")],
   "/redakce/zpravy/smazat-navrh": [existing("proposals", "id")],

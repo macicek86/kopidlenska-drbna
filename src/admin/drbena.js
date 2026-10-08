@@ -39,7 +39,7 @@ function spreadPanel(spread) {
     `<input class="${input}" type="number" name="${name}" value="${value}" min="${GAP_BOUNDS.min}" max="${GAP_BOUNDS.max}" step="1" inputmode="numeric" required>`;
   return `<form class="panel form" method="post" action="${BASE}/rozestup" data-dirty>
       <header class="panel-head"><h2>Rozestup zveřejňování</h2>${spread.on ? badge("Zapnuto", "info") : badge("Vypnuto")}</header>
-      <p class="panel-note">Zprávy, které Drběna z Munipolisu, Deníku, škol, webu města a fotbalu zveřejňuje sama, nevyjdou všechny najednou. Každá dostane čas s náhodným rozestupem od ostatních, a jen přes den: co Drběna napíše v noci, vyjde ráno. Mimo frontu jde, co pustí redakce ručně, uzavírky silnic a Kam vyrazit (má vlastní čas).</p>
+      <p class="panel-note">Zprávy, které Drběna z Munipolisu, Deníku, škol, webu města a fotbalu zveřejňuje sama, nevyjdou všechny najednou. Každá dostane čas s náhodným rozestupem od ostatních, a jen přes den: co Drběna napíše v noci, vyjde ráno. Zprávu, která spěchá (havárie, varování, zrušení akce na poslední chvíli), pustí Drběna ven hned, i v noci; upozornění do prohlížeče ale počkají do 6:00. Mimo frontu jde i to, co pustí redakce ručně, uzavírky silnic a Kam vyrazit (má vlastní čas). Naplánovanou zprávu pustíte ven tlačítkem „Zveřejnit hned“ ve Zprávách.</p>
       ${check("spread", "1", spread.on, "Zveřejňovat s rozestupem", "Bez zaškrtnutí jde zpráva na web hned, jak ji Drběna napíše.")}
       <div class="pair">
         ${field("Nejdřív v", time("spreadFrom", spread.from))}

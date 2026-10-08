@@ -8,7 +8,7 @@ import { credit, esc } from "../view.js";
 import { articleFields, BASE, proposalKind, reviewForm } from "./article-form.js";
 import { contributorArticles } from "./articles-contributor.js";
 import { adminShell } from "./shell.js";
-import { badge, callout, cancelLink, confirmForm, formFoot, hidden, item, list, modal, modalLink, openButton, pageHead, panel } from "./ui.js";
+import { badge, callout, cancelLink, confirmForm, formFoot, hidden, item, list, modal, modalLink, openButton, pageHead, panel, postButton } from "./ui.js";
 
 function articleForm(data, editing, close, event = null) {
   const help = !editing
@@ -71,6 +71,7 @@ function chiefArticles(ctx, data, message, query) {
       meta: [esc(rubricLabel(row)), esc(credit(row)), row.createdOn ? esc(formatLong(row.createdOn)) : ""].filter(Boolean).join(" · "),
       badges: `${planned ? badge(`Vyjde ${formatShort(row.createdOn)}${later && later !== "0:00" ? ` v ${later}` : ""}`, "warn") : later ? badge(`Vyjde v ${later}`, "warn") : live ? badge("Na webu", "ok") : badge("Skrytá", "off")}${row.redacted ? badge("Redigováno") : ""}`,
       actions: `${modalLink(`${BASE}?id=${row.id}`, "Upravit")}
+        ${row.published && !live ? postButton(`${BASE}/hned`, { id: row.id }, "Zveřejnit hned", "btn-ghost") : ""}
         ${live && row.slug ? `<a class="btn btn-sm btn-ghost" href="/zpravy/${esc(row.slug)}" target="_blank" rel="noopener">Zobrazit</a>` : ""}
         ${modalLink(`${BASE}?smazat=${row.id}`, "Smazat", "btn-ghost btn-danger-text")}`,
     });

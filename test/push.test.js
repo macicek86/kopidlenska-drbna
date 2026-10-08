@@ -194,3 +194,8 @@ test("zvoneček a nabídka jen se zapnutými upozorněními, v patičce odkaz ne
     assert.doesNotMatch(page, /data-push-bell|upozorneni|push-bell/);
   }
 });
+
+test("noční klid: mezi 22:00 a 6:00 upozornění neodcházejí", async () => {
+  const { quietTime } = await import("../src/push/dispatch.js");
+  assert.deepEqual(["21:59", "22:00", "03:10", "05:59", "06:00", "12:00"].map(quietTime), [false, true, true, true, false, false]);
+});

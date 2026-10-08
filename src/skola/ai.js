@@ -5,6 +5,7 @@ import { EVENT_CHANGE_RULE } from "../event-change.js";
 import { DEFAULT_VOICE } from "../drbena.js";
 import { writeFollowup } from "../followup.js";
 import { KEYWORDS_RULE } from "../keywords.js";
+import { URGENT_RULE } from "../publish-queue.js";
 import { contentText, importContent } from "../import-overview.js";
 import { importLookup, withLookups } from "../import-tools.js";
 import { base64, LINK_RULE, outputSchema, readArticle, readDecision, visibleImages } from "../munipolis/ai.js";
@@ -26,6 +27,7 @@ ${LINK_RULE}
 - body_html: dva až čtyři krátké odstavce. Smíš použít jen <p>, <strong>, <em>, <ul>, <li>, <h3> a <a> s odkazem ze zdroje. Odkaz na zdroj nepiš, drbna ho doplní sama.
 - event.description: prostý text, jedna až tři věty.
 ${KEYWORDS_RULE}
+${URGENT_RULE}
 - Datum piš jako RRRR-MM-DD a čas jako HH:MM.
 - U části, kterou nevytváříš, dej include false a ostatní pole nech prázdná. Odstávky a uzavírky (notice) z tohoto zdroje drbna nebere, notice nech vždy include false.
 - reason: jedna věta pro redakci, proč jsi tak rozhodla.`;
