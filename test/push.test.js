@@ -143,6 +143,8 @@ test("stránka Upozornění: vypnutá témata chybí, bez klíčů nejde zapnout
   const settings = mapPushSettings({ enabled: 1, topics_off: "svoz" });
   const page = pushPage(ctx, { lists, settings, publicKey: "KEY" });
   assert.doesNotMatch(page, /noindex/);
+  assert.match(page, /<meta property="og:image" content="https:\/\/drbna\.test\/og-upozorneni\.webp">/);
+  assert.match(page, /<meta property="og:image:width" content="1200">/);
   assert.match(page, /data-key="KEY"/);
   assert.match(page, /value="hodiny"/);
   assert.doesNotMatch(page, /value="svoz"/);
