@@ -65,6 +65,14 @@
     if (location.pathname === "/upozorneni") return;
     if (supported && Notification.permission === "denied") return;
     const today = new Date().toLocaleDateString("sv");
+    // Uvítací okno (public/welcome.js) má přednost: v den, kdy se ukazuje (i znovu všem po změně v redakci),
+    // bublina nepřijde, počítá se od toho dne znovu.
+    const welcome = document.querySelector("template[data-welcome]");
+    if (welcome && store.get("drbna-uvitani") !== welcome.dataset.welcome) {
+      store.set(FIRST, today);
+      return;
+    }
+    if (document.querySelector("dialog[open]")) return;
     const first = store.get(FIRST);
     if (!first) store.set(FIRST, today);
     if (!first || first === today) return;
