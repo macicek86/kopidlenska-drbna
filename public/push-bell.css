@@ -72,5 +72,3 @@ body:has(.push-offer) .chat-hint { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .push-offer { animation: none; }
 }
-/* Otevřený chat má přednost, bublina počká pod ním. */
-body:has(.chat.is-open) .push-offer { display: none; }

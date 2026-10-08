@@ -1,6 +1,7 @@
 // Zvoneček upozornění v hlavičce a jednorázová nabídka (src/push/promo.js).
 // Kde prohlížeč upozornění neumí, zvoneček zmizí (iPhone ho vidí: na stránce se dozví, jak drbnu přidat na plochu).
-// Nabídka vyskočí jednou, až při návštěvě v jiný den než první (první den má uvítací okno), a ne tomu, kdo už odebírá.
+// Nabídka vyskočí jen jednou za život prohlížeče, až při návštěvě v jiný den než první (první den má uvítací okno),
+// ne tomu, kdo už odebírá, a ne do otevřeného chatu.
 (() => {
   const bell = document.querySelector("[data-push-bell]");
   const FIRST = "drbna-push-first";
@@ -93,16 +94,16 @@
   }
 
   function show(template) {
+    // Kdo si zrovna povídá s Drběnou, toho nerušit: nabídka přijde při jiné stránce nebo návštěvě.
+    const chatRoot = document.querySelector("[data-chat]");
+    if (chatRoot?.classList.contains("is-open")) return;
     const box = template.content.firstElementChild.cloneNode(true);
     // Bez chatu na stránce není Drběna, která by bublinu říkala: přijde s ní.
     if (!document.querySelector("[data-chat]")) box.classList.add("with-goat");
-    const close = () => {
-      store.set(DONE, "1");
-      box.remove();
-    };
-    box.querySelector("[data-push-offer-no]").addEventListener("click", close);
-    box.querySelector("[data-push-offer-yes]").addEventListener("click", () => store.set(DONE, "1"));
+    box.querySelector("[data-push-offer-no]").addEventListener("click", () => box.remove());
     document.body.append(box);
+    // Jednou a dost: ať na ni klikne, nebo ne, podruhé už nepřijde. Zvoneček v hlavičce zůstává.
+    store.set(DONE, "1");
     aimTail(box);
     // Tlačítko chatu staví public/chat.js, může přijít až po bublině.
     const chat = document.querySelector("[data-chat]");
@@ -115,6 +116,15 @@
       watch.observe(chat, { childList: true, subtree: true });
     }
     window.addEventListener("resize", () => aimTail(box));
+    // Otevře chat, když je bublina vidět: zmizí a už se na téhle stránce nevrátí.
+    if (chatRoot) {
+      const opened = new MutationObserver(() => {
+        if (!chatRoot.classList.contains("is-open")) return;
+        opened.disconnect();
+        box.remove();
+      });
+      opened.observe(chatRoot, { attributes: true, attributeFilter: ["class"] });
+    }
   }
 
   subscribed()
