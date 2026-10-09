@@ -169,7 +169,8 @@ export const selectSkolaItems = (env, source, ids) => markManual(env, source.ite
 export async function rememberSkolaItems(env, source, items, { isOld = () => false } = {}) {
   if (!items.length) return 0;
   // Jedním dávkovým dotazem: zdroj vrací desítky položek a většinu už drbna zná (insert or ignore).
-  const statuses = items.map((item) => (isOld(item) ? "stare" : "nove"));
+  // Položka může přijít už s rozhodnutím (`status`, `reason`), třeba přeskočená při předvýběru úřední desky.
+  const statuses = items.map((item) => item.status ?? (isOld(item) ? "stare" : "nove"));
   const insert = `insert or ignore into ${source.itemsTable} (guid, link, title, text, images, documents, section, term, published_at, status, reason)
     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const statements = items.map((item, index) =>
@@ -184,11 +185,11 @@ export async function rememberSkolaItems(env, source, items, { isOld = () => fal
       item.term,
       item.publishedAt,
       statuses[index],
-      statuses[index] === "stare" ? STALE_REASON : "",
+      items[index].reason ?? (statuses[index] === "stare" ? STALE_REASON : ""),
     ),
   );
   const results = await env.DB.batch(statements);
-  return results.filter((result, index) => Number(result?.meta?.changes ?? 0) > 0 && statuses[index] !== "stare").length;
+  return results.filter((result, index) => Number(result?.meta?.changes ?? 0) > 0 && statuses[index] === "nove").length;
 }
 
 export async function finishSkolaItem(env, source, id, fields) {

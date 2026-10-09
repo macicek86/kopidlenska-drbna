@@ -4,6 +4,7 @@ import { adminSkola } from "../src/admin/index.js";
 import { refLink } from "../src/admin/imports.js";
 import { skolaContent, skolaPrompt, skolaText } from "../src/skola/ai.js";
 import { contentText } from "../src/import-overview.js";
+import { screenDesk } from "../src/skola/deska-screen.js";
 import { DESK_FEED, DESK_SECTION, fetchDocuments, parseDeskFeed } from "../src/skola/deska.js";
 import { parseSchoolFeed } from "../src/skola/feed.js";
 import { photoCaption, skolaSource } from "../src/skola/run.js";
@@ -117,10 +118,10 @@ https://www.kopidlno.cz/file.php?oid=13904853&amp;utm_source=Úřední_deska&amp
  </channel>
 </rss>`;
 
-test("z úřední desky jen usnesení a zápisy, klíčem je id dokumentu, přílohy bez utm", () => {
+test("z úřední desky jdou usnesení a zápisy dál, ostatní čekají na předvýběr, klíčem je id dokumentu, přílohy bez utm", () => {
   const { ok, items } = parseDeskFeed(DESK);
   assert.ok(ok);
-  assert.equal(items.length, 1);
+  assert.deepEqual(items.map((item) => item.screen), [false, true]);
   const [item] = items;
   assert.equal(item.guid, "www.kopidlno.cz/uredni-deska/550");
   assert.equal(item.link, "https://www.kopidlno.cz/uredni-deska?id=550&action=detail");
@@ -136,7 +137,7 @@ test("web města čte aktuality i úřední desku, stačí jedno z nich", async 
   };
   const result = await WEB.fetchItems(WEB.defaultFeeds, { fetchImpl });
   assert.ok(result.ok);
-  assert.deepEqual(result.items.map((item) => item.guid), ["www.kopidlno.cz/uredni-deska/550"]);
+  assert.deepEqual(result.items.map((item) => item.guid), ["www.kopidlno.cz/uredni-deska/550", "www.kopidlno.cz/uredni-deska/549"]);
   assert.match(result.warning, /500/);
 });
 
@@ -252,4 +253,24 @@ test("plakáty odložené položky počkají v R2, po pozvánce zůstane jen ten
   assert.deepEqual([...files.keys()], [item.keptImages[0]]);
   const [after] = (await waitingSkolaItems(env, WEB, 1)) ?? [];
   assert.deepEqual(after.keptImages, []);
+});
+
+test("předvýběr desky: zajímavé nadpisy projdou, nezajímavé se uloží jako přeskočené, známé a neposouzené se nevolají", async () => {
+  const item = (id, title, screen = true) => ({ guid: `d/${id}`, link: `l/${id}`, title, screen, documents: ["x"] });
+  const items = [item(1, "Usnesení rady", false), item(2, "Anketa o osadních výborech"), item(3, "Rozpočtové opatření"), item(4, "Dražba"), item(5, "Neposouzené")];
+  const env = { DB: { prepare: () => ({ bind: () => ({ all: async () => ({ results: [{ guid: "d/4" }] }) }) }) } };
+  let asked = [];
+  const ask = async (_env, titles) => {
+    asked = titles;
+    return { ok: true, found: new Map([["0", { interesting: true, reason: "" }], ["1", { interesting: false, reason: "Formalita." }]]) };
+  };
+  const out = await screenDesk(env, WEB, items, { ask });
+  assert.deepEqual(asked, ["Anketa o osadních výborech", "Rozpočtové opatření", "Neposouzené"]);
+  assert.deepEqual(out.map((entry) => entry.guid), ["d/1", "d/2", "d/3"]);
+  assert.equal(out[1].screen, undefined);
+  assert.equal(out[1].status, undefined);
+  assert.equal(out[2].status, "preskoceno");
+  assert.match(out[2].reason, /Formalita/);
+  const failed = await screenDesk(env, WEB, items, { ask: async () => ({ ok: false, error: "x" }) });
+  assert.deepEqual(failed.map((entry) => entry.guid), ["d/1"]);
 });

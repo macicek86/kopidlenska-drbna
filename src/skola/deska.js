@@ -1,11 +1,12 @@
-// Úřední deska města Kopidlna (Antee): z RSS bere jen usnesení a zápisy rady a zastupitelstva a pozvánky na zasedání.
+// Úřední deska města Kopidlna (Antee): usnesení a zápisy rady a zastupitelstva a pozvánky na zasedání jdou rovnou dál,
+// ostatní nadpisy (`screen`) napřed přečte levný model (`deska-screen.js`), jestli je to pro sousedy zajímavé.
 // RSS nese jen nadpis a odkazy na přílohy; text je v PDF, které Drběna dostane celé (`fetchDocuments`).
 import { decodeEntities, htmlToText, tag, USER_AGENT } from "../munipolis/feed.js";
 import { fetchSchoolFeeds } from "./feed.js";
 
 export const DESK_FEED = "https://www.kopidlno.cz/uredni-deska?action=atom";
 export const DESK_SECTION = "Úřední deska";
-// Ostatní (dražby, rozpočtová opatření, výběrová řízení, katastr…) se ani neukládá.
+// Ostatní (anketa, volby, dražby, rozpočtová opatření, výběrová řízení…) posoudí `screenDesk` podle nadpisu.
 const DESK_TOPICS = /usnesení|zápis\s+(ze|z)\s|zasedání\s+zastupitelstv/i;
 const MAX_ITEMS = 20;
 const MAX_DOCUMENTS = 2;
@@ -49,7 +50,6 @@ export function parseDeskFeed(xml, { maxItems = MAX_ITEMS } = {}) {
   for (const match of text.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)) {
     const block = match[1];
     const title = htmlToText(tag(block, "title")).replace(/\s+/g, " ").slice(0, 300);
-    if (!DESK_TOPICS.test(title)) continue;
     const entry = deskEntry(tag(block, "guid").trim() || tag(block, "link").trim());
     if (!entry) continue;
     const files = decodeEntities(tag(block, "description")).match(/https:\/\/\S+/g) ?? [];
@@ -64,6 +64,7 @@ export function parseDeskFeed(xml, { maxItems = MAX_ITEMS } = {}) {
       section: DESK_SECTION,
       term: "",
       publishedAt: isoStamp(tag(block, "pubDate")),
+      screen: !DESK_TOPICS.test(title),
     });
     if (items.length >= maxItems) break;
   }

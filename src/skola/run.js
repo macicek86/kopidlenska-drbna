@@ -26,6 +26,7 @@ import { pragueNow } from "../waste.js";
 import { loadStockTopics, pickStockImage } from "../stock-db.js";
 import { askSkola } from "./ai.js";
 import { DESK_SECTION, fetchDocuments } from "./deska.js";
+import { screenDesk } from "./deska-screen.js";
 import { deferDay, deferSkolaItem, laterNote, loadKeptImages, PAST_REASON, releaseKeptImages, reopenDeferred, termOver } from "./defer.js";
 import { pastedFrom } from "./paste.js";
 import { draftPastedItem } from "./paste-run.js";
@@ -207,7 +208,8 @@ async function collect(env, source, settings, fetchImpl) {
   // Odložené pozvánky, kterým nastal den (`defer.js`), jdou zpátky do fronty.
   if (source.defer) await reopenDeferred(env, source, today);
   const isOld = (item) => !isFresh(importSourceDate(item, today), today, settings.freshDays);
-  return { ok: true, warning: feed.warning, added: await rememberSkolaItems(env, source, feed.items, { isOld }) };
+  const items = await screenDesk(env, source, feed.items);
+  return { ok: true, warning: feed.warning, added: await rememberSkolaItems(env, source, items, { isOld }) };
 }
 
 // Další článek z fronty. Automatický, který mezitím zestárl (třeba po dlouhé pauze), jde stranou mezi starší.
