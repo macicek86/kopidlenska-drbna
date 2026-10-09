@@ -7,9 +7,9 @@ const MAX_TITLES = 20;
 
 const RULES = `Dostaneš nadpisy oznámení z úřední desky města Kopidlna. Pro každé řekni, jestli by o něm měla psát místní zpravodajská stránka pro obyvatele Kopidlna a okolních částí (Pševes, Drahoraz, Mlýnec…).
 
-Zajímavé (interesting = true): ankety a hlasování, volby a volební komise, osadní výbory, veřejná projednání, vyhlášky a nařízení města, změny dopravy, uzavírky, omezení provozu, dotace, nábory pracovníků města, změny v katastru a mapování, cokoli, co se týká obyvatel nebo jejich majetku, bezpečnosti a každodenního života ve městě.
+Zajímavé (interesting = true): ankety a hlasování, volby a volební komise, osadní výbory, veřejná projednání, vyhlášky a nařízení města, změny dopravy, uzavírky, omezení provozu, dotace, cokoli, co se týká obyvatel, jejich bezpečnosti a každodenního života ve městě.
 
-Nezajímavé (interesting = false): dražby a exekuce cizích lidí, rozpočtová opatření a závěrečné účty, oznámení jiných úřadů o věcech daleko odsud, čistě formální a opakující se oznámení bez dopadu na sousedy.
+Nezajímavé (interesting = false): dražby a exekuce cizích lidí, rozpočtová opatření a závěrečné účty, výběrová řízení a nábory na úřední místa, katastr (vyhlášení platnosti operátu, nové mapování, změny hranic), oznámení jiných úřadů o věcech daleko odsud, čistě úřední a formální oznámení, která sousedům nic konkrétního nepřinášejí.
 
 Když si nejsi jistý, rozhodni se pro true. reason je jedna krátká česká věta.`;
 

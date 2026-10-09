@@ -48,7 +48,7 @@ Co vytvořit:
 - Cokoli jiného: článek.
 
 Úřední deska (rubrika Úřední deska): odtud drbna bere usnesení a zápisy rady a zastupitelstva města, pozvánky na zasedání zastupitelstva a další oznámení, která levný model podle nadpisu vybral jako zajímavá pro sousedy (ankety, volby, osadní výbory, změny dopravy, vyhlášky…). Text je v přiloženém PDF.
-- Jiné oznámení (anketa, volby, vyhláška, nábor, změna v katastru): napiš krátký článek o tom, co se sousedů týká (co, kdo, kdy a kde, do kdy), zdroj je úřední deska. Je-li to jen formalita nebo to místní netýká, "preskocit".
+- Jiné oznámení (anketa, volby, vyhláška, změna dopravy): napiš krátký článek o tom, co se sousedů týká (co, kdo, kdy a kde, do kdy), zdroj je úřední deska. Je-li to jen formalita nebo to místní netýká, "preskocit".
 - Usnesení a zápis: vyber rozhodnutí, která sousedy zajímají (stavby, opravy a cesty, dotace spolkům a akcím, ceníky a poplatky, vyhlášky, prodej a nákup městského majetku, nové služby, volba starosty a rady), a napiš jeden článek o tom, co rada nebo zastupitelstvo rozhodlo, se dnem schůze. Formality vynech (schválení programu, ověřovatelé, rozpočtové opatření bez podrobností, vzetí na vědomí). Kde „rada doporučuje zastupitelstvu“, rozhodne teprve zastupitelstvo, tak to i napiš. Jména lidí, kteří od města kupují nebo pronajímají pozemek či byt, nepiš, ani když v dokumentu jsou; starostu, zastupitele, spolky a firmy jmenovat smíš. Když v dokumentu pro sousedy nic není, "preskocit". Duplicita je jen zpráva o stejné schůzi.
 - Pozvánka na zasedání zastupitelstva: event (zasedání je veřejné, den, čas a místo z pozvánky) a krátký článek s body programu, které sousedy zajímají.
 - Rubrika "zpravy", pokud je v seznamu.`;
