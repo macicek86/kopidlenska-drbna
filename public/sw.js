@@ -12,6 +12,8 @@ self.addEventListener("push", (event) => {
   const options = {
     body: data.body || "",
     icon: "/icon-192.png",
+    // Malá ikonka v liště Androidu: prohlížeč z ní bere jen průhlednost, proto bílá koza na průhledném.
+    badge: "/badge-96.png",
     lang: "cs",
     data: { url: data.url || "/" },
   };
