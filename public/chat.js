@@ -146,12 +146,19 @@ async function turnstileToken(box, sitekey) {
   }
 }
 
+// Přerušené spojení (slabý signál, probouzející se telefon) se zkusí ještě jednou, než chat ohlásí chybu.
+async function send(url, body) {
+  const options = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+  try {
+    return await fetch(url, options);
+  } catch {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return fetch(url, options);
+  }
+}
+
 async function post(url, body) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const response = await send(url, body);
   let data = {};
   try {
     data = await response.json();
