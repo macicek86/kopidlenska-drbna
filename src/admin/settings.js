@@ -12,11 +12,6 @@ function textField(label, value, control, long = false, hint = "") {
   return `<div class="text-field${long ? " text-field-long" : ""}" data-search="${esc(`${label} ${value}`.toLowerCase())}">${field(esc(label), control, esc(hint))}</div>`;
 }
 
-function contactField(value) {
-  const label = "Kontakt na redakci";
-  return textField(label, value, `<textarea class="${input}" name="contactNote" rows="3" maxlength="600" required>${esc(value)}</textarea>`, true);
-}
-
 function welcomeAgainField(copy) {
   const version = Number(copy?.[WELCOME_VERSION]);
   const day = version > 1 ? formatLong(new Date(version).toLocaleDateString("sv-SE", { timeZone: "Europe/Prague" })) : "";
@@ -43,7 +38,7 @@ export function adminTexts(ctx, data, message) {
           return textField(row.label, value, control, row.long, row.hint);
         })
         .join("");
-      const extra = group.name === "O nás" ? contactField(data.contactNote) : group.name === "Uvítací okno" ? welcomeAgainField(ctx.copy) : "";
+      const extra = group.name === "Uvítací okno" ? welcomeAgainField(ctx.copy) : "";
       return `<details class="text-group"${index === 0 ? " open" : ""}>
         <summary><span>${esc(group.name)}</span><small>${group.items.length + (extra ? 1 : 0)}</small></summary>
         <div class="text-group-body">${extra}${fields}</div>

@@ -692,9 +692,7 @@ export async function saveCopy(env, request) {
   const gate = await requireChief(env, request);
   if (!gate.ok) return { ok: false, error: gate.error };
   const form = await request.formData();
-  const contactNote = clip(form.get("contactNote"), 600);
-  if (contactNote.length < 3) return { ok: false, error: "Doplňte kontakt na stránce O nás." };
-  const statements = [env.DB.prepare("update settings set contact_note = ? where id = 1").bind(contactNote)];
+  const statements = [];
   for (const item of COPY) {
     const value = clip(form.get(item.key), item.max);
     if (!value) return { ok: false, error: `Doplňte pole: ${item.label}.` };

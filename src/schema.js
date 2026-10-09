@@ -34,7 +34,7 @@ import { ensureMailinTables } from "./mailin/store.js";
 import { ensureHealthTables } from "./health/store.js";
 import { ensurePushTables } from "./push/store.js";
 
-export const SCHEMA_VERSION = 58;
+export const SCHEMA_VERSION = 59;
 
 let schemaReady = false;
 
@@ -369,6 +369,7 @@ const COPY_RENAMES = [
   ["about_outages_link", "Odstávky vody a elektřiny", "Odstávky a uzavírky"],
   ["bins_alt", "Koza Drběna v montérkách s popelnicí na kopidlenském náměstí", "Koza Drběna v reflexní pracovní soupravě s koštětem a popelnicí"],
   ["ads_flag", "Reklama", "Reklama od sousedů"],
+  ["about_body", "Kopidlenská drbna je sousedský projekt od místních pro místní.\n\nVznikla proto, aby bylo jednodušší zjistit, co se u nás děje, co se chystá, kam vyrazit nebo co by nám nemělo uniknout. Najdete tu praktické informace, pozvánky, zajímavosti i obyčejné sousedské zprávy.\n\nDrbnu provozuje Daniel Meca ve svém volném čase a na vlastní náklady. Není to stránka města, úřadu ani žádné politické strany.\n\nJe to prostě místo, kde si můžeme mezi sebou předávat informace, tipy a novinky z našeho okolí.\n\nMáte něco, co by měli vědět i ostatní? Dejte nám vědět. Drbna je tu pro nás všechny.", "<p>Kopidlenská drbna je sousedský projekt od místních pro místní.</p><p>Vznikla proto, aby bylo jednodušší zjistit, co se u nás děje, co se chystá, kam vyrazit nebo co by nám nemělo uniknout. Najdete tu praktické informace, pozvánky, zajímavosti i obyčejné sousedské zprávy.</p><p>Drbnu provozuje Camledian (Daniel Meca) ve volném čase a na vlastní náklady. Není to stránka města, úřadu ani žádné politické strany.</p><p>Je to prostě místo, kde si můžeme mezi sebou předávat informace, tipy a novinky z našeho okolí.</p>"],
 ];
 
 async function renameCopy(env) {

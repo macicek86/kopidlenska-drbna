@@ -94,6 +94,7 @@ function safeHref(raw) {
   if (!value || /\s/.test(value)) return "";
   if (/^https:\/\//i.test(value) || /^http:\/\//i.test(value)) return withoutTracking(value);
   if (/^mailto:/i.test(value) && !/[<>"]/.test(value)) return value;
+  if (/^tel:\+?[0-9]{3,15}$/i.test(value)) return value;
   if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !value.includes(":")) return value;
   return "";
 }
@@ -252,7 +253,7 @@ function serialize(node) {
   if (!inner.replace(/<br>/g, "").trim()) return "";
   if (node.name === "a") {
     const href = escapeAttr(node.href);
-    if (/^mailto:/i.test(node.href) || node.href.startsWith("/")) return `<a href="${href}">${inner}</a>`;
+    if (/^(?:mailto|tel):/i.test(node.href) || node.href.startsWith("/")) return `<a href="${href}">${inner}</a>`;
     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
   }
   return `<${node.name}>${inner}</${node.name}>`;

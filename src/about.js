@@ -1,6 +1,7 @@
-// Stránka O nás: volný text z Textů webu, kontakt na redakci a rozcestník.
+// Stránka O nás: poslání, provozovatel a pozvání k účasti. Texty jsou HTML z Textů webu (čistí je renderArticleHtml).
 import { text as tx } from "./copy.js";
 import { esc } from "./html.js";
+import { renderArticleHtml } from "./rich.js";
 import { layout } from "./view.js";
 
 // Prázdný řádek dělí odstavce, jednoduchý konec řádku zůstane uvnitř odstavce.
@@ -12,36 +13,33 @@ export function paragraphs(value) {
     .filter(Boolean);
 }
 
+function card(className, title, html) {
+  return `<section class="about-card ${className}">
+            <h2>${esc(title)}</h2>
+            <div class="about-rich">${renderArticleHtml(html)}</div>
+          </section>`;
+}
+
 export function aboutPage(data, ctx) {
-  const [lede = "", ...rest] = paragraphs(tx(ctx.copy, "about_body"));
-  const text = [
-    lede && `<p class="lede">${esc(lede)}</p>`,
-    ...rest.map((part) => `<p>${esc(part).replace(/\n/g, "<br>")}</p>`),
-    data.contactNote && `<p class="about-contact">${esc(data.contactNote)}</p>`,
-    `<p><a href="/smazani-dat">${esc(tx(ctx.copy, "about_deletion"))}</a></p>`,
-  ]
-    .filter(Boolean)
-    .join("\n          ");
   return layout({
     ...ctx,
     title: `${tx(ctx.copy, "nav_about")} | ${tx(ctx.copy, "site_name")}`,
     description: tx(ctx.copy, "about_description"),
     body: `
       <section class="about">
-        <img src="/kozel-maskot.webp" alt="${esc(tx(ctx.copy, "about_alt"))}">
-        <div class="about-text">
-          <p class="eyebrow">${esc(tx(ctx.copy, "about_eyebrow"))}</p>
-          <h1>${esc(tx(ctx.copy, "about_heading"))}</h1>
-          ${text}
-          <div class="row links">
-            <a href="/popelnice">${esc(tx(ctx.copy, "about_bins_link"))}</a>
-            <a href="/sberne-dvory">${esc(tx(ctx.copy, "about_yards_link"))}</a>
-            <a href="/lekari">${esc(tx(ctx.copy, "about_doctors_link"))}</a>
-            <a href="/oteviraci-doba">${esc(tx(ctx.copy, "about_places_link"))}</a>
-            <a href="/odstavky">${esc(tx(ctx.copy, "about_outages_link"))}</a>
-            <a href="/reklamy">${esc(tx(ctx.copy, "about_ads_link"))}</a>
+        <div class="about-hero">
+          <img src="/kozel-maskot.webp" alt="${esc(tx(ctx.copy, "about_alt"))}">
+          <div class="about-intro">
+            <p class="eyebrow">${esc(tx(ctx.copy, "about_eyebrow"))}</p>
+            <h1>${esc(tx(ctx.copy, "about_heading"))}</h1>
+            <div class="about-rich about-mission">${renderArticleHtml(tx(ctx.copy, "about_body"))}</div>
           </div>
         </div>
+        <div class="about-cards">
+          ${card("about-operator", tx(ctx.copy, "about_operator_title"), tx(ctx.copy, "about_operator"))}
+          ${card("about-join", tx(ctx.copy, "about_join_title"), tx(ctx.copy, "about_join"))}
+        </div>
+        <p class="about-deletion"><a href="/smazani-dat">${esc(tx(ctx.copy, "about_deletion"))}</a></p>
       </section>`,
   });
 }

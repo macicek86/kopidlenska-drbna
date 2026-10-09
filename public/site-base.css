@@ -571,10 +571,21 @@ a.card { display: block; text-decoration: none; color: inherit; }
 .date-tile strong { display: block; font-variant-numeric: tabular-nums; }
 .date-tile span { display: block; color: var(--muted); font-size: 0.92rem; }
 
-.about img { width: min(100%, 14rem); margin: 0 auto; display: block; }
-.about-text p { max-width: 38rem; line-height: 1.6; }
-.about-text .links { margin-top: 1.2rem; }
-.about-contact { font-weight: 700; }
+.about { display: block; }
+.about-hero { display: grid; gap: 1.2rem; align-items: center; }
+.about-hero img { width: min(100%, 14rem); margin: 0 auto; display: block; }
+.about-intro h1 { margin-bottom: 0.9rem; }
+.about-rich p, .about-rich li { max-width: 40rem; line-height: 1.6; }
+.about-rich > :first-child { margin-top: 0; }
+.about-rich > :last-child { margin-bottom: 0; }
+.about-rich a { color: var(--brand-dark); font-weight: 700; }
+.about-mission > p:first-child { font-family: var(--display); font-size: 1.3rem; line-height: 1.4; color: var(--ink); }
+.about-cards { display: grid; gap: 0.9rem; margin-top: 1.6rem; align-items: start; }
+.about-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 1.3rem 1.5rem; box-shadow: var(--shadow); }
+.about-card h2 { margin: 0 0 0.6rem; font-family: var(--display); font-size: 1.25rem; }
+.about-join { background: var(--tape); border-color: transparent; color: var(--tape-ink); }
+.about-join a { color: var(--tape-ink); text-decoration: underline; }
+.about-deletion { margin-top: 1.4rem; color: var(--muted); font-size: 0.95rem; }
 
 .login, .narrow { max-width: 34rem; }
 
@@ -860,8 +871,8 @@ ul.plain { list-style: none; margin: 0; padding: 0; }
   .place-grid .dates.compact, .doctor-grid .dates.compact { grid-template-columns: 1fr; }
   .place-grid .doctor-week li { grid-template-columns: 7.6rem minmax(0, 1fr); }
   .place-grid.yard-grid-2, .place-grid.yard-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .about { grid-template-columns: 16rem 1fr; align-items: start; }
-  .about img { position: sticky; top: 1.5rem; }
+  .about-hero { grid-template-columns: 16rem 1fr; gap: 2rem; }
+  .about-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (min-width: 900px) {

@@ -998,10 +998,12 @@ test("filtr sportu zahrne fotbal a podrubrika se ukáže až po výběru", () =>
 
 test("stránka O nás dělí volný text na odstavce", () => {
   assert.deepEqual(paragraphs("První.\r\n\r\nDruhý\nřádek.\n  \n\nTřetí."), ["První.", "Druhý\nřádek.", "Třetí."]);
-  const html = aboutPage({ contactNote: "Pište na <drbna>" }, { path: "/o-nas", copy: { about_body: "Úvod.\n\nDalší <b>odstavec</b>." } });
-  assert.match(html, /<p class="lede">Úvod\.<\/p>/);
-  assert.match(html, /<p>Další &lt;b&gt;odstavec&lt;\/b&gt;\.<\/p>/);
-  assert.match(html, /Pište na &lt;drbna&gt;/);
+  const html = aboutPage({}, { path: "/o-nas", copy: { about_body: "<p>Úvod.</p><p>Další <b>odstavec</b>.</p>", about_operator: "Prostý\n\ntext", about_join: '<p>Zavolejte <a href="tel:+420722888906">teď</a><script>x</script></p>' } });
+  assert.match(html, /<p>Úvod\.<\/p>/);
+  assert.match(html, /<p>Další <strong>odstavec<\/strong>\.<\/p>/);
+  assert.match(html, /<a href="tel:\+420722888906">teď<\/a>/);
+  assert.match(html, /<p>Prostý<\/p><p>text<\/p>/);
+  assert.doesNotMatch(html, /<script>x/);
 });
 
 test("bod výřezu fotky se zaokrouhlí na desítky a nese ho třída", () => {
