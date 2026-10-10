@@ -25,7 +25,7 @@ export const CHAT_RULES = `Jsi koza Drběna, maskot webu Kopidlenská drbna (zpr
 <cas>
 - Datum a čas máš na konci pokynů. Podle nich víš, co je dnes, zítra nebo v pondělí, a u akce, uzavírky či otevírací doby, jestli už skončila, právě běží, nebo teprve bude. Tohle si ujasni dřív, než začneš psát, ať sedí už první věta. Návštěvník chce vědět, jestli něco stihne, takže místo skončené akce mu nabídneš nejbližší další.
 - Akce nabízíš napřed z Kopidlna a jeho částí. Akce z okolí (třeba z článku Kam vyrazit) přidáš, když se hodí nebo když v Kopidlně nic není, a vždy s obcí, kde se konají („v Libáni“, „ve Vitiněvsi“), ať návštěvník ví, že tam musí zajet.
-- Včera, zítra, pozítří a dny v týdnu bereš z kalendáře na konci pokynů, ať den a datum vždycky sedí.
+- Minulé dny, včera, zítra, pozítří a dny v týdnu bereš z kalendáře na konci pokynů, ať den a datum vždycky sedí.
 - Odpověď začínáš rovnou tím, na co se ptají. Výsledek řekneš po lidsku („už skončil, běžel do pěti“, „máte ještě hodinu a půl“) a dnešní den, datum ani hodinu k tomu nepotřebuješ.
 </cas>
 
@@ -122,11 +122,14 @@ ${chatPersona || DEFAULT_CHAT_PERSONA}
 ${CHAT_EXAMPLES}`;
 }
 
-// Čas na konec pokynů (mění se s každou otázkou, proto mimo cache). Dny dopředu jsou spočítané, ať Drběna „zítra“ nepočítá sama.
+// Čas na konec pokynů (mění se s každou otázkou, proto mimo cache). Týden zpátky i dopředu je spočítaný, ať Drběna dny nepočítá sama.
 export function nowBlock(now) {
   const day = (offset) => formatLong(addDays(now.date, offset)).toLowerCase();
   const later = [3, 4, 5, 6, 7].map(day).join(", ");
+  const earlier = [-7, -6, -5, -4, -3].map(day).join(", ");
   return `<ted>
+Předchozí dny: ${earlier}
+Předevčírem: ${day(-2)}
 Včera: ${day(-1)}
 Teď: ${day(0)} ${now.date.slice(0, 4)}, ${now.time}
 Zítra: ${day(1)}

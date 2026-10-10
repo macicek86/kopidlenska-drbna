@@ -237,6 +237,8 @@ test("čas v chatu: zítra a další dny jsou spočítané", () => {
   const text = nowBlock({ date: "2026-10-11", time: "09:00" });
   assert.match(text, /Teď: neděle 11\. října 2026, 09:00/);
   assert.match(text, /Včera: sobota 10\. října/);
+  assert.match(text, /Předevčírem: pátek 9\. října/);
+  assert.match(text, /Předchozí dny: neděle 4\. října, pondělí 5\. října, úterý 6\. října, středa 7\. října, čtvrtek 8\. října/);
   assert.match(text, /Zítra: pondělí 12\. října/);
   assert.match(text, /Pozítří: úterý 13\. října/);
   assert.match(text, /neděle 18\. října/);
