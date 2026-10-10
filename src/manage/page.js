@@ -72,7 +72,7 @@ function requestsPanel(link, row, requests, base) {
   return panel({ id: "navrhy", title: "Poslané ke kontrole", count: rows.length, body: list(rows, ""), tone: "warn" });
 }
 
-function dialogFor(spec, link, row, base, query, author) {
+function dialogFor(spec, link, row, base, query, author, mail) {
   const form = spec.forms.find((entry) => entry.key === query.window);
   const submit = link.direct ? "Zapsat" : "Poslat ke kontrole";
   if (form) {
@@ -82,7 +82,13 @@ function dialogFor(spec, link, row, base, query, author) {
       size: form.wide ? "wide" : "",
       close: base,
       open: true,
-      body: form.render(row, { action: `${base}/${form.action}`, extra: authorField(author), submit, cancel: base }),
+      body: form.render(row, {
+        action: `${base}/${form.action}`,
+        extra: `${mail ? callout(`Z e-mailu nám vyšlo: ${esc(mail.line)}. Upravte, co je potřeba, a uložte.`) : ""}${authorField(author)}`,
+        value: mail?.value,
+        submit,
+        cancel: base,
+      }),
     });
   }
   const change = query.cancelId ? spec.changes(row).find((entry) => entry.id === query.cancelId && entry.cancel) : null;
@@ -101,7 +107,7 @@ function dialogFor(spec, link, row, base, query, author) {
   });
 }
 
-export function managePage({ link, row, requests, query, message, author }) {
+export function managePage({ link, row, requests, query, mail, message, author }) {
   const spec = MANAGE_SECTIONS[link.section];
   const base = linkPath(link.token);
   const flash = flashOf(message);
@@ -123,7 +129,7 @@ export function managePage({ link, row, requests, query, message, author }) {
       ${requestsPanel(link, row, requests, base)}
       ${changesPanel(spec, row, base)}
       ${factsPanel(spec, row)}
-      ${dialogFor(spec, link, row, base, query, author)}
+      ${dialogFor(spec, link, row, base, query, author, mail)}
     </main>
     <div class="toasts" aria-live="polite">${toastHtml(flash)}</div>`,
   });

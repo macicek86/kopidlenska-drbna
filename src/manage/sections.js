@@ -99,3 +99,10 @@ export const MANAGE_SECTIONS = {
     ok: (action) => ({ uzavreni: "uzavreni", hodiny: "dvur-hodiny", udaje: "dvur-udaje", zrusit: "uzavreni-smazane" })[action],
   },
 };
+
+// Které okno patří k akci: u otevírací doby posílají „Zavřeno…“ i „Nová doba“ stejnou akci, liší je `kind`.
+export function formKey(spec, action, fields) {
+  const forms = spec.forms.filter((form) => form.action === action);
+  if (forms.length > 1) return fields.kind === "trvala" ? "nova-doba" : forms[0].key;
+  return forms[0]?.key ?? "";
+}

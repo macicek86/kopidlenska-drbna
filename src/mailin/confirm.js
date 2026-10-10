@@ -5,6 +5,7 @@ import { adminDocument } from "../admin/document.js";
 import { html, redirect } from "../http.js";
 import { esc } from "../view.js";
 import { linkPath } from "../hours-links-db.js";
+import { MANAGE_SECTIONS, formKey } from "../manage/sections.js";
 import { applyPending, editPending, pendingByToken, rejectPending } from "./pending.js";
 
 const PREFIX = "/zmena/";
@@ -55,7 +56,7 @@ function editButtons(pending) {
     if (seen.has(key)) continue;
     seen.add(key);
     const label = pending.items.length > 1 || item.name ? `Upravit čas: ${item.name || "místo"}` : "Upravit čas na webu";
-    buttons.push(button(pending.token, "upravit", label, "btn-line", { section: item.section, targetId: item.targetId }));
+    buttons.push(button(pending.token, "upravit", label, "btn-line", { section: item.section, cil: item.targetId }));
   }
   return buttons.join("");
 }
@@ -66,12 +67,12 @@ function waitingPage(pending, focus) {
     : `Když nic neuděláte, v ${esc(clock(pending.dueAt))} změnu dáme ke kontrole a na web půjde, až ji potvrdíme.`;
   const approve = pending.toWeb ? "Schválit hned" : "Poslat ke kontrole hned";
   const all = `<div class="form-foot">${button(pending.token, "schvalit", approve, "btn-primary")}${button(pending.token, "zamitnout", "Zamítnout", "btn-ghost btn-danger-text")}</div>
-    <p class="adm-lede confirm-edit">Nebo si čas upravte přímo na webu (odkaz platí den a jen jednou):</p>
+    <p class="adm-lede confirm-edit">Nebo si čas upravte přímo na webu (odkaz je jednorázový; když do hodiny nic neuložíte, zapíšeme změnu z e-mailu):</p>
     <div class="manage-actions">${editButtons(pending)}</div>`;
   const only = {
     schvalit: `<p>${pending.toWeb ? "Zapsat změnu na web hned?" : "Dát změnu ke kontrole hned?"}</p><div class="form-foot">${button(pending.token, "schvalit", pending.toWeb ? "Ano, zapsat" : "Ano, dát ke kontrole", "btn-primary")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
     zamitnout: `<p>Opravdu změnu zamítnout? Nic nezapíšeme.</p><div class="form-foot">${button(pending.token, "zamitnout", "Ano, zamítnout", "btn-danger")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
-    upravit: `<p>Čas si upravíte přímo na webu, odkaz platí den a jen jednou.</p><div class="form-foot">${editButtons(pending)}</div>`,
+    upravit: `<p>Čas si upravíte přímo na webu, odkaz je jednorázový. Když do hodiny nic neuložíte, zapíšeme změnu z e-mailu.</p><div class="form-foot">${editButtons(pending)}</div>`,
   }[focus];
   return shell(
     "Potvrzení změny",
@@ -112,8 +113,15 @@ export async function confirmPost(path, env, fields) {
   if (parsed.action === "schvalit") await applyPending(env, pending.id);
   else if (parsed.action === "zamitnout") await rejectPending(env, pending.token);
   else if (parsed.action === "upravit") {
-    const link = await editPending(env, pending.token, { section: String(fields.section ?? ""), targetId: Number(fields.targetId) || 0 });
-    if (link) return redirect(linkPath(link));
+    const link = await editPending(env, pending.token, { section: String(fields.section ?? ""), targetId: fields.targetId ?? 0 });
+    if (link) {
+      // Rovnou do okna formuláře, předvyplněného tím, co z e-mailu vyšlo (`z` nese čekající změnu).
+      const section = String(fields.section ?? "");
+      const targetId = fields.targetId ?? 0;
+      const item = pending.items.find((entry) => entry.section === section && entry.targetId === targetId);
+      const window = item ? formKey(MANAGE_SECTIONS[section], item.action, item) : "";
+      return redirect(window ? `${linkPath(link)}?okno=${window}&z=${pending.token}` : linkPath(link));
+    }
   }
   return redirect(back);
 }

@@ -34,7 +34,7 @@ import { ensureMailinTables } from "./mailin/store.js";
 import { ensureHealthTables } from "./health/store.js";
 import { ensurePushTables } from "./push/store.js";
 
-export const SCHEMA_VERSION = 63;
+export const SCHEMA_VERSION = 64;
 
 let schemaReady = false;
 

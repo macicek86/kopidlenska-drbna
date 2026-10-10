@@ -500,16 +500,9 @@ summary.adm-group-name .adm-count { display: none; }
   .manage-actions .btn { flex: 1 1 100%; justify-content: center; }
 }
 
-/* Okno odkazů v redakci */
-.link-list { list-style: none; margin: 0 0 1.2rem; padding: 0; display: grid; gap: 0.8rem; }
-.link-row { padding: 0.9rem; border: 1px solid var(--line); border-radius: 0.8rem; display: grid; gap: 0.6rem; }
-.link-head { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+/* Kopírovatelná adresa (okno sdílení) */
 .link-copy { display: flex; gap: 0.5rem; }
 .link-copy .control { flex: 1; min-width: 0; font-family: ui-monospace, monospace; font-size: 0.85rem; }
-.link-edit { display: grid; gap: 0.6rem; }
-.link-edit > .btn { justify-self: end; }
-.link-tools { display: flex; justify-content: flex-start; margin-top: -2.4rem; }
-.form-title { margin: 0; font-size: 1.05rem; }
 .link-copy [hidden] { display: none; }
 .share-preview { margin: 0 0 1rem; border: 1px solid var(--line-2); border-radius: var(--r-sm); overflow: hidden; }
 .share-preview img { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; object-fit: cover; }

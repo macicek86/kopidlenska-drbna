@@ -8,7 +8,6 @@ import { closureLabel, esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
-import { linksButton, linksDialog } from "./hours-links.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -200,7 +199,6 @@ export function adminPlaces(ctx, data, message, query = {}) {
         ${chief ? modalLink(`${BASE}?id=${place.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${place.id}`, "Opravit dobu")}
         ${moreMenu([
           shareButton(BASE, place),
-          linksButton(data, SECTION, BASE, place),
           chief ? "" : modalLink(`${BASE}?nabidka=${place.id}`, "Co tu najdete"),
           chief ? "" : modalLink(`${BASE}?udaje=${place.id}`, "Adresa a telefon"),
           chief ? modalLink(`${BASE}?smazat=${place.id}`, "Smazat", "btn-ghost btn-danger-text") : "",
@@ -218,10 +216,8 @@ export function adminPlaces(ctx, data, message, query = {}) {
       modal({ id: "nove-misto", title: "Nové místo", size: "wide", close: BASE, open: Boolean(query.fresh) && !anyOpen, body: placeForm(null) }),
     );
   }
-  const sharing = linksDialog(ctx, data, { section: SECTION, base: BASE, row: places.find((row) => row.id === query.linksId), what: "otevírací dobu" });
   const preview = shareDialog(ctx, { kind: "misto", base: BASE, row: places.find((row) => row.id === query.shareId) });
   if (reviewing) dialogs.push(reviewing);
-  else if (sharing) dialogs.push(sharing);
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit místo", size: "wide", close: BASE, open: true, body: placeForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));

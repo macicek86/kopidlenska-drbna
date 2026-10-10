@@ -3,7 +3,6 @@ import { compactWeek } from "../hours-compact.js";
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
-import { linksButton, linksDialog } from "./hours-links.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -138,7 +137,6 @@ export function adminDoctors(ctx, data, message, query = {}) {
         ${chief ? modalLink(`${BASE}?id=${doctor.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${doctor.id}`, "Hodiny")}
         ${moreMenu([
           shareButton(BASE, doctor),
-          linksButton(data, SECTION, BASE, doctor),
           chief ? "" : modalLink(`${BASE}?udaje=${doctor.id}`, "Údaje"),
           chief ? modalLink(`${BASE}?smazat=${doctor.id}`, "Smazat", "btn-ghost btn-danger-text") : "",
         ])}`,
@@ -159,10 +157,8 @@ export function adminDoctors(ctx, data, message, query = {}) {
       }),
     );
   }
-  const sharing = linksDialog(ctx, data, { section: SECTION, base: BASE, row: doctors.find((row) => row.id === query.linksId), what: "ordinační hodiny" });
   const preview = shareDialog(ctx, { kind: "lekar", base: BASE, row: doctors.find((row) => row.id === query.shareId) });
   if (reviewing) dialogs.push(reviewing);
-  else if (sharing) dialogs.push(sharing);
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit ordinaci", size: "wide", close: BASE, open: true, body: doctorForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Hodiny: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit hodiny") }) }));

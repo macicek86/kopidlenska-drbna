@@ -4,10 +4,9 @@ import test from "node:test";
 import { ensureLoginTables, sha256 } from "../src/login-db.js";
 import { ensurePlaceTables, PLACE_ACTIONS } from "../src/places-db.js";
 import { approveRequest, ensureRequestTables, loadRequests } from "../src/hours-requests-db.js";
-import { createLink, ensureLinkTables, LINK_DAILY_LIMIT, loadLinks, removeLink } from "../src/hours-links-db.js";
+import { createMailLink, ensureLinkTables, linkByToken } from "../src/hours-links-db.js";
 import { ensureAuditTables } from "../src/audit-db.js";
 import { formFields } from "../src/forms.js";
-import { pragueNow } from "../src/waste.js";
 import { manageGet, managePost } from "../src/manage/routes.js";
 
 function d1() {
@@ -42,11 +41,11 @@ async function freshEnv() {
   return env;
 }
 
+// Odkaz vzniká jen z e-mailu (tlačítko Upravit čas na webu): jednorázový, na jedno místo.
 async function linkFor(env, { direct = false } = {}) {
   const place = await env.DB.prepare("select id, name from places order by id limit 1").first();
-  assert.equal((await createLink(env, chief(), { section: "oteviraci-doba", targetId: place.id, label: "recepce", direct })).ok, true);
-  const [link] = (await loadLinks(env, { role: "hlavni" }))["oteviraci-doba"];
-  return { link, place };
+  const token = await createMailLink(env, { section: "oteviraci-doba", targetId: place.id, label: "recepce", direct });
+  return { link: { token }, place };
 }
 
 async function post(env, path, fields) {
@@ -56,7 +55,7 @@ async function post(env, path, fields) {
 
 const closed = { kind: "docasna", startsOn: "2026-10-20", endsOn: "", changeNote: "inventura", author: "Jana Nová" };
 
-test("změna z odkazu čeká na schválení pod jménem žadatele a schválení ji zapíše", async () => {
+test("změna z odkazu čeká na schválení pod jménem žadatele, odkaz po uložení zanikne a schválení změnu zapíše", async () => {
   const env = await freshEnv();
   const { link, place } = await linkFor(env);
   const page = await manageGet(`/sprava/${link.token}`, new Request("http://drbna.test/"), env, new URL(`http://drbna.test/sprava/${link.token}`));
@@ -64,8 +63,10 @@ test("změna z odkazu čeká na schválení pod jménem žadatele a schválení 
   assert.match(await page.text(), new RegExp(place.name));
 
   const response = await post(env, `/sprava/${link.token}/zmena`, closed);
-  assert.match(response.headers.get("location"), /\?ok=zadost$/);
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Změnu jsme přijali/);
   assert.match(response.headers.get("set-cookie"), /drbna_sprava=Jana%20Nov%C3%A1/);
+  assert.equal(await linkByToken(env, link.token), null);
   assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
 
   const [request] = (await loadRequests(env, { id: 1, role: "hlavni", permissions: [] }))["oteviraci-doba"];
@@ -78,41 +79,48 @@ test("změna z odkazu čeká na schválení pod jménem žadatele a schválení 
   assert.deepEqual({ ...audit }, { user_name: "Jana Nová (odkaz: recepce)", section: "oteviraci-doba" });
 });
 
-test("odkaz s „rovnou“ zapíše hned, bez jména nic, cizí změnu nezruší", async () => {
+test("odkaz s „rovnou“ zapíše hned, bez jména nic a odkaz zůstane, cizí změnu nezruší", async () => {
   const env = await freshEnv();
   const { link, place } = await linkFor(env, { direct: true });
+  // Chybně vyplněný formulář odkaz nespotřebuje.
   assert.match((await post(env, `/sprava/${link.token}/zmena`, { ...closed, author: "" })).headers.get("location"), /chyba=/);
-  assert.match((await post(env, `/sprava/${link.token}/zmena`, closed)).headers.get("location"), /ok=misto-zmena$/);
+  assert.match((await post(env, `/sprava/${link.token}/zmena`, { ...closed, startsOn: "" })).headers.get("location"), /chyba=/);
+  assert.notEqual(await linkByToken(env, link.token), null);
+  const saved = await post(env, `/sprava/${link.token}/zmena`, closed);
+  assert.equal(saved.status, 200);
+  assert.match(await saved.text(), /Změna je na webu/);
   assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 1);
+  assert.equal(await linkByToken(env, link.token), null);
 
+  // Nový odkaz: cizí změnu zrušit nejde, údaje jdou.
+  const next = (await linkFor(env, { direct: true })).link;
   const other = await env.DB.prepare("select id from places where id <> ? limit 1").bind(place.id).first();
   await env.DB.prepare("insert into place_changes (place_id, kind, starts_on, ends_on, note, hours) values (?, 'docasna', '2026-11-01', '2026-11-01', 'cizí', '[]')").bind(other.id).run();
   const foreign = (await env.DB.prepare("select id from place_changes where note = 'cizí'").first()).id;
-  assert.match((await post(env, `/sprava/${link.token}/zrusit`, { id: String(foreign), author: "Jana" })).headers.get("location"), /chyba=/);
+  assert.match((await post(env, `/sprava/${next.token}/zrusit`, { id: String(foreign), author: "Jana" })).headers.get("location"), /chyba=/);
   assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 2);
-
-  await post(env, `/sprava/${link.token}/udaje`, { label: "Pobočka", place: "Náměstí 1", phone: "123", author: "Jana" });
+  await post(env, `/sprava/${next.token}/udaje`, { label: "Pobočka", place: "Náměstí 1", phone: "123", author: "Jana" });
   assert.equal((await env.DB.prepare("select phone from places where id = ?").bind(place.id).first()).phone, "123");
 });
 
-test("do limitu se počítají jen uložené změny", async () => {
+test("použitý, prošlý nebo vymyšlený odkaz nefunguje a trvalé odkazy se při migraci smažou", async () => {
   const env = await freshEnv();
   const { link } = await linkFor(env, { direct: true });
-  const used = async () => (await env.DB.prepare("select used_count from hours_links where id = ?").bind(link.id).first()).used_count;
-  assert.match((await post(env, `/sprava/${link.token}/zmena`, { ...closed, startsOn: "" })).headers.get("location"), /chyba=/);
-  assert.equal(await used(), 0, "chybně vyplněný formulář se nepočítá");
   await post(env, `/sprava/${link.token}/zmena`, closed);
-  assert.equal(await used(), 1);
-});
-
-test("zrušený nebo vymyšlený odkaz nefunguje a limit za den platí", async () => {
-  const env = await freshEnv();
-  const { link } = await linkFor(env, { direct: true });
-  await env.DB.prepare("update hours_links set used_count = ?, used_on = ?").bind(LINK_DAILY_LIMIT, pragueNow().date).run();
-  assert.match(decodeURIComponent((await post(env, `/sprava/${link.token}/zmena`, closed)).headers.get("location")), /moc změn/);
-
-  await removeLink(env, chief(), { section: "oteviraci-doba", id: link.id });
   assert.equal((await post(env, `/sprava/${link.token}/zmena`, closed)).status, 404);
+
+  const fresh = (await linkFor(env, { direct: true })).link;
+  await env.DB.prepare("update hours_links set expires_at = datetime('now', '-1 minutes')").run();
+  assert.equal((await post(env, `/sprava/${fresh.token}/zmena`, closed)).status, 404);
   const url = new URL("http://drbna.test/sprava/vymysleny-token-1234");
   assert.equal((await manageGet(url.pathname, new Request(url), env, url)).status, 404);
+
+  // Starý trvalý odkaz (bez `once`) migrace smaže, jednorázový nechá.
+  await env.DB.prepare("delete from hours_links").run();
+  const place = await env.DB.prepare("select id from places order by id limit 1").first();
+  await env.DB.prepare("insert into hours_links (section, target_id, token, once) values ('oteviraci-doba', ?, 'trvaly-odkaz-0000000000', 0)").bind(place.id).run();
+  await createMailLink(env, { section: "oteviraci-doba", targetId: place.id, label: "e-mail", direct: false });
+  await ensureLinkTables(env);
+  assert.equal((await env.DB.prepare("select count(*) as n from hours_links").first()).n, 1);
+  assert.equal(await linkByToken(env, "trvaly-odkaz-0000000000"), null);
 });

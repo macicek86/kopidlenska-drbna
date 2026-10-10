@@ -23,7 +23,6 @@ export function adminQuery(url) {
     newHoursId: positiveParam(url, "nova-doba"),
     offersId: positiveParam(url, "nabidka"),
     detailsId: positiveParam(url, "udaje"),
-    linksId: positiveParam(url, "odkazy"),
     shareId: positiveParam(url, "sdilet"),
     accessId: positiveParam(url, "upravit"),
     disableId: positiveParam(url, "vypnout"),
@@ -188,8 +187,9 @@ export async function formFields(request) {
     requestId: positive("zadost"),
     reply: text("reply"),
     // Odkaz pro správce (src/hours-links-db.js): komu patří, zda zapisuje rovnou, a kdo změnu zapisuje.
-    linkId: positive("odkaz"),
     targetId: positive("cil"),
+    // Potvrzení změny z e-mailu (src/mailin/confirm.js): sekce řádku, který chce odesílatel upravit.
+    section: text("section"),
     direct: form.get("direct") === "1",
     author: text("author"),
     endsTime: text("endsTime"),

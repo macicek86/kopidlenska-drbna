@@ -3,11 +3,12 @@
 // Do historie změn se zapíše pod jménem, které správce napsal, přes formulář redakce se stejnými poli (src/audit-routes.js).
 import { auditFinish, auditStart } from "../audit.js";
 import { fileHours, linkAuthor } from "../hours-requests-db.js";
-import { linkByToken, linkHasRoom, linkPath, linkRequests, useLink, withdrawLinkRequest } from "../hours-links-db.js";
+import { linkByToken, linkPath, linkRequests, useLink, withdrawLinkRequest } from "../hours-links-db.js";
 import { html, redirect, secure, withError } from "../http.js";
 import { messageFrom, OK } from "../ok-messages.js";
 import { deadLinkPage, doneLinkPage, managePage } from "./page.js";
-import { MANAGE_SECTIONS } from "./sections.js";
+import { pendingByToken } from "../mailin/pending.js";
+import { MANAGE_SECTIONS, formKey } from "./sections.js";
 
 const PREFIX = "/sprava/";
 // Jméno toho, kdo zapisuje, si prohlížeč pamatuje, ať ho nepíše pokaždé.
@@ -62,14 +63,17 @@ export async function manageGet(path, request, env, url) {
   if (!found) return html(deadLinkPage(), 404);
   const query = { window: url.searchParams.get("okno") ?? "", cancelId: positive(url.searchParams.get("zrusit")) };
   const requests = await linkRequests(env, found.link);
-  return html(managePage({ ...found, requests, query, message: manageMessage(url), author: rememberedAuthor(request) }));
+  const mail = query.window ? await fromMail(env, url.searchParams.get("z"), found.link, MANAGE_SECTIONS[found.link.section], found.row, query.window) : null;
+  return html(managePage({ ...found, requests, query, mail, message: manageMessage(url), author: rememberedAuthor(request) }));
 }
 
-// Které okno vrátit s chybou: u otevírací doby posílají „Zavřeno…“ i „Nová doba“ stejnou akci, liší je `kind`.
-function formKey(spec, action, fields) {
-  const forms = spec.forms.filter((form) => form.action === action);
-  if (forms.length > 1) return fields.kind === "trvala" ? "nova-doba" : forms[0].key;
-  return forms[0]?.key ?? "";
+// Změna z e-mailu, kterou odesílatel šel upravit (`?z=` je token čekající změny): hodnoty pro předvyplnění okna.
+async function fromMail(env, token, link, spec, row, window) {
+  const pending = token ? await pendingByToken(env, token) : null;
+  const item = pending?.items.find((entry) => entry.section === link.section && entry.targetId === link.targetId && entry.edited);
+  if (!item || formKey(spec, item.action, item) !== window) return null;
+  const value = spec.actions[item.action]?.read({ ...item.input, [spec.idField]: row.id });
+  return value && !value.error ? { value, line: String(item.line ?? "").replace(/^•\s*/, "") } : null;
 }
 
 // Patří změna (zrušení) k místu odkazu?
@@ -97,7 +101,6 @@ export async function managePost(path, request, env, fields) {
   const back = action === "zrusit" ? `${base}?zrusit=${fields.id ?? ""}` : `${base}?okno=${formKey(spec, action, fields)}`;
   if (author.length < 2) return redirect(withError(back, "Napište, kdo změnu zapisuje."));
   if (action === "zrusit" && !(await ownsChange(env, spec, row, fields.id))) return redirect(withError(base, "Tahle změna už tu není."));
-  if (!linkHasRoom(link)) return redirect(withError(base, "Z tohohle odkazu dnes přišlo moc změn. Zkuste to zítra, nebo napište redakci."));
 
   const targetId = action === "zrusit" ? fields.id : row.id;
   const input = { ...fields, [spec.idField]: row.id };
@@ -118,12 +121,7 @@ export async function managePost(path, request, env, fields) {
   const cookie = authorCookie(request, author);
   if (!result.ok) return redirect(withError(back, result.error), cookie);
   await useLink(env, link);
-  if (link.once) {
-    const done = html(doneLinkPage(Boolean(result.requested)), 200, cookie);
-    await auditFinish(env, watch, redirect(`${base}?ok=${result.requested ? "zadost" : spec.ok(action, result.value)}`), OK).catch(() => {});
-    return done;
-  }
-  const response = redirect(`${base}?ok=${result.requested ? "zadost" : spec.ok(action, result.value)}`, cookie);
-  await auditFinish(env, watch, response, OK).catch(() => {});
-  return response;
+  const done = html(doneLinkPage(Boolean(result.requested)), 200, cookie);
+  await auditFinish(env, watch, redirect(`${base}?ok=${result.requested ? "zadost" : spec.ok(action, result.value)}`), OK).catch(() => {});
+  return done;
 }

@@ -3,7 +3,7 @@
 import { applyPending } from "./mailin/pending.js";
 
 const HANDLERS = {
-  "mailin.apply": (env, body) => applyPending(env, Number(body.id)),
+  "mailin.apply": (env, body) => applyPending(env, Number(body.id), { onlyDue: true }),
 };
 
 export async function handleQueue(batch, env) {

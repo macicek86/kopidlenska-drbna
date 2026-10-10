@@ -5,10 +5,14 @@
 import { createMailLink, newToken } from "../hours-links-db.js";
 import { pragueNow } from "../waste.js";
 import { writeItems, changeReply, tellEditors } from "./apply.js";
+import { enqueue } from "../queue.js";
 import { replyTo } from "./reply.js";
 import { senderById, setLogStatus } from "./store.js";
 
 export const CONFIRM_MINUTES = 10;
+// Kolik času má odesílatel na úpravu v odkazu z e-mailu. Když ji do té doby neuloží, zapíše se původní změna
+// z e-mailu normální cestou (na web, nebo ke schválení podle adresy), jinak by se tiše ztratila.
+export const EDIT_MINUTES = 60;
 // Jak dlouho se dá stránka s potvrzením otevřít.
 const KEEP_DAYS = 14;
 
@@ -83,7 +87,27 @@ async function finish(env, pending, status, result) {
 }
 
 // Zapíše změny a odesílateli odepíše, co se stalo. Volá ho klik na Schválit, fronta i cron.
-export async function applyPending(env, id) {
+// Položky, které odesílatel šel upravit na webu: ty s odkazem, který tam pořád je, nikdo neuložil, zapíšou se
+// podle e-mailu a odkaz se zruší (ať se pak nezapíše podruhé). Bez odkazu je upravená a uložená na webu.
+async function itemsToWrite(env, found) {
+  const items = [];
+  for (const item of found.items) {
+    if (!item.edited) {
+      items.push(item);
+      continue;
+    }
+    const open = item.link ? await env.DB.prepare("select id from hours_links where token = ?").bind(item.link).first() : null;
+    if (!open) continue;
+    await env.DB.prepare("delete from hours_links where id = ?").bind(open.id).run();
+    items.push(item);
+  }
+  return items;
+}
+
+// `onlyDue`: fronta ji pustí ve chvíli, kdy měla změna vyprší; pokud mezitím odesílatel šel upravovat a čas se
+// posunul, nic se neudělá (zapíše to další zpráva fronty nebo cron).
+export async function applyPending(env, id, { onlyDue = false } = {}) {
+  if (onlyDue && !(await env.DB.prepare("select id from mail_pending where id = ? and due_at <= datetime('now')").bind(id ?? 0).first())) return { ok: false };
   const found = await pendingById(env, id);
   if (!found || !(await claim(env, found.id, "zapisuje"))) return { ok: false };
   const mail = mailOf(found);
@@ -93,7 +117,12 @@ export async function applyPending(env, id) {
       await finish(env, found, "chyba", "Adresa už není v seznamu.");
       return { ok: false };
     }
-    const outcome = await writeItems(env, { items: found.items, sender, verified: found.verified, today: pragueNow().date, who: found.who, mail });
+    const toWrite = await itemsToWrite(env, found);
+    if (!toWrite.length) {
+      await finish(env, found, "upraveno", "Odesílatel upravil čas přímo na webu.");
+      return { ok: true, outcome: { done: [], asked: [], failed: [], sections: [] } };
+    }
+    const outcome = await writeItems(env, { items: toWrite, sender, verified: found.verified, today: pragueNow().date, who: found.who, mail });
     const wrote = outcome.done.length + outcome.asked.length;
     const text = [...outcome.done, ...outcome.asked, ...outcome.failed.map((line) => `nezapsáno: ${line}`)].join("\n");
     await finish(env, found, wrote ? (outcome.done.length ? "zapsano" : "ke_schvaleni") : "chyba", text);
@@ -117,8 +146,9 @@ export async function rejectPending(env, token) {
   return true;
 }
 
-// Odesílatel chce čas upravit na webu: pro vybraný řádek vznikne jednorázový odkaz, jeho změny z čekající
-// žádosti se vyřadí (zbylé řádky se zapíšou dál podle plánu). Vrací token odkazu.
+// Odesílatel chce čas upravit na webu: pro vybraný řádek vznikne jednorázový odkaz. Položka zůstane v žádosti
+// označená `edited` s tokenem odkazu (z ní se předvyplní formulář). Když odesílatel do `EDIT_MINUTES` nic
+// neuloží, zapíše se původní změna normální cestou (`itemsToWrite`). Vrací token odkazu.
 export async function editPending(env, token, { section, targetId }) {
   const found = await pendingByToken(env, token);
   if (!found || found.status !== "ceka") return null;
@@ -127,12 +157,13 @@ export async function editPending(env, token, { section, targetId }) {
   if (!found.items.some((item) => item.section === section && item.targetId === targetId)) return null;
   const linkToken = await createMailLink(env, { section, targetId, label: `e-mail: ${sender.label || sender.email}`, direct: sender.direct });
   if (!linkToken) return null;
-  const rest = found.items.filter((item) => !(item.section === section && item.targetId === targetId));
-  if (rest.length) {
-    await env.DB.prepare("update mail_pending set items = ? where id = ? and status = 'ceka'").bind(JSON.stringify(rest), found.id).run();
-  } else if (await claim(env, found.id, "upraveno")) {
-    await finish(env, found, "upraveno", "Odesílatel upravuje čas přímo na webu.");
+  for (const item of found.items) {
+    // Předchozí odkaz k téže položce zanikne, ať nejdou uložit dva.
+    if (item.section === section && item.targetId === targetId && item.link) await env.DB.prepare("delete from hours_links where token = ?").bind(item.link).run();
   }
+  const items = found.items.map((item) => (item.section === section && item.targetId === targetId ? { ...item, edited: true, link: linkToken } : item));
+  await env.DB.prepare(`update mail_pending set items = ?, due_at = datetime('now', '+${EDIT_MINUTES} minutes') where id = ? and status = 'ceka'`).bind(JSON.stringify(items), found.id).run();
+  await enqueue(env, { type: "mailin.apply", id: found.id }, EDIT_MINUTES * 60).catch(() => {});
   return linkToken;
 }
 

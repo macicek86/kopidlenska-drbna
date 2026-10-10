@@ -3,7 +3,6 @@ import { WEEK_DAYS } from "../yards.js";
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { yardHoursFields } from "./hours.js";
-import { linksButton, linksDialog } from "./hours-links.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -131,7 +130,6 @@ export function adminYards(ctx, data, message, query = {}) {
         ${chief ? modalLink(`${BASE}?id=${yard.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${yard.id}`, "Otevírací doba")}
         ${moreMenu([
           shareButton(BASE, yard),
-          linksButton(data, SECTION, BASE, yard),
           chief ? "" : modalLink(`${BASE}?udaje=${yard.id}`, "Údaje"),
           chief ? modalLink(`${BASE}?smazat=${yard.id}`, "Smazat", "btn-ghost btn-danger-text") : "",
         ])}`,
@@ -145,10 +143,8 @@ export function adminYards(ctx, data, message, query = {}) {
       modal({ id: "novy-dvur", title: "Nový sběrný dvůr", size: "wide", close: BASE, open: Boolean(query.fresh) && !editing && !removing && !closing && !hours && !detailing && !cancelling && !reviewing, body: yardForm(null) }),
     );
   }
-  const sharing = linksDialog(ctx, data, { section: SECTION, base: BASE, row: yards.find((row) => row.id === query.linksId), what: "otevírací dobu a uzavření" });
   const preview = shareDialog(ctx, { kind: "dvur", base: BASE, row: yards.find((row) => row.id === query.shareId) });
   if (reviewing) dialogs.push(reviewing);
-  else if (sharing) dialogs.push(sharing);
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit sběrný dvůr", size: "wide", close: BASE, open: true, body: yardForm(editing) }));
   else if (closing) dialogs.push(modal({ id: "okno", title: "Mimořádné uzavření", close: BASE, open: true, body: closureForm(closing, { submit: mode.submit("Zapsat uzavření") }) }));

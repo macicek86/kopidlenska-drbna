@@ -93,6 +93,13 @@ export function linkAuthor(name, linkLabel) {
   return linkLabel ? `${who} (odkaz: ${linkLabel})` : `${who} (přes odkaz)`;
 }
 
+// Odkaz po použití zaniká, proto se jméno i s popiskem ukládá do žádosti hned (`author_name`). Starší žádosti mají
+// jen jméno a popisek se k nim dohledá z odkazu, dokud existuje.
+function linkedAuthor(name, linkLabel) {
+  const text = String(name ?? "");
+  return /\((odkaz: .*|přes odkaz)\)$/.test(text) ? text : linkAuthor(text, linkLabel);
+}
+
 // „direct“ zapisuje rovnou, „request“ posílá ke schválení, null sekci nevidí. Plné oprávnění má přednost.
 export function hoursMode(user, section) {
   const rules = REQUEST_SECTIONS[section];
@@ -126,7 +133,7 @@ function mapRequest(row) {
     reply: String(row.reply ?? ""),
     createdBy: Number(row.created_by) || null,
     linkId: row.link_id == null ? null : Number(row.link_id),
-    author: row.link_id != null ? linkAuthor(row.author_name, row.link_label) : String(row.author ?? row.author_name ?? ""),
+    author: row.link_id != null ? linkedAuthor(row.author_name, row.link_label) : String(row.author ?? row.author_name ?? ""),
     mailReply: String(row.mail_reply ?? ""),
     mail: mailOrigin(row.mail_reply),
     createdAt: String(row.created_at ?? ""),
@@ -181,7 +188,7 @@ export async function fileHours(env, { section, actions, action, targetId, input
   const created = await env.DB.prepare(
     "insert into hours_requests (section, action, target_id, payload, created_by, link_id, author_name, mail_reply) values (?, ?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, userId ? "" : clip(author, 160), mailReplyText(mailReply))
+    .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, userId ? "" : clip(linkId ? linkAuthor(author, linkLabel) : author, 160), mailReplyText(mailReply))
     .run();
   await requestNotice(env, linkId ? linkAuthor(author, linkLabel) : author, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0), mail: mailOrigin(mailReplyText(mailReply)) });
   return { ok: true, requested: true, value };

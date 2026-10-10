@@ -16,6 +16,8 @@ import { receiveMail, replayRequest } from "../src/mailin/run.js";
 import { ensureMailinTables, loadMailAdmin, loadUnresolvedMail, markMailHandled, saveSender } from "../src/mailin/store.js";
 import { confirmGet, confirmPost } from "../src/mailin/confirm.js";
 import { applyDue } from "../src/mailin/pending.js";
+import { manageGet, managePost } from "../src/manage/routes.js";
+import { formFields } from "../src/forms.js";
 import { createPlaceFromRequest } from "../src/mailin/new-place.js";
 import { refuseRequest, waitingRequests } from "../src/mailin/register.js";
 import { linkByToken } from "../src/hours-links-db.js";
@@ -211,8 +213,14 @@ test("bez reakce se změna zapíše sama po čekání (cron, záloha fronty) a f
     assert.equal(await applyDue(env), 0);
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
 
-    // Fronta doručí zprávu: zapíše; cron potom už nic.
+    // Fronta zprávu doručí před vypršením (posunutý čas): nic nezapíše.
     let acked = 0;
+    await handleQueue({ messages: [{ body: queued[0].body, ack: () => (acked += 1), retry: () => {} }] }, env);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
+
+    // Ve chvíli splatnosti zprávu doručí fronta: zapíše; cron potom už nic.
+    await env.DB.prepare("update mail_pending set due_at = datetime('now', '-1 minutes')").run();
+    acked = 0;
     await handleQueue({ messages: [{ body: queued[0].body, ack: () => (acked += 1), retry: () => {} }] }, env);
     assert.equal(acked, 1);
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 1);
@@ -258,7 +266,7 @@ test("zamítnutí: nic se nezapíše a odesílatel to ví; později už nejde sc
   }
 });
 
-test("úprava na webu: jednorázový odkaz pro ten řádek, změna z čekání se nezapíše, odkaz po použití zanikne", async () => {
+test("úprava na webu: jednorázový odkaz pro ten řádek, po uložení se původní změna nezapíše, cizí řádek upravit nejde", async () => {
   const claude = await fakeClaude(CLOSED);
   try {
     const { env, place } = await freshEnv(claude.url);
@@ -267,21 +275,65 @@ test("úprava na webu: jednorázový odkaz pro ten řádek, změna z čekání s
     const token = await pendingToken(env);
     const response = await post(env, token, "upravit", { section: "oteviraci-doba", targetId: place.id });
     assert.equal(response.status, 303);
-    const linkToken = response.headers.get("location").replace("/sprava/", "");
+    // Rovnou do okna formuláře, `z` nese čekající změnu pro předvyplnění.
+    const target = new URL(response.headers.get("location"), "https://drbna.test");
+    assert.equal(target.searchParams.get("okno"), "zavreno");
+    assert.equal(target.searchParams.get("z"), token);
+    const linkToken = target.pathname.replace("/sprava/", "");
     const link = await linkByToken(env, linkToken);
     assert.equal(link.section, "oteviraci-doba");
     assert.equal(link.targetId, place.id);
-    assert.equal(link.once, true);
     assert.equal(link.direct, true);
-    assert.equal((await env.DB.prepare("select status from mail_pending").first()).status, "upraveno");
-    await env.DB.prepare("update mail_pending set due_at = datetime('now', '-1 minutes')").run();
-    assert.equal(await applyDue(env), 0);
-    // Odkaz platí den: po vypršení ho web nezná.
-    await env.DB.prepare("update hours_links set expires_at = datetime('now', '-1 minutes')").run();
+    // Čeká dál: odesílatel má na úpravu hodinu a pak se zapíše původní změna.
+    assert.equal((await env.DB.prepare("select status from mail_pending").first()).status, "ceka");
+    // Okno z e-mailu je otevřené a předvyplněné tím, co Drběna přečetla.
+    const page = await manageGet(target.pathname, new Request(target), env, target);
+    const body = await page.text();
+    assert.match(body, /Z e-mailu nám vyšlo/);
+    assert.match(body, /name="startsOn"[^>]*value="2026-08-15"/);
+    assert.match(body, /dovolená/);
+    // Formulář uložen (odkaz je jednorázový, uložením zanikl): po vypršení se nic nezapíše podruhé.
+    const saved = new Request(`http://drbna.test${target.pathname}/zmena`, { method: "POST", body: new URLSearchParams({ kind: "docasna", startsOn: "2026-08-15", endsOn: "", changeNote: "dovolená do 12", author: "Jana" }) });
+    assert.equal((await managePost(`${target.pathname}/zmena`, saved, env, await formFields(saved.clone()))).status, 200);
     assert.equal(await linkByToken(env, linkToken), null);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 1);
+    await env.DB.prepare("update mail_pending set due_at = datetime('now', '-1 minutes')").run();
+    assert.equal(await applyDue(env), 1);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 1);
+    assert.equal((await env.DB.prepare("select note from place_changes").first()).note, "dovolená do 12");
+    assert.equal((await env.DB.prepare("select status from mail_pending").first()).status, "upraveno");
     // Cizí řádek upravit nejde.
     const other = await post(env, token, "upravit", { section: "oteviraci-doba", targetId: 999 });
     assert.equal(other.headers.get("location"), `/zmena/${token}`);
+  } finally {
+    claude.close();
+  }
+});
+
+test("úprava na webu bez uložení: po hodině se zapíše původní změna a odkaz zanikne", async () => {
+  const claude = await fakeClaude(CLOSED);
+  try {
+    const { env, sent, place } = await freshEnv(claude.url);
+    const queued = [];
+    env.JOBS = { send: async (body, options) => queued.push({ body, options }) };
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "knihovna", direct: true, targets: [`oteviraci-doba:${place.id}`] });
+    await receiveMail(message(rawMail()), env);
+    const token = await pendingToken(env);
+    const response = await post(env, token, "upravit", { section: "oteviraci-doba", targetId: place.id });
+    const linkToken = new URL(response.headers.get("location"), "https://drbna.test").pathname.replace("/sprava/", "");
+    // Čas se posunul o hodinu a fronta dostala druhou zprávu.
+    assert.equal(queued.at(-1).options.delaySeconds, 3600);
+    // Starý čas (10 minut) nic nezapíše, formulář je ještě otevřený.
+    assert.equal(await applyDue(env), 0);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
+    assert.notEqual(await linkByToken(env, linkToken), null);
+    // Hodina uplynula, nic se neuložilo: zapíše se původní změna a odkaz zanikne.
+    await env.DB.prepare("update mail_pending set due_at = datetime('now', '-1 minutes')").run();
+    assert.equal(await applyDue(env), 1);
+    assert.equal((await env.DB.prepare("select starts_on, note from place_changes").first()).note, "dovolená");
+    assert.equal(await linkByToken(env, linkToken), null);
+    assert.equal((await env.DB.prepare("select status from mail_pending").first()).status, "zapsano");
+    assert.match(sent.at(-1).text, /Zapsali jsme na web/);
   } finally {
     claude.close();
   }
