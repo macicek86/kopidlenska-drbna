@@ -296,3 +296,32 @@ export async function spamReportedToday(env, email) {
     .first();
   return Boolean(row);
 }
+
+// E-maily od známých adres, kterým Drběna nerozuměla (zeptala se) nebo je nezpracovala kvůli chybě, a odesílatel
+// od té doby nenapsal nic, co by se vyřídilo. Čekají na člověka z redakce (Přehled), dokud je neoznačí „Vyřízeno“.
+const UNRESOLVED_DAYS = 7;
+
+export async function loadUnresolvedMail(env) {
+  try {
+    const rows = await env.DB.prepare(
+      `select * from mail_log m
+       where m.status in ('nejasne', 'chyba') and m.sender_id is not null and m.created_at >= datetime('now', '-${UNRESOLVED_DAYS} days')
+         and not exists (
+           select 1 from mail_log n
+           where n.sender_email = m.sender_email and n.id > m.id and n.status in ('ceka', 'zapsano', 'ke_schvaleni', 'zamitnuto', 'upraveno', 'vyrizeno')
+         )
+       order by m.id desc limit 20`,
+    ).all();
+    return (rows.results ?? []).map(mapLog);
+  } catch {
+    return [];
+  }
+}
+
+// Redaktor e-mail vyřídil sám (zapsal změnu ručně, odpověděl odesílateli): zmizí z Přehledu.
+export async function markMailHandled(env, request, id) {
+  const gate = await requireChief(env, request);
+  if (!gate.ok) return { ok: false, error: gate.error };
+  await env.DB.prepare("update mail_log set status = 'vyrizeno' where id = ? and status in ('nejasne', 'chyba')").bind(id ?? 0).run();
+  return { ok: true };
+}

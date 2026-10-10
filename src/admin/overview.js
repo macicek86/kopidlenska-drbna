@@ -6,7 +6,7 @@ import { problemCount } from "../health/rules.js";
 import { NOTICE_KINDS } from "../notices.js";
 import { SCHOOL_LIST } from "../skola/sources.js";
 import { adminShell } from "./shell.js";
-import { badge, callout, icon, item, list, modalLink, pageHead, panel } from "./ui.js";
+import { badge, callout, icon, item, list, modalLink, pageHead, panel, postButton } from "./ui.js";
 
 function stat(href, glyph, value, label, tone = "") {
   return `<a class="stat${tone ? ` stat-${tone}` : ""}" href="${href}">${icon(glyph)}<b>${esc(value)}</b><span>${esc(label)}</span></a>`;
@@ -74,6 +74,16 @@ export function adminOverview(ctx, data, message) {
           actions: modalLink(`/redakce/emaily?povolit=${request.id}`, "Posoudit", "btn-primary"),
         }),
   );
+  // E-maily na otevírací dobu, kterým Drběna nerozuměla nebo je kvůli chybě nezpracovala: čeká se na člověka.
+  const unresolvedItems = (data.mailUnresolved ?? []).map((row) =>
+    item({
+      title: row.subject || "(bez předmětu)",
+      meta: `${esc(row.email)} · e-mail na otevírací dobu`,
+      badges: row.status === "chyba" ? badge("Nezpracováno, zapište ručně", "bad") : badge("Nerozuměla, čeká na odpověď odesílatele", "warn"),
+      extra: `${row.excerpt ? `<p class="message-text">${esc(row.excerpt.slice(0, 500)).replace(/\n/g, "<br>")}</p>` : ""}${row.result ? `<p class="item-sub"><b>Drběna:</b> ${esc(row.result.slice(0, 300))}</p>` : ""}`,
+      actions: `${modalLink("/redakce/emaily", "Historie", "btn-line")}${postButton("/redakce/emaily/vyrizeno", { id: row.id, next: "prehled" }, "Vyřízeno", "btn-primary")}`,
+    }),
+  );
   const failedSources = [
     ["Munipolis", "/redakce/munipolis", data.importItems],
     ["Fotbal", "/redakce/fotbal", data.footballItems],
@@ -113,6 +123,7 @@ export function adminOverview(ctx, data, message) {
         ...hoursItems,
         ...noticeItems,
         ...addressItems,
+        ...unresolvedItems,
         ...failedItems,
       ]
     : [

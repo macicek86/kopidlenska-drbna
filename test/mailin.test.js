@@ -13,7 +13,7 @@ import { authTrace } from "../src/mailin/parse.js";
 import { normalizeWeek } from "../src/doctors.js";
 import { authVerdict, automatic, freshText } from "../src/mailin/parse.js";
 import { receiveMail, replayRequest } from "../src/mailin/run.js";
-import { ensureMailinTables, loadMailAdmin, saveSender } from "../src/mailin/store.js";
+import { ensureMailinTables, loadMailAdmin, loadUnresolvedMail, markMailHandled, saveSender } from "../src/mailin/store.js";
 import { confirmGet, confirmPost } from "../src/mailin/confirm.js";
 import { applyDue } from "../src/mailin/pending.js";
 import { createPlaceFromRequest } from "../src/mailin/new-place.js";
@@ -467,6 +467,36 @@ test("známá adresa žádá o nové místo: dostane nové místo k těm stávaj
     assert.equal(sender.direct, 1);
     const targets = (await env.DB.prepare("select target_id from mail_sender_targets where sender_id = ? order by target_id").bind(sender.id).all()).results;
     assert.deepEqual(targets.map((row) => Number(row.target_id)), [place.id, result.id]);
+  } finally {
+    claude.close();
+  }
+});
+
+test("e-mail, kterému Drběna nerozuměla, čeká na Přehledu, dokud odesílatel nenapíše jasně nebo ho redaktor nevyřídí", async () => {
+  const claude = await fakeClaude([
+    { verdict: "nejasne", question: "Který den?", changes: [], new_place: { name: "", label: "", address: "", phone: "", slots: [] } },
+    CLOSED,
+    { verdict: "nejasne", question: "Které místo?", changes: [], new_place: { name: "", label: "", address: "", phone: "", slots: [] } },
+  ]);
+  try {
+    const { env, place } = await freshEnv(claude.url);
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "knihovna", direct: true, targets: [`oteviraci-doba:${place.id}`] });
+    await receiveMail(message(rawMail({ subject: "Zavřeno", text: "bude zavřeno" })), env);
+    const waiting = await loadUnresolvedMail(env);
+    assert.equal(waiting.length, 1);
+    assert.equal(waiting[0].status, "nejasne");
+
+    // Odesílatel doplní jasný e-mail: položka z Přehledu zmizí.
+    await receiveMail(message(rawMail({ subject: "Re: Zavřeno", text: "15.8 kvc zavřeno" })), env);
+    assert.equal((await loadUnresolvedMail(env)).length, 0);
+
+    // Další nejasný e-mail čeká, redaktor ho označí jako vyřízený.
+    await receiveMail(message(rawMail({ subject: "Něco", text: "možná zavřeno" })), env);
+    const [row] = await loadUnresolvedMail(env);
+    assert.equal(row.subject, "Něco");
+    assert.equal((await markMailHandled(env, chief(), row.id)).ok, true);
+    assert.equal((await loadUnresolvedMail(env)).length, 0);
+    assert.equal((await loadMailAdmin(env)).log[0].status, "vyrizeno");
   } finally {
     claude.close();
   }

@@ -3,7 +3,7 @@ import { redirect, withError } from "./http.js";
 import { createPlaceFromRequest } from "./mailin/new-place.js";
 import { refuseRequest } from "./mailin/register.js";
 import { replayRequest } from "./mailin/run.js";
-import { removeSender, saveSender } from "./mailin/store.js";
+import { markMailHandled, removeSender, saveSender } from "./mailin/store.js";
 
 const BASE = "/redakce/emaily";
 
@@ -12,6 +12,7 @@ export const MAILIN_OK = {
   "email-adresa-smazana": "Adresa je smazaná, e-maily z ní už se nezapíšou.",
   "email-adresa-povolena": "Adresa je povolená a její e-mail jsem zpracovala.",
   "email-zadost-zamitnuta": "Žádost je zamítnutá, odesílatel to ví.",
+  "email-vyrizeno": "E-mail je označený jako vyřízený.",
   "email-misto-zalozeno": "Místo je založené, odesílatel se to dozví e-mailem.",
 };
 
@@ -23,6 +24,12 @@ export async function mailinPost(path, request, env, fields) {
     // Adresa z žádosti: uložený e-mail se zpracuje, jako by přišel teď.
     if (fields.requestId && (await replayRequest(env, Number(fields.requestId)))) return redirect(`${BASE}?ok=email-adresa-povolena`);
     return redirect(`${BASE}?ok=email-adresa`);
+  }
+  if (path === `${BASE}/vyrizeno`) {
+    const result = await markMailHandled(env, request, Number(fields.id));
+    const back = fields.next === "prehled" ? "/redakce/prehled" : BASE;
+    if (!result.ok) return redirect(withError(back, result.error));
+    return redirect(`${back}?ok=email-vyrizeno`);
   }
   if (path === `${BASE}/misto`) {
     const result = await createPlaceFromRequest(env, request, fields);

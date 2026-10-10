@@ -56,7 +56,7 @@ function nav(data) {
         canSeeHours(data.user, "dvory") && ["dvory", "Sběrné dvory", "recycle", hoursWaiting("dvory")],
         canSeeHours(data.user, "lekari") && ["lekari", "Lékaři", "cross", hoursWaiting("lekari")],
         canSeeHours(data.user, "oteviraci-doba") && ["oteviraci-doba", "Otevírací doba", "clock", hoursWaiting("oteviraci-doba")],
-        chief && ["emaily", "E-mail na hodiny", "inbox", (data.mailRequests ?? []).length],
+        chief && ["emaily", "E-mail na hodiny", "inbox", (data.mailRequests ?? []).length + (data.mailUnresolved ?? []).length],
         chief && ["odstavky", "Odstávky", "bolt", noticesWaiting],
       ],
     },

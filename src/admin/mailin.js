@@ -5,13 +5,14 @@ import { MAILIN_ADDRESS } from "../mailin/reply.js";
 import { esc } from "../view.js";
 import { placeForm } from "./places.js";
 import { adminShell } from "./shell.js";
-import { badge, callout, cancelLink, check, confirmForm, field, formFoot, hidden, input, item, list, modal, modalLink, openButton, pageHead, panel } from "./ui.js";
+import { badge, callout, cancelLink, check, confirmForm, field, formFoot, hidden, input, item, list, modal, modalLink, openButton, pageHead, panel, postButton } from "./ui.js";
 
 const BASE = "/redakce/emaily";
 
 const STATUS = {
   ceka: ["Čeká na potvrzení", "info"],
   zapsano: ["Zapsáno", "ok"],
+  vyrizeno: ["Vyřízeno", "ok"],
   zamitnuto: ["Zamítnuto odesílatelem", ""],
   upraveno: ["Upraveno na webu", ""],
   zadost: ["Čeká na povolení", "info"],
@@ -124,6 +125,7 @@ function logItem(row) {
     title: row.subject || "(bez předmětu)",
     meta: [esc(stamp(row.createdAt)), esc(row.email), row.verified ? "odesílatel ověřený" : "odesílatel neověřený"].join(" · "),
     badges: badge(label, tone),
+    actions: ["nejasne", "chyba"].includes(row.status) ? postButton(`${BASE}/vyrizeno`, { id: row.id }, "Vyřízeno", "btn-line") : "",
     extra: text,
     search: `${row.subject} ${row.email} ${row.excerpt}`,
   });
