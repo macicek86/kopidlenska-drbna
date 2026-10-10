@@ -45,6 +45,9 @@ export function adminQuery(url) {
     clearChat: url.searchParams.has("smazat-otazky"),
     eventId: positiveParam(url, "akce"),
     requestId: positiveParam(url, "zadost"),
+    // E-mail na otevírací dobu: okno povolení neznámé adresy.
+    allowId: positiveParam(url, "povolit"),
+    refuseId: positiveParam(url, "zamitnout"),
   };
 }
 

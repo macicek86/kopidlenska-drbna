@@ -159,6 +159,7 @@ const ROUTES = {
   "/redakce/odber/upozorneni": [single("push_settings", "nastavení upozornění")],
   "/redakce/emaily/ulozit": [by("mail_senders", "id"), mailTargets],
   "/redakce/emaily/smazat": [existing("mail_senders", "id"), mailTargets],
+  "/redakce/emaily/zamitnout": [existing("mail_requests", "id", "žádost o povolení")],
   "/redakce/texty/ulozit": [copyTexts, single("settings", "nastavení")],
 
   ...hoursRoutes("/redakce/dvory", "yards", "yardId", "yard_closures"),

@@ -8,7 +8,12 @@ import { badge, callout, cancelLink, check, confirmForm, field, formFoot, hidden
 const BASE = "/redakce/emaily";
 
 const STATUS = {
+  ceka: ["Čeká na potvrzení", "info"],
   zapsano: ["Zapsáno", "ok"],
+  zamitnuto: ["Zamítnuto odesílatelem", ""],
+  upraveno: ["Upraveno na webu", ""],
+  zadost: ["Čeká na povolení", "info"],
+  spam: ["Spam", "warn"],
   ke_schvaleni: ["Ke schválení", "info"],
   nejasne: ["Nerozuměla", "warn"],
   neni_doba: ["Není o době", ""],
@@ -48,7 +53,8 @@ function targetNames(data, sender) {
   return names;
 }
 
-function senderForm(data, editing) {
+// `request`: žádost neznámé adresy, formulář je předvyplněný a po uložení se její e-mail zpracuje.
+function senderForm(data, editing, request = null) {
   const on = new Set((editing?.targets ?? []).map((target) => `${target.section}:${target.targetId}`));
   const groups = rowGroups(data)
     .filter(([, , rows]) => rows.length)
@@ -60,14 +66,26 @@ function senderForm(data, editing) {
     .join("");
   return `<form class="form" method="post" action="${BASE}/ulozit">
     ${editing ? hidden("id", editing.id) : ""}
+    ${request ? hidden("zadost", request.id) : ""}
     <div class="pair">
-      ${field("E-mail", `<input class="${input}" type="email" name="email" required maxlength="160" value="${esc(editing?.email ?? "")}" placeholder="knihovna@kopidlno.cz">`, "Přesně ta adresa, ze které budou psát.")}
+      ${field("E-mail", `<input class="${input}" type="email" name="email" required maxlength="160" value="${esc(editing?.email ?? request?.email ?? "")}" placeholder="knihovna@kopidlno.cz">`, "Přesně ta adresa, ze které budou psát.")}
       ${field("Kdo to je", `<input class="${input}" name="label" maxlength="80" value="${esc(editing?.label ?? "")}" placeholder="Třeba: knihovna, paní Nováková">`, "Uvidíte to u změn v historii a u žádostí.")}
     </div>
     <div class="field"><span>Změny</span>${check("direct", "1", editing ? editing.direct : true, "Zapisovat rovnou bez schválení", "Bez fajfky půjde každá změna nejdřív k vám. Rovnou se zapíše jen e-mail, který prošel ověřením odesílatele.")}</div>
     ${groups || callout("Zatím tu nejsou žádná místa, lékaři ani sběrné dvory.")}
-    ${formFoot("Uložit", cancelLink(BASE))}
+    ${formFoot(request ? "Povolit a zpracovat e-mail" : "Uložit", cancelLink(BASE))}
   </form>`;
+}
+
+function requestItem(request) {
+  return item({
+    title: request.subject || "(bez předmětu)",
+    meta: [esc(stamp(request.createdAt)), esc(request.email)].join(" · "),
+    badges: badge("Adresa není v seznamu", "info"),
+    extra: `<p class="message-text">${esc(request.text.slice(0, 600)).replace(/\n/g, "<br>")}</p>`,
+    actions: `${modalLink(`${BASE}?povolit=${request.id}`, "Povolit…", "btn-primary")}${modalLink(`${BASE}?zamitnout=${request.id}`, "Zamítnout", "btn-ghost btn-danger-text")}`,
+    search: `${request.email} ${request.subject} ${request.text}`,
+  });
 }
 
 function senderItem(data, sender) {
@@ -100,8 +118,40 @@ export function adminMailin(ctx, data, message, query = {}) {
   const log = data.mailin?.log ?? [];
   const editing = senders.find((row) => row.id === query.editingId) ?? null;
   const removing = editing ? null : (senders.find((row) => row.id === query.confirmId) ?? null);
+  const requests = data.mailin?.requests ?? [];
+  const allowing = requests.find((row) => row.id === query.allowId) ?? null;
+  const refusing = requests.find((row) => row.id === query.refuseId) ?? null;
   const dialogs = [modal({ id: "nova-adresa", title: "Nová adresa", size: "wide", close: BASE, open: Boolean(query.fresh) && !editing && !removing, body: senderForm(data, null) })];
   if (editing) dialogs.push(modal({ id: "okno", title: `Upravit: ${editing.label || editing.email}`, size: "wide", close: BASE, open: true, body: senderForm(data, editing) }));
+  if (allowing) {
+    dialogs.push(
+      modal({
+        id: "okno",
+        title: `Povolit ${allowing.email}`,
+        size: "wide",
+        close: BASE,
+        open: true,
+        body: `<p class="item-sub">Přišlo: <b>${esc(allowing.subject || "(bez předmětu)")}</b></p><p class="message-text">${esc(allowing.text.slice(0, 800)).replace(/\n/g, "<br>")}</p>${senderForm(data, null, allowing)}`,
+      }),
+    );
+  }
+  if (refusing) {
+    dialogs.push(
+      modal({
+        id: "okno",
+        title: "Nepovolit adresu",
+        close: BASE,
+        open: true,
+        body: confirmForm({
+          action: `${BASE}/zamitnout`,
+          id: refusing.id,
+          text: `Nepovolit <b>${esc(refusing.email)}</b>? Drběna odpoví, že ji redakce zatím nepřidala. Dalších 30 dní se ta adresa neozve znovu.`,
+          submit: "Nepovolit",
+          close: BASE,
+        }),
+      }),
+    );
+  }
   if (removing) {
     dialogs.push(
       modal({
@@ -119,8 +169,9 @@ export function adminMailin(ctx, data, message, query = {}) {
       }),
     );
   }
-  const lede = `Správci míst můžou poslat změnu otevírací doby e-mailem na <b>${esc(MAILIN_ADDRESS)}</b>, třeba „15. 8. KVC zavřeno“. Drběna ji přečte, zapíše a odepíše, co zapsala. Píšou jen adresy ze seznamu a jen u míst, která jim zaškrtnete.`;
+  const lede = `Správci míst můžou poslat změnu otevírací doby e-mailem na <b>${esc(MAILIN_ADDRESS)}</b>, třeba „15. 8. KVC zavřeno“. Drběna ji přečte, zapíše a odepíše, co zapsala. Píšou jen adresy ze seznamu a jen u míst, která jim zaškrtnete. Ověřený odesílatel s „zapisovat rovnou“ dostane náhled s tlačítky Schválit a Zamítnout a změna se zapíše sama po 10 minutách. Neznámá adresa, která napíše o otevírací době, čeká tady na povolení.`;
   const body = `${pageHead("E-mail na otevírací dobu", lede, openButton("nova-adresa", `${BASE}?novy=1`, "Nová adresa"))}
+    ${requests.length ? panel({ id: "zadosti", title: "Čeká na povolení", count: requests.length, tone: "warn", body: list(requests.map(requestItem), "") }) : ""}
     ${panel({ id: "adresy", title: "Kdo smí psát", count: senders.length, filter: senders.length > 6 ? "Hledat adresu" : "", body: list(senders.map((row) => senderItem(data, row)), "Zatím žádná adresa. E-mailům z neznámých adres Drběna jen odepíše, kam psát.") })}
     ${panel({ id: "posta", title: "Poslední e-maily", count: log.length, body: list(log.map(logItem), "Zatím nepřišel žádný e-mail.") })}
     ${dialogs.join("")}`;

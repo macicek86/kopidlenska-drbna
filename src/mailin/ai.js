@@ -15,12 +15,15 @@ export const MAIL_SYSTEM = `Jsi koza Drběna z Kopidlenské drbny, zpravodajské
 verdict:
 - "zmeny": e-mail říká, že některé místo z přehledu bude mít zavřeno, jinou dobu nebo novou běžnou dobu. Změny dej do changes.
 - "nejasne": e-mail je o otevírací době, ale nejde jistě poznat, které místo, který den nebo jaké časy. changes nech prázdné a do question napiš krátkou otázku, co má odesílatel doplnit.
-- "neni_doba": e-mail není o otevírací době (zpráva, tip na článek, pozvánka, dotaz, reklama, poděkování). changes prázdné.
+- "neni_doba": e-mail není o otevírací době (zpráva, tip na článek, pozvánka, dotaz, poděkování). changes prázdné.
+- "spam": e-mail je nevyžádaná pošta (reklama, nabídka služeb, SEO, phishing, řetězový e-mail, nesmyslný text). changes prázdné. Použij to jen u zjevného spamu: e-mail od správce, který jen píše nejasně, je "nejasne" nebo "neni_doba".
 Když jsou některé změny jasné a jiné ne, dej jasné do changes, verdict "zmeny" a do question napiš, co u ostatních chybí. Jinak nech question prázdné.
 question piš česky, vykej, jednou nebo dvěma větami.
 
 Pravidla:
 - target je jen značka z přehledu ([misto:ID], [lekar:ID], [dvur:ID]). Jiná místa odesílatel měnit nesmí. Když e-mail mluví o místě, které v přehledu není, nezapisuj ho a zmiň to v question.
+- Jeden e-mail může mít víc míst („duhovka dnes zavřená, knihovna příští týden zavřená“): každé místo je jedna změna v changes se svým obdobím. Když adresa spravuje víc míst a e-mail žádné nejmenuje, je to "nejasne" a v question vyjmenuj, o které místa jde.
+- „Dnes zavřeno“ je zavřeno od dnešního dne (starts_on je dnešek), „zítra do 15“ nebo „dnes jen do 15“ je otevřeno jen do 15:00 (close_at). „Zavřeno do 15“ nebo „dnes otevíráme až v 15“ je otevřeno od 15:00 (open_from).
 - Když je v přehledu jediný řádek a e-mail místo nejmenuje, myslí ten. Zkratky a hovorové názvy (kvc, knihovna, obecňák, doktorka…) přiřaď podle přehledu; když by mohly patřit ke dvěma řádkům, je to "nejasne".
 - Datum bez roku je nejbližší takový den od dneška (dnešek včetně). Den v týdnu („v pátek“, „příští středu“) a slova „zítra“, „o víkendu“ počítej od dneška. Data ber z kalendáře v zadání, nepočítej je sám. Data piš jako RRRR-MM-DD.
 - „Příští týden“ je celý příští týden od pondělí do neděle, „tento týden“ od dneška do neděle, „do konce měsíce“ od dneška do posledního dne měsíce. Na nic se v tom případě neptej, zapiš celé období.
@@ -42,7 +45,7 @@ export function mailSchema() {
     additionalProperties: false,
     required: ["verdict", "question", "changes"],
     properties: {
-      verdict: { type: "string", enum: ["zmeny", "nejasne", "neni_doba"] },
+      verdict: { type: "string", enum: ["zmeny", "nejasne", "neni_doba", "spam"] },
       question: text,
       changes: {
         type: "array",
@@ -113,6 +116,18 @@ export function calendarText(today, weekday) {
     `Tento týden: ${today} až ${thisSunday}. Příští týden: ${nextMonday} až ${addDays(nextMonday, 6)}.`,
     `Kalendář: ${days.join(", ")}`,
   ].join("\n");
+}
+
+// Pro neznámou adresu: nic měnit nesmí, Drběna jen rozhodne, jestli je to spam, nebo jestli to o otevírací době je.
+const UNKNOWN_NOTE = "Odesílatel zatím není v seznamu a nesmí měnit nic. Rozhodni jen verdict: \"spam\", \"neni_doba\", nebo \"nejasne\", když je e-mail o otevírací době. changes nech prázdné.";
+
+export function unknownContent({ today, weekday, mail }) {
+  return [
+    `Dnes je ${DAY_NAMES[weekday]} ${today} (${formatLong(today)}).`,
+    `Odesílatel: ${mail.from}`,
+    UNKNOWN_NOTE,
+    `Předmět: ${mail.subject || "(bez předmětu)"}\n\nText e-mailu:\n${(mail.text || "(prázdný)").slice(0, 3000)}`,
+  ].join("\n\n");
 }
 
 export function mailContent({ today, weekday, sender, mail, allowed, earlier = null }) {

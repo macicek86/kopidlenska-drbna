@@ -65,10 +65,10 @@ test("vypínače: přispěvatel bez druhů nic nevidí, hlavní redaktor vše a 
   const { env } = await staffEnv();
   assert.deepEqual(await loadNotifySwitches(env, jana), []);
   const all = await loadNotifySwitches(env, chief);
-  assert.deepEqual(all.map((topic) => [topic.key, topic.on]), [["vzkaz", true], ["navrh", true], ["drbena", true], ["hodiny", true], ["posta", true], ["stav", true]]);
+  assert.deepEqual(all.map((topic) => [topic.key, topic.on]), [["vzkaz", true], ["navrh", true], ["drbena", true], ["hodiny", true], ["posta", true], ["spam", true], ["registrace", true], ["stav", true]]);
   await saveNotifySwitches(env, chief, ["navrh"]);
   assert.deepEqual((await loadNotifySwitches(env, chief)).filter((topic) => topic.on).map((topic) => topic.key), ["navrh"]);
-  await saveNotifySwitches(env, chief, ["navrh", "vzkaz", "drbena", "hodiny", "posta", "stav"]);
+  await saveNotifySwitches(env, chief, ["navrh", "vzkaz", "drbena", "hodiny", "posta", "spam", "registrace", "stav"]);
   assert.equal((await loadNotifySwitches(env, chief)).every((topic) => topic.on), true);
 });
 

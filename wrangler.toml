@@ -64,6 +64,19 @@ binding = "AI"
 binding = "VECTORS"
 index_name = "kopidlenska-drbna-zpravy"
 
+# Fronta úloh (src/queue.js): zpráva se doručí po zpoždění, zatím jen změny z e-mailu na otevírací dobu
+# (src/mailin/pending.js). Fronta se zakládá jednou (umí to i npm run nasadit):
+#   npx wrangler queues create kopidlenska-drbna-ukoly
+# Bez ní cron každých 15 minut změny dožene sám, jen o něco později.
+[[queues.producers]]
+binding = "JOBS"
+queue = "kopidlenska-drbna-ukoly"
+
+[[queues.consumers]]
+queue = "kopidlenska-drbna-ukoly"
+max_batch_size = 10
+max_retries = 3
+
 [triggers]
 # Druhý řádek jsou upozornění do prohlížeče (src/push/dispatch.js): novinky do 15 minut a večerní připomínky.
 crons = ["15 */4 * * *", "*/15 * * * *"]

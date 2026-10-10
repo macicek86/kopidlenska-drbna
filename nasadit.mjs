@@ -62,6 +62,12 @@ if (vectorsResult.code !== 0 && !/already exists|duplicate/i.test(vectorsResult.
   process.exit(vectorsResult.code);
 }
 
+console.log("Zakládám frontu úloh (Queues)…");
+const queueResult = run(["queues", "create", "kopidlenska-drbna-ukoly"], { allowFail: true });
+if (queueResult.code !== 0 && !/already exists|already taken|11009/i.test(queueResult.text)) {
+  process.exit(queueResult.code);
+}
+
 console.log("Nahrávám schéma a výchozí texty…");
 run(["d1", "execute", dbName, "--remote", "--file=./schema.sql"]);
 

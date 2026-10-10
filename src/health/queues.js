@@ -1,4 +1,5 @@
 // Fronty pro stránku Stav: co v importech čeká na Drběnu, co skončilo chybou, a kolik zpráv čeká na index hledání.
+import { overduePending } from "../mailin/pending.js";
 import { SCHOOL_LIST } from "../skola/sources.js";
 
 export const QUEUES = [
@@ -28,6 +29,6 @@ async function countSearchQueue(env) {
 }
 
 export async function loadQueues(env) {
-  const [queues, search] = await Promise.all([Promise.all(QUEUES.map((queue) => countQueue(env, queue))), countSearchQueue(env)]);
-  return { queues, search };
+  const [queues, search, mail] = await Promise.all([Promise.all(QUEUES.map((queue) => countQueue(env, queue))), countSearchQueue(env), overduePending(env)]);
+  return { queues, search, mail };
 }

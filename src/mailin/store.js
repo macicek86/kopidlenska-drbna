@@ -2,6 +2,7 @@
 // a záznam přijatých e-mailů pro redakci. Seznam spravuje jen hlavní redaktor (src/admin/mailin.js).
 import { clip, requireChief } from "../db-core.js";
 import { REQUEST_SECTIONS } from "../hours-requests-db.js";
+import { waitingRequests } from "./register.js";
 import { pragueNow } from "../waste.js";
 
 // Kolik e-mailů od jedné adresy denně Drběna zpracuje (proti zacyklení s automatickou odpovědí a spamu).
@@ -40,6 +41,37 @@ export const MAILIN_TABLES = [
     created_at text not null default (datetime('now'))
   )`,
   "create index if not exists mail_log_sender on mail_log (sender_email, created_at)",
+  // Změny z e-mailu, které čekají na potvrzení odesílatelem (src/mailin/pending.js). `items` je JSON změn,
+  // `token` je v odkazech z e-mailu, `due_at` kdy se zapíšou samy, `log_id` řádek v mail_log, který se po vyřízení přepíše.
+  `create table if not exists mail_pending (
+    id integer primary key autoincrement,
+    token text not null unique,
+    sender_id integer not null,
+    email text not null,
+    subject text not null default '',
+    message_id text not null default '',
+    refs text not null default '',
+    items text not null default '[]',
+    who text not null default '',
+    status text not null default 'ceka',
+    result text not null default '',
+    log_id integer,
+    due_at text not null,
+    created_at text not null default (datetime('now')),
+    decided_at text
+  )`,
+  "create index if not exists mail_pending_due on mail_pending (status, due_at)",
+  // Žádost neznámé (ale ověřené) adresy o povolení psát: její první e-mail čeká, až ho redakce povolí.
+  `create table if not exists mail_requests (
+    id integer primary key autoincrement,
+    email text not null unique,
+    subject text not null default '',
+    text text not null default '',
+    message_id text not null default '',
+    refs text not null default '',
+    status text not null default 'ceka',
+    created_at text not null default (datetime('now'))
+  )`,
 ];
 
 export async function ensureMailinTables(env) {
@@ -86,6 +118,13 @@ async function targetsOf(env, ids) {
   return out;
 }
 
+export async function senderById(env, id) {
+  const row = await env.DB.prepare("select * from mail_senders where id = ?").bind(id ?? 0).first();
+  if (!row) return null;
+  const targets = await targetsOf(env, [Number(row.id)]);
+  return mapSender(row, targets.get(Number(row.id)) ?? []);
+}
+
 export async function senderByEmail(env, email) {
   const address = normalEmail(email);
   if (!address) return null;
@@ -117,6 +156,7 @@ export async function loadMailAdmin(env) {
   return {
     senders: rows.map((row) => mapSender(row, targets.get(Number(row.id)) ?? [])),
     log: log.map(mapLog),
+    requests: await waitingRequests(env),
   };
 }
 
@@ -180,19 +220,26 @@ export async function countSenderUse(env, sender, today = pragueNow().date) {
     .run();
 }
 
+// Vrací id řádku, ať se dá po vyřízení přepsat (`setLogStatus`).
 export async function logMail(env, { email, senderId = null, subject, excerpt, status, result = "", verified = false, auth = "" }) {
   await env.DB.prepare(`delete from mail_log where created_at < datetime('now', '-${KEEP_LOG_DAYS} days')`).run();
-  await env.DB.prepare(
+  const saved = await env.DB.prepare(
     "insert into mail_log (sender_email, sender_id, subject, excerpt, status, result, verified, auth) values (?, ?, ?, ?, ?, ?, ?, ?)",
   )
     .bind(clip(email, 160), senderId, clip(subject, 200), clip(excerpt, 1000), status, clip(result, 1000), verified ? 1 : 0, clip(auth, 3000))
     .run();
+  return Number(saved.meta?.last_row_id ?? 0);
+}
+
+export async function setLogStatus(env, id, status, result) {
+  if (!id) return;
+  await env.DB.prepare("update mail_log set status = ?, result = ? where id = ?").bind(status, clip(result, 1000), id).run();
 }
 
 // Neznámé adrese Drběna odpoví nejvýš jednou za den, ať se nehádá s robotem.
 export async function answeredToday(env, email) {
   const row = await env.DB.prepare(
-    "select 1 as hit from mail_log where sender_email = ? and status = 'neznamy' and created_at >= datetime('now', '-1 day') limit 1",
+    "select 1 as hit from mail_log where sender_email = ? and status in ('neznamy', 'zadost') and created_at >= datetime('now', '-1 day') limit 1",
   )
     .bind(clip(email, 160))
     .first();
@@ -209,4 +256,24 @@ export async function earlierQuestion(env, senderId) {
     .first();
   if (row?.status !== "nejasne") return null;
   return { subject: String(row.subject ?? ""), text: String(row.excerpt ?? ""), question: String(row.result ?? "") };
+}
+
+// Kolik neznámých adres dnes už Drběna zkoumala (každé zkoumání je volání modelu): strop proti zaplavení.
+export const UNKNOWN_DAILY_LIMIT = 30;
+
+export async function unknownRoom(env) {
+  const row = await env.DB.prepare(
+    "select count(*) as n from mail_log where sender_id is null and status in ('neznamy', 'zadost', 'spam') and created_at >= datetime('now', '-1 day')",
+  ).first();
+  return Number(row?.n ?? 0) < UNKNOWN_DAILY_LIMIT;
+}
+
+// Spam od téhle adresy už dnes redakci hlásil? Víc upozornění od jednoho odesílatele denně nechodí.
+export async function spamReportedToday(env, email) {
+  const row = await env.DB.prepare(
+    "select 1 as hit from mail_log where sender_email = ? and status = 'spam' and created_at >= datetime('now', '-1 day') limit 1",
+  )
+    .bind(clip(email, 160))
+    .first();
+  return Boolean(row);
 }

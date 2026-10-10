@@ -3,10 +3,10 @@
 // Do historie změn se zapíše pod jménem, které správce napsal, přes formulář redakce se stejnými poli (src/audit-routes.js).
 import { auditFinish, auditStart } from "../audit.js";
 import { fileHours, linkAuthor } from "../hours-requests-db.js";
-import { countUse, linkByToken, linkHasRoom, linkPath, linkRequests, withdrawLinkRequest } from "../hours-links-db.js";
+import { linkByToken, linkHasRoom, linkPath, linkRequests, useLink, withdrawLinkRequest } from "../hours-links-db.js";
 import { html, redirect, secure, withError } from "../http.js";
 import { messageFrom, OK } from "../ok-messages.js";
-import { deadLinkPage, managePage } from "./page.js";
+import { deadLinkPage, doneLinkPage, managePage } from "./page.js";
 import { MANAGE_SECTIONS } from "./sections.js";
 
 const PREFIX = "/sprava/";
@@ -117,7 +117,12 @@ export async function managePost(path, request, env, fields) {
   });
   const cookie = authorCookie(request, author);
   if (!result.ok) return redirect(withError(back, result.error), cookie);
-  await countUse(env, link);
+  await useLink(env, link);
+  if (link.once) {
+    const done = html(doneLinkPage(Boolean(result.requested)), 200, cookie);
+    await auditFinish(env, watch, redirect(`${base}?ok=${result.requested ? "zadost" : spec.ok(action, result.value)}`), OK).catch(() => {});
+    return done;
+  }
   const response = redirect(`${base}?ok=${result.requested ? "zadost" : spec.ok(action, result.value)}`, cookie);
   await auditFinish(env, watch, response, OK).catch(() => {});
   return response;

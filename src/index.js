@@ -86,7 +86,10 @@ import { adsPost } from "./post-ads.js";
 import { eventsPost } from "./post-events.js";
 import { feedsPost } from "./post-feeds.js";
 import { mailinPost } from "./post-mailin.js";
+import { confirmGet, confirmPost } from "./mailin/confirm.js";
+import { applyDue } from "./mailin/pending.js";
 import { receiveMail } from "./mailin/run.js";
+import { handleQueue } from "./queue-run.js";
 import { PUSH_PAGE, pushPageHtml, pushPost } from "./push/routes.js";
 import { PUSH_CRON, runPush } from "./push/dispatch.js";
 import { loadPushSettings } from "./push/store.js";
@@ -181,6 +184,9 @@ async function renderGet(request, env, url, execution) {
   // Odkaz pro správce místa, ordinace či dvora: vlastní stránka bez přihlášení.
   const manage = await manageGet(path, request, env, url);
   if (manage) return manage;
+  // Potvrzení změny z e-mailu na otevírací dobu (odkazy z odpovědi Drběny): bez přihlášení, podle tajného odkazu.
+  const confirm = await confirmGet(path, env, url);
+  if (confirm) return confirm;
 
   // Texty a data stránky najednou: na sobě nezávisí.
   const slug = path.startsWith("/zpravy/") ? decodeURIComponent(path.slice("/zpravy/".length)) : null;
@@ -288,6 +294,8 @@ async function renderPost(request, env, url, execution) {
   // Odkaz pro správce: do historie změn zapisuje sám, pod jménem, které správce napsal.
   const manage = await managePost(path, request, env, fields);
   if (manage) return manage;
+  const confirm = await confirmPost(path, env, fields);
+  if (confirm) return confirm;
   // Historie změn: snímek dotčených záznamů před uložením a po něm.
   const watch = path.startsWith("/redakce/") ? await auditStart(env, path, fields, () => currentUser(env, request)).catch(() => null) : null;
   const response = await handlePost(request, env, path, fields, execution);
@@ -383,11 +391,18 @@ export default {
     await ensureSchema(env);
     await receiveMail(message, env);
   },
+  // Fronta úloh (src/queue.js): zatím změny z e-mailu na otevírací dobu po 10 minutách čekání.
+  async queue(batch, env) {
+    await ensureSchema(env);
+    await handleQueue(batch, env);
+  },
   async scheduled(event, env, ctx) {
     await ensureSchema(env);
     // Upozornění mají vlastní cron každých 15 minut (src/push/dispatch.js), ostatní úlohy běží jednou za 4 hodiny.
     if (event?.cron === PUSH_CRON) {
       ctx.waitUntil(trackJob(env, { key: "upozorneni", label: "Upozornění" }, () => runPush(env)));
+      // Záloha fronty: změny z e-mailu, které už měly být zapsané (src/mailin/pending.js).
+      ctx.waitUntil(trackJob(env, { key: "posta", label: "E-maily čekající na potvrzení" }, () => applyDue(env)));
       return;
     }
     await noteCron(env);

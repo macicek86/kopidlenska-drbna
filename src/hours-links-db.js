@@ -1,7 +1,7 @@
 // Odkazy pro správce: tajná adresa `/sprava/<token>` pro jedno místo, ordinaci nebo sběrný dvůr.
 // Kdo ji má (zaměstnanec firmy, sestra v ordinaci), zapíše změnu hodin bez účtu v redakci.
 // Změna jde ke schválení (src/hours-requests-db.js), nebo s `direct` rovnou na web. Zakládá je jen hlavní redaktor.
-import { clip, requireChief } from "./db-core.js";
+import { addColumn, clip, requireChief } from "./db-core.js";
 import { REQUEST_SECTIONS } from "./hours-requests-db.js";
 import { pragueNow } from "./waste.js";
 
@@ -27,6 +27,11 @@ const TABLES = [
 
 export async function ensureLinkTables(env) {
   for (const sql of TABLES) await env.DB.prepare(sql).run();
+  // Jednorázový odkaz z e-mailu na otevírací dobu (src/mailin/): platí do `expires_at` a po první uložené změně zanikne.
+  const info = await env.DB.prepare("pragma table_info(hours_links)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "expires_at", "alter table hours_links add column expires_at text");
+  await addColumn(env, names, "once", "alter table hours_links add column once integer not null default 0");
 }
 
 // 128 bitů náhody šestnáctkově: v adrese se nic neplete (podtržítko v odkazu vypadá jako mezera).
@@ -46,6 +51,7 @@ function mapLink(row) {
     token: String(row.token),
     label: String(row.label ?? ""),
     direct: Number(row.direct) === 1,
+    once: Number(row.once ?? 0) === 1,
     usedOn: String(row.used_on ?? ""),
     usedCount: Number(row.used_count ?? 0),
     lastUsedAt: row.last_used_at ? String(row.last_used_at) : "",
@@ -57,7 +63,7 @@ function mapLink(row) {
 export async function loadLinks(env, user) {
   const out = Object.fromEntries(Object.keys(REQUEST_SECTIONS).map((section) => [section, []]));
   if (user?.role !== "hlavni") return out;
-  const rows = await env.DB.prepare("select * from hours_links order by id asc").all();
+  const rows = await env.DB.prepare("select * from hours_links where once = 0 order by id asc").all();
   for (const row of rows.results ?? []) {
     const link = mapLink(row);
     out[link.section]?.push(link);
@@ -67,7 +73,7 @@ export async function loadLinks(env, user) {
 
 export async function linkByToken(env, token) {
   if (!/^[A-Za-z0-9_-]{16,64}$/.test(String(token ?? ""))) return null;
-  const row = await env.DB.prepare("select * from hours_links where token = ?").bind(token).first();
+  const row = await env.DB.prepare("select * from hours_links where token = ? and (expires_at is null or expires_at > datetime('now'))").bind(token).first();
   return row && REQUEST_SECTIONS[row.section] ? mapLink(row) : null;
 }
 
@@ -87,6 +93,27 @@ export async function countUse(env, link, today = pragueNow().date) {
   )
     .bind(today, today, link.id)
     .run();
+}
+
+// Jednorázový odkaz z e-mailu: jen pro jeden řádek, den platí a po první uložené změně zanikne (`useLink`).
+export const MAIL_LINK_HOURS = 24;
+
+export async function createMailLink(env, { section, targetId, label, direct }) {
+  if (!REQUEST_SECTIONS[section] || !targetId) return null;
+  await env.DB.prepare("delete from hours_links where expires_at is not null and expires_at <= datetime('now')").run();
+  const token = newToken();
+  await env.DB.prepare(
+    `insert into hours_links (section, target_id, token, label, direct, once, expires_at) values (?, ?, ?, ?, ?, 1, datetime('now', '+${MAIL_LINK_HOURS} hours'))`,
+  )
+    .bind(section, targetId, token, clip(label, 80), direct ? 1 : 0)
+    .run();
+  return token;
+}
+
+// Po uložené změně z odkazu: jednorázový zanikne, ostatní si jen připočtou použití.
+export async function useLink(env, link) {
+  if (link.once) await env.DB.prepare("delete from hours_links where id = ?").bind(link.id).run();
+  else await countUse(env, link);
 }
 
 export async function createLink(env, request, { section, targetId, label, direct }) {

@@ -1,77 +1,43 @@
 // E-mail na otevírací dobu (oteviracidoba@kopidlenskadrbna.org): Cloudflare Email Routing ho pošle Workeru
-// (handler `email` v src/index.js). Drběna (Haiku) z textu vytáhne změny a zapíšou se stejnou cestou jako
-// z odkazu pro správce (`fileHours`): rovnou, když to adresa má zapnuté a e-mail prošel ověřením, jinak ke schválení.
+// (handler `email` v src/index.js). Drběna (Haiku) z textu vytáhne změny:
+// - adresa ze seznamu s ověřeným e-mailem a „zapisovat rovnou“: změna čeká 10 minut, odesílatel dostane náhled
+//   s tlačítky Schválit, Zamítnout a Upravit čas na webu a po vypršení se zapíše sama (src/mailin/pending.js),
+// - jinak jde změna ke schválení redakci (`fileHours`),
+// - neznámá, ale ověřená adresa se může ozvat: její e-mail čeká na povolení redakcí (src/mailin/register.js),
+// - spam se zaznamená a redakce o něm ví, nikdo na něj neodpovídá.
 // Odesílateli přijde odpověď, co se zapsalo; e-mail, který o otevírací době není, dostane odpověď, kam psát.
-import { auditFinish, auditStart } from "../audit.js";
-import { loadDoctors } from "../doctors-db.js";
-import { fileHours } from "../hours-requests-db.js";
-import { MANAGE_SECTIONS } from "../manage/sections.js";
+import { SITE_ORIGIN } from "../http.js";
 import { notifyEditors } from "../notify.js";
-import { OK } from "../ok-messages.js";
-import { loadPlaces } from "../places-db.js";
+import { enqueue } from "../queue.js";
 import { pragueNow } from "../waste.js";
-import { loadYards } from "../yards-db.js";
-import { askDrbena, changeInput, mailContent } from "./ai.js";
-import { describeChange } from "./describe.js";
+import { askDrbena, mailContent, unknownContent } from "./ai.js";
+import { allowedRows, applyChanges, changeReply, hasRows, prepareChanges, tellEditors } from "./apply.js";
+import { CONFIRM_MINUTES, createPending } from "./pending.js";
 import { authTrace, authVerdict, automatic, readMail } from "./parse.js";
-import { MAILIN_ADDRESS, NOT_HOURS, UNKNOWN_SENDER, pageLinks, replyTo } from "./reply.js";
-import { answeredToday, countSenderUse, earlierQuestion, logMail, senderByEmail, senderHasRoom } from "./store.js";
+import { markRequest, requestByEmail, requestById, saveRequest } from "./register.js";
+import { MAILIN_ADDRESS, NOT_HOURS, REQUEST_RECEIVED, UNKNOWN_SENDER, replyTo } from "./reply.js";
+import { answeredToday, countSenderUse, earlierQuestion, logMail, senderByEmail, senderHasRoom, spamReportedToday, unknownRoom } from "./store.js";
 
 // Větší e-mail (fotky, přílohy) Cloudflare rovnou odmítne, změna hodin je pár řádků.
 const MAX_SIZE = 2_000_000;
 
-async function allowedRows(env, sender, today) {
-  const want = (section) => new Set(sender.targets.filter((target) => target.section === section).map((target) => target.targetId));
-  const [placeIds, doctorIds, yardIds] = [want("oteviraci-doba"), want("lekari"), want("dvory")];
-  const [places, doctors, yards] = await Promise.all([
-    placeIds.size ? loadPlaces(env, { today }) : [],
-    doctorIds.size ? loadDoctors(env, { today }) : [],
-    yardIds.size ? loadYards(env, { today }) : [],
-  ]);
-  return {
-    places: places.filter((row) => placeIds.has(row.id)),
-    doctors: doctors.filter((row) => doctorIds.has(row.id)),
-    yards: yards.filter((row) => yardIds.has(row.id)),
-  };
+function excerpt(mail) {
+  return mail.text.slice(0, 1000);
 }
 
-function rowName(allowed, change) {
-  const list = { "oteviraci-doba": allowed.places, lekari: allowed.doctors, dvory: allowed.yards }[change.section];
-  return list.find((row) => row.id === change.targetId)?.name ?? "";
+function dayParts() {
+  const today = pragueNow().date;
+  return { today, weekday: new Date(`${today}T12:00:00Z`).getUTCDay() };
 }
 
-// Běžné hodiny lékaře a dvora se přepíšou hned. Novou dobu od pozdějšího dne proto zapíše až redakce.
-function laterRegular(change, today) {
-  return change.action === "hodiny" && change.span.startsOn > today;
-}
-
-function redirectFor(okKey) {
-  return new Response(null, { status: 303, headers: { location: `/x?ok=${okKey}` } });
-}
-
-async function fileChange(env, change, { who, direct, mail }) {
-  const spec = MANAGE_SECTIONS[change.section];
-  const input = { ...change.input, [spec.idField]: change.targetId };
-  const auditPath = `/redakce/${change.section}${spec.audit[change.action]}`;
-  const watch = await auditStart(env, auditPath, input, async () => ({ id: null, name: who })).catch(() => null);
-  const result = await fileHours(env, {
-    section: change.section,
-    actions: spec.actions,
-    action: change.action,
-    targetId: change.targetId,
-    input,
-    mode: direct ? "direct" : "request",
-    author: who,
-    mailReply: { email: mail.from, subject: mail.subject, messageId: mail.messageId, references: mail.references },
-  });
-  if (result.ok) await auditFinish(env, watch, redirectFor(result.requested ? "zadost" : spec.ok(change.action, result.value)), OK).catch(() => {});
-  return result;
-}
-
-async function tellEditors(env, mail, why) {
-  await notifyEditors(env, "posta", {
-    subject: `E-mail na otevírací dobu: ${mail.subject || mail.from}`,
-    intro: `Drběna e-mail na ${MAILIN_ADDRESS} nezapsala: ${why}`,
+// Spam jen zapíše a dá vědět redakci, nejvýš jednou denně za odesílatele.
+async function noteSpam(env, mail, entry) {
+  const reported = await spamReportedToday(env, mail.from);
+  await logMail(env, { ...entry, status: "spam", result: "Drběna ho vyhodnotila jako spam, bez odpovědi." });
+  if (reported) return;
+  await notifyEditors(env, "spam", {
+    subject: `Spam na ${MAILIN_ADDRESS}: ${mail.subject || mail.from}`,
+    intro: "Drběna vyhodnotila e-mail jako spam a nikomu neodpověděla. Kdyby to byl omyl, najdete ho v historii e-mailů.",
     fields: [
       ["Od", mail.from],
       ["Předmět", mail.subject],
@@ -80,53 +46,137 @@ async function tellEditors(env, mail, why) {
   }).catch(() => {});
 }
 
-// Zapíše změny z odpovědi Drběny. Vrací řádky do odpovědi odesílateli a stav do záznamu.
-async function applyChanges(env, { raw, allowed, sender, verified, today, who, mail }) {
-  const regular = new Map([
-    ...allowed.places.map((row) => [`misto:${row.id}`, row.week]),
-    ...allowed.doctors.map((row) => [`lekar:${row.id}`, row.week]),
-    ...allowed.yards.map((row) => [`dvur:${row.id}`, null]),
-  ]);
-  const done = [];
-  const asked = [];
-  const failed = [];
-  const sections = [];
-  for (const item of (raw ?? []).slice(0, 10)) {
-    const change = changeInput(item, regular);
-    if (change.error) {
-      failed.push(`${String(item?.target ?? "").replace(/^\[|\]$/g, "")}: ${change.error}`);
-      continue;
-    }
-    const direct = verified && sender.direct && !laterRegular(change, today);
-    const result = await fileChange(env, change, { who, direct, mail });
-    if (!result.ok) {
-      failed.push(`${rowName(allowed, change)}: ${result.error}`);
-      continue;
-    }
-    const since = change.action === "hodiny" ? { startsOn: change.span.startsOn } : {};
-    const line = `• ${describeChange(change.section, change.action, { ...result.value, ...since }, rowName(allowed, change))}`;
-    if (result.requested) asked.push(line);
-    else done.push(line);
-    sections.push(change.section);
+// Adresa, která v seznamu není. Neověřené adrese se neodpovídá (mohla být podvržená a odpověď by šla někomu,
+// kdo nic neposlal). U ověřené Drběna rozhodne, jestli je to spam, nebo žádost o povolení.
+async function handleUnknown(env, { mail, entry, verified }) {
+  const found = verified ? await requestByEmail(env, mail.from) : null;
+  const waiting = found && found.status !== "povoleno" ? found : null;
+  const skip = !verified || waiting || (await answeredToday(env, mail.from)) || !(await unknownRoom(env));
+  if (skip) {
+    const result = waiting?.status === "ceka" ? "Adresa čeká na povolení redakcí." : "Adresa není v seznamu.";
+    await logMail(env, { ...entry, status: waiting?.status === "ceka" ? "zadost" : "neznamy", result });
+    return;
   }
-  return { done, asked, failed, sections };
+  const { today, weekday } = dayParts();
+  const answer = await askDrbena(env, unknownContent({ today, weekday, mail }));
+  if (!answer.ok) {
+    await logMail(env, { ...entry, status: "chyba", result: answer.error });
+    return;
+  }
+  const verdict = answer.raw?.verdict;
+  if (verdict === "spam") {
+    await noteSpam(env, mail, entry);
+    return;
+  }
+  if (verdict === "neni_doba") {
+    await logMail(env, { ...entry, status: "neznamy", result: "Adresa není v seznamu a e-mail není o otevírací době, odpověděla jsem." });
+    await replyTo(env, mail, [UNKNOWN_SENDER]);
+    return;
+  }
+  const saved = await saveRequest(env, { email: mail.from, subject: mail.subject, text: mail.text, messageId: mail.messageId, references: mail.references });
+  await logMail(env, { ...entry, status: "zadost", result: "Adresa není v seznamu, e-mail čeká na povolení redakcí. Odesílateli jsem to napsala." });
+  await replyTo(env, mail, [REQUEST_RECEIVED]);
+  if (!saved.fresh) return;
+  await notifyEditors(env, "registrace", {
+    subject: `Nová adresa chce psát na otevírací dobu: ${mail.from}`,
+    intro: `Z adresy, kterou neznáme, přišel e-mail o otevírací době. Povolíte-li ji a vyberete místa, Drběna e-mail zpracuje.`,
+    fields: [
+      ["Od", mail.from],
+      ["Předmět", mail.subject],
+    ],
+    body: mail.text,
+    path: `/redakce/emaily?povolit=${saved.id}`,
+  }).catch(() => {});
 }
 
-function changeReply({ done, asked, failed, sections }, { question, sender, verified }) {
-  const parts = [];
-  if (done.length) parts.push(`Zapsala jsem na web:\n${done.join("\n")}`);
-  if (asked.length) {
-    const why = sender.direct && !verified ? " (e-mail se nepodařilo ověřit, proto ho musí potvrdit člověk)" : "";
-    parts.push(`Poslala jsem redakci ke schválení${why}, na web to půjde po schválení:\n${asked.join("\n")}`);
-  }
-  if (failed.length) parts.push(`Tohle jsem nezapsala:\n${failed.map((line) => `• ${line}`).join("\n")}`);
-  if (question) parts.push(question);
-  if (done.length || asked.length) parts.push(`Kdyby něco nesedělo, napište mi znovu nebo na redakce@kopidlenskadrbna.org.\n${pageLinks(sections)}`);
-  return parts;
+function confirmationButtons(token) {
+  const base = `${SITE_ORIGIN}/zmena/${token}`;
+  return [
+    { label: "Schválit hned", url: `${base}?akce=schvalit`, tone: "primary" },
+    { label: "Zamítnout", url: `${base}?akce=zamitnout`, tone: "danger" },
+    { label: "Upravit čas na webu", url: `${base}?akce=upravit`, tone: "line" },
+  ];
 }
 
-function excerpt(mail) {
-  return mail.text.slice(0, 1000);
+// Změny jsou připravené: odesílatel dostane náhled s tlačítky, zápis proběhne sám po `CONFIRM_MINUTES`.
+async function holdForConfirmation(env, { mail, sender, entry, prepared, question, who }) {
+  const lines = prepared.items.map((item) => item.line);
+  const logId = await logMail(env, { ...entry, status: "ceka", result: [...lines, ...prepared.failed.map((line) => `nezapsáno: ${line}`), question].filter(Boolean).join("\n") });
+  const pending = await createPending(env, { sender, mail, items: prepared.items, who, logId });
+  await enqueue(env, { type: "mailin.apply", id: pending.id }, CONFIRM_MINUTES * 60);
+  const paragraphs = [
+    `Rozumím tomu takhle:\n${lines.join("\n")}`,
+    prepared.failed.length ? `Tohle jsem nepochopila, nezapíšu to:\n${prepared.failed.map((line) => `• ${line}`).join("\n")}` : "",
+    question,
+    `Když nic neuděláte, zapíšu to na web za ${CONFIRM_MINUTES} minut. Můžete to schválit hned, zamítnout, nebo čas upravit přímo na webu.`,
+  ];
+  await replyTo(env, mail, paragraphs, confirmationButtons(pending.token));
+}
+
+// E-mail od adresy ze seznamu (nebo po povolení nové adresy z žádosti).
+export async function processKnown(env, { mail, sender, entry, verified }) {
+  if (!senderHasRoom(sender)) {
+    await logMail(env, { ...entry, status: "limit", result: "Z téhle adresy dnes přišlo moc e-mailů, nezpracovala jsem ho." });
+    return;
+  }
+  await countSenderUse(env, sender);
+
+  const { today, weekday } = dayParts();
+  const allowed = await allowedRows(env, sender, today);
+  if (!hasRows(allowed)) {
+    await logMail(env, { ...entry, status: "chyba", result: "Adresa nemá žádné místo." });
+    await replyTo(env, mail, [`Tahle adresa u nás zatím nemůže měnit žádné místo. Napište prosím na redakce@kopidlenskadrbna.org.`]);
+    return;
+  }
+  if (!mail.text && !mail.subject) {
+    await logMail(env, { ...entry, status: "neni_doba", result: "Prázdný e-mail." });
+    await replyTo(env, mail, [NOT_HOURS]);
+    return;
+  }
+
+  const earlier = await earlierQuestion(env, sender.id);
+  const answer = await askDrbena(env, mailContent({ today, weekday, sender, mail, allowed, earlier }));
+  if (!answer.ok) {
+    await logMail(env, { ...entry, status: "chyba", result: answer.error });
+    await tellEditors(env, mail, answer.error);
+    await replyTo(env, mail, ["Teď se mi e-mail nepodařilo zpracovat. Předala jsem ho redakci, změnu zapíše člověk."]);
+    return;
+  }
+  const verdict = answer.raw?.verdict;
+  const question = String(answer.raw?.question ?? "").trim().slice(0, 600);
+  if (verdict === "spam") {
+    await noteSpam(env, mail, entry);
+    return;
+  }
+  if (verdict === "neni_doba") {
+    await logMail(env, { ...entry, status: "neni_doba", result: "Není o otevírací době." });
+    await replyTo(env, mail, [NOT_HOURS]);
+    return;
+  }
+  const who = `${sender.label || mail.from} (e-mail)`;
+  let outcome = { done: [], asked: [], failed: [], sections: [] };
+  if (verdict === "zmeny" && verified && sender.direct) {
+    // Ověřený odesílatel s „zapisovat rovnou“: nejdřív náhled a potvrzení, zapíše se po čekání.
+    const prepared = await prepareChanges(env, { raw: answer.raw?.changes, allowed, today });
+    if (prepared.items.length) {
+      await holdForConfirmation(env, { mail, sender, entry, prepared, question, who });
+      return;
+    }
+    outcome = { ...outcome, failed: prepared.failed };
+  } else if (verdict === "zmeny") {
+    outcome = await applyChanges(env, { raw: answer.raw?.changes, allowed, sender, verified, today, who, mail });
+  }
+  const wrote = outcome.done.length + outcome.asked.length;
+  if (!wrote) {
+    const ask = question || "Nepoznala jsem, co přesně se mění. Napište mi prosím, které místo, který den (nebo od kdy do kdy) a jestli je zavřeno, nebo jaké jsou časy.";
+    await logMail(env, { ...entry, status: "nejasne", result: [ask, ...outcome.failed].join(" · ") });
+    await tellEditors(env, mail, "nerozuměla mu a zeptala se odesílatele.");
+    await replyTo(env, mail, changeReply(outcome, { question: ask, sender, verified }));
+    return;
+  }
+  const status = outcome.done.length ? "zapsano" : "ke_schvaleni";
+  await logMail(env, { ...entry, status, result: [...outcome.done, ...outcome.asked, ...outcome.failed.map((line) => `nezapsáno: ${line}`), question].filter(Boolean).join("\n") });
+  await replyTo(env, mail, changeReply(outcome, { question, sender, verified }));
 }
 
 export async function receiveMail(message, env) {
@@ -150,60 +200,21 @@ export async function receiveMail(message, env) {
   const auth = verified ? check.auth : authTrace(mail.headers, message.headers);
   const sender = await senderByEmail(env, mail.from);
   if (!sender) {
-    // Neověřené adrese neodpovídá: mohla být podvržená a odpověď by šla někomu, kdo nic neposlal.
-    const reply = verified && !(await answeredToday(env, mail.from));
-    await logMail(env, { ...base, status: "neznamy", verified, auth, result: reply ? "Adresa není v seznamu, odpověděla jsem." : "Adresa není v seznamu." });
-    if (reply) await replyTo(env, mail, [UNKNOWN_SENDER]);
+    await handleUnknown(env, { mail, entry: { ...base, verified, auth }, verified });
     return;
   }
-  const entry = { ...base, senderId: sender.id, verified, auth };
-  if (!senderHasRoom(sender)) {
-    await logMail(env, { ...entry, status: "limit", result: "Z téhle adresy dnes přišlo moc e-mailů, nezpracovala jsem ho." });
-    return;
-  }
-  await countSenderUse(env, sender);
+  await processKnown(env, { mail, sender, entry: { ...base, senderId: sender.id, verified, auth }, verified });
+}
 
-  const now = pragueNow();
-  const today = now.date;
-  const allowed = await allowedRows(env, sender, today);
-  if (!allowed.places.length && !allowed.doctors.length && !allowed.yards.length) {
-    await logMail(env, { ...entry, status: "chyba", result: "Adresa nemá žádné místo." });
-    await replyTo(env, mail, [`Tahle adresa u nás zatím nemůže měnit žádné místo. Napište prosím na redakce@kopidlenskadrbna.org.`]);
-    return;
-  }
-  if (!mail.text && !mail.subject) {
-    await logMail(env, { ...entry, status: "neni_doba", result: "Prázdný e-mail." });
-    await replyTo(env, mail, [NOT_HOURS]);
-    return;
-  }
-
-  const weekday = new Date(`${today}T12:00:00Z`).getUTCDay();
-  const earlier = await earlierQuestion(env, sender.id);
-  const answer = await askDrbena(env, mailContent({ today, weekday, sender, mail, allowed, earlier }));
-  if (!answer.ok) {
-    await logMail(env, { ...entry, status: "chyba", result: answer.error });
-    await tellEditors(env, mail, answer.error);
-    await replyTo(env, mail, ["Teď se mi e-mail nepodařilo zpracovat. Předala jsem ho redakci, změnu zapíše člověk."]);
-    return;
-  }
-  const verdict = answer.raw?.verdict;
-  const question = String(answer.raw?.question ?? "").trim().slice(0, 600);
-  if (verdict === "neni_doba") {
-    await logMail(env, { ...entry, status: "neni_doba", result: "Není o otevírací době." });
-    await replyTo(env, mail, [NOT_HOURS]);
-    return;
-  }
-  const who = `${sender.label || mail.from} (e-mail)`;
-  const outcome = verdict === "zmeny" ? await applyChanges(env, { raw: answer.raw?.changes, allowed, sender, verified, today, who, mail }) : { done: [], asked: [], failed: [], sections: [] };
-  const wrote = outcome.done.length + outcome.asked.length;
-  if (!wrote) {
-    const ask = question || "Nepoznala jsem, co přesně se mění. Napište mi prosím, které místo, který den (nebo od kdy do kdy) a jestli je zavřeno, nebo jaké jsou časy.";
-    await logMail(env, { ...entry, status: "nejasne", result: [ask, ...outcome.failed].join(" · ") });
-    await tellEditors(env, mail, "nerozuměla mu a zeptala se odesílatele.");
-    await replyTo(env, mail, changeReply(outcome, { question: ask, sender, verified }));
-    return;
-  }
-  const status = outcome.done.length ? "zapsano" : "ke_schvaleni";
-  await logMail(env, { ...entry, status, result: [...outcome.done, ...outcome.asked, ...outcome.failed.map((line) => `nezapsáno: ${line}`), question].filter(Boolean).join("\n") });
-  await replyTo(env, mail, changeReply(outcome, { question, sender, verified }));
+// Redakce adresu z žádosti povolila: uložený e-mail se zpracuje, jako by přišel teď.
+export async function replayRequest(env, id) {
+  const found = await requestById(env, id);
+  if (!found || found.status !== "ceka") return false;
+  const sender = await senderByEmail(env, found.email);
+  if (!sender) return false;
+  await markRequest(env, found.id, "povoleno");
+  const mail = { from: found.email, subject: found.subject, text: found.text, headers: [], messageId: found.messageId, references: found.references };
+  const entry = { email: found.email, subject: found.subject, excerpt: excerpt(mail), senderId: sender.id, verified: true, auth: "" };
+  await processKnown(env, { mail, sender, entry, verified: true });
+  return true;
 }

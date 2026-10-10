@@ -63,6 +63,7 @@ export function adminHealth(ctx, data, message, now = new Date()) {
   const queues = data.health?.queues ?? [];
   const busy = queues.filter((queue) => queue.waiting || queue.failed);
   const search = data.health?.search ?? 0;
+  const mailLate = data.health?.mail ?? 0;
   const body = `${pageHead("Stav drbny", "Odkud drbna stahuje, jestli to jde a jestli doběhla práce na pozadí. Když něco přestane fungovat, přijde e-mail (vypnete v Můj účet).")}
     ${cronCallout(rows.find((row) => row.kind === "cron"), now)}
     ${panel({ id: "zdroje", title: "Zdroje", count: sources.length, body: list(sources.map((row) => healthItem(row, now)), "Zatím se nic nestahovalo.") })}
@@ -71,7 +72,7 @@ export function adminHealth(ctx, data, message, now = new Date()) {
       ${panel({
         id: "fronty",
         title: "Fronty",
-        body: `${list(busy.map(queueItem), "Ve frontách importů nic nečeká.")}<p class="panel-note">${search ? `Na index hledání čeká zpráv: ${search}.` : "Index hledání je aktuální."}</p>`,
+        body: `${list(busy.map(queueItem), "Ve frontách importů nic nečeká.")}<p class="panel-note">${search ? `Na index hledání čeká zpráv: ${search}.` : "Index hledání je aktuální."}${mailLate ? ` E-mailů na otevírací dobu, které se po čekání nezapsaly: ${mailLate} (fronta ani cron je nedoručily).` : ""}</p>`,
       })}
     </div>`;
   return adminShell(ctx, data, "stav", message, body, { title: "Stav drbny" });

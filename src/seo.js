@@ -14,6 +14,7 @@ export function robotsTxt(origin) {
 Allow: /
 Disallow: /redakce
 Disallow: /sprava/
+Disallow: /zmena/
 Disallow: /cdn-cgi/
 
 Sitemap: ${origin}/sitemap.xml

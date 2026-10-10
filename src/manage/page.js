@@ -144,3 +144,19 @@ export function deadLinkPage() {
     </main>`,
   });
 }
+
+// Jednorázový odkaz z e-mailu po uložené změně: odkaz už zanikl, tak se ukáže jen potvrzení.
+export function doneLinkPage(requested) {
+  return adminDocument({
+    title: "Hotovo | Kopidlenská drbna",
+    bodyClass: "adm adm-login",
+    body: `<main class="login-box" id="obsah">
+      <a class="login-brand" href="/"><img src="/kozel-maskot.webp" alt=""><span>Kopidlenská <b>drbna</b></span></a>
+      <div class="login-card form">
+        <h1>Hotovo</h1>
+        <p class="adm-lede">${requested ? "Změnu jsem poslala redakci. Na web půjde, až ji zkontroluje." : "Změna je na webu."} Tenhle odkaz byl jednorázový, už neplatí. Až budete chtít něco změnit příště, stačí napsat e-mail.</p>
+      </div>
+      <a class="login-back" href="/">← Zpět na web</a>
+    </main>`,
+  });
+}
