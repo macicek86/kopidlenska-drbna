@@ -2,7 +2,6 @@
 import { facebookUrl } from "../copy.js";
 import { loadCopy, loadPublic } from "../db.js";
 import { loadDrbena } from "../drbena-db.js";
-import { formatLong } from "../format.js";
 import { messagePage } from "../messages-db.js";
 import { isBot } from "../visits.js";
 import { dayVisitor } from "../visits-db.js";
@@ -10,8 +9,8 @@ import { pragueNow } from "../waste.js";
 import { askDrbena, usageCost } from "./ai.js";
 import { loadArchive } from "./archive.js";
 import { RECENT_ARTICLES, runChatTool, siteOverview } from "./context.js";
+import { chatInstructions, nowBlock } from "./prompt.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "./pass.js";
-import { chatInstructions } from "./prompt.js";
 import { chatLimit, countQuestion, countStop, loadChatSettings, recordAnswer } from "./store.js";
 
 export const QUESTION_MAX = 500;
@@ -79,7 +78,7 @@ async function chatSystem(env, request) {
   return [
     { type: "text", text: chatInstructions(drbena, settings.persona, facebookUrl(copy)) },
     { type: "text", text: `<prehled_drbny>\n${siteOverview(data, ctx, { ads: settings.ads, archive })}\n</prehled_drbny>`, cache_control: { type: "ephemeral" } },
-    { type: "text", text: `<ted>${formatLong(now.date)} ${now.date.slice(0, 4)}, ${now.time} (${now.date})</ted>\nPodle toho víš, co už skončilo a co teprve bude.` },
+    { type: "text", text: nowBlock(now) },
   ];
 }
 

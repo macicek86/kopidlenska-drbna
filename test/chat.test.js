@@ -7,7 +7,7 @@ import { archiveLine, archiveText } from "../src/chat/archive.js";
 import { adLines, articleWhen, scoreArticle, slugFrom } from "../src/chat/context.js";
 import { fold, searchStems } from "../src/search/query.js";
 import { issuePass, readPass, turnstileConfig, verifyTurnstile } from "../src/chat/pass.js";
-import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, ownChatPersona } from "../src/chat/prompt.js";
+import { chatInstructions, DEFAULT_CHAT_PERSONA, htmlText, nowBlock, ownChatPersona } from "../src/chat/prompt.js";
 import { readHistory } from "../src/chat/run.js";
 import { chatIdeas, DEFAULT_CHAT_IDEAS, readChatSettings } from "../src/chat/store.js";
 import { czk, questionChart } from "../src/admin/chat.js";
@@ -231,4 +231,13 @@ test("půlka emoji z ořezaného textu se před odesláním Claudovi odstraní",
   assert.equal(fixed.n, 3);
   assert.equal(fixed.nothing, null);
   JSON.parse(JSON.stringify(fixed));
+});
+
+test("čas v chatu: zítra a další dny jsou spočítané", () => {
+  const text = nowBlock({ date: "2026-10-11", time: "09:00" });
+  assert.match(text, /Teď: neděle 11\. října 2026, 09:00/);
+  assert.match(text, /Včera: sobota 10\. října/);
+  assert.match(text, /Zítra: pondělí 12\. října/);
+  assert.match(text, /Pozítří: úterý 13\. října/);
+  assert.match(text, /neděle 18\. října/);
 });
