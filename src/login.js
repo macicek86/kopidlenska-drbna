@@ -6,6 +6,7 @@
 import { auditLogin, auditLogout } from "./audit.js";
 import { turnstileConfig, verifyTurnstile } from "./chat/pass.js";
 import { clearCookie, currentUser, readCookie, sessionCookie } from "./db-core.js";
+import { esc } from "./html.js";
 import { html, redirect, secure } from "./http.js";
 import {
   CODE_MINUTES,
@@ -23,6 +24,7 @@ import {
   verifyLink,
 } from "./login-db.js";
 import { sendMail } from "./mail.js";
+import { mailButtons, mailShell } from "./mail-layout.js";
 import { readEmail } from "./users-db.js";
 import { linkPage } from "./admin/login.js";
 
@@ -67,12 +69,14 @@ function codeMail(code, link) {
     "",
     "Když jste o přihlášení nežádali, e-mail smažte. Bez kódu se do redakce nikdo nedostane.",
   ].join("\n");
-  const html = `<!doctype html><html lang="cs"><body style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
-<p>Kód pro přihlášení do redakce Kopidlenské drbny:</p>
-<p style="font-size:32px;font-weight:bold;letter-spacing:6px;margin:16px 0">${code}</p>
-<p>Platí ${CODE_MINUTES} minut. Nebo se přihlaste odkazem: <a href="${link}">Přihlásit do redakce</a></p>
-<p style="color:#777;font-size:13px">Když jste o přihlášení nežádali, e-mail smažte. Bez kódu se do redakce nikdo nedostane.</p>
-</body></html>`;
+  const html = mailShell({
+    preheader: `Kód do redakce: ${code}`,
+    body: `<p style="margin:0 0 6px">Kód pro přihlášení do redakce Kopidlenské drbny:</p>
+<p style="margin:0 0 16px;font-size:32px;font-weight:bold;letter-spacing:6px">${esc(code)}</p>
+<p style="margin:0 0 14px">Platí ${CODE_MINUTES} minut. Nebo se přihlaste odkazem:</p>
+${mailButtons([{ label: "Přihlásit do redakce", url: link, tone: "primary" }])}`,
+    footer: "Když jste o přihlášení nežádali, e-mail smažte. Bez kódu se do redakce nikdo nedostane.",
+  });
   return { subject: `Kód do redakce: ${code}`, text, html };
 }
 

@@ -1,8 +1,8 @@
 // Odpověď odesílateli e-mailu na otevírací dobu. Jde přes Email Service (src/mail.js) z adresy redakce,
 // na kterou může odesílatel rovnou odpovědět člověku.
-import { esc } from "../html.js";
 import { SITE_ORIGIN } from "../http.js";
 import { MAIL_FROM, sendMail } from "../mail.js";
+import { mailButtons, mailParagraphs, mailShell } from "../mail-layout.js";
 
 export const MAILIN_ADDRESS = "oteviracidoba@kopidlenskadrbna.org";
 
@@ -12,30 +12,6 @@ function subjectOf(subject) {
   const base = String(subject ?? "").trim();
   if (!base) return "Otevírací doba";
   return /^re:/i.test(base) ? base : `Re: ${base}`;
-}
-
-function mailHtml(text) {
-  return text
-    .split(/\n{2,}/)
-    .map((block) => `<p>${esc(block).replace(/\n/g, "<br>")}</p>`)
-    .join("\n");
-}
-
-// Tlačítka v e-mailu: odkazy se styly přímo v prvku, pošta jiné nenačte. `tone`: primary, danger, line.
-const BUTTON_STYLES = {
-  primary: "background:#1d6b3a;color:#ffffff;border:2px solid #1d6b3a",
-  danger: "background:#ffffff;color:#a3261f;border:2px solid #a3261f",
-  line: "background:#ffffff;color:#1d3b2a;border:2px solid #1d3b2a",
-};
-
-function buttonsHtml(buttons) {
-  const links = buttons
-    .map(
-      (button) =>
-        `<a href="${esc(button.url)}" style="display:inline-block;margin:0 8px 8px 0;padding:10px 16px;border-radius:8px;font-weight:700;text-decoration:none;${BUTTON_STYLES[button.tone] ?? BUTTON_STYLES.line}">${esc(button.label)}</a>`,
-    )
-    .join("");
-  return `<p>${links}</p>`;
 }
 
 // Vlákno: odpověď navazuje na e-mail odesílatele, ať ji jeho pošta ukáže pod ním.
@@ -52,7 +28,8 @@ export async function replyTo(env, mail, paragraphs, buttons = []) {
   const body = paragraphs.filter(Boolean);
   const links = buttons.map((button) => `${button.label}: ${button.url}`).join("\n");
   const text = [...body, links, SIGN].filter(Boolean).join("\n\n");
-  const html = [mailHtml(body.join("\n\n")), buttons.length ? buttonsHtml(buttons) : "", mailHtml(SIGN)].join("\n");
+  const first = String(body[0] ?? "").split("\n")[0];
+  const html = mailShell({ preheader: first, body: [mailParagraphs(body.join("\n\n")), mailButtons(buttons), mailParagraphs(SIGN)].join("\n") });
   const letter = { to: mail.from, subject: subjectOf(mail.subject), text, html, headers: threadHeaders(mail) };
   const sent = await sendMail(env, { ...letter, from: { email: MAILIN_ADDRESS, name: MAIL_FROM.name } });
   if (sent.ok) return sent;

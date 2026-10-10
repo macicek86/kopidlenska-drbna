@@ -5,6 +5,7 @@
 import { esc } from "./html.js";
 import { SITE_ORIGIN } from "./http.js";
 import { sendMail } from "./mail.js";
+import { mailButtons, mailShell } from "./mail-layout.js";
 
 // who: "hlavni" = jen hlavní redaktoři, jinak oprávnění, které příjemce musí mít (hlavní redaktor má všechna).
 // path: výchozí odkaz do redakce, dopis ho může upřesnit (okno konkrétního návrhu).
@@ -85,13 +86,18 @@ export function noticeMail({ subject, intro, fields = [], body = "", link = "" }
     "",
     "Upozornění si vypnete v redakci na stránce Můj účet.",
   ].join("\n");
-  const html = `<!doctype html><html lang="cs"><body style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
-<p>${esc(intro)}</p>
-${rows.length ? `<table style="border-collapse:collapse">${rows.map(([label, value]) => `<tr><td style="color:#777;padding:2px 12px 2px 0;vertical-align:top">${esc(label)}</td><td style="padding:2px 0">${esc(value)}</td></tr>`).join("")}</table>` : ""}
-${body ? `<p style="white-space:pre-line;border-left:3px solid #ddd;padding-left:12px">${esc(body)}</p>` : ""}
-${link ? `<p><a href="${esc(link)}">Otevřít v redakci</a></p>` : ""}
-<p style="color:#777;font-size:13px">Upozornění si vypnete v redakci na stránce Můj účet.</p>
-</body></html>`;
+  const table = rows.length
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin:0 0 14px">${rows
+        .map(([label, value]) => `<tr><td style="color:#8a6f66;padding:2px 14px 2px 0;vertical-align:top">${esc(label)}</td><td style="padding:2px 0">${esc(value)}</td></tr>`)
+        .join("")}</table>`
+    : "";
+  const quote = body ? `<p style="margin:0 0 14px;white-space:pre-line;border-left:3px solid #c7434d;padding-left:12px">${esc(body)}</p>` : "";
+  const button = link ? mailButtons([{ label: "Otevřít v redakci", url: link, tone: "primary" }]) : "";
+  const html = mailShell({
+    preheader: intro,
+    body: `<p style="margin:0 0 14px">${esc(intro)}</p>${table}${quote}${button}`,
+    footer: "Upozornění si vypnete v redakci na stránce Můj účet.",
+  });
   return { subject: String(subject).slice(0, 150), text, html };
 }
 
