@@ -61,12 +61,15 @@ function editButtons(pending) {
 }
 
 function waitingPage(pending, focus) {
-  const due = `Když nic neuděláte, zapíše se to na web v ${esc(clock(pending.dueAt))}.`;
-  const all = `<div class="form-foot">${button(pending.token, "schvalit", "Schválit hned", "btn-primary")}${button(pending.token, "zamitnout", "Zamítnout", "btn-ghost btn-danger-text")}</div>
+  const due = pending.toWeb
+    ? `Když nic neuděláte, zapíše se to na web v ${esc(clock(pending.dueAt))}.`
+    : `Když nic neuděláte, v ${esc(clock(pending.dueAt))} se to pošle redakci ke schválení. Na web to půjde, až ji redakce schválí.`;
+  const approve = pending.toWeb ? "Schválit hned" : "Poslat redakci hned";
+  const all = `<div class="form-foot">${button(pending.token, "schvalit", approve, "btn-primary")}${button(pending.token, "zamitnout", "Zamítnout", "btn-ghost btn-danger-text")}</div>
     <p class="adm-lede confirm-edit">Nebo si čas upravte přímo na webu (odkaz platí den a jen jednou):</p>
     <div class="manage-actions">${editButtons(pending)}</div>`;
   const only = {
-    schvalit: `<p>Zapsat změnu na web hned?</p><div class="form-foot">${button(pending.token, "schvalit", "Ano, zapsat", "btn-primary")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
+    schvalit: `<p>${pending.toWeb ? "Zapsat změnu na web hned?" : "Poslat změnu redakci ke schválení hned?"}</p><div class="form-foot">${button(pending.token, "schvalit", pending.toWeb ? "Ano, zapsat" : "Ano, poslat", "btn-primary")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
     zamitnout: `<p>Opravdu změnu zamítnout? Nic se nezapíše.</p><div class="form-foot">${button(pending.token, "zamitnout", "Ano, zamítnout", "btn-danger")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
     upravit: `<p>Čas si upravíte přímo na webu, odkaz platí den a jen jednou.</p><div class="form-foot">${editButtons(pending)}</div>`,
   }[focus];

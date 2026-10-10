@@ -5,7 +5,7 @@
 // Každá sekce dává `actions`: { [akce]: { read(input) → hodnota | {error}, target(env, id) → bool, apply(env, id, hodnota, userId) } }.
 import { addColumn, clip, requireChief, requireUser, userCan } from "./db-core.js";
 import { notifyEditors } from "./notify.js";
-import { answerRequester, mailReplyText } from "./mailin/answer.js";
+import { answerRequester, mailOrigin, mailReplyText } from "./mailin/answer.js";
 
 // Klíč je adresa sekce v redakci.
 export const REQUEST_SECTIONS = {
@@ -40,7 +40,7 @@ const REQUEST_ACTIONS = {
 };
 const REQUEST_ROWS = { dvory: "yards", lekari: "doctors", "oteviraci-doba": "places" };
 
-async function requestNotice(env, author, { section, action, targetId, id }) {
+async function requestNotice(env, author, { section, action, targetId, id, mail = null }) {
   const row =
     action === "zrusit" ? null : await env.DB.prepare(`select name from ${REQUEST_ROWS[section]} where id = ?`).bind(targetId).first();
   return notifyEditors(env, "hodiny", {
@@ -51,7 +51,9 @@ async function requestNotice(env, author, { section, action, targetId, id }) {
       ["Sekce", REQUEST_SECTIONS[section].label],
       ["Kde", row?.name ?? ""],
       ["Co", REQUEST_ACTIONS[action] ?? action],
+      ...(mail ? [["E-mail", mail.subject]] : []),
     ],
+    body: mail?.text ?? "",
     path: `/redakce/${section}?zadost=${id}`,
   });
 }
@@ -126,6 +128,7 @@ function mapRequest(row) {
     linkId: row.link_id == null ? null : Number(row.link_id),
     author: row.link_id != null ? linkAuthor(row.author_name, row.link_label) : String(row.author ?? row.author_name ?? ""),
     mailReply: String(row.mail_reply ?? ""),
+    mail: mailOrigin(row.mail_reply),
     createdAt: String(row.created_at ?? ""),
   };
 }
@@ -141,7 +144,7 @@ export async function loadRequests(env, user) {
   if (!user) return out;
   const chief = user.role === "hlavni";
   const query = env.DB.prepare(
-    `select r.id, r.section, r.action, r.target_id, r.payload, r.status, r.reply, r.created_by, r.link_id, r.author_name, r.created_at, u.name as author, l.label as link_label
+    `select r.id, r.section, r.action, r.target_id, r.payload, r.status, r.reply, r.created_by, r.link_id, r.author_name, r.mail_reply, r.created_at, u.name as author, l.label as link_label
      from hours_requests r left join users u on u.id = r.created_by left join hours_links l on l.id = r.link_id
      where ${chief ? "r.status = 'pending'" : "r.created_by = ?"} order by r.id asc`,
   );
@@ -180,7 +183,7 @@ export async function fileHours(env, { section, actions, action, targetId, input
   )
     .bind(section, action, targetId, JSON.stringify(value), userId ?? 0, linkId, userId ? "" : clip(author, 160), mailReplyText(mailReply))
     .run();
-  await requestNotice(env, linkId ? linkAuthor(author, linkLabel) : author, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0) });
+  await requestNotice(env, linkId ? linkAuthor(author, linkLabel) : author, { section, action, targetId, id: Number(created.meta?.last_row_id ?? 0), mail: mailOrigin(mailReplyText(mailReply)) });
   return { ok: true, requested: true, value };
 }
 

@@ -301,16 +301,24 @@ test("spam od známé adresy: zaznamená se, redakce o něm ví jednou denně, n
   }
 });
 
-test("neověřený e-mail jde ke schválení i s přepínačem rovnou", async () => {
+test("neověřený e-mail: náhled, po potvrzení jde ke schválení i s přepínačem rovnou; redakce vidí původní text", async () => {
   const claude = await fakeClaude({ verdict: "zmeny", question: "", changes: [{ target: "misto:1", kind: "zavreno", starts_on: "2026-08-15", ends_on: "", note: "", slots: [] }] });
   try {
     const { env, sent, place } = await freshEnv(claude.url);
     await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "knihovna", direct: true, targets: [`oteviraci-doba:${place.id}`] });
-    await receiveMail(message(rawMail({ auth: "X-Other: 1" })), env);
+    await receiveMail(message(rawMail({ auth: "X-Other: 1", text: "15.8 kvc zavřeno kvůli školení" })), env);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
+    assert.match(sent.at(-1).text, /ověřit/);
+    assert.match(sent.at(-1).html, /Poslat redakci hned/);
+    const token = await pendingToken(env);
+    await post(env, token, "schvalit");
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
     const [request] = (await loadRequests(env, { id: 1, role: "hlavni", permissions: [] }))["oteviraci-doba"];
     assert.equal(request.author, "knihovna (e-mail)");
-    assert.match(sent.at(-1).text, /ověřit/);
+    assert.equal(request.mail.text, "15.8 kvc zavřeno kvůli školení");
+    assert.equal(request.mail.email, "knihovna@kopidlno.cz");
+    // Upozornění pro redakci nese původní text.
+    assert.equal(sent.some((mail) => mail.to === "hlavni@example.cz" && /kvůli školení/.test(mail.text)), true);
   } finally {
     claude.close();
   }
@@ -483,14 +491,18 @@ test("změna z e-mailu ke schválení: po schválení i zamítnutí přijde odes
     await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "duhovka", direct: false, targets: [`oteviraci-doba:${place.id}`] });
     const replies = () => sent.filter((mail) => mail.to === "knihovna@kopidlno.cz");
     await receiveMail(message(rawMail({ subject: "Duhovka" })), env);
-    assert.match(replies()[0].text, /ke schválení/);
+    // Napřed náhled s tlačítky, po potvrzení jde změna k redakci.
+    assert.match(replies()[0].text, /pošlu redakci ke schválení/);
+    assert.match(replies()[0].html, /Poslat redakci hned/);
     assert.match(replies()[0].text, /pondělí 12\. října až neděle 18\. října, zavřeno \(dovolená\)/);
+    await post(env, await pendingToken(env), "schvalit");
+    assert.match(replies()[1].text, /ke schválení/);
 
     const chiefUser = { id: 1, role: "hlavni", permissions: [] };
     let [request] = (await loadRequests(env, chiefUser))["oteviraci-doba"];
     const input = { kind: "docasna", startsOn: "2026-10-12", endsOn: "2026-10-16", changeNote: "dovolená", doctorWeek: [], placeId: place.id };
     assert.equal((await approveRequest(env, chief(), { section: "oteviraci-doba", actions: PLACE_ACTIONS, id: request.id, input })).ok, true);
-    const approved = replies()[1];
+    const approved = replies()[2];
     assert.match(approved.text, /Redakce změnu schválila/);
     // Redakce období zkrátila: odpověď říká, co se opravdu zapsalo.
     assert.match(approved.text, /pátek 16\. října/);
@@ -498,6 +510,7 @@ test("změna z e-mailu ke schválení: po schválení i zamítnutí přijde odes
     assert.match(approved.headers["In-Reply-To"], /@kopidlno\.cz>$/);
 
     await receiveMail(message(rawMail({ subject: "Duhovka" })), env);
+    await post(env, await pendingToken(env), "schvalit");
     [request] = (await loadRequests(env, chiefUser))["oteviraci-doba"];
     assert.equal((await rejectRequest(env, chief(), { section: "oteviraci-doba", id: request.id, reply: "Už je zapsané." })).ok, true);
     assert.match(replies().at(-1).text, /nezapsala[\s\S]*Důvod: Už je zapsané\./);

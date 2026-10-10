@@ -1,6 +1,6 @@
 // Změna z e-mailu, která čeká na potvrzení odesílatelem. Drběna e-mail přečte, odesílateli pošle náhled
-// s tlačítky Schválit, Zamítnout a Upravit čas na webu a změna se zapíše sama po `CONFIRM_MINUTES`,
-// když nezareaguje. Zapíše ji fronta (src/queue.js) a cron každých 15 minut jako záloha: zápis je idempotentní,
+// s tlačítky Schválit, Zamítnout a Upravit čas na webu a po `CONFIRM_MINUTES` se změna vyřídí sama, když
+// nezareaguje: ověřený odesílatel s „zapisovat rovnou“ ji tím zapíše na web, ostatní ji tím pošlou ke schválení redakci. Zapíše ji fronta (src/queue.js) a cron každých 15 minut jako záloha: zápis je idempotentní,
 // kdo první přepne stav na `zapisuje`, ten zapíše.
 import { createMailLink, newToken } from "../hours-links-db.js";
 import { pragueNow } from "../waste.js";
@@ -31,27 +31,31 @@ function mapPending(row) {
     messageId: String(row.message_id ?? ""),
     references: String(row.refs ?? ""),
     items: parseItems(row.items),
+    text: String(row.text ?? ""),
     who: String(row.who ?? ""),
     status: String(row.status),
     result: String(row.result ?? ""),
     logId: row.log_id == null ? null : Number(row.log_id),
+    verified: Number(row.verified ?? 1) === 1,
+    toWeb: Number(row.to_web ?? 1) === 1,
     dueAt: String(row.due_at),
     createdAt: String(row.created_at ?? ""),
   };
 }
 
 function mailOf(pending) {
-  return { from: pending.email, subject: pending.subject, messageId: pending.messageId, references: pending.references };
+  return { from: pending.email, subject: pending.subject, messageId: pending.messageId, references: pending.references, text: pending.text };
 }
 
-export async function createPending(env, { sender, mail, items, who, logId }) {
+// `toWeb`: ověřený odesílatel s „zapisovat rovnou“, po čekání jde změna na web. Jinak jde ke schválení redakci.
+export async function createPending(env, { sender, mail, items, who, logId, verified, toWeb }) {
   await env.DB.prepare(`delete from mail_pending where created_at < datetime('now', '-${KEEP_DAYS} days')`).run();
   const token = newToken();
   const saved = await env.DB.prepare(
-    `insert into mail_pending (token, sender_id, email, subject, message_id, refs, items, who, log_id, due_at)
-     values (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+${CONFIRM_MINUTES} minutes'))`,
+    `insert into mail_pending (token, sender_id, email, subject, message_id, refs, items, text, who, log_id, verified, to_web, due_at)
+     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+${CONFIRM_MINUTES} minutes'))`,
   )
-    .bind(token, sender.id, mail.from, String(mail.subject ?? "").slice(0, 200), String(mail.messageId ?? "").slice(0, 300), String(mail.references ?? "").slice(0, 2000), JSON.stringify(items), who, logId ?? null)
+    .bind(token, sender.id, mail.from, String(mail.subject ?? "").slice(0, 200), String(mail.messageId ?? "").slice(0, 300), String(mail.references ?? "").slice(0, 2000), JSON.stringify(items), String(mail.text ?? "").slice(0, 4000), who, logId ?? null, verified ? 1 : 0, toWeb ? 1 : 0)
     .run();
   return { id: Number(saved.meta?.last_row_id ?? 0), token };
 }
@@ -89,16 +93,16 @@ export async function applyPending(env, id) {
       await finish(env, found, "chyba", "Adresa už není v seznamu.");
       return { ok: false };
     }
-    const outcome = await writeItems(env, { items: found.items, sender, verified: true, today: pragueNow().date, who: found.who, mail });
+    const outcome = await writeItems(env, { items: found.items, sender, verified: found.verified, today: pragueNow().date, who: found.who, mail });
     const wrote = outcome.done.length + outcome.asked.length;
     const text = [...outcome.done, ...outcome.asked, ...outcome.failed.map((line) => `nezapsáno: ${line}`)].join("\n");
     await finish(env, found, wrote ? (outcome.done.length ? "zapsano" : "ke_schvaleni") : "chyba", text);
-    await replyTo(env, mail, changeReply(outcome, { question: "", sender, verified: true })).catch(() => {});
+    await replyTo(env, mail, changeReply(outcome, { question: "", sender, verified: found.verified })).catch(() => {});
     return { ok: true, outcome };
   } catch (error) {
     const why = error instanceof Error ? error.message : "Neznámá chyba.";
     await finish(env, found, "chyba", why);
-    await tellEditors(env, { ...mail, text: found.items.map((item) => item.line).join("\n") }, why);
+    await tellEditors(env, mail, why);
     await replyTo(env, mail, ["Změnu se mi nepodařilo zapsat. Předala jsem ji redakci, zapíše ji člověk."]).catch(() => {});
     return { ok: false };
   }

@@ -48,7 +48,7 @@ function redirectFor(okKey) {
   return new Response(null, { status: 303, headers: { location: `/x?ok=${okKey}` } });
 }
 
-// `mail`: { from, subject, messageId, references }, komu po schválení redakcí odepsat.
+// `mail`: { from, subject, messageId, references, text }, komu po schválení redakcí odepsat a co napsal.
 async function fileChange(env, change, { who, direct, mail }) {
   const spec = MANAGE_SECTIONS[change.section];
   const input = { ...change.input, [spec.idField]: change.targetId };
@@ -62,7 +62,7 @@ async function fileChange(env, change, { who, direct, mail }) {
     input,
     mode: direct ? "direct" : "request",
     author: who,
-    mailReply: { email: mail.from, subject: mail.subject, messageId: mail.messageId, references: mail.references },
+    mailReply: { email: mail.from, subject: mail.subject, messageId: mail.messageId, references: mail.references, text: mail.text },
   });
   if (result.ok) await auditFinish(env, watch, redirectFor(result.requested ? "zadost" : spec.ok(change.action, result.value)), OK).catch(() => {});
   return result;
@@ -140,13 +140,6 @@ export async function writeItems(env, { items, sender, verified, today, who, mai
     sections.push(item.section);
   }
   return { done, asked, failed, sections };
-}
-
-// Přijatý e-mail rovnou: připraví a zapíše (adresy ke schválení a neověřené e-maily).
-export async function applyChanges(env, { raw, allowed, sender, verified, today, who, mail }) {
-  const prepared = await prepareChanges(env, { raw, allowed, today });
-  const written = await writeItems(env, { items: prepared.items, sender, verified, today, who, mail });
-  return { ...written, failed: [...prepared.failed, ...written.failed] };
 }
 
 export function changeReply({ done, asked, failed, sections }, { question, sender, verified }) {

@@ -169,7 +169,7 @@ export function adminMailin(ctx, data, message, query = {}) {
       }),
     );
   }
-  const lede = `Správci míst můžou poslat změnu otevírací doby e-mailem na <b>${esc(MAILIN_ADDRESS)}</b>, třeba „15. 8. KVC zavřeno“. Drběna ji přečte, zapíše a odepíše, co zapsala. Píšou jen adresy ze seznamu a jen u míst, která jim zaškrtnete. Ověřený odesílatel s „zapisovat rovnou“ dostane náhled s tlačítky Schválit a Zamítnout a změna se zapíše sama po 10 minutách. Neznámá adresa, která napíše o otevírací době, čeká tady na povolení.`;
+  const lede = `Správci míst můžou poslat změnu otevírací doby e-mailem na <b>${esc(MAILIN_ADDRESS)}</b>, třeba „15. 8. KVC zavřeno“. Drběna ji přečte, zapíše a odepíše, co zapsala. Píšou jen adresy ze seznamu a jen u míst, která jim zaškrtnete. Každý odesílatel dostane náhled s tlačítky Schválit, Zamítnout a Upravit čas na webu. Bez reakce se po 10 minutách změna vyřídí sama: u ověřeného odesílatele s „zapisovat rovnou“ se zapíše na web, u ostatních jde k vám ke schválení. Neznámá adresa, která napíše o otevírací době, čeká tady na povolení.`;
   const body = `${pageHead("E-mail na otevírací dobu", lede, openButton("nova-adresa", `${BASE}?novy=1`, "Nová adresa"))}
     ${requests.length ? panel({ id: "zadosti", title: "Čeká na povolení", count: requests.length, tone: "warn", body: list(requests.map(requestItem), "") }) : ""}
     ${panel({ id: "adresy", title: "Kdo smí psát", count: senders.length, filter: senders.length > 6 ? "Hledat adresu" : "", body: list(senders.map((row) => senderItem(data, row)), "Zatím žádná adresa. E-mailům z neznámých adres Drběna jen odepíše, kam psát.") })}

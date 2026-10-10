@@ -63,6 +63,13 @@ export function waitingBadge(section, row, requests) {
   return count ? badge(count === 1 ? "Návrh čeká" : `Návrhy čekají: ${count}`, "warn") : "";
 }
 
+// Původní e-mail, ze kterého změna vznikla (e-mail na otevírací dobu): odesílatel, předmět a celý text.
+function originalMail(request) {
+  if (!request.mail?.text && !request.mail?.subject) return "";
+  const body = request.mail.text ? `<p class="message-text">${esc(request.mail.text).replace(/\n/g, "<br>")}</p>` : "";
+  return `<div class="request-mail"><p class="item-sub"><b>Původní e-mail</b> od ${esc(request.mail.email)}${request.mail.subject ? `: ${esc(request.mail.subject)}` : ""}</p>${body}</div>`;
+}
+
 export function requestItems(section, data, chief) {
   const base = BASES[section];
   return (data.hoursRequests?.[section] ?? []).map((request) => {
@@ -72,6 +79,7 @@ export function requestItems(section, data, chief) {
         title: name,
         meta: `${esc(text)} · navrhuje ${esc(request.author || "přispěvatel")}`,
         badges: badge(REQUEST_SECTIONS[section].label),
+        extra: originalMail(request),
         actions: modalLink(`${base}?zadost=${request.id}`, "Posoudit", "btn-primary"),
       });
     }
@@ -121,6 +129,7 @@ export function requestDialog(section, data, id, form) {
     close: base,
     open: true,
     body: `${callout(`<b>${esc(request.author || "Přispěvatel")}</b> navrhuje: ${esc(text)}.${request.action === "zrusit" ? "" : " Před schválením to můžete upravit."}`, "warn")}
+      ${originalMail(request)}
       ${approve}
       <hr class="form-split">
       ${reject}`,

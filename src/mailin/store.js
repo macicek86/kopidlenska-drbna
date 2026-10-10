@@ -1,6 +1,6 @@
 // E-mail na otevírací dobu: kdo smí psát (adresa, pro koho, které řádky, rovnou nebo ke schválení)
 // a záznam přijatých e-mailů pro redakci. Seznam spravuje jen hlavní redaktor (src/admin/mailin.js).
-import { clip, requireChief } from "../db-core.js";
+import { addColumn, clip, requireChief } from "../db-core.js";
 import { REQUEST_SECTIONS } from "../hours-requests-db.js";
 import { waitingRequests } from "./register.js";
 import { pragueNow } from "../waste.js";
@@ -52,10 +52,13 @@ export const MAILIN_TABLES = [
     message_id text not null default '',
     refs text not null default '',
     items text not null default '[]',
+    text text not null default '',
     who text not null default '',
     status text not null default 'ceka',
     result text not null default '',
     log_id integer,
+    verified integer not null default 1,
+    to_web integer not null default 1,
     due_at text not null,
     created_at text not null default (datetime('now')),
     decided_at text
@@ -76,6 +79,12 @@ export const MAILIN_TABLES = [
 
 export async function ensureMailinTables(env) {
   for (const sql of MAILIN_TABLES) await env.DB.prepare(sql).run();
+  // `verified`: e-mail prošel ověřením odesílatele, `to_web`: po čekání jde na web (jinak ke schválení redakci).
+  const info = await env.DB.prepare("pragma table_info(mail_pending)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "text", "alter table mail_pending add column text text not null default ''");
+  await addColumn(env, names, "verified", "alter table mail_pending add column verified integer not null default 1");
+  await addColumn(env, names, "to_web", "alter table mail_pending add column to_web integer not null default 1");
 }
 
 export function normalEmail(value) {
@@ -226,7 +235,7 @@ export async function logMail(env, { email, senderId = null, subject, excerpt, s
   const saved = await env.DB.prepare(
     "insert into mail_log (sender_email, sender_id, subject, excerpt, status, result, verified, auth) values (?, ?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(clip(email, 160), senderId, clip(subject, 200), clip(excerpt, 1000), status, clip(result, 1000), verified ? 1 : 0, clip(auth, 3000))
+    .bind(clip(email, 160), senderId, clip(subject, 200), clip(excerpt, 4000), status, clip(result, 1000), verified ? 1 : 0, clip(auth, 3000))
     .run();
   return Number(saved.meta?.last_row_id ?? 0);
 }

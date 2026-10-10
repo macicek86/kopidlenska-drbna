@@ -1,8 +1,8 @@
 // E-mail na otevírací dobu (oteviracidoba@kopidlenskadrbna.org): Cloudflare Email Routing ho pošle Workeru
 // (handler `email` v src/index.js). Drběna (Haiku) z textu vytáhne změny:
-// - adresa ze seznamu s ověřeným e-mailem a „zapisovat rovnou“: změna čeká 10 minut, odesílatel dostane náhled
-//   s tlačítky Schválit, Zamítnout a Upravit čas na webu a po vypršení se zapíše sama (src/mailin/pending.js),
-// - jinak jde změna ke schválení redakci (`fileHours`),
+// - adresa ze seznamu: změna čeká 10 minut, odesílatel dostane náhled s tlačítky Schválit, Zamítnout a Upravit
+//   čas na webu a po vypršení se vyřídí sama (src/mailin/pending.js): ověřený e-mail s „zapisovat rovnou“ se
+//   zapíše na web, jinak jde změna ke schválení redakci (`fileHours`),
 // - neznámá, ale ověřená adresa se může ozvat: její e-mail čeká na povolení redakcí (src/mailin/register.js),
 // - spam se zaznamená a redakce o něm ví, nikdo na něj neodpovídá.
 // Odesílateli přijde odpověď, co se zapsalo; e-mail, který o otevírací době není, dostane odpověď, kam psát.
@@ -11,7 +11,7 @@ import { notifyEditors } from "../notify.js";
 import { enqueue } from "../queue.js";
 import { pragueNow } from "../waste.js";
 import { askDrbena, mailContent, unknownContent } from "./ai.js";
-import { allowedRows, applyChanges, changeReply, hasRows, prepareChanges, tellEditors } from "./apply.js";
+import { allowedRows, changeReply, hasRows, prepareChanges, tellEditors } from "./apply.js";
 import { CONFIRM_MINUTES, createPending } from "./pending.js";
 import { authTrace, authVerdict, automatic, readMail } from "./parse.js";
 import { markRequest, requestByEmail, requestById, saveRequest } from "./register.js";
@@ -22,7 +22,7 @@ import { answeredToday, countSenderUse, earlierQuestion, logMail, senderByEmail,
 const MAX_SIZE = 2_000_000;
 
 function excerpt(mail) {
-  return mail.text.slice(0, 1000);
+  return mail.text.slice(0, 4000);
 }
 
 function dayParts() {
@@ -89,28 +89,33 @@ async function handleUnknown(env, { mail, entry, verified }) {
   }).catch(() => {});
 }
 
-function confirmationButtons(token) {
+function confirmationButtons(token, toWeb) {
   const base = `${SITE_ORIGIN}/zmena/${token}`;
   return [
-    { label: "Schválit hned", url: `${base}?akce=schvalit`, tone: "primary" },
+    { label: toWeb ? "Schválit hned" : "Poslat redakci hned", url: `${base}?akce=schvalit`, tone: "primary" },
     { label: "Zamítnout", url: `${base}?akce=zamitnout`, tone: "danger" },
     { label: "Upravit čas na webu", url: `${base}?akce=upravit`, tone: "line" },
   ];
 }
 
 // Změny jsou připravené: odesílatel dostane náhled s tlačítky, zápis proběhne sám po `CONFIRM_MINUTES`.
-async function holdForConfirmation(env, { mail, sender, entry, prepared, question, who }) {
+async function holdForConfirmation(env, { mail, sender, entry, prepared, question, who, verified }) {
+  const toWeb = verified && sender.direct;
   const lines = prepared.items.map((item) => item.line);
   const logId = await logMail(env, { ...entry, status: "ceka", result: [...lines, ...prepared.failed.map((line) => `nezapsáno: ${line}`), question].filter(Boolean).join("\n") });
-  const pending = await createPending(env, { sender, mail, items: prepared.items, who, logId });
+  const pending = await createPending(env, { sender, mail, items: prepared.items, who, logId, verified, toWeb });
   await enqueue(env, { type: "mailin.apply", id: pending.id }, CONFIRM_MINUTES * 60);
+  const unverified = sender.direct && !verified ? " (e-mail se nepodařilo ověřit, proto ho musí potvrdit člověk)" : "";
+  const next = toWeb
+    ? `Když nic neuděláte, zapíšu to na web za ${CONFIRM_MINUTES} minut. Můžete to schválit hned, zamítnout, nebo čas upravit přímo na webu.`
+    : `Když nic neuděláte, za ${CONFIRM_MINUTES} minut to pošlu redakci ke schválení${unverified} a na web to půjde, až ji redakce schválí. Můžete to poslat hned, zamítnout, nebo čas upravit přímo na webu.`;
   const paragraphs = [
     `Rozumím tomu takhle:\n${lines.join("\n")}`,
     prepared.failed.length ? `Tohle jsem nepochopila, nezapíšu to:\n${prepared.failed.map((line) => `• ${line}`).join("\n")}` : "",
     question,
-    `Když nic neuděláte, zapíšu to na web za ${CONFIRM_MINUTES} minut. Můžete to schválit hned, zamítnout, nebo čas upravit přímo na webu.`,
+    next,
   ];
-  await replyTo(env, mail, paragraphs, confirmationButtons(pending.token));
+  await replyTo(env, mail, paragraphs, confirmationButtons(pending.token, toWeb));
 }
 
 // E-mail od adresy ze seznamu (nebo po povolení nové adresy z žádosti).
@@ -155,16 +160,14 @@ export async function processKnown(env, { mail, sender, entry, verified }) {
   }
   const who = `${sender.label || mail.from} (e-mail)`;
   let outcome = { done: [], asked: [], failed: [], sections: [] };
-  if (verdict === "zmeny" && verified && sender.direct) {
-    // Ověřený odesílatel s „zapisovat rovnou“: nejdřív náhled a potvrzení, zapíše se po čekání.
+  if (verdict === "zmeny") {
+    // Každá známá adresa dostane nejdřív náhled s tlačítky, vyřídí se po čekání: na web, nebo ke schválení redakci.
     const prepared = await prepareChanges(env, { raw: answer.raw?.changes, allowed, today });
     if (prepared.items.length) {
-      await holdForConfirmation(env, { mail, sender, entry, prepared, question, who });
+      await holdForConfirmation(env, { mail, sender, entry, prepared, question, who, verified });
       return;
     }
     outcome = { ...outcome, failed: prepared.failed };
-  } else if (verdict === "zmeny") {
-    outcome = await applyChanges(env, { raw: answer.raw?.changes, allowed, sender, verified, today, who, mail });
   }
   const wrote = outcome.done.length + outcome.asked.length;
   if (!wrote) {

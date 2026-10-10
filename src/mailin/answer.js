@@ -11,7 +11,15 @@ export function mailReplyText(mailReply) {
     subject: String(mailReply.subject ?? "").slice(0, 200),
     messageId: String(mailReply.messageId ?? "").slice(0, 300),
     references: String(mailReply.references ?? "").slice(0, 2000),
+    // Původní text e-mailu, ať ho redakce vidí u změny ke schválení.
+    text: String(mailReply.text ?? "").slice(0, 4000),
   });
+}
+
+// Odesílatel a původní text e-mailu k žádosti ke schválení (pro redakci), nebo null.
+export function mailOrigin(mailReply) {
+  const meta = readMailReply(mailReply);
+  return meta ? { email: String(meta.email), subject: String(meta.subject ?? ""), text: String(meta.text ?? "") } : null;
 }
 
 function readMailReply(text) {
