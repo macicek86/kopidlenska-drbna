@@ -78,8 +78,8 @@ async function chatSystem(env, request) {
   const now = pragueNow();
   return [
     { type: "text", text: chatInstructions(drbena, settings.persona, facebookUrl(copy)) },
-    { type: "text", text: siteOverview(data, ctx, { ads: settings.ads, archive }), cache_control: { type: "ephemeral" } },
-    { type: "text", text: `Teď je ${formatLong(now.date).toLowerCase()} ${now.date.slice(0, 4)}, ${now.time} (${now.date}). Jen pro tebe, ať víš, co už skončilo a co teprve bude; datum ani hodinu nahlas neopakuj, pokud se na ně někdo neptá. Říct, kolik času ještě zbývá („ještě to stihnete, máte hodinu a půl“), je v pořádku, když to pomůže.` },
+    { type: "text", text: `<prehled_drbny>\n${siteOverview(data, ctx, { ads: settings.ads, archive })}\n</prehled_drbny>`, cache_control: { type: "ephemeral" } },
+    { type: "text", text: `<ted>${formatLong(now.date)} ${now.date.slice(0, 4)}, ${now.time} (${now.date})</ted>\nPodle toho víš, co už skončilo a co teprve bude.` },
   ];
 }
 
