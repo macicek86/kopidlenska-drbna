@@ -1,6 +1,7 @@
 // Formuláře žádostí ke schválení (sběrné dvory, lékaři, otevírací doba): schválit, zamítnout, stáhnout.
 import { approveRequest, rejectRequest, withdrawRequest } from "./hours-requests-db.js";
 import { redirect, withError } from "./http.js";
+import { periodInputs } from "./post-periods.js";
 
 export const REQUESTS_OK = {
   zadost: "Návrh je odeslaný. Na web půjde, až ho schválí hlavní redaktor.",
@@ -19,7 +20,15 @@ export async function requestPost(path, request, env, fields, { base, section, a
   if (!path.startsWith(`${base}/zadost/`)) return null;
   const id = fields.requestId;
   if (path === `${base}/zadost/schvalit`) {
-    const result = await approveRequest(env, request, { section, actions, id, input: fields });
+    let input = fields;
+    // Okno se změnou hodin je formulář s obdobími (jedno období, to, které žadatel navrhl): vezme se z něj
+    // vstup jedné změny. „Jen do“ a „až od“ tu nejsou, protože potřebují běžnou dobu, jen zavřeno a po dnech.
+    if (fields.periods?.length) {
+      const prepared = periodInputs({ section, actions, idField: section === "dvory" ? "yardId" : section === "lekari" ? "doctorId" : "placeId", targetId: 0, periods: fields.periods.slice(0, 1), regular: null, shape: section === "dvory" ? "week1" : "week2" });
+      if (prepared.error) return redirect(withError(`${base}?zadost=${id}`, prepared.error));
+      input = { ...fields, ...prepared.inputs[0] };
+    }
+    const result = await approveRequest(env, request, { section, actions, id, input });
     if (!result.ok) return redirect(withError(`${base}?zadost=${id}`, result.error));
     return redirect(`${base}?ok=zadost-schvalena`);
   }

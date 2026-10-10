@@ -112,7 +112,7 @@ export function requestDialog(section, data, id, form) {
   const request = data.user?.role === "hlavni" ? (data.hoursRequests?.[section] ?? []).find((entry) => entry.id === id) : null;
   if (!request) return "";
   const { name, text } = describeRequest(section, request, data);
-  const approveFields = { action: `${base}/zadost/schvalit`, submit: "Schválit a zapsat", extra: hidden("zadost", request.id), value: request.value };
+  const approveFields = { action: `${base}/zadost/schvalit`, submit: "Schválit a zapsat", extra: hidden("zadost", request.id), value: request.value, review: true };
   const approve =
     request.action === "zrusit"
       ? `<div class="form-foot"><span class="form-foot-gap"></span>${postButton(`${base}/zadost/schvalit`, { zadost: request.id }, "Schválit zrušení", "btn-primary")}</div>`

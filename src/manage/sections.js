@@ -12,7 +12,7 @@ import { placeSummary } from "../places.js";
 import { closureLabel } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { YARD_ACTIONS, loadYards } from "../yards-db.js";
-import { hoursSummary as yardHours } from "../yards.js";
+import { changeSummary, hoursSummary as yardHours } from "../yards.js";
 
 const changeHours = (change) => (periodClosed(change) ? "Zavřeno" : spanSummary(change));
 
@@ -89,14 +89,17 @@ export const MANAGE_SECTIONS = {
       ["Otevírací doba", yardHours(row)],
       ["Co se tam vozí", row.accepts],
     ],
-    changes: (row) => row.closures.map((closure) => ({ id: closure.id, when: closureLabel(closure), what: `Zavřeno · ${closure.reason}`, cancel: true })),
+    changes: (row) =>
+      [...row.closures, ...(row.changes ?? [])]
+        .sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.id - b.id)
+        .map((change) => ({ id: change.id, when: closureLabel(change), what: change.week ? `${changeSummary(change)} · ${change.reason}` : `Zavřeno · ${change.reason}`, cancel: true })),
     forms: [
-      { key: "uzavreni", action: "uzavreni", label: "Mimořádně zavřeno", title: "Mimořádné uzavření", render: yards.closureForm, primary: true },
+      { key: "zmena", action: "zmena", label: "Zavřeno nebo jiná doba", title: "Zavřeno nebo jiná doba", wide: true, render: yards.closureForm, primary: true },
       { key: "hodiny", action: "hodiny", label: "Otevírací doba", title: "Otevírací doba", wide: true, render: yards.hoursForm },
       { key: "udaje", action: "udaje", label: "Místo a co se tam vozí", title: "Místo a co se tam vozí", render: yards.detailsForm },
     ],
-    audit: { uzavreni: "/uzavreni", hodiny: "/hodiny", udaje: "/udaje", zrusit: "/uzavreni/smazat" },
-    ok: (action) => ({ uzavreni: "uzavreni", hodiny: "dvur-hodiny", udaje: "dvur-udaje", zrusit: "uzavreni-smazane" })[action],
+    audit: { zmena: "/zmena", uzavreni: "/zmena", hodiny: "/hodiny", udaje: "/udaje", zrusit: "/uzavreni/smazat" },
+    ok: (action) => ({ zmena: "dvur-zmena", uzavreni: "dvur-zmena", hodiny: "dvur-hodiny", udaje: "dvur-udaje", zrusit: "uzavreni-smazane" })[action],
   },
 };
 

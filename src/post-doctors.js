@@ -1,7 +1,8 @@
 // Formuláře sekce Lékaři: ordinace, ordinační hodiny, dočasné změny a návrhy ke schválení.
-import { DOCTOR_ACTIONS, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorDetails, saveDoctorHours } from "./doctors-db.js";
+import { DOCTOR_ACTIONS, loadDoctors, removeDoctor, removeDoctorChange, saveDoctor, saveDoctorChange, saveDoctorDetails, saveDoctorHours } from "./doctors-db.js";
 import { redirect, withError } from "./http.js";
 import { requestPost, submitted } from "./post-requests.js";
+import { submitPeriods } from "./post-periods.js";
 
 const BASE = "/redakce/lekari";
 
@@ -12,6 +13,7 @@ export const DOCTORS_OK = {
   "lekar-hodiny": "Ordinační hodiny jsou uložené.",
   "lekar-udaje": "Údaje ordinace jsou uložené.",
   "lekar-zmena": "Dočasná změna je zapsaná.",
+  "lekar-zmeny": "Změny ordinačních hodin jsou zapsané.",
   "lekar-zmena-smazana": "Dočasná změna je zrušená.",
 };
 
@@ -30,7 +32,23 @@ export async function doctorsPost(path, request, env, fields) {
   }
   if (path === `${BASE}/hodiny`) return submitted(BASE, await saveDoctorHours(env, request, fields), "lekar-hodiny");
   if (path === `${BASE}/udaje`) return submitted(BASE, await saveDoctorDetails(env, request, fields), "lekar-udaje");
-  if (path === `${BASE}/zmena`) return submitted(BASE, await saveDoctorChange(env, request, fields), "lekar-zmena");
+  if (path === `${BASE}/zmena`) {
+    const doctor = (await loadDoctors(env)).find((row) => row.id === fields.doctorId);
+    return submitPeriods({
+      base: BASE,
+      back: `${BASE}?zmena=${fields.doctorId ?? ""}`,
+      section: "lekari",
+      actions: DOCTOR_ACTIONS,
+      idField: "doctorId",
+      targetId: fields.doctorId,
+      periods: fields.periods,
+      regular: doctor?.week ?? null,
+      shape: "week2",
+      save: (input) => saveDoctorChange(env, request, input),
+      okKey: "lekar-zmena",
+      manyKey: "lekar-zmeny",
+    });
+  }
   if (path === `${BASE}/zmena/smazat`) {
     if (!fields.confirm || !fields.id) return redirect(BASE);
     return submitted(BASE, await removeDoctorChange(env, request, fields.id), "lekar-zmena-smazana");

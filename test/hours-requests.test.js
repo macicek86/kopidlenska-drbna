@@ -166,7 +166,7 @@ test("redakce: žadatel posílá ke schválení, hlavní redaktor má okno s př
   assert.match(review, /action="\/redakce\/oteviraci-doba\/zadost\/schvalit"/);
   assert.match(review, /name="zadost" value="7"/);
   assert.match(review, /value="2026-10-22"/);
-  assert.match(review, />dovolená<\/textarea>/);
+  assert.match(review, /name="p1-note"[^>]*value="dovolená"/);
   assert.match(review, /Zamítnout/);
   assert.match(review, /Návrh čeká/);
 });

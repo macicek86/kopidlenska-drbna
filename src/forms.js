@@ -1,4 +1,5 @@
 // Čtení adres a formulářů redakce: co otevřít v okně a pole z odeslaného formuláře.
+import { readPeriods } from "./periods.js";
 import { WEEK_DAYS } from "./yards.js";
 
 function positiveParam(url, name) {
@@ -180,6 +181,8 @@ export async function formFields(request) {
         note: text(`pm-note-${day}`),
       },
     })),
+    // Formulář „Zavřeno nebo jiná doba“ s více obdobími (src/periods.js).
+    periods: readPeriods(form),
     permissions: form.getAll("permission").map((item) => String(item)),
     confirm: text("confirm") === "1",
     kind: text("kind"),

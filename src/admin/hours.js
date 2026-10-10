@@ -8,18 +8,19 @@ function timePair(prefix, day, part, label) {
 }
 
 // Otevírací doba sběrného dvora: jeden úsek za den.
-export function yardHoursFields(week) {
+// `ns`: předpona jmen polí (formulář s více obdobími má týden v každém období zvlášť), `legend` nadpis.
+export function yardHoursFields(week, ns = "", legend = "Otevřeno ve dnech") {
   const rows = week
     .map((slot) => {
       const name = dayLabel(slot.day);
       return `<div class="wg-row${slot.open ? "" : " is-off"}" data-slot>
-        <label class="wg-day"><input type="checkbox" name="open-${slot.day}" value="1"${slot.open ? " checked" : ""} data-slot-toggle> <span>${esc(name)}</span></label>
-        <div class="wg-slot">${timePair("", slot.day, slot, name)}</div>
+        <label class="wg-day"><input type="checkbox" name="${ns}open-${slot.day}" value="1"${slot.open ? " checked" : ""} data-slot-toggle> <span>${esc(name)}</span></label>
+        <div class="wg-slot">${timePair(ns, slot.day, slot, name)}</div>
       </div>`;
     })
     .join("");
   return `<fieldset class="field week-grid" data-week>
-    <legend>Otevřeno ve dnech</legend>
+    <legend>${esc(legend)}</legend>
     ${rows}
     <div class="wg-tools"><button class="btn btn-sm btn-ghost" type="button" data-copy-week>Pondělí zkopírovat do všech zaškrtnutých dnů</button></div>
     <span class="hint">Den bez fajfky je zavřený.</span>
@@ -35,15 +36,15 @@ function doctorSlot(prefix, day, part, label, placeholder) {
 }
 
 // Ordinační hodiny: dopoledne a odpoledne zvlášť, ať mezi nimi může být polední pauza.
-export function doctorHoursFields(week, legend = "Ordinační hodiny") {
+export function doctorHoursFields(week, legend = "Ordinační hodiny", ns = "") {
   const days = week?.length ? week : blankWeek();
   const rows = days
     .map((slot) => {
       const name = dayLabel(slot.day);
       return `<div class="wg-row wg-row-2">
         <span class="wg-day"><span>${esc(name)}</span></span>
-        ${doctorSlot("am", slot.day, slot.morning, `${name} dopoledne`, "Poznámka, třeba jen objednaní")}
-        ${doctorSlot("pm", slot.day, slot.afternoon, `${name} odpoledne`, "Poznámka, třeba jen akutní")}
+        ${doctorSlot(`${ns}am`, slot.day, slot.morning, `${name} dopoledne`, "Poznámka, třeba jen objednaní")}
+        ${doctorSlot(`${ns}pm`, slot.day, slot.afternoon, `${name} odpoledne`, "Poznámka, třeba jen akutní")}
       </div>`;
     })
     .join("");

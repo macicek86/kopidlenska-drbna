@@ -697,3 +697,14 @@ summary.adm-group-name .adm-count { display: none; }
 .paste-restore { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 .paste-redo > summary, .paste-source > summary { cursor: pointer; font-weight: 700; }
 .paste-redo[open] > summary, .paste-source[open] > summary { margin-bottom: 0.6rem; }
+
+/* Formulář s více obdobími (src/admin/periods.js) */
+.period { display: grid; gap: 0.75rem; margin: 0 0 0.9rem; padding: 0.9rem 1rem 1rem; border: 1px solid var(--line, #ddd); border-radius: var(--r-md, 0.6rem); background: var(--surface, #fff); }
+.period-title { padding: 0 0.35rem; font-weight: 800; font-size: 0.95rem; }
+.period-modes { display: grid; gap: 0.3rem; }
+.period-mode { margin: 0; }
+.period-time { max-width: 12rem; }
+.period-week > summary { cursor: pointer; font-weight: 700; font-size: 0.92rem; padding: 0.2rem 0; }
+.period-week[open] > summary { margin-bottom: 0.5rem; }
+.period-tools, .period-add { display: flex; justify-content: flex-end; }
+.period-add { justify-content: flex-start; margin-bottom: 0.9rem; }

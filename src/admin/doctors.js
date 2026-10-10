@@ -3,6 +3,7 @@ import { compactWeek } from "../hours-compact.js";
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
+import { periodsForm } from "./periods.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -72,20 +73,15 @@ export function hoursForm(doctor, opts = {}) {
   </form>`;
 }
 
+// Dočasná změna ordinačních hodin: jedno nebo víc období najednou (src/admin/periods.js).
 export function changeForm(doctor, opts = {}) {
-  const value = opts.value ?? {};
-  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/zmena`}">
-    ${hidden("doctorId", doctor.id)}${opts.extra ?? ""}
-    ${callout(`Dočasná změna pro <b>${esc(doctor.name)}</b>. Na titulce se ukáže ${HOME_LEAD_DAYS} dní předem a po dobu, kdy platí. Na stránce Lékaři je vidět hned.`)}
-    <div class="pair">
-      ${field("Od", `<input class="control" type="date" name="startsOn" required value="${esc(value.startsOn ?? "")}">`)}
-      ${field("Do", `<input class="control" type="date" name="endsOn" value="${esc(value.endsOn && value.endsOn !== value.startsOn ? value.endsOn : "")}">`, "Když jde o jeden den, nechte prázdné.")}
-    </div>
-    ${field("Poznámka", `<textarea class="${input}" name="changeNote" required maxlength="400" rows="2" placeholder="Třeba: sestra přítomna, zastupuje MUDr. Novák. Nebo: akutní případy ošetří ordinace v Jičíně.">${esc(value.note ?? "")}</textarea>`)}
-    ${doctorHoursFields(value.week ?? blankWeek(), "Hodiny v tom období")}
-    <span class="hint">Bez zaškrtnutého času je ordinace v tom období zavřená a na webu zůstane poznámka.</span>
-    ${formFoot(opts.submit ?? "Zapsat změnu", cancelLink(opts.cancel ?? BASE))}
-  </form>`;
+  return periodsForm(doctor, {
+    flavour: "week2",
+    idName: "doctorId",
+    id: doctor.id,
+    opts: { ...opts, action: opts.action ?? `${BASE}/zmena` },
+    lead: (row) => `Dočasná změna pro <b>${esc(row.name)}</b>. Na titulce se ukáže ${HOME_LEAD_DAYS} dní předem a po dobu, kdy platí. Na stránce Lékaři je vidět hned. Víc dnů s různou dobou zapište jako víc období.`,
+  });
 }
 
 // Formulář návrhu v okně schválení.
@@ -162,7 +158,7 @@ export function adminDoctors(ctx, data, message, query = {}) {
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit ordinaci", size: "wide", close: BASE, open: true, body: doctorForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Hodiny: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit hodiny") }) }));
-  else if (changing) dialogs.push(modal({ id: "okno", title: "Dočasná změna", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
+  else if (changing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
   else if (detailing) dialogs.push(modal({ id: "okno", title: `Údaje: ${detailing.name}`, close: BASE, open: true, body: detailsForm(detailing, { submit: mode.submit("Uložit") }) }));
   else if (cancelling) {
     dialogs.push(

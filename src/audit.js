@@ -96,6 +96,15 @@ export async function auditFinish(env, watch, response, messages = {}) {
   const changes = [];
   for (const [target, shot] of watch.shots) {
     if (!shot) continue;
+    // Formulář, který zakládá víc záznamů najednou (období otevírací doby): každý nový řádek zvlášť.
+    if (target.many && shot.fresh) {
+      const rows = (await env.DB.prepare(`select * from ${target.table} where id > ? order by id limit 20`).bind(shot.top).all()).results ?? [];
+      for (const row of rows) {
+        const diff = diffRows(null, row);
+        if (diff) changes.push({ label: target.label ?? target.table ?? "", id: Number(row.id) || null, title: rowTitle(row), ...diff });
+      }
+      continue;
+    }
     const after = await afterValue(env, target, shot, watch.ctx);
     const diff = diffRows(shot.value, after);
     if (!diff) continue;

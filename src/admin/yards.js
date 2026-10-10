@@ -1,8 +1,9 @@
 import { compactWeek } from "../hours-compact.js";
-import { WEEK_DAYS } from "../yards.js";
+import { WEEK_DAYS, changeSummary } from "../yards.js";
 import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { yardHoursFields } from "./hours.js";
+import { periodsForm } from "./periods.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -70,29 +71,32 @@ export function detailsForm(yard, opts = {}) {
   </form>`;
 }
 
+// Mimořádné zavření nebo jiná doba: jedno nebo víc období najednou (src/admin/periods.js).
 // `opts`: kam formulář poslat a čím předvyplnit (návrh ke schválení), jinak běžné uložení.
 export function closureForm(yard, opts = {}) {
-  const value = opts.value ?? {};
-  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/uzavreni`}">
-    ${hidden("yardId", yard.id)}${opts.extra ?? ""}
-    ${callout(`Mimořádné uzavření dvora <b>${esc(yard.name)}</b>. Na webu se ukáže i s důvodem.`)}
-    <div class="pair">
-      ${field("Od", `<input class="control" type="date" name="startsOn" required value="${esc(value.startsOn ?? "")}">`)}
-      ${field("Do", `<input class="control" type="date" name="endsOn" value="${esc(value.endsOn && value.endsOn !== value.startsOn ? value.endsOn : "")}">`, "Když jde o jeden den, nechte prázdné.")}
-    </div>
-    ${field("Důvod", `<textarea class="${input}" name="reason" required maxlength="400" rows="3" placeholder="Třeba inventura nebo porucha vrat.">${esc(value.reason ?? "")}</textarea>`)}
-    ${formFoot(opts.submit ?? "Zapsat uzavření", cancelLink(opts.cancel ?? BASE))}
-  </form>`;
+  return periodsForm(yard, {
+    flavour: "week1",
+    idName: "yardId",
+    id: yard.id,
+    opts: { ...opts, action: opts.action ?? `${BASE}/zmena` },
+    lead: (row) => `Zavřeno nebo jiná doba: dvůr <b>${esc(row.name)}</b>. Na webu se ukáže i s důvodem. Víc dnů s různou dobou zapište jako víc období.`,
+  });
+}
+
+// Zavření i jiná doba dvora jsou jeden seznam podle data; jiná doba ukáže, jak se doba mění.
+function allChanges(yard) {
+  return [...yard.closures, ...(yard.changes ?? [])].sort((a, b) => a.startsOn.localeCompare(b.startsOn) || a.id - b.id);
 }
 
 function closureChips(yard) {
-  if (!yard.closures.length) return "";
-  return `<ul class="chips-list">${yard.closures
+  const changes = allChanges(yard);
+  if (!changes.length) return "";
+  return `<ul class="chips-list">${changes
     .map(
-      (closure) => `<li class="chip-row">
-        <span class="chip-when">${esc(closureLabel(closure))}</span>
-        <span class="chip-what">${esc(closure.reason)}</span>
-        ${modalLink(`${BASE}?zrusit=${closure.id}`, "Zrušit", "btn-ghost btn-danger-text")}
+      (change) => `<li class="chip-row">
+        <span class="chip-when">${esc(closureLabel(change))}</span>
+        <span class="chip-what">${esc(change.week ? `${changeSummary(change)} · ${change.reason}` : `Zavřeno · ${change.reason}`)}</span>
+        ${modalLink(`${BASE}?zrusit=${change.id}`, "Zrušit", "btn-ghost btn-danger-text")}
       </li>`,
     )
     .join("")}</ul>`;
@@ -116,7 +120,7 @@ export function adminYards(ctx, data, message, query = {}) {
   const detailing = chief ? null : (yards.find((row) => row.id === query.detailsId) ?? null);
   let cancelling = null;
   for (const yard of yards) {
-    const found = yard.closures.find((closure) => closure.id === query.cancelId);
+    const found = allChanges(yard).find((closure) => closure.id === query.cancelId);
     if (found) cancelling = { yard, closure: found };
   }
 
@@ -124,9 +128,9 @@ export function adminYards(ctx, data, message, query = {}) {
     item({
       title: yard.name,
       meta: esc(yard.place),
-      badges: `${yard.published ? "" : badge("Skrytý", "off")}${yard.closures.length ? badge(`Uzavření: ${yard.closures.length}`, "warn") : ""}${waitingBadge(SECTION, yard, requests)}<span class="item-sub">${esc(compactWeek(yard.legacy ? [] : yard.week) || yard.legacy || "Bez otevřeného dne")}</span>`,
+      badges: `${yard.published ? "" : badge("Skrytý", "off")}${allChanges(yard).length ? badge(`Změny: ${allChanges(yard).length}`, "warn") : ""}${waitingBadge(SECTION, yard, requests)}<span class="item-sub">${esc(compactWeek(yard.legacy ? [] : yard.week) || yard.legacy || "Bez otevřeného dne")}</span>`,
       grid: true,
-      actions: `${modalLink(`${BASE}?uzavreni=${yard.id}`, "Zapsat uzavření")}
+      actions: `${modalLink(`${BASE}?uzavreni=${yard.id}`, "Zavřeno nebo jiná doba")}
         ${chief ? modalLink(`${BASE}?id=${yard.id}`, "Upravit") : modalLink(`${BASE}?hodiny=${yard.id}`, "Otevírací doba")}
         ${moreMenu([
           shareButton(BASE, yard),
@@ -147,7 +151,7 @@ export function adminYards(ctx, data, message, query = {}) {
   if (reviewing) dialogs.push(reviewing);
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit sběrný dvůr", size: "wide", close: BASE, open: true, body: yardForm(editing) }));
-  else if (closing) dialogs.push(modal({ id: "okno", title: "Mimořádné uzavření", close: BASE, open: true, body: closureForm(closing, { submit: mode.submit("Zapsat uzavření") }) }));
+  else if (closing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: closureForm(closing, { submit: mode.submit("Zapsat změny") }) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));
   else if (detailing) dialogs.push(modal({ id: "okno", title: `Údaje: ${detailing.name}`, close: BASE, open: true, body: detailsForm(detailing, { submit: mode.submit("Uložit") }) }));
   else if (cancelling) {
@@ -185,7 +189,7 @@ export function adminYards(ctx, data, message, query = {}) {
   }
 
   const lede = chief
-    ? "Místo, co se tam vozí a kdy má otevřeno. Mimořádné uzavření zapíše i člověk s oprávněním Sběrný dvůr."
+    ? "Místo, co se tam vozí a kdy má otevřeno. Zavření nebo jinou dobu zapíše i člověk s oprávněním Sběrný dvůr."
     : `Dvory zakládá hlavní redaktor. Vy tu zapíšete mimořádné uzavření, otevírací dobu a co se tam vozí.${mode.note}`;
   const body = `${pageHead("Sběrné dvory", lede, chief ? openButton("novy-dvur", `${BASE}?novy=1`, "Nový dvůr") : "")}
     ${requestsPanel(SECTION, data)}

@@ -96,6 +96,7 @@ function hoursRoutes(base, parent, parentField, child) {
       return num((await first(env, "select target_id from hours_requests where id = ?", num(fields.requestId)))?.target_id);
     },
   };
+  // Zrušení změny dvora zůstalo na adrese uzavření.
   const childPath = child === "yard_closures" ? "uzavreni" : "zmena";
   return {
     [`${base}/ulozit`]: [by(parent, "id")],
@@ -103,7 +104,7 @@ function hoursRoutes(base, parent, parentField, child) {
     [`${base}/hodiny`]: [existing(parent, parentField), requests],
     [`${base}/nabidka`]: [existing(parent, parentField), requests],
     [`${base}/udaje`]: [existing(parent, parentField), requests],
-    [`${base}/${childPath}`]: [fresh(child), requests],
+    [`${base}/zmena`]: [{ ...fresh(child), many: true }, { ...requests, many: true }],
     [`${base}/${childPath}/smazat`]: [existing(child, "id"), requests],
     [`${base}/zadost/schvalit`]: [approvedParent, fresh(child), requestRow],
     [`${base}/zadost/zamitnout`]: [requestRow],

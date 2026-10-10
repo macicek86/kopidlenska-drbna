@@ -8,6 +8,7 @@ import { html, redirect, secure, withError } from "../http.js";
 import { messageFrom, OK } from "../ok-messages.js";
 import { deadLinkPage, doneLinkPage, managePage } from "./page.js";
 import { pendingByToken } from "../mailin/pending.js";
+import { periodInputs } from "../post-periods.js";
 import { MANAGE_SECTIONS, formKey } from "./sections.js";
 
 const PREFIX = "/sprava/";
@@ -70,10 +71,20 @@ export async function manageGet(path, request, env, url) {
 // Změna z e-mailu, kterou odesílatel šel upravit (`?z=` je token čekající změny): hodnoty pro předvyplnění okna.
 async function fromMail(env, token, link, spec, row, window) {
   const pending = token ? await pendingByToken(env, token) : null;
-  const item = pending?.items.find((entry) => entry.section === link.section && entry.targetId === link.targetId && entry.edited);
-  if (!item || formKey(spec, item.action, item) !== window) return null;
-  const value = spec.actions[item.action]?.read({ ...item.input, [spec.idField]: row.id });
-  return value && !value.error ? { value, line: String(item.line ?? "").replace(/^•\s*/, "") } : null;
+  const items = (pending?.items ?? []).filter((entry) => entry.section === link.section && entry.targetId === link.targetId && entry.edited);
+  const first = items[0];
+  if (!first || formKey(spec, first.action, first) !== window) return null;
+  // Všechny změny z e-mailu pro tenhle řádek jsou období v jednom formuláři.
+  const values = [];
+  for (const item of items) {
+    const value = spec.actions[item.action]?.read({ ...item.input, [spec.idField]: row.id });
+    if (!value || value.error) continue;
+    // „Jen do“ a „až od“ si formulář pamatuje (`shift`), ať se neukáže jako celý rozepsaný týden.
+    values.push({ ...value, ...(item.shift ? { mode: item.shift.mode, time: item.shift.time } : {}) });
+  }
+  if (!values.length) return null;
+  const line = items.map((item) => String(item.line ?? "").replace(/^•\s*/, "")).join("; ");
+  return { value: values[0], values, line };
 }
 
 // Patří změna (zrušení) k místu odkazu?
@@ -104,20 +115,39 @@ export async function managePost(path, request, env, fields) {
 
   const targetId = action === "zrusit" ? fields.id : row.id;
   const input = { ...fields, [spec.idField]: row.id };
+  // Dočasné změny jdou z formuláře s více obdobími: každé období je jedna změna.
+  let inputs = [input];
+  if (action === "zmena" && fields.kind !== "trvala") {
+    const prepared = periodInputs({
+      section: link.section,
+      actions: spec.actions,
+      idField: spec.idField,
+      targetId: row.id,
+      periods: fields.periods,
+      regular: link.section === "dvory" && row.legacy ? null : row.week ?? null,
+      shape: link.section === "dvory" ? "week1" : "week2",
+    });
+    if (prepared.error) return redirect(withError(back, prepared.error), authorCookie(request, author));
+    inputs = prepared.inputs;
+  }
   const auditPath = `/redakce/${link.section}${spec.audit[action]}`;
   const who = linkAuthor(author, link.label);
   const watch = await auditStart(env, auditPath, input, async () => ({ id: null, name: who })).catch(() => null);
-  const result = await fileHours(env, {
-    section: link.section,
-    actions: spec.actions,
-    action,
-    targetId,
-    input,
-    mode: link.direct ? "direct" : "request",
-    author,
-    linkId: link.id,
-    linkLabel: link.label,
-  });
+  let result = { ok: true };
+  for (const one of inputs) {
+    result = await fileHours(env, {
+      section: link.section,
+      actions: spec.actions,
+      action,
+      targetId,
+      input: one,
+      mode: link.direct ? "direct" : "request",
+      author,
+      linkId: link.id,
+      linkLabel: link.label,
+    });
+    if (!result.ok) break;
+  }
   const cookie = authorCookie(request, author);
   if (!result.ok) return redirect(withError(back, result.error), cookie);
   await useLink(env, link);

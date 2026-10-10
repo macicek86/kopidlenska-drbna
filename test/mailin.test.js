@@ -303,10 +303,10 @@ test("úprava na webu: jednorázový odkaz pro ten řádek, po uložení se pův
     const page = await manageGet(target.pathname, new Request(target), env, target);
     const body = await page.text();
     assert.match(body, /Z e-mailu nám vyšlo/);
-    assert.match(body, /name="startsOn"[^>]*value="2026-08-15"/);
+    assert.match(body, /name="p1-from"[^>]*value="2026-08-15"/);
     assert.match(body, /dovolená/);
     // Formulář uložen (odkaz je jednorázový, uložením zanikl): po vypršení se nic nezapíše podruhé.
-    const saved = new Request(`http://drbna.test${target.pathname}/zmena`, { method: "POST", body: new URLSearchParams({ kind: "docasna", startsOn: "2026-08-15", endsOn: "", changeNote: "dovolená do 12", author: "Jana" }) });
+    const saved = new Request(`http://drbna.test${target.pathname}/zmena`, { method: "POST", body: new URLSearchParams({ "p1-from": "2026-08-15", "p1-to": "", "p1-mode": "zavreno", "p1-note": "dovolená do 12", author: "Jana" }) });
     assert.equal((await managePost(`${target.pathname}/zmena`, saved, env, await formFields(saved.clone()))).status, 200);
     assert.equal(await linkByToken(env, linkToken), null);
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 1);
@@ -791,4 +791,46 @@ test("nová běžná doba: stejná jako dnešní se přeskočí, jeden den vytr�
   const same = [1, 3, 4, 5].flatMap((day) => [{ day: ["ne", "po", "ut", "st", "ct", "pa", "so"][day], from: "07:30", to: "12:00", note: "" }, { day: ["ne", "po", "ut", "st", "ct", "pa", "so"][day], from: "13:00", to: "16:00", note: "" }]);
   same.push({ day: "ut", from: "07:30", to: "14:00", note: "" });
   assert.equal(changeInput({ ...friday, slots: same }, regular).skip, true);
+});
+
+test("zkrácení jednoho dne nechá ostatní dny ve formuláři běžné", () => {
+  const regular = new Map([["misto:8", duhovka]]);
+  const change = changeInput({ target: "misto:8", kind: "docasna", starts_on: "2026-10-26", ends_on: "2026-10-26", open_from: "", close_at: "10:00", note: "", slots: [] }, regular);
+  const day = (n) => change.input.doctorWeek.find((slot) => slot.day === n);
+  assert.deepEqual([day(1).morning.to, day(1).afternoon.open], ["10:00", false]);
+  assert.deepEqual([day(3).morning.to, day(3).afternoon.to], ["12:00", "16:00"]);
+});
+
+test("dvě změny jednoho místa z e-mailu: jeden formulář s oběma obdobími, uložení zapíše obě a nic se nezapíše podruhé", async () => {
+  const two = {
+    verdict: "zmeny",
+    question: "",
+    changes: [
+      { target: "misto:1", kind: "zavreno", starts_on: "2026-10-14", ends_on: "", note: "", open_from: "", close_at: "", slots: [] },
+      { target: "misto:1", kind: "zavreno", starts_on: "2026-10-26", ends_on: "", note: "školení", open_from: "", close_at: "", slots: [] },
+    ],
+  };
+  const claude = await fakeClaude(two);
+  try {
+    const { env, place } = await freshEnv(claude.url);
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "knihovna", direct: true, targets: [`oteviraci-doba:${place.id}`] });
+    await receiveMail(message(rawMail()), env);
+    const token = await pendingToken(env);
+    const response = await post(env, token, "upravit", { section: "oteviraci-doba", targetId: place.id });
+    const target = new URL(response.headers.get("location"), "https://drbna.test");
+    const body = await (await manageGet(target.pathname, new Request(target), env, target)).text();
+    assert.match(body, /name="p1-from"[^>]*value="2026-10-14"/);
+    assert.match(body, /name="p2-from"[^>]*value="2026-10-26"/);
+    assert.match(body, /name="p2-note"[^>]*value="školení"/);
+    // Uloženo obě období z formuláře: dvě změny, odkaz zanikl.
+    const form = new URLSearchParams({ "p1-from": "2026-10-14", "p1-mode": "zavreno", "p1-note": "Mimořádně zavřeno", "p2-from": "2026-10-26", "p2-mode": "zavreno", "p2-note": "školení", author: "Jana" });
+    const saved = new Request(`http://drbna.test${target.pathname}/zmena`, { method: "POST", body: form });
+    assert.equal((await managePost(`${target.pathname}/zmena`, saved, env, await formFields(saved.clone()))).status, 200);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 2);
+    await env.DB.prepare("update mail_pending set due_at = datetime('now', '-1 minutes')").run();
+    await applyDue(env);
+    assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 2);
+  } finally {
+    claude.close();
+  }
 });

@@ -86,6 +86,7 @@ function dialogFor(spec, link, row, base, query, author, mail) {
         action: `${base}/${form.action}`,
         extra: `${mail ? callout(`Z e-mailu nám vyšlo: ${esc(mail.line)}. Upravte, co je potřeba, a uložte.`) : ""}${authorField(author)}`,
         value: mail?.value,
+        values: mail?.values,
         submit,
         cancel: base,
       }),

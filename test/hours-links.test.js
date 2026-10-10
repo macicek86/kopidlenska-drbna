@@ -53,7 +53,9 @@ async function post(env, path, fields) {
   return managePost(path, request, env, await formFields(request.clone()));
 }
 
-const closed = { kind: "docasna", startsOn: "2026-10-20", endsOn: "", changeNote: "inventura", author: "Jana Nová" };
+// Formulář odkazu posílá období (src/periods.js); schválení bere vstup jedné změny.
+const closed = { "p1-from": "2026-10-20", "p1-to": "", "p1-mode": "zavreno", "p1-note": "inventura", author: "Jana Nová" };
+const closedChange = { kind: "docasna", startsOn: "2026-10-20", endsOn: "", changeNote: "inventura" };
 
 test("změna z odkazu čeká na schválení pod jménem žadatele, odkaz po uložení zanikne a schválení změnu zapíše", async () => {
   const env = await freshEnv();
@@ -71,7 +73,7 @@ test("změna z odkazu čeká na schválení pod jménem žadatele, odkaz po ulo�
 
   const [request] = (await loadRequests(env, { id: 1, role: "hlavni", permissions: [] }))["oteviraci-doba"];
   assert.equal(request.author, "Jana Nová (odkaz: recepce)");
-  assert.equal((await approveRequest(env, chief(), { section: "oteviraci-doba", actions: PLACE_ACTIONS, id: request.id, input: { ...closed, placeId: place.id } })).ok, true);
+  assert.equal((await approveRequest(env, chief(), { section: "oteviraci-doba", actions: PLACE_ACTIONS, id: request.id, input: { ...closedChange, placeId: place.id } })).ok, true);
   const row = await env.DB.prepare("select note, created_by from place_changes").first();
   assert.deepEqual({ ...row }, { note: "inventura", created_by: null });
 
@@ -84,7 +86,7 @@ test("odkaz s „rovnou“ zapíše hned, bez jména nic a odkaz zůstane, cizí
   const { link, place } = await linkFor(env, { direct: true });
   // Chybně vyplněný formulář odkaz nespotřebuje.
   assert.match((await post(env, `/sprava/${link.token}/zmena`, { ...closed, author: "" })).headers.get("location"), /chyba=/);
-  assert.match((await post(env, `/sprava/${link.token}/zmena`, { ...closed, startsOn: "" })).headers.get("location"), /chyba=/);
+  assert.match((await post(env, `/sprava/${link.token}/zmena`, { ...closed, "p1-from": "" })).headers.get("location"), /chyba=/);
   assert.notEqual(await linkByToken(env, link.token), null);
   const saved = await post(env, `/sprava/${link.token}/zmena`, closed);
   assert.equal(saved.status, 200);

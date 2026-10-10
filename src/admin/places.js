@@ -8,6 +8,7 @@ import { closureLabel, esc } from "../view.js";
 import { pragueNow } from "../waste.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
+import { periodsForm } from "./periods.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -97,21 +98,15 @@ export function hoursForm(place, opts = {}) {
   </form>`;
 }
 
+// Dočasná změna nebo zavření: jedno nebo víc období najednou (src/admin/periods.js).
 export function changeForm(place, opts = {}) {
-  const value = opts.value ?? {};
-  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/zmena`}">
-    ${hidden("placeId", place.id)}${opts.extra ?? ""}
-    ${hidden("kind", "docasna")}
-    ${callout(`Dočasná změna nebo zavření: <b>${esc(place.name)}</b>. Na titulce se ukáže ${HOME_LEAD_DAYS} dní předem a po dobu, kdy platí.`)}
-    <div class="pair">
-      ${field("Od", `<input class="control" type="date" name="startsOn" required value="${esc(value.startsOn ?? "")}">`)}
-      ${field("Do", `<input class="control" type="date" name="endsOn" value="${esc(value.endsOn && value.endsOn !== value.startsOn ? value.endsOn : "")}">`, "Když jde o jeden den, nechte prázdné.")}
-    </div>
-    ${field("Poznámka", `<textarea class="${input}" name="changeNote" required maxlength="400" rows="2" placeholder="Třeba: školení k volbám. Nebo: dovolená.">${esc(value.note ?? "")}</textarea>`)}
-    ${doctorHoursFields(value.week ?? blankWeek(), "Otevřeno v tom období")}
-    <span class="hint">Bez zaškrtnutého času má místo v tom období zavřeno.</span>
-    ${formFoot(opts.submit ?? "Zapsat změnu", cancelLink(opts.cancel ?? BASE))}
-  </form>`;
+  return periodsForm(place, {
+    flavour: "week2",
+    idName: "placeId",
+    id: place.id,
+    opts: { ...opts, action: opts.action ?? `${BASE}/zmena` },
+    lead: (row) => `Zavřeno nebo jiná doba: <b>${esc(row.name)}</b>. Na titulce se ukáže ${HOME_LEAD_DAYS} dní předem a po dobu, kdy platí. Víc dnů s různou dobou zapište jako víc období.`,
+  });
 }
 
 export function newHoursForm(place, opts = {}) {
@@ -221,7 +216,7 @@ export function adminPlaces(ctx, data, message, query = {}) {
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit místo", size: "wide", close: BASE, open: true, body: placeForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));
-  else if (changing) dialogs.push(modal({ id: "okno", title: "Dočasná změna", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
+  else if (changing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
   else if (renewing) dialogs.push(modal({ id: "okno", title: "Nová otevírací doba", size: "wide", close: BASE, open: true, body: newHoursForm(renewing, { submit: mode.submit("Zapsat novou dobu") }) }));
   else if (offering) dialogs.push(modal({ id: "okno", title: `Co tu najdete: ${offering.name}`, close: BASE, open: true, body: offersForm(offering, { submit: mode.submit("Uložit") }) }));
   else if (detailing) dialogs.push(modal({ id: "okno", title: `Adresa a telefon: ${detailing.name}`, close: BASE, open: true, body: detailsForm(detailing, { submit: mode.submit("Uložit") }) }));

@@ -25,7 +25,7 @@ export function adminOverview(ctx, data, message) {
   const adReturned = (data.adProposals ?? []).filter((row) => row.status === "rejected");
   const upcoming = (data.events ?? []).filter((row) => !today || row.startsOn >= today);
   const hiddenArticles = (data.articles ?? []).filter((row) => !row.published).length;
-  const closures = (data.yards ?? []).flatMap((yard) => yard.closures.map((closure) => ({ yard, closure })));
+  const closures = (data.yards ?? []).flatMap((yard) => [...yard.closures, ...(yard.changes ?? [])].map((closure) => ({ yard, closure })));
   const changes = (data.doctors ?? []).flatMap((doctor) => doctor.changes.map((change) => ({ doctor, change })));
 
   const waitingNotice = (notice) => !notice.published && Boolean(notice.sourceUrl);
@@ -159,7 +159,7 @@ export function adminOverview(ctx, data, message) {
       item({ title: row.title, meta: `${esc(formatLong(row.startsOn))}${row.startsTime ? ` v ${esc(row.startsTime)}` : ""} · ${esc(row.place)}`, badges: badge("Akce") }),
     ),
     ...closures.map(({ yard, closure }) =>
-      item({ title: yard.name, meta: `${esc(formatLong(closure.startsOn))}${closure.endsOn !== closure.startsOn ? ` – ${esc(formatLong(closure.endsOn))}` : ""} · ${esc(closure.reason)}`, badges: badge("Uzavření dvora", "warn") }),
+      item({ title: yard.name, meta: `${esc(formatLong(closure.startsOn))}${closure.endsOn !== closure.startsOn ? ` – ${esc(formatLong(closure.endsOn))}` : ""} · ${esc(closure.reason)}`, badges: badge("Změna dvora", "warn") }),
     ),
     ...changes.map(({ doctor, change }) =>
       item({ title: doctor.name, meta: `${esc(formatLong(change.startsOn))}${change.endsOn !== change.startsOn ? ` – ${esc(formatLong(change.endsOn))}` : ""} · ${esc(change.note)}`, badges: badge("Změna u lékaře", "warn") }),

@@ -133,7 +133,7 @@ test("bez přihlášení a na adresách mimo seznam se nic nefotí", async () =>
 test("návrh uzavření dvora a jeho schválení: žádost, pak nové uzavření a zmizelá žádost", async () => {
   const env = await freshEnv();
   const input = { yardId: "1", startsOn: "2026-10-20", endsOn: "2026-10-21", reason: "inventura" };
-  let watch = await auditStart(env, "/redakce/dvory/uzavreni", input, async () => JANA);
+  let watch = await auditStart(env, "/redakce/dvory/zmena", input, async () => JANA);
   const sent = await saveClosure(env, as("token-jana-00000000000"), input);
   assert.equal(sent.requested, true);
   await auditFinish(env, watch, redirect("/redakce/dvory?ok=zadost"), { zadost: "Návrh je odeslaný." });
