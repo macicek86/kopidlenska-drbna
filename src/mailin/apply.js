@@ -88,8 +88,18 @@ function regularWeeks(allowed) {
   ]);
 }
 
-function failure(item, message) {
-  return `${String(item?.target ?? "").replace(/^\[|\]$/g, "")}: ${message}`;
+// Jméno řádku podle značky z odpovědi ([misto:8]), jinak sama značka.
+function failure(item, message, allowed) {
+  const target = String(item?.target ?? "").replace(/^\[|\]$/g, "");
+  const [kind, id] = target.split(":");
+  const list = { misto: allowed.places, lekar: allowed.doctors, dvur: allowed.yards }[kind];
+  const name = list?.find((row) => String(row.id) === id)?.name;
+  return `${name || target}: ${message}`;
+}
+
+// Dvě různé změny téhož řádku na stejný den si odporují: e-mail se musí upřesnit.
+function overlaps(a, b) {
+  return a.kind !== "trvala" && b.kind !== "trvala" && a.section === b.section && a.targetId === b.targetId && a.span.startsOn <= b.span.endsOn && b.span.startsOn <= a.span.endsOn;
 }
 
 // Z odpovědi Drběny udělá změny připravené k zápisu a náhled pro odesílatele, nic nezapisuje.
@@ -100,8 +110,9 @@ export async function prepareChanges(env, { raw, allowed, today }) {
   const failed = [];
   for (const entry of (raw ?? []).slice(0, MAX_CHANGES)) {
     const change = changeInput(entry, regular);
+    if (change.skip) continue;
     if (change.error) {
-      failed.push(failure(entry, change.error));
+      failed.push(failure(entry, change.error, allowed));
       continue;
     }
     const spec = MANAGE_SECTIONS[change.section];
@@ -114,7 +125,13 @@ export async function prepareChanges(env, { raw, allowed, today }) {
     const since = change.action === "hodiny" ? { startsOn: change.span.startsOn } : {};
     const later = laterRegular(change, today);
     const line = `• ${describeChange(change.section, change.action, { ...value, ...since }, name)}${later ? " (novou běžnou dobu od pozdějšího dne potvrdíme)" : ""}`;
-    items.push({ section: change.section, action: change.action, targetId: change.targetId, kind: change.kind, span: change.span, input: change.input, name, line, later });
+    const item = { section: change.section, action: change.action, targetId: change.targetId, kind: change.kind, span: change.span, input: change.input, name, line, later };
+    const clash = items.find((other) => overlaps(other, item));
+    if (clash) {
+      failed.push(`${name}: na stejný den jsou dvě různé změny, napište nám prosím jen jednu`);
+      continue;
+    }
+    items.push(item);
   }
   return { items, failed };
 }

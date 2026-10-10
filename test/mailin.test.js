@@ -755,3 +755,27 @@ test("záznam hlaviček pro ověření: pořadí a hlavičky s výsledkem kontro
   assert.match(trace, /dkim-signature d=gmail\.com/);
   assert.match(trace, /worker x-cf-spamh-score: 0/);
 });
+
+test("zkrácení, které nic nezmění (prodloužení, den běžně zavřený), se nezapíše a ptá se; prodloužení jde přes časy", () => {
+  const regular = new Map([["misto:8", duhovka]]);
+  const base = { target: "misto:8", kind: "docasna", open_from: "", close_at: "", note: "", slots: [] };
+  // Úterý je běžně do 14:00, „do 15“ ho nezkrátí.
+  const tuesday = changeInput({ ...base, starts_on: "2026-10-13", ends_on: "2026-10-13", close_at: "15:00" }, regular);
+  assert.match(tuesday.error, /běžně je v ty dny otevřeno út 7:30–14:00/);
+  // Sobota je běžně zavřená.
+  assert.match(changeInput({ ...base, starts_on: "2026-10-17", ends_on: "2026-10-17", close_at: "10:00" }, regular).error, /běžně zavřeno/);
+  // Týden, kde se aspoň jeden den zkrátí, projde.
+  assert.ok(!changeInput({ ...base, starts_on: "2026-10-12", ends_on: "2026-10-16", close_at: "15:00" }, regular).error);
+  // Prodloužení v úterý: celé časy ve slots.
+  const longer = changeInput({ ...base, starts_on: "2026-10-13", ends_on: "2026-10-13", slots: [{ day: "ut", from: "07:30", to: "17:00", note: "" }] }, regular);
+  assert.equal(longer.input.doctorWeek.find((slot) => slot.day === 2).morning.to, "17:00");
+});
+
+test("nová běžná doba: stejná jako dnešní se přeskočí, jeden den vytržený z věty (zavřel by ostatní) se nezapíše", () => {
+  const regular = new Map([["misto:8", duhovka]]);
+  const friday = { target: "misto:8", kind: "trvala", starts_on: "2026-10-16", ends_on: "2026-10-16", open_from: "", close_at: "", note: "", slots: [{ day: "pa", from: "07:30", to: "12:00", note: "" }, { day: "pa", from: "13:00", to: "16:00", note: "" }] };
+  assert.match(changeInput(friday, regular).error, /celý nový týden/);
+  const same = [1, 3, 4, 5].flatMap((day) => [{ day: ["ne", "po", "ut", "st", "ct", "pa", "so"][day], from: "07:30", to: "12:00", note: "" }, { day: ["ne", "po", "ut", "st", "ct", "pa", "so"][day], from: "13:00", to: "16:00", note: "" }]);
+  same.push({ day: "ut", from: "07:30", to: "14:00", note: "" });
+  assert.equal(changeInput({ ...friday, slots: same }, regular).skip, true);
+});

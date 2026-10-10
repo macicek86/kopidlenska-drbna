@@ -4,8 +4,8 @@ import { callClaude } from "../claude.js";
 import { changeSpan, normalizeWeek } from "../doctors.js";
 import { formatLong } from "../format.js";
 import { isoDate } from "../notices.js";
-import { addDays } from "../waste.js";
-import { clock } from "./describe.js";
+import { addDays, civilWeekday, daysBetween } from "../waste.js";
+import { clock, weekText } from "./describe.js";
 import { hoursSummary as yardHours, parseTime } from "../yards.js";
 
 const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
@@ -27,11 +27,15 @@ Pravidla:
 - „Dnes zavřeno“ je zavřeno od dnešního dne (starts_on je dnešek), „zítra do 15“ nebo „dnes jen do 15“ je otevřeno jen do 15:00 (close_at). „Zavřeno do 15“ nebo „dnes otevíráme až v 15“ je otevřeno od 15:00 (open_from).
 - Když je v přehledu jediný řádek a e-mail místo nejmenuje, myslí ten. Zkratky a hovorové názvy (kvc, knihovna, obecňák, doktorka…) přiřaď podle přehledu; když by mohly patřit ke dvěma řádkům, je to "nejasne".
 - Datum bez roku je nejbližší takový den od dneška (dnešek včetně). Den v týdnu („v pátek“, „příští středu“) a slova „zítra“, „o víkendu“ počítej od dneška. Data ber z kalendáře v zadání, nepočítej je sám. Data piš jako RRRR-MM-DD.
-- „Příští týden“ je celý příští týden od pondělí do neděle, „tento týden“ od dneška do neděle, „do konce měsíce“ od dneška do posledního dne měsíce. Na nic se v tom případě neptej, zapiš celé období.
+- „Příští týden“ je celý příští týden od pondělí do neděle, „tento týden“ od dneška do neděle, „do konce měsíce“ od dneška do posledního dne měsíce. Na nic se v tom případě neptej, zapiš celé období („příští týden zavřeno dovolená“ je jedna změna zavreno od pondělí do neděle s note „dovolená“, i když e-mail nepíše, které dny).
+- Každý den má svůj vlastní stav. Když e-mail říká o různých dnech různé věci („zavřeno v úterý a ve čtvrtek jen do 15“), rozděl ho po dnech a každý den je zvláštní změna se svým kind: úterý "zavreno", čtvrtek "docasna" s close_at 15:00. Čas ani poznámku z jednoho dne nepřenášej na druhý, „jen do 15“ platí jen pro den, u kterého stojí. Stejné to je u více míst v jednom e-mailu.
+- Lidé píšou rychle: bez diakritiky, bez čárek a teček, ve zkratkách, s překlepy a často bez předmětu („ve stredu zavreno ve ctvrtek az od 10 v patek normal“). Větu proto nedělej podle interpunkce, ale podle dnů a míst: ke každému dni či období si urči, jestli je zavřeno, otevřeno jen do / až od nějaké hodiny, nebo jiná doba. „Normal“, „jako vzdy“ a podobně znamená běžná doba, nic se tam nezapisuje.
+- close_at a open_from dobu jen zkracují. Když e-mail říká, že bude otevřeno déle nebo dřív než běžně („budeme mít otevřeno do 17“, „otevíráme už v 7“) nebo že bude otevřeno v den, kdy je běžně zavřeno, nepoužij je: zapiš kind "docasna" a do slots celé časy toho dne.
 - Ptej se ("nejasne") jen tehdy, když opravdu nejde poznat místo, kdy, nebo jaké časy. Co jde rozumně odvodit, odvoď a zapiš.
 - Když zadání obsahuje předchozí e-mail a tvou otázku, nový e-mail je odpověď na ni: spoj oba dohromady (místo nebo důvod může být jen v tom předchozím).
 - kind "zavreno": v těch dnech má zavřeno (slots nech prázdné). kind "docasna": v těch dnech má jinou dobu, do slots dej jen časy, kdy je v tom období otevřeno. Platí od starts_on do ends_on (u jednoho dne stejné datum).
 - Když se jen dřív zavírá nebo později otevírá („zavřeno od 14“, „zavíráme už ve 14“, „otevíráme až v 10“), zapiš kind "docasna", slots nech prázdné a čas dej do close_at (zavírá v) nebo open_from (otevírá v). Běžné hodiny i polední pauzu z nich spočítá web sám, nepiš je. Jinak nech close_at i open_from prázdné.
+- „Normal“, „jako vždy“ a „běžně“ u jednoho dne jsou jen odpověď „tenhle den beze změny“, ne změna: nic k němu nezapisuj, hlavně ne kind "trvala". "trvala" jen když e-mail výslovně říká, že nová doba platí natrvalo nebo od určitého dne dál („od listopadu máme nově“).
 - kind "trvala": nová běžná otevírací doba natrvalo („od září máme nově…“). Do starts_on den, od kdy platí (když ho e-mail neříká, dnešek), do slots celý nový týden, i dny, které se nemění (vezmi je z přehledu).
 - Sběrný dvůr umí jen "zavreno" a "trvala" (jeden úsek denně). Jinou dobu na pár dní u dvora nezapisuj a zmiň to v question.
 - Ordinace: když e-mail říká, kdo z lékařů kdy ordinuje, zapiš dočasnou změnu se slots podle běžných hodin a v poznámce slotu změň jen to, kdo ordinuje. Když lékař neordinuje a o sestře e-mail nic neříká, je zavřeno; když výslovně řekne, že sestra bude, nech otevřeno jen na odběry (poznámka „jen odběry, lékař neordinuje“).
@@ -199,6 +203,14 @@ export function trimWeek(week, openFrom, closeAt) {
   return (week ?? []).map((slot) => ({ ...slot, morning: cut(slot.morning), afternoon: cut(slot.afternoon) }));
 }
 
+// Dny v týdnu, které období zasáhne (nejvýš týden).
+function shiftedDays(span) {
+  const days = new Set();
+  const total = Math.min(daysBetween(span.startsOn, span.endsOn), 6);
+  for (let step = 0; step <= total; step += 1) days.add(civilWeekday(addDays(span.startsOn, step)));
+  return days;
+}
+
 // `regular`: značka řádku ("misto:3") → jeho běžný týden; jen řádky, které adresa smí měnit.
 export function changeInput(raw, regular) {
   const target = String(raw?.target ?? "").trim().replace(/^\[|\]$/g, "");
@@ -211,6 +223,17 @@ export function changeInput(raw, regular) {
   if (span.error) return { error: "chybí nebo nesedí datum" };
   const note = String(raw?.note ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
   const closed = kind === "zavreno";
+  if (kind === "trvala" && match[1] !== "dvur") {
+    const regularWeek = regular.get(target);
+    const week = weekFromSlots(raw?.slots);
+    // Nová běžná doba, která je stejná jako ta dnešní, nic nemění.
+    if (!week.error && weekText(week.week) === weekText(regularWeek)) return { skip: true };
+    // Nový týden, který zavře dva a víc dní, co jsou běžně otevřené, je skoro jistě jen jeden den vytržený z věty.
+    const isOpen = (slot) => Boolean(slot?.morning?.open || slot?.afternoon?.open);
+    const dayOf = (list, day) => (list ?? []).find((slot) => slot.day === day);
+    const lost = [0, 1, 2, 3, 4, 5, 6].filter((day) => isOpen(dayOf(regularWeek, day)) && !isOpen(dayOf(week.week, day)));
+    if (!week.error && lost.length >= 2) return { error: "nová běžná doba by zavřela víc dní, než e-mail říká; napište nám prosím celý nový týden" };
+  }
   if (match[1] === "dvur") {
     if (kind === "docasna") return { error: "jinou dobu na pár dní u sběrného dvora zapsat nejde, jen zavřeno nebo novou běžnou dobu" };
     if (closed) return { section: "dvory", action: "uzavreni", targetId: id, kind, span, input: { startsOn: span.startsOn, endsOn: span.endsOn, reason: note || "Mimořádně zavřeno" } };
@@ -219,6 +242,16 @@ export function changeInput(raw, regular) {
   const openFrom = parseTime(raw?.open_from);
   const closeAt = parseTime(raw?.close_at);
   const shifted = kind === "docasna" && (openFrom || closeAt);
+  if (shifted) {
+    const days = shiftedDays(span);
+    const regularWeek = regular.get(target);
+    const trimmed = trimWeek(regularWeek, openFrom, closeAt);
+    // Zkrácení, které v zasažených dnech nic nezmění (e-mail chce dobu prodloužit, nebo je den běžně zavřený), se nezapíše.
+    if (![...days].some((day) => weekText(trimmed, new Set([day])) !== weekText(regularWeek, new Set([day])))) {
+      const usual = weekText(regularWeek, days);
+      return { error: `${usual ? `běžně je v ty dny otevřeno ${usual}` : "ty dny je běžně zavřeno"}, zadaný čas to nemění`, noEffect: true };
+    }
+  }
   const parsed = closed ? normalizeWeek([]) : shifted ? normalizeWeek(trimWeek(regular.get(target), openFrom, closeAt)) : weekFromSlots(raw?.slots);
   if (parsed.error) return { error: "nejde přečíst časy" };
   const open = parsed.week.some((slot) => slot.morning.open || slot.afternoon.open);
