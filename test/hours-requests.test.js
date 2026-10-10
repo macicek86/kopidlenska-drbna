@@ -45,7 +45,7 @@ async function freshEnv() {
     role text, active integer default 1)`);
   await run("create table user_permissions (user_id integer, code text)");
   await run("create table yards (id integer primary key, name text, place text, accepts text, hours text, sort_order integer default 0, published integer default 1)");
-  await run("create table yard_closures (id integer primary key autoincrement, yard_id integer, starts_on text, ends_on text, reason text, created_by integer)");
+  await run("create table yard_closures (id integer primary key autoincrement, yard_id integer, starts_on text, ends_on text, reason text, hours text, created_by integer)");
   await ensurePlaceTables(env);
   await ensureRequestTables(env);
   await ensureLinkTables(env);

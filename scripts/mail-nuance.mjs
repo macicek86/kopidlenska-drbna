@@ -41,6 +41,7 @@ const CASES = [
   [[8], "pristi tyden zavreno dovolena", [T(8, "zavreno", ["2026-10-12", "2026-10-18"])]],
   [[8, 3, 5], "Knihovna v pondeli zavřeno v pátek jen do 10 děkuji", [T(3, "zavreno", "2026-10-12"), T(3, "docasna", "2026-10-16", { close: "10:00" })]],
   [[8, 3, 5], "kvc zavreno 20.10 a 21.10", [T(5, "zavreno", ["2026-10-20", "2026-10-21"])]],
+  [[8], "14.10 bude zavreno a 26.10 jen do desiti hodin", [T(8, "zavreno", "2026-10-14"), T(8, "docasna", "2026-10-26", { close: "10:00" })]],
   [[8], "dnes otevřeno do 18", "slots"],
   [[8], "v utery otevirame uz v 7", "slots"],
   [[8], "dobry den ve ctvrtek mame skoleni takze prijdte az po obede od 13", [T(8, "docasna", "2026-10-15", { open: "13:00" })]],

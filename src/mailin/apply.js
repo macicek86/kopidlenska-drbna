@@ -84,7 +84,7 @@ function regularWeeks(allowed) {
   return new Map([
     ...allowed.places.map((row) => [`misto:${row.id}`, row.week]),
     ...allowed.doctors.map((row) => [`lekar:${row.id}`, row.week]),
-    ...allowed.yards.map((row) => [`dvur:${row.id}`, null]),
+    ...allowed.yards.map((row) => [`dvur:${row.id}`, row.week]),
   ]);
 }
 
@@ -125,7 +125,7 @@ export async function prepareChanges(env, { raw, allowed, today }) {
     const since = change.action === "hodiny" ? { startsOn: change.span.startsOn } : {};
     const later = laterRegular(change, today);
     const line = `• ${describeChange(change.section, change.action, { ...value, ...since }, name)}${later ? " (novou běžnou dobu od pozdějšího dne potvrdíme)" : ""}`;
-    const item = { section: change.section, action: change.action, targetId: change.targetId, kind: change.kind, span: change.span, input: change.input, name, line, later };
+    const item = { section: change.section, action: change.action, targetId: change.targetId, kind: change.kind, span: change.span, shift: change.shift ?? null, input: change.input, name, line, later };
     const clash = items.find((other) => overlaps(other, item));
     if (clash) {
       failed.push(`${name}: na stejný den jsou dvě různé změny, napište nám prosím jen jednu`);

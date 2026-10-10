@@ -4,9 +4,10 @@ import { callClaude } from "../claude.js";
 import { changeSpan, normalizeWeek } from "../doctors.js";
 import { formatLong } from "../format.js";
 import { isoDate } from "../notices.js";
-import { addDays, civilWeekday, daysBetween } from "../waste.js";
+import { addDays } from "../waste.js";
 import { clock, weekText } from "./describe.js";
-import { hoursSummary as yardHours, parseTime } from "../yards.js";
+import { spanWeekdays, trimWeek, weekDiffers } from "../week-shift.js";
+import { hoursSummary as yardHours, normalizeWeek as yardNormalize, parseTime } from "../yards.js";
 
 const DAY_NAMES = ["neděle", "pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota"];
 
@@ -37,7 +38,7 @@ Pravidla:
 - Když se jen dřív zavírá nebo později otevírá („zavřeno od 14“, „zavíráme už ve 14“, „otevíráme až v 10“), zapiš kind "docasna", slots nech prázdné a čas dej do close_at (zavírá v) nebo open_from (otevírá v). Běžné hodiny i polední pauzu z nich spočítá web sám, nepiš je. Jinak nech close_at i open_from prázdné.
 - „Normal“, „jako vždy“ a „běžně“ u jednoho dne jsou jen odpověď „tenhle den beze změny“, ne změna: nic k němu nezapisuj, hlavně ne kind "trvala". "trvala" jen když e-mail výslovně říká, že nová doba platí natrvalo nebo od určitého dne dál („od listopadu máme nově“).
 - kind "trvala": nová běžná otevírací doba natrvalo („od září máme nově…“). Do starts_on den, od kdy platí (když ho e-mail neříká, dnešek), do slots celý nový týden, i dny, které se nemění (vezmi je z přehledu).
-- Sběrný dvůr umí jen "zavreno" a "trvala" (jeden úsek denně). Jinou dobu na pár dní u dvora nezapisuj a zmiň to v question.
+- Sběrný dvůr má jeden úsek za den (bez polední pauzy): u něj slots obsahují nejvýš jeden úsek na den. Jinak platí stejná pravidla jako u ostatních míst, i dočasná jiná doba.
 - Ordinace: když e-mail říká, kdo z lékařů kdy ordinuje, zapiš dočasnou změnu se slots podle běžných hodin a v poznámce slotu změň jen to, kdo ordinuje. Když lékař neordinuje a o sestře e-mail nic neříká, je zavřeno; když výslovně řekne, že sestra bude, nech otevřeno jen na odběry (poznámka „jen odběry, lékař neordinuje“).
 - new_place vyplň jen u "nove_misto" (jinak prázdné řetězce a prázdné slots): name je krátký název, jak se má vypisovat („Pekárna u Nováků“), label druh nebo popisek („Pekárna“), address adresa, phone telefon, slots běžná otevírací doba jako u "trvala". Čeho se e-mail nedotýká, nech prázdné a nic si nevymýšlej.
 - Změnu, která už v přehledu u místa je, nezapisuj znovu.
@@ -107,7 +108,9 @@ function yardContext(yards) {
   if (!yards.length) return "";
   const rows = yards.map((yard) => {
     const closed = (yard.closures ?? []).map((closure) => `${closure.startsOn}${closure.endsOn !== closure.startsOn ? ` až ${closure.endsOn}` : ""} zavřeno`);
-    return `[dvur:${yard.id}] ${yard.name} · ${yardHours(yard)}${closed.length ? ` · změny: ${closed.join("; ")}` : ""}`;
+    const other = (yard.changes ?? []).map((change) => `${change.startsOn}${change.endsOn !== change.startsOn ? ` až ${change.endsOn}` : ""} ${yardHours({ week: change.week })}`);
+    const all = [...closed, ...other];
+    return `[dvur:${yard.id}] ${yard.name} · ${yardHours(yard)}${all.length ? ` · změny: ${all.join("; ")}` : ""}`;
   });
   return `Sběrné dvory:\n${rows.join("\n")}`;
 }
@@ -191,27 +194,9 @@ function yardWeek(slots) {
   return [...byDay.values()];
 }
 
-// Jedna změna z odpovědi, převedená na formulář sekce (stejná pole jako v redakci), nebo { error }.
-// Běžný týden zkrácený na „otevírá v“ / „zavírá v“: úseky se jen oříznou, polední pauza zůstane.
-export function trimWeek(week, openFrom, closeAt) {
-  const cut = (part) => {
-    if (!part?.open) return part;
-    const from = openFrom && openFrom > part.from ? openFrom : part.from;
-    const to = closeAt && closeAt < part.to ? closeAt : part.to;
-    return from < to ? { ...part, from, to } : { ...part, open: false };
-  };
-  return (week ?? []).map((slot) => ({ ...slot, morning: cut(slot.morning), afternoon: cut(slot.afternoon) }));
-}
-
-// Dny v týdnu, které období zasáhne (nejvýš týden).
-function shiftedDays(span) {
-  const days = new Set();
-  const total = Math.min(daysBetween(span.startsOn, span.endsOn), 6);
-  for (let step = 0; step <= total; step += 1) days.add(civilWeekday(addDays(span.startsOn, step)));
-  return days;
-}
-
 // `regular`: značka řádku ("misto:3") → jeho běžný týden; jen řádky, které adresa smí měnit.
+export { trimWeek };
+
 export function changeInput(raw, regular) {
   const target = String(raw?.target ?? "").trim().replace(/^\[|\]$/g, "");
   const match = target.match(/^(misto|lekar|dvur):(\d+)$/);
@@ -234,34 +219,41 @@ export function changeInput(raw, regular) {
     const lost = [0, 1, 2, 3, 4, 5, 6].filter((day) => isOpen(dayOf(regularWeek, day)) && !isOpen(dayOf(week.week, day)));
     if (!week.error && lost.length >= 2) return { error: "nová běžná doba by zavřela víc dní, než e-mail říká; napište nám prosím celý nový týden" };
   }
-  if (match[1] === "dvur") {
-    if (kind === "docasna") return { error: "jinou dobu na pár dní u sběrného dvora zapsat nejde, jen zavřeno nebo novou běžnou dobu" };
-    if (closed) return { section: "dvory", action: "uzavreni", targetId: id, kind, span, input: { startsOn: span.startsOn, endsOn: span.endsOn, reason: note || "Mimořádně zavřeno" } };
-    return { section: "dvory", action: "hodiny", targetId: id, kind, span, input: { week: yardWeek(raw.slots) } };
-  }
   const openFrom = parseTime(raw?.open_from);
   const closeAt = parseTime(raw?.close_at);
   const shifted = kind === "docasna" && (openFrom || closeAt);
+  const regularWeek = regular.get(target);
+  const days = spanWeekdays(span.startsOn, span.endsOn);
+  const shiftNote = [openFrom && `otevírá až v ${clock(openFrom)}`, closeAt && `zavírá už v ${clock(closeAt)}`].filter(Boolean).join(", ");
+  const fallback = closed ? "Mimořádně zavřeno" : shifted ? shiftNote.charAt(0).toUpperCase() + shiftNote.slice(1) : "Jiná otevírací doba";
+  // Pro formulář s obdobími: „jen do“ / „až od“ se předvyplní jako volba s časem, ne jako celý týden.
+  const shift = shifted && !(openFrom && closeAt) ? { mode: closeAt ? "jendo" : "azod", time: closeAt || openFrom } : null;
+  let trimmed = null;
   if (shifted) {
-    const days = shiftedDays(span);
-    const regularWeek = regular.get(target);
-    const trimmed = trimWeek(regularWeek, openFrom, closeAt);
+    trimmed = trimWeek(regularWeek, openFrom, closeAt, days);
     // Zkrácení, které v zasažených dnech nic nezmění (e-mail chce dobu prodloužit, nebo je den běžně zavřený), se nezapíše.
-    if (![...days].some((day) => weekText(trimmed, new Set([day])) !== weekText(regularWeek, new Set([day])))) {
+    if (!weekDiffers(regularWeek, trimmed, days)) {
       const usual = weekText(regularWeek, days);
       return { error: `${usual ? `běžně je v ty dny otevřeno ${usual}` : "ty dny je běžně zavřeno"}, zadaný čas to nemění`, noEffect: true };
     }
   }
-  const parsed = closed ? normalizeWeek([]) : shifted ? normalizeWeek(trimWeek(regular.get(target), openFrom, closeAt)) : weekFromSlots(raw?.slots);
+  if (match[1] === "dvur") {
+    if (kind === "trvala") return { section: "dvory", action: "hodiny", targetId: id, kind, span, input: { week: yardWeek(raw.slots) } };
+    const input = { startsOn: span.startsOn, endsOn: span.endsOn, reason: note || fallback };
+    if (closed) return { section: "dvory", action: "zmena", targetId: id, kind, span, input };
+    const week = shifted ? trimmed : yardWeek(raw.slots);
+    const checked = yardNormalize(week);
+    if (checked.error || !checked.week.some((slot) => slot.open)) return { error: "chybí časy, kdy je otevřeno" };
+    return { section: "dvory", action: "zmena", targetId: id, kind, span, shift, input: { ...input, week: checked.week } };
+  }
+  const parsed = closed ? normalizeWeek([]) : shifted ? normalizeWeek(trimmed) : weekFromSlots(raw?.slots);
   if (parsed.error) return { error: "nejde přečíst časy" };
   const open = parsed.week.some((slot) => slot.morning.open || slot.afternoon.open);
   if (!closed && !open) return { error: "chybí časy, kdy je otevřeno" };
-  const shiftNote = [openFrom && `otevírá až v ${clock(openFrom)}`, closeAt && `zavírá už v ${clock(closeAt)}`].filter(Boolean).join(", ");
-  const fallback = closed ? "Mimořádně zavřeno" : shifted ? shiftNote.charAt(0).toUpperCase() + shiftNote.slice(1) : "Jiná otevírací doba";
   const changeNote = note || fallback;
   if (match[1] === "lekar") {
     if (kind === "trvala") return { section: "lekari", action: "hodiny", targetId: id, kind, span, input: { doctorWeek: parsed.week } };
-    return { section: "lekari", action: "zmena", targetId: id, kind, span, input: { startsOn: span.startsOn, endsOn: span.endsOn, changeNote, doctorWeek: parsed.week } };
+    return { section: "lekari", action: "zmena", targetId: id, kind, span, shift, input: { startsOn: span.startsOn, endsOn: span.endsOn, changeNote, doctorWeek: parsed.week } };
   }
   return {
     section: "oteviraci-doba",
@@ -269,6 +261,7 @@ export function changeInput(raw, regular) {
     targetId: id,
     kind,
     span,
+    shift,
     input: { kind: kind === "trvala" ? "trvala" : "docasna", startsOn: span.startsOn, endsOn: span.endsOn, changeNote: kind === "trvala" ? note : changeNote, doctorWeek: parsed.week, placeId: id },
   };
 }

@@ -1,4 +1,5 @@
 import { addDays, civilWeekday, daysBetween } from "./waste.js";
+import { spanWeekdays } from "./week-shift.js";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
 const DAY_IN = ["neděli", "pondělí", "úterý", "středu", "čtvrtek", "pátek", "sobotu"];
@@ -90,6 +91,14 @@ export function normalizeWeek(slots) {
   return { week };
 }
 
+// Týden dočasné jiné doby z uloženého JSON (sloupec `hours` u změny), nebo null, když jde o zavření.
+export function weekOfChange(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text.startsWith("[")) return null;
+  const { week } = parseHours(text);
+  return week.some((slot) => slot.open) ? week : null;
+}
+
 function openSlot(week, iso) {
   const day = civilWeekday(iso);
   return (week ?? []).find((slot) => slot.day === day && slot.open) ?? null;
@@ -101,19 +110,28 @@ function closureOn(closures, iso) {
   return hits.reduce((latest, closure) => (closure.endsOn > latest.endsOn ? closure : latest));
 }
 
+// Doba, která ten den platí: dočasná změna (nejnovější, když se jich víc překrývá), jinak běžná.
+// `change` je jen u dne s jinou dobou, i když v něm zavřeno (týden změny ten den nemá otevřeno).
+function effective(yard, iso) {
+  const hits = (yard.changes ?? []).filter((change) => coversDay(change, iso));
+  if (hits.length) {
+    const change = hits.reduce((latest, item) => (item.id >= latest.id ? item : latest));
+    return { slot: openSlot(change.week, iso), change, note: String(change.reason ?? "").trim() };
+  }
+  return { slot: openSlot(weekOf(yard), iso), change: null, note: "" };
+}
+
 function nextOpening(yard, startDate) {
-  const week = weekOf(yard);
   for (let step = 0; step <= 400; step += 1) {
     const date = step === 0 ? startDate : addDays(startDate, step);
     if (closureOn(yard.closures, date)) continue;
-    const slot = openSlot(week, date);
-    if (slot) return { date, from: slot.from, to: slot.to };
+    const { slot, note } = effective(yard, date);
+    if (slot) return { date, from: slot.from, to: slot.to, note };
   }
   return null;
 }
 
 export function yardStatus(yard, today, time) {
-  const week = weekOf(yard);
   const clock = parseTime(time) || "00:00";
   const closure = closureOn(yard.closures, today);
   if (closure) {
@@ -124,12 +142,12 @@ export function yardStatus(yard, today, time) {
       next: nextOpening(yard, addDays(closure.endsOn, 1)),
     };
   }
-  const todaySlot = openSlot(week, today);
+  const { slot: todaySlot, note } = effective(yard, today);
   if (todaySlot && clock >= todaySlot.from && clock < todaySlot.to) {
-    return { kind: "open", from: todaySlot.from, to: todaySlot.to };
+    return { kind: "open", from: todaySlot.from, to: todaySlot.to, note };
   }
   if (todaySlot && clock < todaySlot.from) {
-    return { kind: "later", from: todaySlot.from, to: todaySlot.to };
+    return { kind: "later", from: todaySlot.from, to: todaySlot.to, note };
   }
   const tomorrow = addDays(today, 1);
   const ahead = closureOn(yard.closures, tomorrow);
@@ -211,11 +229,12 @@ function dayAside(yard, today) {
       short: speak([short, again.short]),
     };
   }
-  const slot = openSlot(weekOf(yard), date);
+  const { slot, note } = effective(yard, date);
   if (slot) {
     const text = `Zítra ${range(slot.from, slot.to)}.`;
-    return { sentence: text, short: text };
+    return { sentence: speak([text, note ? finish(note) : ""]), short: speak([text, note ? finish(note) : ""]) };
   }
+  if (note) return { sentence: speak(["Zítra má zavřeno.", finish(note)]), short: speak(["Zítra zavřeno.", finish(note)]) };
   return { sentence: "Zítra má zavřeno.", short: "Zítra zavřeno." };
 }
 
@@ -231,9 +250,9 @@ function presented(yard, today, time) {
       kind: "open",
       name,
       state: "Teď otevřený",
-      detail: `${status.from}–${status.to}`,
+      detail: speak([`${status.from}–${status.to}`, status.note ? `· ${status.note}` : ""]),
       tomorrow: aside.short,
-      line: speak([`${name} je teď otevřený, dnes ${status.from}–${status.to}.`, aside.sentence]),
+      line: speak([`${name} je teď otevřený, dnes ${status.from}–${status.to}.`, status.note ? finish(status.note) : "", aside.sentence]),
     };
   }
   if (status.kind === "later") {
@@ -242,10 +261,11 @@ function presented(yard, today, time) {
       kind: "later",
       name,
       state: `Otevře v ${status.from}`,
-      detail: `Dnes do ${status.to}.`,
+      detail: speak([`Dnes do ${status.to}.`, status.note ? finish(status.note) : ""]),
       tomorrow: aside.short,
       line: speak([
         `${name} dnes otevře v ${status.from} a má otevřeno do ${status.to}.`,
+        status.note ? finish(status.note) : "",
         aside.sentence,
       ]),
     };
@@ -310,4 +330,10 @@ export function hoursSummary(yard) {
   const open = (yard.week ?? []).filter((slot) => slot.open);
   if (!open.length) return "Bez otevřeného dne";
   return open.map((slot) => `${SHORT[slot.day]} ${slot.from}–${slot.to}`).join(", ");
+}
+
+// Jiná doba dočasné změny jen ve dnech v týdnu, které období zasáhne („So 08:00–10:00“).
+export function changeSummary(change) {
+  const days = spanWeekdays(change.startsOn, change.endsOn);
+  return hoursSummary({ week: (change.week ?? []).filter((slot) => days.has(slot.day)) });
 }

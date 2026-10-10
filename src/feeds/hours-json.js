@@ -57,12 +57,10 @@ export function hoursJson(base, { places = [], doctors = [], yards = [] }) {
       accepts: yard.accepts,
       url: `${base}/sberne-dvory#dvur-${yard.id}`,
       ...(yard.legacy ? { hours_text: yard.legacy } : { week: weekJson(yard.week) }),
-      closures: (yard.closures ?? []).map((closure) => ({
-        kind: "closed",
-        starts_on: closure.startsOn,
-        ends_on: closure.endsOn,
-        note: closure.reason,
-      })),
+      closures: [
+        ...(yard.closures ?? []).map((closure) => ({ kind: "closed", starts_on: closure.startsOn, ends_on: closure.endsOn, note: closure.reason })),
+        ...(yard.changes ?? []).map((change) => ({ kind: "temporary", starts_on: change.startsOn, ends_on: change.endsOn, note: change.reason, week: weekJson(change.week) })),
+      ],
     })),
   };
 }

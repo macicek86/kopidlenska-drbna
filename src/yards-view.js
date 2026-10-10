@@ -5,26 +5,29 @@ import { yardLd } from "./hours-ld.js";
 import { shareLayout, sharedRow } from "./hours-share.js";
 import { rowShare } from "./share.js";
 import { addDays, civilWeekday } from "./waste.js";
-import { coversDay, homeStatus, statusLine } from "./yards.js";
+import { changeSummary, coversDay, homeStatus, statusLine } from "./yards.js";
 import { askLine, clockOf, closureLabel, dayLabel, layout, siteOrigin } from "./view.js";
 
 // Běžný týden od pondělí. Den, jehož nejbližší výskyt (dnes až za 6 dní) padne do mimořádného
 // uzavření, má hodiny přeškrtnuté.
-function weekList(week, today, closures = []) {
+// Dočasná jiná doba v ten den: přeškrtnutá běžná a vedle ní nová (nebo „zavřeno“, když ten den ve změně otevřeno není).
+function weekList(week, today, closures = [], changes = []) {
   const todayDay = civilWeekday(today);
   return `<ul class="week-list">${week
     .map((slot) => {
       const date = addDays(today, (slot.day - todayDay + 7) % 7);
       const closed = slot.open && closures.some((closure) => coversDay(closure, date));
-      const classes = [slot.day === todayDay ? "is-today" : "", slot.open ? "" : "is-off", closed ? "is-closure" : ""]
+      const changed = closed ? null : changes.filter((change) => coversDay(change, date)).at(-1) ?? null;
+      const other = changed ? changed.week.find((item) => item.day === slot.day) : null;
+      const classes = [slot.day === todayDay ? "is-today" : "", slot.open || other?.open ? "" : "is-off", closed || (changed && slot.open) ? "is-closure" : ""]
         .filter(Boolean)
         .join(" ");
       const hours = esc(`${slot.from}–${slot.to}`);
-      const when = closed
-        ? `<em>zavřeno ${shortDay(date)}</em> <s>${hours}</s>`
-        : slot.open
-          ? hours
-          : "zavřeno";
+      let when;
+      if (closed) when = `<em>zavřeno ${shortDay(date)}</em> <s>${hours}</s>`;
+      else if (changed && other?.open) when = `<em>jinak ${shortDay(date)}</em> ${slot.open ? `<s>${hours}</s> ` : ""}${esc(`${other.from}–${other.to}`)}`;
+      else if (changed && slot.open) when = `<em>zavřeno ${shortDay(date)}</em> <s>${hours}</s>`;
+      else when = slot.open ? hours : "zavřeno";
       return `<li${classes ? ` class="${classes}"` : ""}><span>${esc(dayLabel(slot.day))}</span><strong>${when}</strong></li>`;
     })
     .join("")}</ul>`;
@@ -55,18 +58,18 @@ export function yardsPage(data, ctx, params) {
   const cards = yards.length
     ? yards
         .map((yard) => {
-          const later = yard.closures.filter((closure) => closure.startsOn > today);
+          const later = [...yard.closures, ...(yard.changes ?? [])].filter((closure) => closure.startsOn > today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
           const planned = later.length
             ? `<p class="kicker">${esc(tx(ctx.copy, "yards_upcoming"))}</p><div class="dates compact">${later
                 .map(
                   (closure) =>
-                    `<article class="date-tile"><strong>${esc(closureLabel(closure))}</strong><span>${esc(closure.reason)}</span></article>`,
+                    `<article class="date-tile"><strong>${esc(closureLabel(closure))}</strong><span>${esc(closure.reason)}</span>${closure.week ? `<span>${esc(changeSummary(closure))}</span>` : ""}</article>`,
                 )
                 .join("")}</div>`
             : "";
           const hours = yard.legacy
             ? `<p class="keep-lines">${esc(yard.legacy)}</p>`
-            : weekList(yard.week, today, yard.closures);
+            : weekList(yard.week, today, yard.closures, yard.changes ?? []);
           // Víc dvorů: stejné řádky mřížky jako karty otevírací doby (záhlaví, nadpis týdne, 7 dnů, uzavření).
           return `<article class="card yard${several ? " place-card" : ""}" id="dvur-${yard.id}">
             <div class="place-head">

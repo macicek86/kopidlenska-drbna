@@ -3,7 +3,7 @@ import { asBool, clip, requireChief } from "./db-core.js";
 import { submitHours } from "./hours-requests-db.js";
 import { removeLinksOf } from "./hours-links-db.js";
 import { removeMailTargetsOf } from "./mailin/store.js";
-import { closureSpan, normalizeWeek, parseHours } from "./yards.js";
+import { closureSpan, normalizeWeek, parseHours, weekOfChange } from "./yards.js";
 
 function mapYard(row) {
   const hours = parseHours(row.hours);
@@ -17,6 +17,7 @@ function mapYard(row) {
     sortOrder: Number(row.sort_order ?? 0),
     published: asBool(row.published),
     closures: [],
+    changes: [],
   };
 }
 
@@ -27,6 +28,8 @@ function mapClosure(row) {
     startsOn: String(row.starts_on ?? "").slice(0, 10),
     endsOn: String(row.ends_on ?? "").slice(0, 10),
     reason: String(row.reason ?? ""),
+    // Týden dočasné jiné doby (jeden úsek denně), bez něj je to zavření.
+    week: weekOfChange(row.hours),
     createdBy: row.created_by == null || row.created_by === "" ? null : Number(row.created_by),
   };
 }
@@ -39,7 +42,7 @@ export async function loadYards(env, { publicOnly = false, today = null } = {}) 
        from yards order by sort_order asc, id asc`;
   const yards = ((await env.DB.prepare(yardSql).all()).results ?? []).map(mapYard);
   if (!yards.length) return [];
-  let closureSql = "select id, yard_id, starts_on, ends_on, reason, created_by from yard_closures";
+  let closureSql = "select id, yard_id, starts_on, ends_on, reason, hours, created_by from yard_closures";
   const binds = [];
   if (today) {
     closureSql += " where ends_on >= ?";
@@ -52,7 +55,7 @@ export async function loadYards(env, { publicOnly = false, today = null } = {}) 
   for (const row of rows.results ?? []) {
     const closure = mapClosure(row);
     const yard = byYard.get(closure.yardId);
-    if (yard) yard.closures.push(closure);
+    if (yard) (closure.week ? yard.changes : yard.closures).push(closure);
   }
   return yards;
 }
@@ -107,12 +110,19 @@ export async function removeYard(env, request, id) {
   return { ok: true };
 }
 
+// Zavření (bez `week`), nebo dočasná jiná doba (`week`: sedm dní, v jednom aspoň jeden otevřený úsek).
+// Týden bez otevřeného dne je zavření.
 function readClosure(input) {
   const span = closureSpan(input.startsOn, input.endsOn);
   if (span.error) return span;
   const reason = clip(input.reason, 400);
-  if (reason.length < 3) return { error: "Napište důvod uzavření." };
-  return { startsOn: span.startsOn, endsOn: span.endsOn, reason };
+  if (reason.length < 3) return { error: "Napište důvod uzavření nebo změny." };
+  const value = { startsOn: span.startsOn, endsOn: span.endsOn, reason };
+  const slots = input.week;
+  if (!Array.isArray(slots) || !slots.some((slot) => slot?.open)) return value;
+  const normalized = normalizeWeek(slots);
+  if (normalized.error) return normalized;
+  return { ...value, week: normalized.week };
 }
 
 async function yardExists(env, id) {
@@ -132,6 +142,19 @@ function readYardDetails(input) {
   if (accepts.length < 3) return { error: "Napište, co se tam vozí." };
   return { place, accepts };
 }
+
+// Zavření i dočasná jiná doba jsou jeden druh záznamu. `uzavreni` zůstává kvůli starším žádostem a e-mailům.
+const CLOSURE_ACTION = {
+  read: readClosure,
+  target: yardExists,
+  missing: "Tenhle sběrný dvůr už tu není.",
+  apply: async (env, yardId, value, userId) => {
+    await env.DB.prepare("insert into yard_closures (yard_id, starts_on, ends_on, reason, hours, created_by) values (?, ?, ?, ?, ?, ?)")
+      .bind(yardId, value.startsOn, value.endsOn, value.reason, value.week ? JSON.stringify(value.week) : null, userId)
+      .run();
+    return { ok: true };
+  },
+};
 
 // Co jde u dvora zapsat rovnou nebo poslat ke schválení (src/hours-requests-db.js).
 export const YARD_ACTIONS = {
@@ -153,17 +176,8 @@ export const YARD_ACTIONS = {
       return { ok: true };
     },
   },
-  uzavreni: {
-    read: readClosure,
-    target: yardExists,
-    missing: "Tenhle sběrný dvůr už tu není.",
-    apply: async (env, yardId, value, userId) => {
-      await env.DB.prepare("insert into yard_closures (yard_id, starts_on, ends_on, reason, created_by) values (?, ?, ?, ?, ?)")
-        .bind(yardId, value.startsOn, value.endsOn, value.reason, userId)
-        .run();
-      return { ok: true };
-    },
-  },
+  uzavreni: CLOSURE_ACTION,
+  zmena: CLOSURE_ACTION,
   zrusit: {
     fields: false,
     read: () => ({}),
@@ -181,5 +195,5 @@ const submit = (env, request, action, targetId, input = {}) =>
 
 export const saveYardHours = (env, request, input) => submit(env, request, "hodiny", input.yardId, input);
 export const saveYardDetails = (env, request, input) => submit(env, request, "udaje", input.yardId, input);
-export const saveClosure = (env, request, input) => submit(env, request, "uzavreni", input.yardId, input);
+export const saveClosure = (env, request, input) => submit(env, request, "zmena", input.yardId, input);
 export const removeClosure = (env, request, id) => submit(env, request, "zrusit", id);

@@ -13,7 +13,7 @@ export const REQUEST_SECTIONS = {
     direct: "sberny_dvur",
     request: "sberny_dvur_navrh",
     label: "Sběrné dvory",
-    denied: "Mimořádné uzavření zapíše hlavní redaktor, nebo člověk s oprávněním na sběrný dvůr.",
+    denied: "Zavření nebo jinou dobu dvora zapíše hlavní redaktor, nebo člověk s oprávněním na sběrný dvůr.",
   },
   lekari: {
     direct: "doktori",
@@ -38,6 +38,8 @@ const REQUEST_ACTIONS = {
   udaje: "údaje (adresa, telefon…)",
   zrusit: "zrušení zapsané změny",
 };
+// Sběrné dvory mají záznam pro zavření i jinou dobu, jedna akce `zmena`.
+const YARD_REQUEST = "mimořádné uzavření nebo jiná doba";
 const REQUEST_ROWS = { dvory: "yards", lekari: "doctors", "oteviraci-doba": "places" };
 
 async function requestNotice(env, author, { section, action, targetId, id, mail = null }) {
@@ -50,7 +52,7 @@ async function requestNotice(env, author, { section, action, targetId, id, mail 
       ["Od", author],
       ["Sekce", REQUEST_SECTIONS[section].label],
       ["Kde", row?.name ?? ""],
-      ["Co", REQUEST_ACTIONS[action] ?? action],
+      ["Co", section === "dvory" && action === "zmena" ? YARD_REQUEST : (REQUEST_ACTIONS[action] ?? action)],
       ...(mail ? [["E-mail", mail.subject]] : []),
     ],
     body: mail?.text ?? "",

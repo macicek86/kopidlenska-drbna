@@ -109,7 +109,7 @@ export const COPY = [
   { group: "Sběrné dvory", key: "yards_description", label: "Popis stránky sběrných dvorů", value: "Sběrné dvory v Kopidlně: co se tam vozí, kdy mají otevřeno a kdy je mimořádně zavřeno.", max: 240, long: true },
   { group: "Sběrné dvory", key: "yards_eyebrow", label: "Malý nadpis stránky dvorů", value: "Odpad", max: 40 },
   { group: "Sběrné dvory", key: "yards_heading", label: "Nadpis stránky dvorů", value: "Sběrné dvory", max: 80 },
-  { group: "Sběrné dvory", key: "yards_lede", label: "Úvod stránky dvorů", value: "Co se kam vozí a kdy mají otevřeno. Když je dvůr mimořádně zavřený, je tu i důvod. Není to úřední deska města.", max: 500, long: true },
+  { group: "Sběrné dvory", key: "yards_lede", label: "Úvod stránky dvorů", value: "Co se kam vozí a kdy mají otevřeno. Když je dvůr mimořádně zavřený nebo má jinou dobu, je tu i důvod. Není to úřední deska města.", max: 500, long: true },
   { group: "Sběrné dvory", key: "yards_empty", label: "Když není žádný dvůr", value: "Zatím tu není zveřejněný sběrný dvůr. Až ho redakce doplní, objeví se tady.", max: 240, long: true },
   { group: "Sběrné dvory", key: "yards_ask", label: "Otázka pod úvodem", value: "Je tu něco špatně?", max: 120 },
   { group: "Sběrné dvory", key: "yards_ask_chat", label: "Odkaz pod úvodem, když je chat zapnutý", value: "Řekněte to Drběně v chatu", max: 80 },
@@ -117,7 +117,7 @@ export const COPY = [
   { group: "Sběrné dvory", key: "yards_accepts", label: "Nadpis, co dvůr bere", value: "Co se sem vozí", max: 80 },
   { group: "Sběrné dvory", key: "yards_hours", label: "Nadpis otevírací doby", value: "Otevřeno", max: 40 },
   { group: "Sběrné dvory", key: "yards_closed", label: "Štítek mimořádného uzavření", value: "Mimořádně zavřeno", max: 80 },
-  { group: "Sběrné dvory", key: "yards_upcoming", label: "Nadpis plánovaných uzavření", value: "Plánovaná uzavření", max: 80 },
+  { group: "Sběrné dvory", key: "yards_upcoming", label: "Nadpis plánovaných změn", value: "Plánované změny", max: 80 },
 
   { group: "Lékaři", key: "doctors_description", label: "Popis stránky lékařů", value: "Ordinační hodiny lékařů v Kopidlně a dočasné změny, třeba zástup nebo jiná doba.", max: 240, long: true },
   { group: "Lékaři", key: "doctors_eyebrow", label: "Malý nadpis stránky lékařů", value: "Ordinace", max: 40 },

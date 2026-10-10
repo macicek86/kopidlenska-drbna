@@ -67,6 +67,11 @@ function closedSpec(startsOn, endsOn, day = null) {
 // Dočasná změna: zavřeno celé období, nebo jiné hodiny ve dny, které do období padnou (ostatní z nich zavřené).
 export function changeSpec(change) {
   if (periodClosed(change)) return [closedSpec(change.startsOn, change.endsOn)];
+  return hoursInSpan(change);
+}
+
+// Jiná doba ve dny, které období zasáhne (u sběrného dvora, kde je den jeden úsek, i bez `periodClosed`).
+function hoursInSpan(change) {
   const days = new Set();
   const total = Math.min(daysBetween(change.startsOn, change.endsOn), 6);
   for (let step = 0; step <= total; step += 1) days.add(civilWeekday(addDays(change.startsOn, step)));
@@ -120,7 +125,10 @@ export function doctorLd(base, doctor) {
 export function yardLd(base, yard) {
   const url = absolute(base, `/sberne-dvory#dvur-${yard.id}`);
   const spec = yard.legacy ? [] : hoursSpec(yard.week);
-  const special = (yard.closures ?? []).map((closure) => closedSpec(closure.startsOn, closure.endsOn));
+  const special = [
+    ...(yard.closures ?? []).map((closure) => closedSpec(closure.startsOn, closure.endsOn)),
+    ...(yard.changes ?? []).flatMap(hoursInSpan),
+  ];
   return entity("RecyclingCenter", url, yard.name, {
     ...(yard.accepts ? { description: yard.accepts } : {}),
     url,

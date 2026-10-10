@@ -1079,3 +1079,15 @@ test("služby jsou v menu pod Praktické, na mobilu na konci", () => {
   const news = layout({ path: "/zpravy", copy: {}, title: "T", description: "", body: "" });
   assert.match(news, /<summary class="nav-link">Praktické<\/summary>/);
 });
+
+test("sběrný dvůr: dočasná jiná doba platí jen ten den a stav ji ukáže", () => {
+  const week = normalizeWeek([1, 2, 3, 4, 5].map((day) => ({ day, open: true, from: "08:00", to: "16:00" }))).week;
+  const other = normalizeWeek([{ day: 3, open: true, from: "08:00", to: "10:00" }]).week;
+  const yard = { name: "Dvůr", week, closures: [], changes: [{ id: 1, startsOn: "2026-10-14", endsOn: "2026-10-14", reason: "Školení", week: other }] };
+  // Středa 14. října: do 10:00 a poznámka.
+  assert.equal(statusLine(yard, "2026-10-14", "09:00"), "Dvůr je teď otevřený, dnes 08:00–10:00. Školení. Zítra od 08:00 do 16:00.");
+  assert.match(statusLine(yard, "2026-10-14", "10:30"), /má dnes už zavřeno/);
+  // Čtvrtek 15. října: zase běžně; ve středu předtím už zítra ukáže jinou dobu.
+  assert.equal(statusLine(yard, "2026-10-15", "09:00"), "Dvůr je teď otevřený, dnes 08:00–16:00. Zítra od 08:00 do 16:00.");
+  assert.match(statusLine(yard, "2026-10-13", "09:00"), /Zítra od 08:00 do 10:00\. Školení\./);
+});

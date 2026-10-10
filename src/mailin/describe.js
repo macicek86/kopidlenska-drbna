@@ -13,7 +13,8 @@ export function clock(time) {
 const SHORT = ["ne", "po", "út", "st", "čt", "pá", "so"];
 
 function dayText(slot) {
-  return [slot?.morning, slot?.afternoon]
+  // Místa a lékaři mají dopoledne a odpoledne, sběrné dvory jeden úsek za den.
+  return (slot && !("morning" in slot) ? [slot] : [slot?.morning, slot?.afternoon])
     .filter((part) => part?.open)
     .map((part) => `${clock(part.from)}–${clock(part.to)}`)
     .join(" a ");
@@ -57,7 +58,11 @@ function since(value) {
 export function describeChange(section, action, value, name) {
   const who = name ? `${name}: ` : "";
   if (section === "dvory") {
-    if (action === "uzavreni") return `${who}${span(value)}, zavřeno${value.reason ? ` (${value.reason})` : ""}`;
+    if (action === "uzavreni" || action === "zmena") {
+      const open = value.week ? weekText(value.week, spanDays(value)) : "";
+      const reason = value.reason ? ` (${value.reason})` : "";
+      return `${who}${span(value)}, ${open ? `otevřeno ${open}` : "zavřeno"}${reason}`;
+    }
     return `${who}${since(value)}nová běžná doba: ${yardHours({ week: value.week })}`;
   }
   if (action === "hodiny") return `${who}${since(value)}nová běžná doba: ${weekText(value.week)}`;

@@ -6,6 +6,7 @@ import { homeNotice, numeric } from "./doctors.js";
 import { compactWeek } from "./hours-compact.js";
 import { HOME_LEAD_DAYS, placeNotices } from "./places.js";
 import { addDays } from "./waste.js";
+import { spanWeekdays } from "./week-shift.js";
 
 // Obrázek podle druhu upozornění; bez upozornění výchozí obrázek webu.
 export const SHARE_IMAGES = {
@@ -54,13 +55,17 @@ function regularText(label, row, hours) {
 
 function yardNotice(yard, today) {
   const horizon = addDays(today, HOME_LEAD_DAYS);
-  const closure = (yard.closures ?? [])
+  const first = [...(yard.closures ?? []), ...(yard.changes ?? [])]
     .filter((item) => item.endsOn >= today && item.startsOn <= horizon)
     .sort((a, b) => a.startsOn.localeCompare(b.startsOn))[0];
-  if (!closure) return null;
-  const from = numeric(closure.startsOn, today);
-  const when = closure.startsOn === closure.endsOn ? from : `od ${from} do ${numeric(closure.endsOn, today)}`;
-  return { name: yard.name, state: `Má ${when} zavřeno.`, detail: "", note: closure.reason, kind: "closed" };
+  if (!first) return null;
+  const from = numeric(first.startsOn, today);
+  const when = first.startsOn === first.endsOn ? from : `od ${from} do ${numeric(first.endsOn, today)}`;
+  if (first.week) {
+    const detail = compactWeek(first.week.filter((slot) => spanWeekdays(first.startsOn, first.endsOn).has(slot.day)));
+    return { name: yard.name, state: `Má ${when} jinou otevírací dobu.`, detail, note: first.reason, kind: "change" };
+  }
+  return { name: yard.name, state: `Má ${when} zavřeno.`, detail: "", note: first.reason, kind: "closed" };
 }
 
 // { title, description, image } pro řádek; image je cesta, nebo "" pro výchozí obrázek.

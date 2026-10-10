@@ -123,14 +123,27 @@ test("automatické odpovědi pozná", () => {
   assert.equal(automatic([{ key: "auto-submitted", value: "no" }], "a@b.cz"), false);
 });
 
-test("změna z odpovědi: jen povolené řádky, dvůr bez dočasné doby", () => {
-  const tags = new Map([["misto:1", []], ["dvur:2", null]]);
+test("změna z odpovědi: jen povolené řádky, dvůr umí zavřeno, jinou dobu i novou běžnou", () => {
+  const yardWeek = [1, 2, 3, 4, 5].map((day) => ({ day, open: true, from: "08:00", to: "16:00" }));
+  const tags = new Map([["misto:1", []], ["dvur:2", yardWeek]]);
   assert.match(changeInput({ target: "misto:9", kind: "zavreno", starts_on: "2026-08-15", ends_on: "", note: "", slots: [] }, tags).error, /nejde/);
   const place = changeInput({ target: "[misto:1]", kind: "zavreno", starts_on: "2026-08-15", ends_on: "", note: "", slots: [] }, tags);
   assert.equal(place.section, "oteviraci-doba");
   assert.equal(place.input.changeNote, "Mimořádně zavřeno");
   assert.equal(place.input.endsOn, "2026-08-15");
-  assert.match(changeInput({ target: "dvur:2", kind: "docasna", starts_on: "2026-08-15", ends_on: "", note: "", slots: [{ day: "pa", from: "8:00", to: "12:00", note: "" }] }, tags).error, /sběrného dvora/);
+  // Dvůr: jiná doba na jeden den (pátek 14. 8. 2026), zavřeno a „jen do 12“ z běžné doby.
+  const other = changeInput({ target: "dvur:2", kind: "docasna", starts_on: "2026-08-14", ends_on: "", note: "školení", slots: [{ day: "pa", from: "8:00", to: "12:00", note: "" }] }, tags);
+  assert.equal(other.section, "dvory");
+  assert.equal(other.action, "zmena");
+  assert.equal(other.input.reason, "školení");
+  assert.deepEqual(other.input.week.filter((slot) => slot.open), [{ day: 5, open: true, from: "08:00", to: "12:00" }]);
+  const closed = changeInput({ target: "dvur:2", kind: "zavreno", starts_on: "2026-08-14", ends_on: "", note: "", slots: [] }, tags);
+  assert.equal(closed.input.week, undefined);
+  assert.equal(closed.input.reason, "Mimořádně zavřeno");
+  const until = changeInput({ target: "dvur:2", kind: "docasna", starts_on: "2026-08-14", ends_on: "", open_from: "", close_at: "12:00", note: "", slots: [] }, tags);
+  assert.deepEqual(until.input.week.find((slot) => slot.day === 5), { day: 5, open: true, from: "08:00", to: "12:00" });
+  assert.equal(until.input.week.find((slot) => slot.day === 4).to, "16:00");
+  assert.equal(until.input.reason, "Zavírá už v 12:00");
   const yard = changeInput({ target: "dvur:2", kind: "trvala", starts_on: "2026-08-15", ends_on: "", note: "", slots: [{ day: "pa", from: "8:00", to: "12:00", note: "" }, { day: "pa", from: "13:00", to: "17:00", note: "" }] }, tags);
   assert.deepEqual(yard.input.week, [{ day: 5, open: true, from: "08:00", to: "17:00" }]);
 });

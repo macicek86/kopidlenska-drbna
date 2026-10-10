@@ -34,7 +34,7 @@ import { ensureMailinTables } from "./mailin/store.js";
 import { ensureHealthTables } from "./health/store.js";
 import { ensurePushTables } from "./push/store.js";
 
-export const SCHEMA_VERSION = 64;
+export const SCHEMA_VERSION = 65;
 
 let schemaReady = false;
 
@@ -186,6 +186,13 @@ async function createDeskTables(env) {
       sort_order integer not null default 0
     )`,
   ).run();
+}
+
+// Dočasná jiná doba sběrného dvora je řádek yard_closures s týdnem v `hours` (JSON); bez týdne je to zavření.
+async function ensureYardChangeColumns(env) {
+  const info = await env.DB.prepare("pragma table_info(yard_closures)").all();
+  const names = new Set((info.results ?? []).map((row) => row.name));
+  await addColumn(env, names, "hours", "alter table yard_closures add column hours text");
 }
 
 async function ensureArticleColumns(env) {
@@ -481,6 +488,7 @@ async function migrateSchema(env) {
   ).first();
   if (articlesTable) {
     await ensureArticleColumns(env);
+    await ensureYardChangeColumns(env);
     await ensureSearchTables(env);
     const proposalsTable = await env.DB.prepare(
       "select 1 as ok from sqlite_master where type = 'table' and name = 'proposals'",

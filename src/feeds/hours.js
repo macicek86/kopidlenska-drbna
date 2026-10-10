@@ -2,6 +2,7 @@
 // a uzavření sběrných dvorů. Běžné hodiny jsou ve strukturovaných datech stránek a v /oteviraci-doba.json.
 import { text as tx } from "../copy.js";
 import { hoursSummary, parseHours, periodClosed, spanSummary } from "../doctors.js";
+import { changeSummary, weekOfChange } from "../yards.js";
 import { formatShort } from "../format.js";
 import { esc } from "../html.js";
 import { NEW_HOURS_DAYS, PLACE_MISSING } from "../places.js";
@@ -29,7 +30,7 @@ export async function loadHoursChanges(env, today) {
       .bind(today, HOURS_LIMIT)
       .all(),
     env.DB.prepare(
-      `select c.id, c.yard_id as owner_id, c.starts_on, c.ends_on, c.reason as note, c.created_at, y.name, y.place as detail
+      `select c.id, c.yard_id as owner_id, c.starts_on, c.ends_on, c.reason as note, c.hours, c.created_at, y.name, y.place as detail
        from yard_closures c join yards y on y.id = c.yard_id
        where y.published = 1 and c.ends_on >= ? order by c.created_at desc, c.id desc limit ?`,
     )
@@ -44,7 +45,7 @@ export async function loadHoursChanges(env, today) {
     startsOn: String(row.starts_on ?? "").slice(0, 10),
     endsOn: String(row.ends_on ?? "").slice(0, 10),
     note: String(row.note ?? ""),
-    week: section === "dvur" ? [] : parseHours(row.hours),
+    week: section === "dvur" ? weekOfChange(row.hours) ?? [] : parseHours(row.hours),
     createdAt: String(row.created_at ?? ""),
     name: String(row.name ?? ""),
     detail: String(row.detail ?? ""),
@@ -70,7 +71,10 @@ function changeUrl(base, change) {
 
 // Nadpis a řádky textu jedné změny.
 export function describeChange(change) {
-  if (change.section === "dvur") return { title: `${change.name}: zavřeno ${span(change)}`, lines: [change.note] };
+  if (change.section === "dvur") {
+    if (change.week?.length) return { title: `${change.name}: jiná otevírací doba ${span(change)}`, lines: [changeSummary(change), change.note] };
+    return { title: `${change.name}: zavřeno ${span(change)}`, lines: [change.note] };
+  }
   if (change.kind === "trvala") {
     return {
       title: `${change.name}: nová otevírací doba od ${formatShort(change.startsOn)}`,
