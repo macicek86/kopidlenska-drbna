@@ -360,6 +360,24 @@ test("neznámá ověřená adresa: e-mail čeká na povolení, odpoví se jednou
   }
 });
 
+test("neověřený pokus z neznámé adresy nezablokuje pozdější ověřený e-mail z téže adresy", async () => {
+  const claude = await fakeClaude({ verdict: "nejasne", question: "", changes: [] });
+  try {
+    const { env, sent } = await freshEnv(claude.url);
+    await receiveMail(message(rawMail({ auth: "X-Other: 1" })), env);
+    assert.equal(claude.seen.length, 0);
+    await receiveMail(message(rawMail()), env);
+    assert.equal(claude.seen.length, 1);
+    assert.equal((await waitingRequests(env)).length, 1);
+    assert.equal(sent.filter((mail) => mail.to === "knihovna@kopidlno.cz").length, 1);
+    // Další ověřený e-mail týž den už Drběna nezkoumá.
+    await receiveMail(message(rawMail({ text: "ještě jednou" })), env);
+    assert.equal(claude.seen.length, 1);
+  } finally {
+    claude.close();
+  }
+});
+
 test("neznámá adresa: spam se zahodí, e-mail mimo otevírací dobu dostane odpověď kam psát", async () => {
   const claude = await fakeClaude([{ verdict: "spam", question: "", changes: [] }, { verdict: "neni_doba", question: "", changes: [] }]);
   try {

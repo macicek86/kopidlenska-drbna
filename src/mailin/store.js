@@ -245,10 +245,15 @@ export async function setLogStatus(env, id, status, result) {
   await env.DB.prepare("update mail_log set status = ?, result = ? where id = ?").bind(status, clip(result, 1000), id).run();
 }
 
-// Neznámé adrese Drběna odpoví nejvýš jednou za den, ať se nehádá s robotem.
+// Neznámou adresu Drběna zkoumá a odpovídá jí nejvýš jednou za den, ať se nehádá s robotem. Počítá se jen e-mail,
+// který opravdu vyřídila (ověřený: žádost o povolení, spam nebo odpověď „kam psát“), ne přeskočený
+// ani neověřený pokus (ten by jinak zablokoval pozdější ověřený e-mail z téže adresy).
 export async function answeredToday(env, email) {
   const row = await env.DB.prepare(
-    "select 1 as hit from mail_log where sender_email = ? and status in ('neznamy', 'zadost') and created_at >= datetime('now', '-1 day') limit 1",
+    `select 1 as hit from mail_log
+     where sender_email = ? and verified = 1 and created_at >= datetime('now', '-1 day')
+       and (status in ('zadost', 'spam') or (status = 'neznamy' and result like '%odpověděla jsem%'))
+     limit 1`,
   )
     .bind(clip(email, 160))
     .first();
