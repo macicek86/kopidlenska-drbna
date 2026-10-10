@@ -287,3 +287,21 @@ test("den v týdnu, který nesedí na datum, se pozná a Drběna se o tom dozví
   assert.match(text, /Pozor, datum ve zdroji nesedí/);
   assert.doesNotMatch(footballText(sunday, { articles: [], proposals: [] }, { today: "2026-10-01" }), /Pozor/);
 });
+
+test("rozpis: domácí je kopidlenský tým na prvním místě", async () => {
+  const { fixtureSides, saveFixtures } = await import("../src/fotbal/fixtures-db.js");
+  assert.deepEqual(fixtureSides({ home: "Kopidlno C", away: "Češov" }), { team: "Kopidlno C", atHome: true });
+  assert.deepEqual(fixtureSides({ home: "Libuň", away: "Kopidlno C" }), { team: "Kopidlno C", atHome: false });
+  assert.deepEqual(fixtureSides({ home: "Libuň", away: "Češov" }), { team: "", atHome: false });
+  const calls = [];
+  const db = {
+    prepare: (sql) => ({ bind: (...args) => ({ sql, args, run: async () => calls.push({ sql, args }) }), run: async () => calls.push({ sql }) }),
+    batch: async (list) => calls.push(...list),
+  };
+  assert.equal(await saveFixtures({ DB: db }, []), 0);
+  assert.equal(calls.length, 0, "prázdný rozpis nic nemaže");
+  const fixture = { url: "https://fotbalunas.cz/zapas/1/", source: "https://fotbalunas.cz/rozlosovani/soutez/188", home: "Kopidlno C", away: "Češov", date: "2026-10-10", time: "16:00", score: "", cancelled: false };
+  assert.equal(await saveFixtures({ DB: db }, [fixture, { ...fixture, date: "", url: "x" }]), 1);
+  assert.ok(calls.some((call) => /insert into football_fixtures/.test(call.sql) && call.args[5] === 1));
+  assert.ok(calls.some((call) => /delete from football_fixtures where source/.test(call.sql)));
+});

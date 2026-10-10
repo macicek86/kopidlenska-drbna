@@ -10,6 +10,7 @@ import { callClaude } from "../claude.js";
 import { loadDrbena } from "../drbena-db.js";
 import { DEFAULT_VOICE, voiceFor } from "../drbena.js";
 import { loadEvents } from "../events-db.js";
+import { loadHomeFixtures } from "../fotbal/fixtures-db.js";
 import { rubricMap } from "../import-context.js";
 import { prepareArticleBody } from "../rich.js";
 import { topicsText } from "../stock.js";
@@ -33,6 +34,12 @@ function eventLine(event, extra = "") {
 // Kopidlenská akce odkazuje na svou zprávu na drbně, jinak na kartu v kalendáři akcí.
 export function kopidlnoLink(event) {
   return event.articleSlug ? `/zpravy/${event.articleSlug}` : `/akce#akce-${event.id}`;
+}
+
+// Domácí zápas FK Kopidlno z oficiálního rozpisu (src/fotbal/fixtures-db.js). Do kalendáře akcí se nedává, jen sem.
+export function footballLine(fixture) {
+  const time = fixture.time ? ` v ${fixture.time}` : "";
+  return `- ${czechDay(fixture.date)}${time}, hřiště v Kopidlně: ${fixture.home} – ${fixture.away} (muži, okresní soutěž).`;
 }
 
 const KINDS = { divadlo: "divadlo", kino: "kino", akce: "akce" };
@@ -79,7 +86,7 @@ function previousText(previous) {
   return `Předchozí článek Kam vyrazit (${czechDay(previous.day)}): ${previous.title}\n${previous.text}`;
 }
 
-export function weekendText({ today, weekend, home, nearby, radiusKm, topics, previous = null }) {
+export function weekendText({ today, weekend, home, nearby, radiusKm, topics, previous = null, football = [] }) {
   const homeLines = home.map((event) => eventLine({ ...event, link: kopidlnoLink(event) }));
   const nearLines = nearby
     .slice(0, MAX_NEARBY)
@@ -87,6 +94,7 @@ export function weekendText({ today, weekend, home, nearby, radiusKm, topics, pr
   return [
     `Dnes je ${czechDay(today)} ${today.slice(0, 4)}. ${periodLine(weekend)}`,
     `Akce v Kopidlně (z kalendáře drbny):\n${homeLines.join("\n") || "Žádné."}`,
+    football.length ? `Fotbal v Kopidlně (domácí zápasy FK Kopidlno z oficiálního rozpisu, nejsou v kalendáři drbny):\n${football.map(footballLine).join("\n")}` : "",
     `Akce v okolí (do ${radiusKm} km):\n${nearLines.join("\n") || "Žádné."}`,
     previousText(previous),
     topicsText(topics),
@@ -108,6 +116,7 @@ Na jaké dny článek je, stojí v přehledu:
 Jak článek poskládat:
 - Nejdřív Kopidlno: všechny kopidlenské akce z přehledu, každou s dnem, časem a místem. Kopidlno je doma, má přednost.
 - Pak okolí: vyber 3 až 6 akcí, které za cestu stojí. Dej přednost jedinečným akcím (koncert, divadlo, přednáška, pohádka pro děti) před běžným promítáním. Z kina vyber nejvýš dva filmy, spíš zvláštní promítání (předpremiéra, přenos opery nebo baletu, film pro děti o víkendu). Vyprodané nedoporučuj. Snaž se o pestrost: něco pro rodiny s dětmi, něco na večer. U každé akce musí čtenář z textu poznat město a místo, den a čas a v kostce, o co jde.
+- Fotbal: domácí zápasy z oddílu „Fotbal v Kopidlně“ jsou jen drobnost, ne téma článku. Zmiň je jednou krátkou větou na konci kopidlenské části (den, čas, s kým hraje naše mužstvo), bez odkazu. Nepatří do title ani do excerpt a nesmí ovlivnit, které akce článek vyzdvihne. Na zápasy chodíš na tribunu, ne na lavičku. Průběh, tabulku, očekávání ani jména hráčů nevymýšlej a nepiš. Víc zápasů jedním dechem. Když je stejný zápas už mezi akcemi v Kopidlně, napiš ho jen jednou.
 - Akce z okolí, která se koná přímo v Kopidle (místo v přehledu), patří ke kopidlenským. Když je stejná jako některá kopidlenská, napiš ji jen jednou.
 - Vícedenní akci (festival, výstava) piš s rozsahem dní, ne jen prvním dnem.
 - Když se v Kopidlně v těch dnech nic nekoná, řekni to jednou lehkou větou a pokračuj okolím. Když je jen Kopidlno, okolí vynech.
@@ -118,7 +127,7 @@ Pravidla:
 - O přehledu ani o podkladech nepiš („podle přehledu“, „v kalendáři mám“), piš, jako bys to věděla sama.
 - Názvy, dny, časy a místa opiš přesně podle přehledu. Nic nevymýšlej: žádné ceny, účinkující, program ani zajímavosti, které v přehledu nejsou.
 - Každou akci, o které píšeš, odkaž jednou: <a href="adresa">název</a>. Adresu opiš z přehledu (u kopidlenských začíná lomítkem). Jiné adresy nepiš.
-- title: do 90 znaků, vlastní a pokaždé jiný, ať je poznat, co tyhle dny nabízejí. Bez emoji a bez psaní velkými písmeny.
+- title: do 90 znaků, vlastní a pokaždé jiný, ať je poznat, co tyhle dny nabízejí; vyber z nejzajímavějších akcí (klidně tři, třeba „Kvítí v zámecké zahradě, draci nad Vitiněvsí a cesta k pramenům“), ne z fotbalu. Bez emoji a bez psaní velkými písmeny.
 - excerpt: jedna až dvě věty, do 220 znaků.
 - body_html: povídání, ne výčet. Piš souvislé odstavce, jako když sousedům u plotu vyprávíš, co se v těch dnech děje a kam se sama chystáš (u pracovního týdne věcněji, viz výše). Akce propoj do příběhu volných dnů (dopoledne, odpoledne, večer, další den), přecházej mezi nimi přirozeně a u každé řekni, proč by tam někdo měl jít, ale jen z toho, co je v přehledu. Den, čas a místo vpleť do věty, nepiš je jako hlavičku. Žádné seznamy ani tučné řádky s časem. Kopidlno dej na začátek, okolí po něm; nadpis <h3> smíš použít nanejvýš jednou, když se přechází do okolí, klidně vůbec. Tři až šest odstavců, u samostatného svátku dva až tři, u pracovního týdne dva až čtyři. Smíš použít jen <p>, <strong>, <em>, <h3> a <a>.
 - image_topic: téma z knihovny obrázků, které k článku nejlíp sedí (značka ze seznamu témat). Když nesedí žádné, nech prázdné.
@@ -159,9 +168,11 @@ export function readWeekend(raw) {
 }
 
 // Zdroj pod čarou (src/article-source.js): odkud je program okolí.
-export function weekendSource(nearby) {
+export function weekendSource(nearby, football = []) {
   const used = NEARBY_SOURCES.filter((source) => nearby.some((event) => event.source === source.tag));
-  return used.map((source) => sourceEntry(source.name, source.home)).join(", ");
+  const entries = used.map((source) => sourceEntry(source.name, source.home));
+  if (football.length) entries.push(sourceEntry("fotbalunas.cz", "https://fotbalunas.cz/"));
+  return entries.join(", ");
 }
 
 // Stejná akce z víc zdrojů (jicin.org přebírá program KZMJ): stejný den, čas a začátek názvu. Zůstane první.
@@ -181,7 +192,9 @@ export async function weekendInput(env, weekend, radiusKm) {
   const events = await loadEvents(env, { publicOnly: true });
   const home = events.filter((event) => !event.cancelled && event.startsOn >= weekend.from && event.startsOn <= weekend.to);
   const nearby = dedupeNearby(await loadNearbyEvents(env, { from: weekend.from, to: weekend.to, radiusKm }));
-  return { home, nearby };
+  // Rozpis fotbalu je navíc: když se nenačte, článek vyjde bez něj.
+  const football = await loadHomeFixtures(env, weekend.from, weekend.to).catch(() => []);
+  return { home, nearby, football };
 }
 
 function weekendRubric(rubrics) {
@@ -191,12 +204,12 @@ function weekendRubric(rubrics) {
 // Napíše článek na období. Vrací { ok, note, articleId?, proposalId? }; bez akcí Claude vůbec nevolá.
 export async function writeWeekend(env, settings, weekend, { ask = callClaude } = {}) {
   const today = pragueNow().date;
-  const { home, nearby } = await weekendInput(env, weekend, settings.radiusKm);
+  const { home, nearby, football } = await weekendInput(env, weekend, settings.radiusKm);
   if (!home.length && !nearby.length) return { ok: true, note: `Na ${periodLabel(weekend)} od ${czechDay(weekend.from)} nejsou žádné akce, článek nevyšel.` };
   const [topics, drbena, previous] = await Promise.all([loadStockTopics(env), loadDrbena(env), previousOuting(env, today)]);
   const answer = await ask(env, {
     system: weekendPrompt(voiceFor(drbena)),
-    content: [{ type: "text", text: weekendText({ today, weekend, home, nearby, radiusKm: settings.radiusKm, topics, previous }) }],
+    content: [{ type: "text", text: weekendText({ today, weekend, home, nearby, football, radiusKm: settings.radiusKm, topics, previous }) }],
     schema: weekendSchema(topics.map((topic) => topic.slug)),
   });
   if (!answer.ok) return answer;
@@ -208,7 +221,7 @@ export async function writeWeekend(env, settings, weekend, { ask = callClaude } 
   const made = await saveBotArticle(env, {
     article: result.article,
     image: await pickStockImage(env, result.imageTopic),
-    source: weekendSource(nearby),
+    source: weekendSource(nearby, football),
     autoPublish: settings.autoPublish,
     publishTime: weekend.manual ? "" : weekend.kind === "tyden" ? settings.weekPublishTime : settings.publishTime,
     rubric,

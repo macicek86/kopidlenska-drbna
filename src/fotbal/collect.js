@@ -16,6 +16,7 @@ import {
   parseTable,
   tableUrl,
 } from "./fotbalunas.js";
+import { saveFixtures } from "./fixtures-db.js";
 import { knownGuids, rememberFootballItem } from "./store.js";
 
 async function fetchPage(url, fetchImpl) {
@@ -96,7 +97,20 @@ export function footballSourceDate(item, today) {
 }
 
 // Projde úvodní stránku a aktuality klubu. Nové aktuality uloží do fronty, starší (podle data ve zdroji) a vypnuté rovnou odloží.
+// Oficiální rozpis se při každém stažení uloží i do vlastní tabulky (`football_fixtures`), i když na webu klubu nic nového není.
 export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
+  const shared = { fixtures: null };
+  const result = await collectClubNews(env, settings, fetchImpl, shared);
+  try {
+    shared.fixtures ??= await officialFixtures(settings, fetchImpl);
+    await saveFixtures(env, shared.fixtures);
+  } catch (error) {
+    console.error("Rozpis fotbalu se neuložil:", error);
+  }
+  return result;
+}
+
+async function collectClubNews(env, settings, fetchImpl, shared) {
   const home = await fetchPage(settings.clubUrl, fetchImpl);
   if (!home.ok) return home;
   const pages = clubPages(home.html, settings.clubUrl);
@@ -108,7 +122,6 @@ export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
   const known = await knownGuids(env, news.map((entry) => `${entry.id}:${entry.kind}`));
   const fresh = news.filter((entry) => !known.has(`${entry.id}:${entry.kind}`));
   let matches = null;
-  let fixtures = null;
   const tables = new Map();
   let added = 0;
   for (const entry of fresh.reverse()) {
@@ -124,11 +137,11 @@ export async function collectNews(env, settings, { fetchImpl = fetch } = {}) {
           if (schedule.ok) matches.push(...parseMatchList(schedule.html, settings.clubUrl));
         }
       }
-      fixtures ??= await officialFixtures(settings, fetchImpl);
+      shared.fixtures ??= await officialFixtures(settings, fetchImpl);
       const title = detail.title || entry.title;
       const match = findMatch(matches, title);
       const played = match?.score ? await fetchPage(match.url, fetchImpl) : null;
-      const official = await officialFor(fixtures, tables, match, title, match?.date || entry.date || detail.date, fetchImpl);
+      const official = await officialFor(shared.fixtures, tables, match, title, match?.date || entry.date || detail.date, fetchImpl);
       extra = matchExtra(match, detail, played?.ok ? parseMatchDetail(played.html) : "", official);
     }
     const item = {

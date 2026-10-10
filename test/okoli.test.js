@@ -418,3 +418,15 @@ test("obce na Galileu: novější vzhled přehledu a vynechaná oznámení", asy
   assert.deepEqual(events.map((event) => [event.id, event.title, event.startsOn, event.startsTime, event.place]), [["147", "Lampionový průvod", "2026-10-26", "18:00", "celá obec"]]);
   assert.equal(events[0].link, "https://www.dymokury.cz/cs/zivot-v-obci/akce-v-obci/lampionovy-pruvod-147_62cs.html");
 });
+
+test("domácí fotbal jde do podkladů článku, bez zápasů blok chybí", async () => {
+  const { footballLine } = await import("../src/okoli/weekend.js");
+  const weekend = weekendFor("2026-10-09");
+  const match = { home: "Kopidlno C", away: "Češov", date: "2026-10-10", time: "16:00" };
+  assert.equal(footballLine(match), "- sobota 10. 10. v 16:00, hřiště v Kopidlně: Kopidlno C – Češov (muži, okresní soutěž).");
+  const withFootball = weekendText({ today: "2026-10-09", weekend, home: [], nearby: [], radiusKm: 25, topics: [], football: [match] });
+  assert.match(withFootball, /Fotbal v Kopidlně[^\n]*\n- sobota 10\. 10\. v 16:00/);
+  const without = weekendText({ today: "2026-10-09", weekend, home: [], nearby: [], radiusKm: 25, topics: [] });
+  assert.ok(!without.includes("Fotbal v Kopidlně"));
+  assert.equal(weekendSource([], [match]), "fotbalunas.cz https://fotbalunas.cz/");
+});

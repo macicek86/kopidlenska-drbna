@@ -3,6 +3,7 @@ import { countQueued, lockHeld, lockRow, markManual, queuedWhere, readFreshDays,
 import { addColumn, asBool, clip, requireChief, sqliteStamp } from "../db-core.js";
 import { DEFAULT_CLUB_URL, readClubUrl } from "./club.js";
 import { DEFAULT_TRUTH_URL, readTruthUrl } from "./fotbalunas.js";
+import { FIXTURE_TABLES } from "./fixtures-db.js";
 
 export const DEFAULT_FRESH_DAYS = 7;
 export const INTERVALS = [
@@ -67,7 +68,7 @@ async function seedRubric(env) {
 }
 
 export async function ensureFootballTables(env) {
-  for (const sql of FOOTBALL_TABLES) await env.DB.prepare(sql).run();
+  for (const sql of [...FOOTBALL_TABLES, ...FIXTURE_TABLES]) await env.DB.prepare(sql).run();
   const info = await env.DB.prepare("pragma table_info(football_items)").all();
   await addColumn(env, new Set((info.results ?? []).map((row) => row.name)), "manual", "alter table football_items add column manual integer not null default 0");
   const settingsInfo = await env.DB.prepare("pragma table_info(football_settings)").all();
