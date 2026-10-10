@@ -378,6 +378,20 @@ test("neověřený pokus z neznámé adresy nezablokuje pozdější ověřený e
   }
 });
 
+test("strop zkoumaných neznámých adres se neucpe neověřenými e-maily", async () => {
+  const claude = await fakeClaude({ verdict: "nejasne", question: "", changes: [] });
+  try {
+    const { env } = await freshEnv(claude.url);
+    for (let i = 0; i < 40; i += 1) await receiveMail(message(rawMail({ from: `podvrh${i}@kopidlno.cz`, auth: "X-Other: 1" })), env);
+    assert.equal(claude.seen.length, 0);
+    await receiveMail(message(rawMail({ from: "skutecny@kopidlno.cz" })), env);
+    assert.equal(claude.seen.length, 1);
+    assert.equal((await waitingRequests(env)).length, 1);
+  } finally {
+    claude.close();
+  }
+});
+
 test("neznámá adresa: spam se zahodí, e-mail mimo otevírací dobu dostane odpověď kam psát", async () => {
   const claude = await fakeClaude([{ verdict: "spam", question: "", changes: [] }, { verdict: "neni_doba", question: "", changes: [] }]);
   try {

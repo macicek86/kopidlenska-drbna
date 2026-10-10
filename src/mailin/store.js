@@ -248,13 +248,11 @@ export async function setLogStatus(env, id, status, result) {
 // Neznámou adresu Drběna zkoumá a odpovídá jí nejvýš jednou za den, ať se nehádá s robotem. Počítá se jen e-mail,
 // který opravdu vyřídila (ověřený: žádost o povolení, spam nebo odpověď „kam psát“), ne přeskočený
 // ani neověřený pokus (ten by jinak zablokoval pozdější ověřený e-mail z téže adresy).
+// Řádek historie, u kterého Drběna zkoumala neznámou adresu (a platila za volání modelu).
+const HANDLED = `verified = 1 and created_at >= datetime('now', '-1 day') and (status in ('zadost', 'spam') or (status = 'neznamy' and result like '%odpověděla jsem%'))`;
+
 export async function answeredToday(env, email) {
-  const row = await env.DB.prepare(
-    `select 1 as hit from mail_log
-     where sender_email = ? and verified = 1 and created_at >= datetime('now', '-1 day')
-       and (status in ('zadost', 'spam') or (status = 'neznamy' and result like '%odpověděla jsem%'))
-     limit 1`,
-  )
+  const row = await env.DB.prepare(`select 1 as hit from mail_log where sender_email = ? and ${HANDLED} limit 1`)
     .bind(clip(email, 160))
     .first();
   return Boolean(row);
@@ -275,10 +273,10 @@ export async function earlierQuestion(env, senderId) {
 // Kolik neznámých adres dnes už Drběna zkoumala (každé zkoumání je volání modelu): strop proti zaplavení.
 export const UNKNOWN_DAILY_LIMIT = 30;
 
+// Počítají se jen zkoumané adresy, ne přeskočené ani neověřené: podvržených e-mailů může přijít kolik chce
+// a nesmí tím ucpat žádosti skutečných lidí.
 export async function unknownRoom(env) {
-  const row = await env.DB.prepare(
-    "select count(*) as n from mail_log where sender_id is null and status in ('neznamy', 'zadost', 'spam') and created_at >= datetime('now', '-1 day')",
-  ).first();
+  const row = await env.DB.prepare(`select count(*) as n from mail_log where sender_id is null and ${HANDLED}`).first();
   return Number(row?.n ?? 0) < UNKNOWN_DAILY_LIMIT;
 }
 
