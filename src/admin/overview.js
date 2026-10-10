@@ -3,6 +3,8 @@ import { formatLong } from "../format.js";
 import { credit, esc } from "../view.js";
 import { requestItems } from "./hours-requests.js";
 import { problemCount } from "../health/rules.js";
+import { NOTICE_KINDS } from "../notices.js";
+import { SCHOOL_LIST } from "../skola/sources.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, icon, item, list, modalLink, pageHead, panel } from "./ui.js";
 
@@ -26,10 +28,14 @@ export function adminOverview(ctx, data, message) {
   const closures = (data.yards ?? []).flatMap((yard) => yard.closures.map((closure) => ({ yard, closure })));
   const changes = (data.doctors ?? []).flatMap((doctor) => doctor.changes.map((change) => ({ doctor, change })));
 
+  const waitingNotice = (notice) => !notice.published && Boolean(notice.sourceUrl);
+  // Co čeká na schválení hlavního redaktora: zprávy, nabídky, změny hodin, odstávky a adresy (stejné jako čísla v menu).
+  const approvalCount =
+    pending.length + adPending.length + Object.values(data.hoursRequests ?? {}).flat().length + (data.notices ?? []).filter(waitingNotice).length + (data.mailRequests ?? []).length;
   const first = (data.user?.name ?? "").split(" ")[0];
   const stats = chief
     ? [
-        stat("/redakce/zpravy", "news", pending.length + adPending.length, "čeká na schválení", pending.length + adPending.length ? "warn" : ""),
+        stat("#fronta", "news", approvalCount, "čeká na schválení", approvalCount ? "warn" : ""),
         stat("/redakce/zpravy", "news", (data.articles ?? []).length, hiddenArticles ? `zpráv, ${hiddenArticles} skrytých` : "zpráv na webu"),
         stat("/redakce/akce", "calendar", upcoming.length, "chystaných akcí"),
         stat("/redakce/odstavky", "bolt", data.outages?.items?.length ?? 0, "odstávek v přehledu"),
@@ -40,6 +46,43 @@ export function adminOverview(ctx, data, message) {
         stat("/redakce/zpravy", "x", returned.length + adReturned.length, "vráceno k úpravě", returned.length + adReturned.length ? "bad" : ""),
         stat("/redakce/zpravy", "news", (data.articles ?? []).filter((row) => row.authorId === data.user?.id).length, "mých zpráv na webu"),
       ];
+
+  // Další věci, které čekají na hlavního redaktora a mají své číslo v menu: odstávky z cizích zdrojů
+  // ke schválení, adresy čekající na povolení a importy, které skončily chybou.
+  const noticeItems = (data.notices ?? [])
+    .filter(waitingNotice)
+    .map((notice) =>
+      item({
+        title: notice.title,
+        meta: `${esc(NOTICE_KINDS[notice.kind]?.label ?? "Oznámení")}${notice.startsOn ? ` · ${esc(formatLong(notice.startsOn))}` : ""}`,
+        badges: badge("Odstávka ke schválení", "warn"),
+        actions: modalLink(`/redakce/odstavky?oznameni=${notice.id}`, "Posoudit", "btn-primary"),
+      }),
+    );
+  const addressItems = (data.mailRequests ?? []).map((request) =>
+    item({
+      title: request.subject || "(bez předmětu)",
+      meta: `${esc(request.email)} · adresa není v seznamu`,
+      badges: badge("Povolit adresu", "warn"),
+      actions: modalLink(`/redakce/emaily?povolit=${request.id}`, "Posoudit", "btn-primary"),
+    }),
+  );
+  const failedSources = [
+    ["Munipolis", "/redakce/munipolis", data.importItems],
+    ["Fotbal", "/redakce/fotbal", data.footballItems],
+    ["Jičínský deník", "/redakce/denik", data.denikItems],
+    ...SCHOOL_LIST.map((source) => [source.page, `/redakce/${source.tag}`, data.schools?.[source.tag]?.items]),
+  ]
+    .map(([label, href, items]) => ({ label, href, failed: (items ?? []).filter((row) => row.status === "chyba").length }))
+    .filter((source) => source.failed);
+  const failedItems = failedSources.map((source) =>
+    item({
+      title: source.label,
+      meta: `${source.failed === 1 ? "1 položka skončila chybou" : source.failed < 5 ? `${source.failed} položky skončily chybou` : `${source.failed} položek skončilo chybou`}`,
+      badges: badge("Chyba importu", "bad"),
+      actions: modalLink(source.href, "Podívat se", "btn-line"),
+    }),
+  );
 
   const hoursItems = Object.keys(REQUEST_SECTIONS).flatMap((section) => requestItems(section, data, chief));
   const queueItems = chief
@@ -61,6 +104,9 @@ export function adminOverview(ctx, data, message) {
           }),
         ),
         ...hoursItems,
+        ...noticeItems,
+        ...addressItems,
+        ...failedItems,
       ]
     : [
         ...(data.botProposals ?? []).map((row) =>
@@ -125,7 +171,7 @@ export function adminOverview(ctx, data, message) {
     <div class="stats">${stats.join("")}</div>
     <div class="quick">${actions}</div>
     <div class="cards-2">
-      ${panel({ id: "fronta", title: chief ? "Ke schválení" : (data.botProposals ?? []).length ? "Návrhy" : "Moje návrhy", count: queueItems.length, body: list(queueItems, chief ? "Nic nečeká. Hezký den." : "Nemáte žádný rozpracovaný návrh."), tone: queueItems.length && chief ? "warn" : "" })}
+      ${panel({ id: "fronta", title: chief ? "Čeká na vás" : (data.botProposals ?? []).length ? "Návrhy" : "Moje návrhy", count: queueItems.length, body: list(queueItems, chief ? "Nic nečeká. Hezký den." : "Nemáte žádný rozpracovaný návrh."), tone: queueItems.length && chief ? "warn" : "" })}
       ${panel({ id: "brzy", title: "Chystá se", count: soon.length, body: list(soon, "Nic zvláštního se nechystá.") })}
     </div>`;
   return adminShell(ctx, data, "prehled", message, body, { title: "Přehled", rich: true });

@@ -460,6 +460,10 @@ test("stránka redakce ukáže adresy a zaškrtnutá místa", async () => {
   assert.match(page, /oteviracidoba@kopidlenskadrbna\.org/);
   assert.match(page, new RegExp(`value="oteviraci-doba:${place.id}" checked`));
   assert.match(page, /Ke schválení/);
+  // Čekající žádost o povolení se ukáže jako číslo v menu.
+  const waiting = adminMailin({ path: "/redakce/emaily", origin: "http://drbna.test" }, { ...data, mailRequests: [{ id: 1 }, { id: 2 }] }, "", {});
+  assert.match(waiting, /href="\/redakce\/emaily"[^>]*>[\s\S]*?<b class="adm-count" aria-label="2 čeká">2<\/b>/);
+  assert.doesNotMatch(page, /href="\/redakce\/emaily"[^>]*>[\s\S]{0,160}?adm-count/);
 });
 
 test("kalendář: příští týden je pondělí až neděle", () => {
