@@ -16,6 +16,7 @@ import { receiveMail, replayRequest } from "../src/mailin/run.js";
 import { ensureMailinTables, loadMailAdmin, saveSender } from "../src/mailin/store.js";
 import { confirmGet, confirmPost } from "../src/mailin/confirm.js";
 import { applyDue } from "../src/mailin/pending.js";
+import { createPlaceFromRequest } from "../src/mailin/new-place.js";
 import { refuseRequest, waitingRequests } from "../src/mailin/register.js";
 import { linkByToken } from "../src/hours-links-db.js";
 import { handleQueue } from "../src/queue-run.js";
@@ -390,6 +391,82 @@ test("strop zkoumaných neznámých adres se neucpe neověřenými e-maily", asy
     await receiveMail(message(rawMail({ from: "skutecny@kopidlno.cz" })), env);
     assert.equal(claude.seen.length, 1);
     assert.equal((await waitingRequests(env)).length, 1);
+  } finally {
+    claude.close();
+  }
+});
+
+const NEW_PLACE = {
+  verdict: "nove_misto",
+  question: "",
+  changes: [],
+  new_place: { name: "Pekárna u Nováků", label: "Pekárna", address: "Hilmarovo náměstí 5", phone: "777 123 456", slots: [{ day: "po", from: "6:00", to: "16:00", note: "" }, { day: "pa", from: "6:00", to: "16:00", note: "" }] },
+};
+
+test("neznámá adresa žádá o nové místo: návrh pro redaktora, po potvrzení se místo založí, přiřadí a odesílatel se to dozví", async () => {
+  const claude = await fakeClaude(NEW_PLACE);
+  try {
+    const { env, sent } = await freshEnv(claude.url);
+    const before = Number((await env.DB.prepare("select count(*) as n from places").first()).n);
+    await receiveMail(message(rawMail({ subject: "Přidejte nás", text: "Dobrý den, chceme přidat naši pekárnu, otevřeno po a pá 6–16." })), env);
+
+    // Odesílatel dostane jen potvrzení, na webu nic nevzniklo.
+    const reply = sent.find((mail) => mail.to === "knihovna@kopidlno.cz");
+    assert.match(reply.text, /e-mail zpracujeme/);
+    assert.equal(Number((await env.DB.prepare("select count(*) as n from places").first()).n), before);
+    const [request] = await waitingRequests(env);
+    assert.equal(request.kind, "misto");
+    assert.equal(request.draft.name, "Pekárna u Nováků");
+    assert.equal(request.text.includes("pekárnu"), true);
+    assert.equal(sent.some((mail) => mail.to === "hlavni@example.cz" && /Nové místo na web/.test(mail.subject)), true);
+
+    // Redaktor potvrdí (formulář místa).
+    const result = await createPlaceFromRequest(env, chief(), { requestId: request.id, name: "Pekárna u Nováků", label: "Pekárna", place: "Hilmarovo náměstí 5", phone: "777 123 456", sortOrder: 100, published: true, doctorWeek: request.draft.week });
+    assert.equal(result.ok, true);
+    const place = await env.DB.prepare("select name, label, place from places where id = ?").bind(result.id).first();
+    assert.equal(place.name, "Pekárna u Nováků");
+    const sender = await env.DB.prepare("select id, direct, label from mail_senders where email = 'knihovna@kopidlno.cz'").first();
+    assert.equal(sender.direct, 0);
+    const target = await env.DB.prepare("select section, target_id from mail_sender_targets where sender_id = ?").bind(sender.id).first();
+    assert.deepEqual({ ...target }, { section: "oteviraci-doba", target_id: result.id });
+    assert.match(sent.at(-1).text, /Místo Pekárna u Nováků je na webu/);
+    assert.equal((await waitingRequests(env)).length, 0);
+    // Podruhé už nic.
+    assert.equal((await createPlaceFromRequest(env, chief(), { requestId: request.id, name: "x" })).ok, false);
+  } finally {
+    claude.close();
+  }
+});
+
+test("zamítnutí žádosti o nové místo: odesílatel dostane krátkou zprávu a místo nevznikne", async () => {
+  const claude = await fakeClaude(NEW_PLACE);
+  try {
+    const { env, sent } = await freshEnv(claude.url);
+    const before = Number((await env.DB.prepare("select count(*) as n from places").first()).n);
+    await receiveMail(message(rawMail({ subject: "Přidejte nás" })), env);
+    const [request] = await waitingRequests(env);
+    assert.equal((await refuseRequest(env, chief(), request.id)).ok, true);
+    assert.match(sent.at(-1).text, /Tohle místo jsme zatím na web nepřidali/);
+    assert.equal(Number((await env.DB.prepare("select count(*) as n from places").first()).n), before);
+  } finally {
+    claude.close();
+  }
+});
+
+test("známá adresa žádá o nové místo: dostane nové místo k těm stávajícím", async () => {
+  const claude = await fakeClaude(NEW_PLACE);
+  try {
+    const { env, place } = await freshEnv(claude.url);
+    await saveSender(env, chief(), { email: "knihovna@kopidlno.cz", label: "knihovna", direct: true, targets: [`oteviraci-doba:${place.id}`] });
+    await receiveMail(message(rawMail({ subject: "Další provozovna" })), env);
+    const [request] = await waitingRequests(env);
+    assert.equal(request.kind, "misto");
+    const result = await createPlaceFromRequest(env, chief(), { requestId: request.id, name: "Pekárna u Nováků", sortOrder: 100, published: true, doctorWeek: request.draft.week });
+    assert.equal(result.ok, true);
+    const sender = await env.DB.prepare("select id, direct from mail_senders where email = 'knihovna@kopidlno.cz'").first();
+    assert.equal(sender.direct, 1);
+    const targets = (await env.DB.prepare("select target_id from mail_sender_targets where sender_id = ? order by target_id").bind(sender.id).all()).results;
+    assert.deepEqual(targets.map((row) => Number(row.target_id)), [place.id, result.id]);
   } finally {
     claude.close();
   }

@@ -10,12 +10,12 @@ import { SITE_ORIGIN } from "../http.js";
 import { notifyEditors } from "../notify.js";
 import { enqueue } from "../queue.js";
 import { pragueNow } from "../waste.js";
-import { askDrbena, mailContent, unknownContent } from "./ai.js";
+import { askDrbena, mailContent, placeDraft, unknownContent } from "./ai.js";
 import { allowedRows, changeReply, hasRows, prepareChanges, tellEditors } from "./apply.js";
 import { CONFIRM_MINUTES, createPending } from "./pending.js";
 import { authTrace, authVerdict, automatic, readMail } from "./parse.js";
 import { markRequest, requestByEmail, requestById, saveRequest } from "./register.js";
-import { MAILIN_ADDRESS, NOT_HOURS, REQUEST_RECEIVED, UNKNOWN_SENDER, replyTo } from "./reply.js";
+import { MAILIN_ADDRESS, NOT_HOURS, PLACE_RECEIVED, REQUEST_RECEIVED, UNKNOWN_SENDER, replyTo } from "./reply.js";
 import { answeredToday, countSenderUse, earlierQuestion, logMail, senderByEmail, senderHasRoom, spamReportedToday, unknownRoom } from "./store.js";
 
 // Větší e-mail (fotky, přílohy) Cloudflare rovnou odmítne, změna hodin je pár řádků.
@@ -46,6 +46,31 @@ async function noteSpam(env, mail, entry) {
   }).catch(() => {});
 }
 
+// Žádost o nové místo (obchod, služba): uloží se jako návrh pro hlavního redaktora s původním textem,
+// odesílatel dostane jen potvrzení, že e-mail zpracujeme. Platí pro neznámou i známou adresu.
+async function requestNewPlace(env, { mail, entry, answer }) {
+  const draft = placeDraft(answer.raw);
+  if (draft.name.length < 2) return false;
+  const saved = await saveRequest(env, { email: mail.from, subject: mail.subject, text: mail.text, messageId: mail.messageId, references: mail.references, kind: "misto", draft });
+  await logMail(env, { ...entry, status: "zadost", result: `Žádost o nové místo: ${draft.name}. Čeká na potvrzení redakcí.` });
+  await replyTo(env, mail, [PLACE_RECEIVED]);
+  if (saved.fresh) {
+    await notifyEditors(env, "registrace", {
+      subject: `Nové místo na web: ${draft.name}`,
+      intro: `E-mail z adresy ${mail.from} žádá o přidání nového místa. Zkontrolujte údaje a potvrďte, nebo zamítněte.`,
+      fields: [
+        ["Od", mail.from],
+        ["Název", draft.name],
+        ["Adresa", draft.place],
+        ["Telefon", draft.phone],
+      ],
+      body: mail.text,
+      path: `/redakce/emaily?zalozit=${saved.id}`,
+    }).catch(() => {});
+  }
+  return true;
+}
+
 // Adresa, která v seznamu není. Neověřené adrese se neodpovídá (mohla být podvržená a odpověď by šla někomu,
 // kdo nic neposlal). U ověřené Drběna rozhodne, jestli je to spam, nebo žádost o povolení.
 async function handleUnknown(env, { mail, entry, verified }) {
@@ -68,6 +93,7 @@ async function handleUnknown(env, { mail, entry, verified }) {
     await noteSpam(env, mail, entry);
     return;
   }
+  if (verdict === "nove_misto" && (await requestNewPlace(env, { mail, entry, answer }))) return;
   if (verdict === "neni_doba") {
     await logMail(env, { ...entry, status: "neznamy", result: "Adresa není v seznamu a e-mail není o otevírací době, odpověděla jsem." });
     await replyTo(env, mail, [UNKNOWN_SENDER]);
@@ -153,6 +179,7 @@ export async function processKnown(env, { mail, sender, entry, verified }) {
     await noteSpam(env, mail, entry);
     return;
   }
+  if (verdict === "nove_misto" && (await requestNewPlace(env, { mail, entry, answer }))) return;
   if (verdict === "neni_doba") {
     await logMail(env, { ...entry, status: "neni_doba", result: "Není o otevírací době." });
     await replyTo(env, mail, [NOT_HOURS]);

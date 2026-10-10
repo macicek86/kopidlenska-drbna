@@ -62,6 +62,7 @@ const TABS = [
   "oteviraci-doba?sdilet=1",
   "emaily?id=1",
   "emaily?povolit=1",
+  "emaily?zalozit=2",
   "emaily?zamitnout=1",
   "lide?novy=1",
   "rubriky?smazat=1",

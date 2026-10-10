@@ -35,9 +35,10 @@ import {
 const BASE = "/redakce/oteviraci-doba";
 const SECTION = "oteviraci-doba";
 
-function placeForm(editing) {
-  return `<form class="form" method="post" action="${BASE}/ulozit">
-    ${editing ? hidden("id", editing.id) : ""}
+// `opts`: kam formulář poslat (`action`), skrytá pole navíc (`extra`), text tlačítka (`submit`) a kam vede Zrušit (`cancel`).
+export function placeForm(editing, opts = {}) {
+  return `<form class="form" method="post" action="${opts.action ?? `${BASE}/ulozit`}">
+    ${editing?.id ? hidden("id", editing.id) : ""}${opts.extra ?? ""}
     ${callout("Název se na webu vypisuje přesně tak, jak ho zadáte, a věty jsou postavené tak, aby se neskloňoval. Třeba „Knihovna má 2. 10. zavřeno.“")}
     <div class="pair">
       ${field("Název", `<input class="${input}" name="name" required maxlength="120" value="${esc(editing?.name ?? "")}" placeholder="Knihovna">`)}
@@ -53,7 +54,7 @@ function placeForm(editing) {
       ${field("Pořadí", `<input class="${input} control-short" type="number" name="sortOrder" min="0" max="999" required value="${editing?.sortOrder ?? 0}">`, "Menší číslo je na stránce výš. Rychleji to jde šipkami u míst.")}
       <div class="field"><span>Viditelnost</span>${check("published", "1", editing ? editing.published : true, "Zveřejnit na webu")}</div>
     </div>
-    ${formFoot("Uložit", cancelLink(BASE))}
+    ${formFoot(opts.submit ?? "Uložit", cancelLink(opts.cancel ?? BASE))}
   </form>`;
 }
 

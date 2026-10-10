@@ -159,10 +159,10 @@ export async function savePlace(env, request, input) {
       .run();
     return { ok: true, updated: true };
   }
-  await env.DB.prepare("insert into places (name, label, place, phone, hours, sort_order, published, offers) values (?, ?, ?, ?, ?, ?, ?, ?)")
+  const created = await env.DB.prepare("insert into places (name, label, place, phone, hours, sort_order, published, offers) values (?, ?, ?, ?, ?, ?, ?, ?)")
     .bind(...values)
     .run();
-  return { ok: true, updated: false };
+  return { ok: true, updated: false, id: Number(created.meta?.last_row_id ?? 0) };
 }
 
 export async function removePlace(env, request, id) {

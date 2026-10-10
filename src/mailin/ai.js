@@ -16,6 +16,7 @@ verdict:
 - "zmeny": e-mail říká, že některé místo z přehledu bude mít zavřeno, jinou dobu nebo novou běžnou dobu. Změny dej do changes.
 - "nejasne": e-mail je o otevírací době, ale nejde jistě poznat, které místo, který den nebo jaké časy. changes nech prázdné a do question napiš krátkou otázku, co má odesílatel doplnit.
 - "neni_doba": e-mail není o otevírací době (zpráva, tip na článek, pozvánka, dotaz, poděkování). changes prázdné.
+- "nove_misto": odesílatel chce na web přidat nové místo (svůj obchod, službu, provozovnu, ordinaci) s jeho otevírací dobou. Vyplň new_place a changes nech prázdné. Je to něco jiného než změna doby u místa z přehledu: když e-mail mluví o místě, které odesílatel v přehledu má, je to "zmeny".
 - "spam": e-mail je nevyžádaná pošta (reklama, nabídka služeb, SEO, phishing, řetězový e-mail, nesmyslný text). changes prázdné. Použij to jen u zjevného spamu: e-mail od správce, který jen píše nejasně, je "nejasne" nebo "neni_doba".
 Když jsou některé změny jasné a jiné ne, dej jasné do changes, verdict "zmeny" a do question napiš, co u ostatních chybí. Jinak nech question prázdné.
 question piš česky, vykej, jednou nebo dvěma větami, za celý tým v množném čísle („z e-mailu nepoznáme…“, „napište nám…“), nikdy v 1. osobě jednotného čísla („jsem“) a nikdy o redakci ve 3. osobě.
@@ -34,6 +35,7 @@ Pravidla:
 - kind "trvala": nová běžná otevírací doba natrvalo („od září máme nově…“). Do starts_on den, od kdy platí (když ho e-mail neříká, dnešek), do slots celý nový týden, i dny, které se nemění (vezmi je z přehledu).
 - Sběrný dvůr umí jen "zavreno" a "trvala" (jeden úsek denně). Jinou dobu na pár dní u dvora nezapisuj a zmiň to v question.
 - Ordinace: když e-mail říká, kdo z lékařů kdy ordinuje, zapiš dočasnou změnu se slots podle běžných hodin a v poznámce slotu změň jen to, kdo ordinuje. Když lékař neordinuje a o sestře e-mail nic neříká, je zavřeno; když výslovně řekne, že sestra bude, nech otevřeno jen na odběry (poznámka „jen odběry, lékař neordinuje“).
+- new_place vyplň jen u "nove_misto" (jinak prázdné řetězce a prázdné slots): name je krátký název, jak se má vypisovat („Pekárna u Nováků“), label druh nebo popisek („Pekárna“), address adresa, phone telefon, slots běžná otevírací doba jako u "trvala". Čeho se e-mail nedotýká, nech prázdné a nic si nevymýšlej.
 - Změnu, která už v přehledu u místa je, nezapisuj znovu.
 - slots: jeden řádek na souvislý úsek. day je den v týdnu (po, ut, st, ct, pa, so, ne), from a to jako HH:MM, note krátká poznámka, nebo prázdná.
 - note: krátký důvod pro čtenáře („dovolená“, „školení“, „státní svátek“), bez data. Když ho e-mail neříká, nech prázdné. Nic si nevymýšlej.`;
@@ -43,10 +45,30 @@ export function mailSchema() {
   return {
     type: "object",
     additionalProperties: false,
-    required: ["verdict", "question", "changes"],
+    required: ["verdict", "question", "changes", "new_place"],
     properties: {
-      verdict: { type: "string", enum: ["zmeny", "nejasne", "neni_doba", "spam"] },
+      verdict: { type: "string", enum: ["zmeny", "nejasne", "neni_doba", "nove_misto", "spam"] },
       question: text,
+      new_place: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "label", "address", "phone", "slots"],
+        properties: {
+          name: text,
+          label: text,
+          address: text,
+          phone: text,
+          slots: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["day", "from", "to", "note"],
+              properties: { day: { type: "string", enum: ["po", "ut", "st", "ct", "pa", "so", "ne"] }, from: text, to: text, note: text },
+            },
+          },
+        },
+      },
       changes: {
         type: "array",
         items: {
@@ -119,7 +141,7 @@ export function calendarText(today, weekday) {
 }
 
 // Pro neznámou adresu: nic měnit nesmí, Drběna jen rozhodne, jestli je to spam, nebo jestli to o otevírací době je.
-const UNKNOWN_NOTE = "Odesílatel zatím není v seznamu a nesmí měnit nic. Rozhodni jen verdict: \"spam\", \"neni_doba\", nebo \"nejasne\", když je e-mail o otevírací době. changes nech prázdné.";
+const UNKNOWN_NOTE = "Odesílatel zatím není v seznamu a nesmí měnit nic. Rozhodni jen verdict: \"spam\", \"neni_doba\", \"nove_misto\" (chce přidat nové místo, vyplň new_place), nebo \"nejasne\", když je e-mail o otevírací době existujícího místa. changes nech prázdné.";
 
 export function unknownContent({ today, weekday, mail }) {
   return [
@@ -215,5 +237,19 @@ export function changeInput(raw, regular) {
     kind,
     span,
     input: { kind: kind === "trvala" ? "trvala" : "docasna", startsOn: span.startsOn, endsOn: span.endsOn, changeNote: kind === "trvala" ? note : changeNote, doctorWeek: parsed.week, placeId: id },
+  };
+}
+
+// Návrh nového místa z e-mailu: tvar polí formuláře místa v redakci (src/admin/places.js), týden podle slotů.
+export function placeDraft(raw) {
+  const place = raw?.new_place ?? {};
+  const text = (value, max) => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  const parsed = weekFromSlots(place.slots);
+  return {
+    name: text(place.name, 120),
+    label: text(place.label, 120),
+    place: text(place.address, 160),
+    phone: text(place.phone, 40),
+    week: parsed.error ? normalizeWeek([]).week : parsed.week,
   };
 }

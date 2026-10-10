@@ -47,6 +47,8 @@ export function adminQuery(url) {
     requestId: positiveParam(url, "zadost"),
     // E-mail na otevírací dobu: okno povolení neznámé adresy.
     allowId: positiveParam(url, "povolit"),
+    // E-mail na otevírací dobu: okno založení místa z žádosti.
+    placeRequestId: positiveParam(url, "zalozit"),
     refuseId: positiveParam(url, "zamitnout"),
   };
 }

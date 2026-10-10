@@ -73,6 +73,8 @@ export const MAILIN_TABLES = [
     message_id text not null default '',
     refs text not null default '',
     status text not null default 'ceka',
+    kind text not null default 'adresa',
+    draft text not null default '',
     created_at text not null default (datetime('now'))
   )`,
 ];
@@ -83,6 +85,11 @@ export async function ensureMailinTables(env) {
   const info = await env.DB.prepare("pragma table_info(mail_pending)").all();
   const names = new Set((info.results ?? []).map((row) => row.name));
   await addColumn(env, names, "text", "alter table mail_pending add column text text not null default ''");
+  // Žádost o povolení adresy (`adresa`), nebo o založení nového místa (`misto`, `draft` je JSON s návrhem).
+  const requests = await env.DB.prepare("pragma table_info(mail_requests)").all();
+  const requestNames = new Set((requests.results ?? []).map((row) => row.name));
+  await addColumn(env, requestNames, "kind", "alter table mail_requests add column kind text not null default 'adresa'");
+  await addColumn(env, requestNames, "draft", "alter table mail_requests add column draft text not null default ''");
   await addColumn(env, names, "verified", "alter table mail_pending add column verified integer not null default 1");
   await addColumn(env, names, "to_web", "alter table mail_pending add column to_web integer not null default 1");
 }

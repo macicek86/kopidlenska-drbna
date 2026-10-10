@@ -73,3 +73,15 @@ export const UNKNOWN_SENDER = `Na adresu ${MAILIN_ADDRESS} můžou psát jen spr
 export const REQUEST_RECEIVED = `Tahle adresa zatím není v seznamu správců, e-mail zkontrolujeme. Jakmile dokončíme kontrolu, e-mail zpracujeme a pošleme vám potvrzení, co se změnilo. Psát znovu nemusíte.`;
 
 export const REQUEST_REFUSED = `Tuhle adresu jsme zatím nepřidali mezi správce, kteří smějí měnit otevírací dobu e-mailem, a proto jsme e-mail nezapsali. Kdyby šlo o omyl, napište nám na ${MAIL_FROM.email}.`;
+
+// Žádost o nové místo (obchod, služba) od neznámé adresy: odesílatel dostane jen potvrzení, že to zpracujeme.
+export const PLACE_RECEIVED = `Děkujeme, e-mail zpracujeme. Jakmile bude místo na webu, dáme vám vědět.`;
+
+export const PLACE_REFUSED = `Tohle místo jsme zatím na web nepřidali. Kdyby šlo o omyl nebo vám chyběly údaje, napište nám na ${MAIL_FROM.email}.`;
+
+export function placeCreated(name) {
+  return [
+    `Místo ${name} je na webu: ${SITE_ORIGIN}/oteviraci-doba`,
+    `Změny otevírací doby (třeba „zítra zavřeno“ nebo „příští týden do 15“) nám od teď můžete psát na tuto adresu.`,
+  ];
+}

@@ -1,5 +1,6 @@
 // Formuláře stránky E-mail na otevírací dobu: adresy, které smějí psát (jen hlavní redaktor).
 import { redirect, withError } from "./http.js";
+import { createPlaceFromRequest } from "./mailin/new-place.js";
 import { refuseRequest } from "./mailin/register.js";
 import { replayRequest } from "./mailin/run.js";
 import { removeSender, saveSender } from "./mailin/store.js";
@@ -10,7 +11,8 @@ export const MAILIN_OK = {
   "email-adresa": "Adresa je uložená.",
   "email-adresa-smazana": "Adresa je smazaná, e-maily z ní už se nezapíšou.",
   "email-adresa-povolena": "Adresa je povolená a její e-mail jsem zpracovala.",
-  "email-zadost-zamitnuta": "Adresa není povolená, odesílatel to ví.",
+  "email-zadost-zamitnuta": "Žádost je zamítnutá, odesílatel to ví.",
+  "email-misto-zalozeno": "Místo je založené, odesílatel se to dozví e-mailem.",
 };
 
 export async function mailinPost(path, request, env, fields) {
@@ -21,6 +23,11 @@ export async function mailinPost(path, request, env, fields) {
     // Adresa z žádosti: uložený e-mail se zpracuje, jako by přišel teď.
     if (fields.requestId && (await replayRequest(env, Number(fields.requestId)))) return redirect(`${BASE}?ok=email-adresa-povolena`);
     return redirect(`${BASE}?ok=email-adresa`);
+  }
+  if (path === `${BASE}/misto`) {
+    const result = await createPlaceFromRequest(env, request, fields);
+    if (!result.ok) return redirect(withError(fields.requestId ? `${BASE}?zalozit=${fields.requestId}` : BASE, result.error));
+    return redirect(`${BASE}?ok=email-misto-zalozeno`);
   }
   if (path === `${BASE}/zamitnout`) {
     const result = await refuseRequest(env, request, Number(fields.id));

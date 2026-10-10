@@ -60,12 +60,19 @@ export function adminOverview(ctx, data, message) {
       }),
     );
   const addressItems = (data.mailRequests ?? []).map((request) =>
-    item({
-      title: request.subject || "(bez předmětu)",
-      meta: `${esc(request.email)} · adresa není v seznamu`,
-      badges: badge("Povolit adresu", "warn"),
-      actions: modalLink(`/redakce/emaily?povolit=${request.id}`, "Posoudit", "btn-primary"),
-    }),
+    request.kind === "misto"
+      ? item({
+          title: `Nové místo: ${request.draft?.name || request.subject || "(bez názvu)"}`,
+          meta: `${esc(request.email)} · žádost o nové místo`,
+          badges: badge("Založit místo", "warn"),
+          actions: modalLink(`/redakce/emaily?zalozit=${request.id}`, "Posoudit", "btn-primary"),
+        })
+      : item({
+          title: request.subject || "(bez předmětu)",
+          meta: `${esc(request.email)} · adresa není v seznamu`,
+          badges: badge("Povolit adresu", "warn"),
+          actions: modalLink(`/redakce/emaily?povolit=${request.id}`, "Posoudit", "btn-primary"),
+        }),
   );
   const failedSources = [
     ["Munipolis", "/redakce/munipolis", data.importItems],

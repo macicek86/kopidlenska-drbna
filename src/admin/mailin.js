@@ -1,7 +1,9 @@
 // Redakce: E-mail na otevírací dobu (src/mailin/). Adresy, které smějí psát, s místy, lékaři a dvory,
 // které můžou měnit, a záznam posledních přijatých e-mailů. Jen hlavní redaktor.
+import { weekText } from "../mailin/describe.js";
 import { MAILIN_ADDRESS } from "../mailin/reply.js";
 import { esc } from "../view.js";
+import { placeForm } from "./places.js";
 import { adminShell } from "./shell.js";
 import { badge, callout, cancelLink, check, confirmForm, field, formFoot, hidden, input, item, list, modal, modalLink, openButton, pageHead, panel } from "./ui.js";
 
@@ -77,7 +79,21 @@ function senderForm(data, editing, request = null) {
   </form>`;
 }
 
+function placeRequestItem(request) {
+  const draft = request.draft ?? {};
+  const hours = weekText(draft.week ?? []);
+  return item({
+    title: `Nové místo: ${draft.name || request.subject || "(bez názvu)"}`,
+    meta: [esc(stamp(request.createdAt)), esc(request.email), [draft.place, draft.phone, hours].filter(Boolean).map(esc).join(" · ")].filter(Boolean).join(" · "),
+    badges: badge("Žádost o nové místo", "info"),
+    extra: `<p class="message-text">${esc(request.text.slice(0, 600)).replace(/\n/g, "<br>")}</p>`,
+    actions: `${modalLink(`${BASE}?zalozit=${request.id}`, "Založit…", "btn-primary")}${modalLink(`${BASE}?zamitnout=${request.id}`, "Zamítnout", "btn-ghost btn-danger-text")}`,
+    search: `${request.email} ${draft.name ?? ""} ${request.text}`,
+  });
+}
+
 function requestItem(request) {
+  if (request.kind === "misto") return placeRequestItem(request);
   return item({
     title: request.subject || "(bez předmětu)",
     meta: [esc(stamp(request.createdAt)), esc(request.email)].join(" · "),
@@ -119,10 +135,26 @@ export function adminMailin(ctx, data, message, query = {}) {
   const editing = senders.find((row) => row.id === query.editingId) ?? null;
   const removing = editing ? null : (senders.find((row) => row.id === query.confirmId) ?? null);
   const requests = data.mailin?.requests ?? [];
-  const allowing = requests.find((row) => row.id === query.allowId) ?? null;
+  const allowing = requests.find((row) => row.id === query.allowId && row.kind !== "misto") ?? null;
   const refusing = requests.find((row) => row.id === query.refuseId) ?? null;
+  const founding = requests.find((row) => row.id === query.placeRequestId && row.kind === "misto") ?? null;
   const dialogs = [modal({ id: "nova-adresa", title: "Nová adresa", size: "wide", close: BASE, open: Boolean(query.fresh) && !editing && !removing, body: senderForm(data, null) })];
   if (editing) dialogs.push(modal({ id: "okno", title: `Upravit: ${editing.label || editing.email}`, size: "wide", close: BASE, open: true, body: senderForm(data, editing) }));
+  if (founding) {
+    const draft = { ...(founding.draft ?? {}), sortOrder: 100, published: true, offers: [] };
+    dialogs.push(
+      modal({
+        id: "okno",
+        title: `Nové místo: ${draft.name || founding.email}`,
+        size: "wide",
+        close: BASE,
+        open: true,
+        body: `<p class="item-sub">Přišlo od <b>${esc(founding.email)}</b>: <b>${esc(founding.subject || "(bez předmětu)")}</b></p><p class="message-text">${esc(founding.text.slice(0, 1500)).replace(/\n/g, "<br>")}</p>
+          ${callout("Zkontrolujte údaje z e-mailu. Po uložení se místo založí na webu, přiřadí odesílateli (jeho změny půjdou nejdřív k vám) a odesílatel dostane zprávu.")}
+          ${placeForm(draft, { action: `${BASE}/misto`, extra: hidden("zadost", founding.id), submit: "Založit místo a poslat zprávu", cancel: BASE })}`,
+      }),
+    );
+  }
   if (allowing) {
     dialogs.push(
       modal({
@@ -169,7 +201,7 @@ export function adminMailin(ctx, data, message, query = {}) {
       }),
     );
   }
-  const lede = `Správci míst můžou poslat změnu otevírací doby e-mailem na <b>${esc(MAILIN_ADDRESS)}</b>, třeba „15. 8. KVC zavřeno“. Drběna ji přečte, zapíše a odepíše, co zapsala. Píšou jen adresy ze seznamu a jen u míst, která jim zaškrtnete. Každý odesílatel dostane náhled s tlačítky Schválit, Zamítnout a Upravit čas na webu. Bez reakce se po 10 minutách změna vyřídí sama: u ověřeného odesílatele s „zapisovat rovnou“ se zapíše na web, u ostatních jde k vám ke schválení. Neznámá adresa, která napíše o otevírací době, čeká tady na povolení.`;
+  const lede = `Správci míst můžou poslat změnu otevírací doby e-mailem na <b>${esc(MAILIN_ADDRESS)}</b>, třeba „15. 8. KVC zavřeno“. Drběna ji přečte, zapíše a odepíše, co zapsala. Píšou jen adresy ze seznamu a jen u míst, která jim zaškrtnete. Každý odesílatel dostane náhled s tlačítky Schválit, Zamítnout a Upravit čas na webu. Bez reakce se po 10 minutách změna vyřídí sama: u ověřeného odesílatele s „zapisovat rovnou“ se zapíše na web, u ostatních jde k vám ke schválení. Neznámá adresa, která napíše o otevírací době, čeká tady na povolení. Kdo chce přidat nové místo (obchod, službu), se tu ukáže jako žádost o založení místa.`;
   const body = `${pageHead("E-mail na otevírací dobu", lede, openButton("nova-adresa", `${BASE}?novy=1`, "Nová adresa"))}
     ${requests.length ? panel({ id: "zadosti", title: "Čeká na povolení", count: requests.length, tone: "warn", body: list(requests.map(requestItem), "") }) : ""}
     ${panel({ id: "adresy", title: "Kdo smí psát", count: senders.length, filter: senders.length > 6 ? "Hledat adresu" : "", body: list(senders.map((row) => senderItem(data, row)), "Zatím žádná adresa. E-mailům z neznámých adres Drběna jen odepíše, kam psát.") })}
