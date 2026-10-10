@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPeriods, changeFields, readPeriods } from "../src/periods.js";
+import { buildPeriods, changeFields, packPeriods, readPeriods, unpackPeriods } from "../src/periods.js";
+import { submitPeriods } from "../src/post-periods.js";
+import { PLACE_ACTIONS } from "../src/places-db.js";
 import { normalizeWeek } from "../src/doctors.js";
 
 const part = (from, to) => ({ open: true, from, to, note: "" });
@@ -39,4 +41,25 @@ test("období u dvora: jiná doba po dnech a zavřeno bez týdne", () => {
   assert.equal(built.error, undefined);
   assert.deepEqual(built.items[0].week.filter((slot) => slot.open), [{ day: 6, open: true, from: "08:00", to: "10:00" }]);
   assert.deepEqual(changeFields("dvory", built.items[1]), { startsOn: "2026-10-20", endsOn: "2026-10-20", reason: "inventura" });
+});
+
+test("chyba formuláře vrátí rozepsaná období: adresa nese koncept a ten se rozbalí do stejných hodnot", async () => {
+  const periods = readPeriods(form({
+    "p1-from": "2026-10-14", "p1-to": "2026-10-16", "p1-mode": "zavreno", "p1-note": "školení",
+    "p2-from": "2026-10-15", "p2-mode": "jina", "p2-am-open-4": "1", "p2-am-from-4": "09:00", "p2-am-to-4": "11:00", "p2-am-note-4": "jen objednaní",
+  }));
+  const response = await submitPeriods({
+    base: "/redakce/oteviraci-doba", back: "/redakce/oteviraci-doba?zmena=1", section: "oteviraci-doba", actions: PLACE_ACTIONS,
+    idField: "placeId", targetId: 1, periods, regular, shape: "week2", save: async () => ({ ok: true }), okKey: "misto-zmena",
+  });
+  const target = new URL(response.headers.get("location"), "http://drbna.test");
+  assert.match(target.searchParams.get("chyba"), /překrývají/);
+  const draft = unpackPeriods(target.searchParams.get("obdobi"), "week2");
+  assert.deepEqual(draft.map((item) => [item.startsOn, item.endsOn, item.mode, item.note]), [["2026-10-14", "2026-10-16", "zavreno", "školení"], ["2026-10-15", "", "jina", ""]]);
+  const thursday = draft[1].week.find((slot) => slot.day === 4);
+  assert.deepEqual([thursday.morning.open, thursday.morning.from, thursday.morning.to, thursday.morning.note], [true, "09:00", "11:00", "jen objednaní"]);
+  assert.equal(thursday.afternoon.open, false);
+  // Poškozený koncept formulář nerozbije.
+  assert.deepEqual(unpackPeriods("%%%", "week2"), []);
+  assert.equal(packPeriods([]).length > 0, true);
 });

@@ -9,6 +9,7 @@ import { messageFrom, OK } from "../ok-messages.js";
 import { deadLinkPage, doneLinkPage, managePage } from "./page.js";
 import { pendingByToken } from "../mailin/pending.js";
 import { periodInputs } from "../post-periods.js";
+import { unpackPeriods, withDraft } from "../periods.js";
 import { MANAGE_SECTIONS, formKey } from "./sections.js";
 
 const PREFIX = "/sprava/";
@@ -62,7 +63,7 @@ export async function manageGet(path, request, env, url) {
   if (!parsed) return null;
   const found = parsed.action ? null : await loadLink(env, parsed.token);
   if (!found) return html(deadLinkPage(), 404);
-  const query = { window: url.searchParams.get("okno") ?? "", cancelId: positive(url.searchParams.get("zrusit")) };
+  const query = { window: url.searchParams.get("okno") ?? "", cancelId: positive(url.searchParams.get("zrusit")), draft: url.searchParams.get("obdobi") ?? "" };
   const requests = await linkRequests(env, found.link);
   const mail = query.window ? await fromMail(env, url.searchParams.get("z"), found.link, MANAGE_SECTIONS[found.link.section], found.row, query.window) : null;
   return html(managePage({ ...found, requests, query, mail, message: manageMessage(url), author: rememberedAuthor(request) }));
@@ -127,7 +128,7 @@ export async function managePost(path, request, env, fields) {
       regular: link.section === "dvory" && row.legacy ? null : row.week ?? null,
       shape: link.section === "dvory" ? "week1" : "week2",
     });
-    if (prepared.error) return redirect(withError(back, prepared.error), authorCookie(request, author));
+    if (prepared.error) return redirect(withError(withDraft(back, fields.periods), prepared.error), authorCookie(request, author));
     inputs = prepared.inputs;
   }
   const auditPath = `/redakce/${link.section}${spec.audit[action]}`;
@@ -149,7 +150,7 @@ export async function managePost(path, request, env, fields) {
     if (!result.ok) break;
   }
   const cookie = authorCookie(request, author);
-  if (!result.ok) return redirect(withError(back, result.error), cookie);
+  if (!result.ok) return redirect(withError(inputs.length > 1 || fields.periods?.length ? withDraft(back, fields.periods ?? []) : back, result.error), cookie);
   await useLink(env, link);
   const done = html(doneLinkPage(Boolean(result.requested)), 200, cookie);
   await auditFinish(env, watch, redirect(`${base}?ok=${result.requested ? "zadost" : spec.ok(action, result.value)}`), OK).catch(() => {});

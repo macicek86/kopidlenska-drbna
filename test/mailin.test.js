@@ -834,3 +834,10 @@ test("dvě změny jednoho místa z e-mailu: jeden formulář s oběma obdobími,
     claude.close();
   }
 });
+
+test("čas v noci („zavřeno od 4“) se nezapíše a ptá se na odpoledne", () => {
+  const regular = new Map([["misto:8", duhovka]]);
+  const base = { target: "misto:8", kind: "docasna", starts_on: "2026-10-12", ends_on: "2026-10-12", open_from: "", note: "", slots: [] };
+  assert.match(changeInput({ ...base, close_at: "04:00" }, regular).error, /v noci, myslíte 16:00 odpoledne/);
+  assert.ok(!changeInput({ ...base, close_at: "14:00" }, regular).error);
+});

@@ -4,6 +4,7 @@ import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { yardHoursFields } from "./hours.js";
 import { periodsForm } from "./periods.js";
+import { unpackPeriods } from "../periods.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -151,7 +152,7 @@ export function adminYards(ctx, data, message, query = {}) {
   if (reviewing) dialogs.push(reviewing);
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit sběrný dvůr", size: "wide", close: BASE, open: true, body: yardForm(editing) }));
-  else if (closing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: closureForm(closing, { submit: mode.submit("Zapsat změny") }) }));
+  else if (closing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: closureForm(closing, { values: query.periodsDraft ? unpackPeriods(query.periodsDraft, "week1") : undefined, submit: mode.submit("Zapsat změny") }) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Otevírací doba: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit dobu") }) }));
   else if (detailing) dialogs.push(modal({ id: "okno", title: `Údaje: ${detailing.name}`, close: BASE, open: true, body: detailsForm(detailing, { submit: mode.submit("Uložit") }) }));
   else if (cancelling) {

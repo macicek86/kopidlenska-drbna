@@ -1,7 +1,7 @@
 // Odeslání formuláře s více obdobími (src/periods.js): každé období je jedna změna, zapisují se po jedné stejnou
 // cestou jako dřív (rovnou, nebo ke schválení podle oprávnění). Nejdřív se zkontrolují všechna, ať se nezapíše půlka.
 import { redirect, withError } from "./http.js";
-import { buildPeriods, changeFields } from "./periods.js";
+import { buildPeriods, changeFields, withDraft } from "./periods.js";
 
 // Změny k zápisu z formuláře: { inputs: [vstup akce], items } nebo { error }.
 // `regular` je běžný týden řádku, `shape` "week2" (místa, lékaři) nebo "week1" (dvory).
@@ -19,11 +19,13 @@ export function periodInputs({ section, actions, action = "zmena", idField, targ
 // `save(input)` zapíše jednu změnu a vrátí { ok, requested, error }. Vrací přesměrování jako ostatní formuláře.
 export async function submitPeriods({ base, back = base, okKey, manyKey = okKey, save, ...rest }) {
   const prepared = periodInputs(rest);
-  if (prepared.error) return redirect(withError(back, prepared.error));
+  // Po chybě se formulář vrátí s tím, co člověk napsal.
+  const again = withDraft(back, rest.periods);
+  if (prepared.error) return redirect(withError(again, prepared.error));
   let requested = false;
   for (const input of prepared.inputs) {
     const result = await save(input);
-    if (!result.ok) return redirect(withError(back, result.error));
+    if (!result.ok) return redirect(withError(again, result.error));
     if (result.requested) requested = true;
   }
   return redirect(`${base}?ok=${requested ? "zadost" : prepared.inputs.length > 1 ? manyKey : okKey}`);

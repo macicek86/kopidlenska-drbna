@@ -27,9 +27,10 @@ Pravidla:
 - Jeden e-mail může mít víc míst („duhovka dnes zavřená, knihovna příští týden zavřená“): každé místo je jedna změna v changes se svým obdobím. Když adresa spravuje víc míst a e-mail žádné nejmenuje, je to "nejasne" a v question vyjmenuj, o které místa jde.
 - „Dnes zavřeno“ je zavřeno od dnešního dne (starts_on je dnešek), „zítra do 15“ nebo „dnes jen do 15“ je otevřeno jen do 15:00 (close_at). „Zavřeno do 15“ nebo „dnes otevíráme až v 15“ je otevřeno od 15:00 (open_from).
 - Když je v přehledu jediný řádek a e-mail místo nejmenuje, myslí ten. Zkratky a hovorové názvy (kvc, knihovna, obecňák, doktorka…) přiřaď podle přehledu; když by mohly patřit ke dvěma řádkům, je to "nejasne".
+- Hodina bez „ráno“ či „večer“ do šesti je odpoledne: „zavřeno od 4“ je close_at 16:00, „do 5“ je 17:00. Zapisuj čas 24hodinově.
 - Datum bez roku je nejbližší takový den od dneška (dnešek včetně). Den v týdnu („v pátek“, „příští středu“) a slova „zítra“, „o víkendu“ počítej od dneška. Data ber z kalendáře v zadání, nepočítej je sám. Data piš jako RRRR-MM-DD.
 - „Příští týden“ je celý příští týden od pondělí do neděle, „tento týden“ od dneška do neděle, „do konce měsíce“ od dneška do posledního dne měsíce. Na nic se v tom případě neptej, zapiš celé období („příští týden zavřeno dovolená“ je jedna změna zavreno od pondělí do neděle s note „dovolená“, i když e-mail nepíše, které dny).
-- Každý den má svůj vlastní stav. Když e-mail říká o různých dnech různé věci („zavřeno v úterý a ve čtvrtek jen do 15“), rozděl ho po dnech a každý den je zvláštní změna se svým kind: úterý "zavreno", čtvrtek "docasna" s close_at 15:00. Čas ani poznámku z jednoho dne nepřenášej na druhý, „jen do 15“ platí jen pro den, u kterého stojí. Stejné to je u více míst v jednom e-mailu.
+- Každý den má svůj vlastní stav. Když e-mail říká o různých dnech různé věci („zavřeno v úterý a ve čtvrtek jen do 15“), rozděl ho po dnech a každý den je zvláštní změna se svým kind: úterý "zavreno", čtvrtek "docasna" s close_at 15:00. Čas ani poznámku z jednoho dne nepřenášej na druhý, „jen do 15“ platí jen pro den, u kterého stojí. Den, o kterém e-mail říká jen „zavřeno“, je vždy samostatná změna kind "zavreno", i když je v jedné větě s dnem, který má jen omezenou dobu („v sobotu jen do 10 a v pátek zavřeno“). Stejné to je u více míst v jednom e-mailu.
 - Lidé píšou rychle: bez diakritiky, bez čárek a teček, ve zkratkách, s překlepy a často bez předmětu („ve stredu zavreno ve ctvrtek az od 10 v patek normal“). Větu proto nedělej podle interpunkce, ale podle dnů a míst: ke každému dni či období si urči, jestli je zavřeno, otevřeno jen do / až od nějaké hodiny, nebo jiná doba. „Normal“, „jako vzdy“ a podobně znamená běžná doba, nic se tam nezapisuje.
 - close_at a open_from dobu jen zkracují. Když e-mail říká, že bude otevřeno déle nebo dřív než běžně („budeme mít otevřeno do 17“, „otevíráme už v 7“) nebo že bude otevřeno v den, kdy je běžně zavřeno, nepoužij je: zapiš kind "docasna" a do slots celé časy toho dne.
 - Ptej se ("nejasne") jen tehdy, když opravdu nejde poznat místo, kdy, nebo jaké časy. Co jde rozumně odvodit, odvoď a zapiš.
@@ -224,6 +225,11 @@ export function changeInput(raw, regular) {
   const shifted = kind === "docasna" && (openFrom || closeAt);
   const regularWeek = regular.get(target);
   const days = spanWeekdays(span.startsOn, span.endsOn);
+  // Čas v noci („zavřeno od 4“) je skoro jistě odpoledne; zapsat by ho znamenalo zavřít celý den, proto se zeptáme.
+  if ((closeAt && closeAt < "06:00") || (openFrom && openFrom < "05:00")) {
+    const at = clock(closeAt || openFrom);
+    return { error: `čas ${at} je v noci, myslíte ${Number(at.split(":")[0]) + 12}:${at.split(":")[1]} odpoledne? Napište nám prosím čas znovu`, noEffect: true };
+  }
   const shiftNote = [openFrom && `otevírá až v ${clock(openFrom)}`, closeAt && `zavírá už v ${clock(closeAt)}`].filter(Boolean).join(", ");
   const fallback = closed ? "Mimořádně zavřeno" : shifted ? shiftNote.charAt(0).toUpperCase() + shiftNote.slice(1) : "Jiná otevírací doba";
   // Pro formulář s obdobími: „jen do“ / „až od“ se předvyplní jako volba s časem, ne jako celý týden.

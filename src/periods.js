@@ -125,3 +125,56 @@ export function changeFields(section, item) {
   const base = { startsOn: item.startsOn, endsOn: item.endsOn, changeNote: item.note, doctorWeek };
   return section === "oteviraci-doba" ? { ...base, kind: "docasna" } : base;
 }
+
+// Rozepsaná období po chybě: formulář se vrátí s tím, co člověk napsal (v adrese, bez cookies a bez ukládání).
+// Týden se pamatuje jen u „Jiná doba“ a jen otevřené úseky; jinak by byla adresa zbytečně dlouhá.
+const MAX_DRAFT = 6000;
+
+export function packPeriods(periods) {
+  const slim = periods.map((period) => {
+    const out = { f: period.startsOn, t: period.endsOn, m: period.mode, h: period.time, n: period.note };
+    if (period.mode === "jina") {
+      out.a = period.week2.flatMap((slot) => ["morning", "afternoon"].filter((part) => slot[part].open).map((part) => [slot.day, part === "morning" ? 0 : 1, slot[part].from, slot[part].to, slot[part].note]));
+      out.b = period.week1.filter((slot) => slot.open).map((slot) => [slot.day, slot.from, slot.to]);
+    }
+    return out;
+  });
+  const text = Buffer.from(JSON.stringify(slim), "utf8").toString("base64url");
+  return text.length > MAX_DRAFT ? "" : text;
+}
+
+// Zpátky do tvaru, který bere formulář (`periodView`): { startsOn, endsOn, mode, time, note, week2/week1 → week }.
+export function unpackPeriods(text, shape) {
+  let list;
+  try {
+    list = JSON.parse(Buffer.from(String(text ?? ""), "base64url").toString("utf8"));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, MAX_PERIODS).map((item) => {
+    const mode = MODES.includes(item?.m) ? item.m : "zavreno";
+    let week = null;
+    if (mode === "jina" && shape === "week1") {
+      week = WEEK_DAYS.map(({ day }) => ({ day, open: false, from: "08:00", to: "16:00" }));
+      for (const [day, from, to] of Array.isArray(item.b) ? item.b : []) {
+        const slot = week.find((entry) => entry.day === Number(day));
+        if (slot) Object.assign(slot, { open: true, from: String(from), to: String(to) });
+      }
+    } else if (mode === "jina") {
+      week = blankWeek();
+      for (const [day, part, from, to, note] of Array.isArray(item.a) ? item.a : []) {
+        const slot = week.find((entry) => entry.day === Number(day));
+        if (slot) Object.assign(slot[part ? "afternoon" : "morning"], { open: true, from: String(from), to: String(to), note: String(note ?? "") });
+      }
+    }
+    return { startsOn: String(item?.f ?? ""), endsOn: String(item?.t ?? ""), mode, time: String(item?.h ?? ""), note: String(item?.n ?? ""), week };
+  });
+}
+
+// Adresa formuláře s rozepsanými obdobími (pro přesměrování po chybě).
+export function withDraft(path, periods) {
+  const draft = packPeriods(periods);
+  if (!draft) return path;
+  return `${path}${path.includes("?") ? "&" : "?"}obdobi=${draft}`;
+}

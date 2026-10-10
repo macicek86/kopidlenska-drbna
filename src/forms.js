@@ -21,6 +21,8 @@ export function adminQuery(url) {
     closureYardId: positiveParam(url, "uzavreni"),
     hoursId: positiveParam(url, "hodiny"),
     changeId: positiveParam(url, "zmena"),
+    // Rozepsaná období po chybě formuláře (src/periods.js).
+    periodsDraft: url.searchParams.get("obdobi") ?? "",
     newHoursId: positiveParam(url, "nova-doba"),
     offersId: positiveParam(url, "nabidka"),
     detailsId: positiveParam(url, "udaje"),

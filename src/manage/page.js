@@ -4,6 +4,7 @@ import { REQUEST_SECTIONS } from "../hours-requests-db.js";
 import { linkPath } from "../hours-links-db.js";
 import { describeRequest } from "../admin/hours-requests.js";
 import { adminDocument } from "../admin/document.js";
+import { unpackPeriods } from "../periods.js";
 import { toastHtml } from "../admin/shell.js";
 import { badge, callout, cancelLink, field, hidden, input, item, list, modal, modalLink, panel, postButton } from "../admin/ui.js";
 import { esc, flashOf } from "../view.js";
@@ -86,7 +87,7 @@ function dialogFor(spec, link, row, base, query, author, mail) {
         action: `${base}/${form.action}`,
         extra: `${mail ? callout(`Z e-mailu nám vyšlo: ${esc(mail.line)}. Upravte, co je potřeba, a uložte.`) : ""}${authorField(author)}`,
         value: mail?.value,
-        values: mail?.values,
+        values: mail?.values ?? (query.draft ? unpackPeriods(query.draft, link.section === "dvory" ? "week1" : "week2") : undefined),
         submit,
         cancel: base,
       }),

@@ -4,6 +4,7 @@ import { closureLabel, esc } from "../view.js";
 import { adminShell } from "./shell.js";
 import { doctorHoursFields } from "./hours.js";
 import { periodsForm } from "./periods.js";
+import { unpackPeriods } from "../periods.js";
 import { shareButton, shareDialog } from "./hours-share.js";
 import { requestDialog, requestMode, requestsPanel, waitingBadge } from "./hours-requests.js";
 import {
@@ -158,7 +159,7 @@ export function adminDoctors(ctx, data, message, query = {}) {
   else if (preview) dialogs.push(preview);
   else if (editing) dialogs.push(modal({ id: "okno", title: "Upravit ordinaci", size: "wide", close: BASE, open: true, body: doctorForm(editing) }));
   else if (hours) dialogs.push(modal({ id: "okno", title: `Hodiny: ${hours.name}`, size: "wide", close: BASE, open: true, body: hoursForm(hours, { submit: mode.submit("Uložit hodiny") }) }));
-  else if (changing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: changeForm(changing, { submit: mode.submit("Zapsat změnu") }) }));
+  else if (changing) dialogs.push(modal({ id: "okno", title: "Zavřeno nebo jiná doba", size: "wide", close: BASE, open: true, body: changeForm(changing, { values: query.periodsDraft ? unpackPeriods(query.periodsDraft, "week2") : undefined, submit: mode.submit("Zapsat změnu") }) }));
   else if (detailing) dialogs.push(modal({ id: "okno", title: `Údaje: ${detailing.name}`, close: BASE, open: true, body: detailsForm(detailing, { submit: mode.submit("Uložit") }) }));
   else if (cancelling) {
     dialogs.push(
