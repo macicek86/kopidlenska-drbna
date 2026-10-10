@@ -103,7 +103,7 @@ export async function applyPending(env, id) {
     const why = error instanceof Error ? error.message : "Neznámá chyba.";
     await finish(env, found, "chyba", why);
     await tellEditors(env, mail, why);
-    await replyTo(env, mail, ["Změnu se mi nepodařilo zapsat. Předala jsem ji redakci, zapíše ji člověk."]).catch(() => {});
+    await replyTo(env, mail, ["Změnu se nepodařilo zapsat hned. Zapíšeme ji."]).catch(() => {});
     return { ok: false };
   }
 }
@@ -113,7 +113,7 @@ export async function rejectPending(env, token) {
   const found = await pendingByToken(env, token);
   if (!found || !(await claim(env, found.id, "zamitnuto"))) return false;
   await finish(env, found, "zamitnuto", "Odesílatel změnu zamítl.");
-  await replyTo(env, mailOf(found), ["Dobře, nic jsem nezapsala. Kdyby šlo o omyl, napište mi znovu."]).catch(() => {});
+  await replyTo(env, mailOf(found), ["Změnu jsme nezapsali. Kdyby šlo o omyl, napište nám znovu."]).catch(() => {});
   return true;
 }
 

@@ -32,7 +32,7 @@ function shell(title, inner) {
 }
 
 function deadPage() {
-  return shell("Odkaz neplatí", `<h1>Odkaz neplatí</h1><p class="adm-lede">Tahle změna už tu není, nebo je odkaz starý. Napište mi e-mail znovu.</p>`);
+  return shell("Odkaz neplatí", `<h1>Odkaz neplatí</h1><p class="adm-lede">Tahle změna už tu není, nebo je odkaz starý. Napište e-mail znovu.</p>`);
 }
 
 function lines(pending) {
@@ -62,20 +62,20 @@ function editButtons(pending) {
 
 function waitingPage(pending, focus) {
   const due = pending.toWeb
-    ? `Když nic neuděláte, zapíše se to na web v ${esc(clock(pending.dueAt))}.`
-    : `Když nic neuděláte, v ${esc(clock(pending.dueAt))} se to pošle redakci ke schválení. Na web to půjde, až ji redakce schválí.`;
-  const approve = pending.toWeb ? "Schválit hned" : "Poslat redakci hned";
+    ? `Když nic neuděláte, v ${esc(clock(pending.dueAt))} změnu zapíšeme na web.`
+    : `Když nic neuděláte, v ${esc(clock(pending.dueAt))} změnu dáme ke kontrole a na web půjde, až ji potvrdíme.`;
+  const approve = pending.toWeb ? "Schválit hned" : "Poslat ke kontrole hned";
   const all = `<div class="form-foot">${button(pending.token, "schvalit", approve, "btn-primary")}${button(pending.token, "zamitnout", "Zamítnout", "btn-ghost btn-danger-text")}</div>
     <p class="adm-lede confirm-edit">Nebo si čas upravte přímo na webu (odkaz platí den a jen jednou):</p>
     <div class="manage-actions">${editButtons(pending)}</div>`;
   const only = {
-    schvalit: `<p>${pending.toWeb ? "Zapsat změnu na web hned?" : "Poslat změnu redakci ke schválení hned?"}</p><div class="form-foot">${button(pending.token, "schvalit", pending.toWeb ? "Ano, zapsat" : "Ano, poslat", "btn-primary")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
-    zamitnout: `<p>Opravdu změnu zamítnout? Nic se nezapíše.</p><div class="form-foot">${button(pending.token, "zamitnout", "Ano, zamítnout", "btn-danger")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
+    schvalit: `<p>${pending.toWeb ? "Zapsat změnu na web hned?" : "Dát změnu ke kontrole hned?"}</p><div class="form-foot">${button(pending.token, "schvalit", pending.toWeb ? "Ano, zapsat" : "Ano, dát ke kontrole", "btn-primary")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
+    zamitnout: `<p>Opravdu změnu zamítnout? Nic nezapíšeme.</p><div class="form-foot">${button(pending.token, "zamitnout", "Ano, zamítnout", "btn-danger")}<a class="btn btn-ghost" href="${PREFIX}${pending.token}">Zpět</a></div>`,
     upravit: `<p>Čas si upravíte přímo na webu, odkaz platí den a jen jednou.</p><div class="form-foot">${editButtons(pending)}</div>`,
   }[focus];
   return shell(
     "Potvrzení změny",
-    `<h1>Rozuměla jsem takhle</h1>
+    `<h1>Z e-mailu nám vyšlo toto</h1>
     ${lines(pending)}
     <p class="adm-lede">${due}</p>
     ${only ?? all}`,
@@ -85,11 +85,11 @@ function waitingPage(pending, focus) {
 function donePage(pending) {
   const text = {
     zapsano: "Změna je na webu.",
-    ke_schvaleni: "Změna čeká na schválení redakcí, na web půjde po něm.",
-    zamitnuto: "Změnu jste zamítli, nic se nezapsalo.",
-    upraveno: "Čas jste převzali na webu.",
+    ke_schvaleni: "Změna čeká na naši kontrolu, na web půjde po potvrzení.",
+    zamitnuto: "Změnu jste zamítli, nic jsme nezapsali.",
+    upraveno: "Čas upravujete přímo na webu.",
     zapisuje: "Změna se právě zapisuje, obnovte stránku za chvíli.",
-    chyba: "Změnu se nepodařilo zapsat, předala jsem ji redakci.",
+    chyba: "Změnu se nepodařilo zapsat hned, zapíšeme ji.",
   }[pending.status] ?? "Tahle změna už je vyřízená.";
   return shell("Hotovo", `<h1>Hotovo</h1><p class="adm-lede">${esc(text)}</p>${lines(pending)}`);
 }

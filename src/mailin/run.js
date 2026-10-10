@@ -92,7 +92,7 @@ async function handleUnknown(env, { mail, entry, verified }) {
 function confirmationButtons(token, toWeb) {
   const base = `${SITE_ORIGIN}/zmena/${token}`;
   return [
-    { label: toWeb ? "Schválit hned" : "Poslat redakci hned", url: `${base}?akce=schvalit`, tone: "primary" },
+    { label: toWeb ? "Schválit hned" : "Poslat ke kontrole hned", url: `${base}?akce=schvalit`, tone: "primary" },
     { label: "Zamítnout", url: `${base}?akce=zamitnout`, tone: "danger" },
     { label: "Upravit čas na webu", url: `${base}?akce=upravit`, tone: "line" },
   ];
@@ -105,13 +105,13 @@ async function holdForConfirmation(env, { mail, sender, entry, prepared, questio
   const logId = await logMail(env, { ...entry, status: "ceka", result: [...lines, ...prepared.failed.map((line) => `nezapsáno: ${line}`), question].filter(Boolean).join("\n") });
   const pending = await createPending(env, { sender, mail, items: prepared.items, who, logId, verified, toWeb });
   await enqueue(env, { type: "mailin.apply", id: pending.id }, CONFIRM_MINUTES * 60);
-  const unverified = sender.direct && !verified ? " (e-mail se nepodařilo ověřit, proto ho musí potvrdit člověk)" : "";
+  const unverified = sender.direct && !verified ? " (e-mail se nepodařilo ověřit, proto ho musíme potvrdit)" : "";
   const next = toWeb
-    ? `Když nic neuděláte, zapíšu to na web za ${CONFIRM_MINUTES} minut. Můžete to schválit hned, zamítnout, nebo čas upravit přímo na webu.`
-    : `Když nic neuděláte, za ${CONFIRM_MINUTES} minut to pošlu redakci ke schválení${unverified} a na web to půjde, až ji redakce schválí. Můžete to poslat hned, zamítnout, nebo čas upravit přímo na webu.`;
+    ? `Když nic neuděláte, za ${CONFIRM_MINUTES} minut změnu zapíšeme na web. Můžete ji schválit hned, zamítnout, nebo čas upravit přímo na webu.`
+    : `Když nic neuděláte, za ${CONFIRM_MINUTES} minut změnu dáme ke kontrole${unverified} a na web půjde, až ji potvrdíme. Můžete ji poslat ke kontrole hned, zamítnout, nebo čas upravit přímo na webu.`;
   const paragraphs = [
-    `Rozumím tomu takhle:\n${lines.join("\n")}`,
-    prepared.failed.length ? `Tohle jsem nepochopila, nezapíšu to:\n${prepared.failed.map((line) => `• ${line}`).join("\n")}` : "",
+    `Z e-mailu nám vyšlo toto:\n${lines.join("\n")}`,
+    prepared.failed.length ? `Tohle jsme nepochopili, nezapíšeme to:\n${prepared.failed.map((line) => `• ${line}`).join("\n")}` : "",
     question,
     next,
   ];
@@ -130,7 +130,7 @@ export async function processKnown(env, { mail, sender, entry, verified }) {
   const allowed = await allowedRows(env, sender, today);
   if (!hasRows(allowed)) {
     await logMail(env, { ...entry, status: "chyba", result: "Adresa nemá žádné místo." });
-    await replyTo(env, mail, [`Tahle adresa u nás zatím nemůže měnit žádné místo. Napište prosím na redakce@kopidlenskadrbna.org.`]);
+    await replyTo(env, mail, [`Pro tuhle adresu zatím nemáme nastavené žádné místo. Napište nám prosím na redakce@kopidlenskadrbna.org.`]);
     return;
   }
   if (!mail.text && !mail.subject) {
@@ -144,7 +144,7 @@ export async function processKnown(env, { mail, sender, entry, verified }) {
   if (!answer.ok) {
     await logMail(env, { ...entry, status: "chyba", result: answer.error });
     await tellEditors(env, mail, answer.error);
-    await replyTo(env, mail, ["Teď se mi e-mail nepodařilo zpracovat. Předala jsem ho redakci, změnu zapíše člověk."]);
+    await replyTo(env, mail, ["E-mail se nám teď nepodařilo zpracovat hned. Změnu zapíšeme."]);
     return;
   }
   const verdict = answer.raw?.verdict;
@@ -171,7 +171,7 @@ export async function processKnown(env, { mail, sender, entry, verified }) {
   }
   const wrote = outcome.done.length + outcome.asked.length;
   if (!wrote) {
-    const ask = question || "Nepoznala jsem, co přesně se mění. Napište mi prosím, které místo, který den (nebo od kdy do kdy) a jestli je zavřeno, nebo jaké jsou časy.";
+    const ask = question || "Z e-mailu nepoznáme, co přesně se mění. Napište nám prosím, které místo, který den (nebo od kdy do kdy) a jestli je zavřeno, nebo jaké jsou časy.";
     await logMail(env, { ...entry, status: "nejasne", result: [ask, ...outcome.failed].join(" · ") });
     await tellEditors(env, mail, "nerozuměla mu a zeptala se odesílatele.");
     await replyTo(env, mail, changeReply(outcome, { question: ask, sender, verified }));

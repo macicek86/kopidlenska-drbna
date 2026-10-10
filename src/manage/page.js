@@ -16,7 +16,7 @@ function authorField(name) {
   return field(
     "Kdo to zapisuje",
     `<input class="${input}" name="author" required maxlength="80" autocomplete="name" value="${esc(name)}" placeholder="Jméno a příjmení">`,
-    "Uvidí to jen redakce drbny.",
+    "Uvidíme to jen my.",
   );
 }
 
@@ -69,12 +69,12 @@ function requestsPanel(link, row, requests, base) {
       actions: postButton(`${base}/stahnout`, { zadost: request.id }, rejected ? "Smazat" : "Vzít zpět", "btn-ghost btn-danger-text"),
     });
   });
-  return panel({ id: "navrhy", title: "Poslané redakci", count: rows.length, body: list(rows, ""), tone: "warn" });
+  return panel({ id: "navrhy", title: "Poslané ke kontrole", count: rows.length, body: list(rows, ""), tone: "warn" });
 }
 
 function dialogFor(spec, link, row, base, query, author) {
   const form = spec.forms.find((entry) => entry.key === query.window);
-  const submit = link.direct ? "Zapsat" : "Poslat redakci";
+  const submit = link.direct ? "Zapsat" : "Poslat ke kontrole";
   if (form) {
     return modal({
       id: "okno",
@@ -93,10 +93,10 @@ function dialogFor(spec, link, row, base, query, author) {
     close: base,
     open: true,
     body: `<form class="form confirm" method="post" action="${base}/zrusit">
-      <p class="confirm-text">Zrušit ${esc(change.when)}: ${esc(change.what)}?${link.direct ? "" : " Zruší se, až to redakce schválí."}</p>
+      <p class="confirm-text">Zrušit ${esc(change.when)}: ${esc(change.what)}?${link.direct ? "" : " Zruší se, až to potvrdíme."}</p>
       ${hidden("id", change.id)}
       ${authorField(author)}
-      <div class="form-foot">${cancelLink(base, "Nechat")}<span class="form-foot-gap"></span><button class="btn btn-danger" type="submit">${link.direct ? "Opravdu zrušit" : "Poslat redakci"}</button></div>
+      <div class="form-foot">${cancelLink(base, "Nechat")}<span class="form-foot-gap"></span><button class="btn btn-danger" type="submit">${link.direct ? "Opravdu zrušit" : "Poslat ke kontrole"}</button></div>
     </form>`,
   });
 }
@@ -107,7 +107,7 @@ export function managePage({ link, row, requests, query, message, author }) {
   const flash = flashOf(message);
   const how = link.direct
     ? "Co tu zapíšete, je na drbně hned."
-    : "Co tu zapíšete, pošle se redakci drbny. Na web to půjde, jakmile to zkontroluje, většinou ještě týž den.";
+    : "Co tu zapíšete, dáme ke kontrole. Na web to půjde, jakmile to potvrdíme, většinou ještě týž den.";
   return adminDocument({
     title: `${row.name} | Kopidlenská drbna`,
     bodyClass: "adm adm-manage",
@@ -118,7 +118,7 @@ export function managePage({ link, row, requests, query, message, author }) {
         <h1>${esc(row.name)}</h1>
         <p class="adm-lede">Tady zapíšete změny, které drbna ukazuje lidem z Kopidlna. ${how}</p>
       </header>
-      ${callout("Tenhle odkaz je jen pro vás a funguje bez hesla. Nikomu cizímu ho neposílejte. Název nebo smazání místa vyřídí redakce, napište jí.")}
+      ${callout("Tenhle odkaz je jen pro vás a funguje bez hesla. Nikomu cizímu ho neposílejte. Název nebo smazání místa vyřídíme my, napište nám.")}
       ${actionsPanel(spec, base)}
       ${requestsPanel(link, row, requests, base)}
       ${changesPanel(spec, row, base)}
@@ -138,7 +138,7 @@ export function deadLinkPage() {
       <a class="login-brand" href="/"><img src="/kozel-maskot.webp" alt=""><span>Kopidlenská <b>drbna</b></span></a>
       <div class="login-card form">
         <h1>Odkaz neplatí</h1>
-        <p class="adm-lede">Tenhle odkaz redakce zrušila, nebo v něm chybí kus. Napište redakci drbny a pošle vám nový.</p>
+        <p class="adm-lede">Tenhle odkaz jsme zrušili, nebo v něm chybí kus. Napište nám a pošleme vám nový.</p>
       </div>
       <a class="login-back" href="/">← Zpět na web</a>
     </main>`,
@@ -154,7 +154,7 @@ export function doneLinkPage(requested) {
       <a class="login-brand" href="/"><img src="/kozel-maskot.webp" alt=""><span>Kopidlenská <b>drbna</b></span></a>
       <div class="login-card form">
         <h1>Hotovo</h1>
-        <p class="adm-lede">${requested ? "Změnu jsem poslala redakci. Na web půjde, až ji zkontroluje." : "Změna je na webu."} Tenhle odkaz byl jednorázový, už neplatí. Až budete chtít něco změnit příště, stačí napsat e-mail.</p>
+        <p class="adm-lede">${requested ? "Změnu jsme přijali, na web půjde po naší kontrole." : "Změna je na webu."} Tenhle odkaz byl jednorázový, už neplatí. Až budete chtít něco změnit příště, stačí napsat e-mail.</p>
       </div>
       <a class="login-back" href="/">← Zpět na web</a>
     </main>`,

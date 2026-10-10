@@ -158,7 +158,10 @@ test("e-mail od povolené adresy: náhled s tlačítky, zápis po schválení a 
     assert.doesNotMatch(prompt, /misto:2\]/);
     assert.equal(sent.length, 1);
     assert.equal(sent[0].to, "knihovna@kopidlno.cz");
-    assert.match(sent[0].text, /Rozumím tomu takhle/);
+    assert.match(sent[0].text, /Z e-mailu nám vyšlo toto/);
+    // Neutrální věcný tón bez 1. osoby, podpis maskota a telefon pro spěch.
+    assert.doesNotMatch(sent[0].text, /\bjsem\b|Rozumím/);
+    assert.match(sent[0].text, /Koza Drběna[\s\S]*\+420 722 888 906/);
     assert.match(sent[0].html, /Schválit hned/);
     assert.match(sent[0].html, /Zamítnout/);
     assert.match(sent[0].html, /Upravit čas na webu/);
@@ -175,7 +178,7 @@ test("e-mail od povolené adresy: náhled s tlačítky, zápis po schválení a 
     const change = await env.DB.prepare("select starts_on, ends_on, note from place_changes").first();
     assert.deepEqual({ ...change }, { starts_on: "2026-08-15", ends_on: "2026-08-15", note: "dovolená" });
     assert.equal(sent.length, 2);
-    assert.match(sent[1].text, /Zapsala jsem na web/);
+    assert.match(sent[1].text, /Zapsali jsme na web/);
     const audit = await env.DB.prepare("select user_name, section from audit_log").first();
     assert.deepEqual({ ...audit }, { user_name: "knihovna (e-mail)", section: "oteviraci-doba" });
     const { log } = await loadMailAdmin(env);
@@ -243,7 +246,7 @@ test("zamítnutí: nic se nezapíše a odesílatel to ví; později už nejde sc
     const token = await pendingToken(env);
     await post(env, token, "zamitnout");
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
-    assert.match(sent.at(-1).text, /nic jsem nezapsala/);
+    assert.match(sent.at(-1).text, /Změnu jsme nezapsali/);
     await post(env, token, "schvalit");
     await env.DB.prepare("update mail_pending set due_at = datetime('now', '-1 minutes')").run();
     assert.equal(await applyDue(env), 0);
@@ -309,7 +312,7 @@ test("neověřený e-mail: náhled, po potvrzení jde ke schválení i s přepí
     await receiveMail(message(rawMail({ auth: "X-Other: 1", text: "15.8 kvc zavřeno kvůli školení" })), env);
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
     assert.match(sent.at(-1).text, /ověřit/);
-    assert.match(sent.at(-1).html, /Poslat redakci hned/);
+    assert.match(sent.at(-1).html, /Poslat ke kontrole hned/);
     const token = await pendingToken(env);
     await post(env, token, "schvalit");
     assert.equal((await env.DB.prepare("select count(*) as n from place_changes").first()).n, 0);
@@ -346,7 +349,7 @@ test("neznámá ověřená adresa: e-mail čeká na povolení, odpoví se jednou
     await receiveMail(message(rawMail({ from: "cizi@jinde.cz", auth: "X-Other: 1" })), env);
     const replies = sent.filter((mail) => mail.to === "knihovna@kopidlno.cz");
     assert.equal(replies.length, 1);
-    assert.match(replies[0].text, /předala redakci/);
+    assert.match(replies[0].text, /e-mail zkontrolujeme/);
     assert.equal(sent.filter((mail) => /Nová adresa/.test(mail.subject)).length, 1);
     assert.equal(sent.some((mail) => mail.to === "cizi@jinde.cz"), false);
     // Model se zeptal jen u první ověřené adresy.
@@ -425,7 +428,7 @@ test("povolení neznámé adresy: uložený e-mail se zpracuje; zamítnutí odep
     await receiveMail(message(rawMail({ from: "druha@kopidlno.cz" })), env);
     const [second] = await waitingRequests(env);
     assert.equal((await refuseRequest(env, chief(), second.id)).ok, true);
-    assert.match(sent.at(-1).text, /zatím mezi správce/);
+    assert.match(sent.at(-1).text, /nepřidali mezi správce/);
     assert.equal((await waitingRequests(env)).length, 0);
   } finally {
     claude.close();
@@ -487,12 +490,12 @@ test("odpověď na otázku Drběny: další e-mail dostane i předchozí a otáz
     const prompt = JSON.stringify(claude.seen[1]);
     assert.match(prompt, /příští týden bude mít duhovka zavřeno/);
     assert.match(prompt, /Moje otázka na něj: Který den/);
-    assert.match(replies()[1].text, /Rozumím tomu takhle/);
+    assert.match(replies()[1].text, /Z e-mailu nám vyšlo toto/);
     await post(env, await pendingToken(env), "schvalit");
     const change = await env.DB.prepare("select starts_on, ends_on from place_changes").first();
     assert.deepEqual({ ...change }, { starts_on: "2026-10-12", ends_on: "2026-10-18" });
     assert.equal(replies()[1].subject, "Re: Duhovka");
-    assert.match(replies()[2].text, /Zapsala jsem na web/);
+    assert.match(replies()[2].text, /Zapsali jsme na web/);
   } finally {
     claude.close();
   }
@@ -524,18 +527,18 @@ test("změna z e-mailu ke schválení: po schválení i zamítnutí přijde odes
     const replies = () => sent.filter((mail) => mail.to === "knihovna@kopidlno.cz");
     await receiveMail(message(rawMail({ subject: "Duhovka" })), env);
     // Napřed náhled s tlačítky, po potvrzení jde změna k redakci.
-    assert.match(replies()[0].text, /pošlu redakci ke schválení/);
-    assert.match(replies()[0].html, /Poslat redakci hned/);
+    assert.match(replies()[0].text, /dáme ke kontrole/);
+    assert.match(replies()[0].html, /Poslat ke kontrole hned/);
     assert.match(replies()[0].text, /pondělí 12\. října až neděle 18\. října, zavřeno \(dovolená\)/);
     await post(env, await pendingToken(env), "schvalit");
-    assert.match(replies()[1].text, /ke schválení/);
+    assert.match(replies()[1].text, /čeká na naši kontrolu/);
 
     const chiefUser = { id: 1, role: "hlavni", permissions: [] };
     let [request] = (await loadRequests(env, chiefUser))["oteviraci-doba"];
     const input = { kind: "docasna", startsOn: "2026-10-12", endsOn: "2026-10-16", changeNote: "dovolená", doctorWeek: [], placeId: place.id };
     assert.equal((await approveRequest(env, chief(), { section: "oteviraci-doba", actions: PLACE_ACTIONS, id: request.id, input })).ok, true);
     const approved = replies()[2];
-    assert.match(approved.text, /Redakce změnu schválila/);
+    assert.match(approved.text, /Změnu jsme schválili/);
     // Redakce období zkrátila: odpověď říká, co se opravdu zapsalo.
     assert.match(approved.text, /pátek 16\. října/);
     assert.equal(approved.subject, "Re: Duhovka");
@@ -545,7 +548,7 @@ test("změna z e-mailu ke schválení: po schválení i zamítnutí přijde odes
     await post(env, await pendingToken(env), "schvalit");
     [request] = (await loadRequests(env, chiefUser))["oteviraci-doba"];
     assert.equal((await rejectRequest(env, chief(), { section: "oteviraci-doba", id: request.id, reply: "Už je zapsané." })).ok, true);
-    assert.match(replies().at(-1).text, /nezapsala[\s\S]*Důvod: Už je zapsané\./);
+    assert.match(replies().at(-1).text, /nezapsali[\s\S]*Důvod: Už je zapsané\./);
   } finally {
     claude.close();
   }

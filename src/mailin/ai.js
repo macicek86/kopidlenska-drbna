@@ -18,7 +18,7 @@ verdict:
 - "neni_doba": e-mail není o otevírací době (zpráva, tip na článek, pozvánka, dotaz, poděkování). changes prázdné.
 - "spam": e-mail je nevyžádaná pošta (reklama, nabídka služeb, SEO, phishing, řetězový e-mail, nesmyslný text). changes prázdné. Použij to jen u zjevného spamu: e-mail od správce, který jen píše nejasně, je "nejasne" nebo "neni_doba".
 Když jsou některé změny jasné a jiné ne, dej jasné do changes, verdict "zmeny" a do question napiš, co u ostatních chybí. Jinak nech question prázdné.
-question piš česky, vykej, jednou nebo dvěma větami.
+question piš česky, vykej, jednou nebo dvěma větami, za celý tým v množném čísle („z e-mailu nepoznáme…“, „napište nám…“), nikdy v 1. osobě jednotného čísla („jsem“) a nikdy o redakci ve 3. osobě.
 
 Pravidla:
 - target je jen značka z přehledu ([misto:ID], [lekar:ID], [dvur:ID]). Jiná místa odesílatel měnit nesmí. Když e-mail mluví o místě, které v přehledu není, nezapisuj ho a zmiň to v question.

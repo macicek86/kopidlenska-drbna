@@ -113,7 +113,7 @@ export async function prepareChanges(env, { raw, allowed, today }) {
     const name = rowName(allowed, change);
     const since = change.action === "hodiny" ? { startsOn: change.span.startsOn } : {};
     const later = laterRegular(change, today);
-    const line = `• ${describeChange(change.section, change.action, { ...value, ...since }, name)}${later ? " (novou běžnou dobu od pozdějšího dne potvrdí redakce)" : ""}`;
+    const line = `• ${describeChange(change.section, change.action, { ...value, ...since }, name)}${later ? " (novou běžnou dobu od pozdějšího dne potvrdíme)" : ""}`;
     items.push({ section: change.section, action: change.action, targetId: change.targetId, kind: change.kind, span: change.span, input: change.input, name, line, later });
   }
   return { items, failed };
@@ -144,13 +144,13 @@ export async function writeItems(env, { items, sender, verified, today, who, mai
 
 export function changeReply({ done, asked, failed, sections }, { question, sender, verified }) {
   const parts = [];
-  if (done.length) parts.push(`Zapsala jsem na web:\n${done.join("\n")}`);
+  if (done.length) parts.push(`Zapsali jsme na web:\n${done.join("\n")}`);
   if (asked.length) {
-    const why = sender.direct && !verified ? " (e-mail se nepodařilo ověřit, proto ho musí potvrdit člověk)" : "";
-    parts.push(`Poslala jsem redakci ke schválení${why}, na web to půjde po schválení:\n${asked.join("\n")}`);
+    const why = sender.direct && !verified ? " (e-mail se nepodařilo ověřit, proto ho musíme potvrdit)" : "";
+    parts.push(`Změna čeká na naši kontrolu${why}, na web půjde po potvrzení:\n${asked.join("\n")}`);
   }
-  if (failed.length) parts.push(`Tohle jsem nezapsala:\n${failed.map((line) => `• ${line}`).join("\n")}`);
+  if (failed.length) parts.push(`Tohle jsme nezapsali:\n${failed.map((line) => `• ${line}`).join("\n")}`);
   if (question) parts.push(question);
-  if (done.length || asked.length) parts.push(`Kdyby něco nesedělo, napište mi znovu nebo na redakce@kopidlenskadrbna.org.\n${pageLinks(sections)}`);
+  if (done.length || asked.length) parts.push(`Kdyby něco nesedělo, napište nám znovu na tuto adresu nebo na redakce@kopidlenskadrbna.org.\n${pageLinks(sections)}`);
   return parts;
 }

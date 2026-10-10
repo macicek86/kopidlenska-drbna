@@ -38,7 +38,7 @@ export async function answerRequester(env, { mailReply, section, action, value, 
   const mail = { from: meta.email, subject: meta.subject, messageId: meta.messageId, references: meta.references };
   const line = `• ${describeChange(section, action, value, name)}`;
   const paragraphs = approved
-    ? [`Redakce změnu schválila, už je na webu:\n${line}`, pageLinks([section])]
-    : [`Redakce tuhle změnu nezapsala:\n${line}`, reason ? `Důvod: ${reason}` : "", "Kdyby to byl omyl, napište mi znovu nebo na redakce@kopidlenskadrbna.org."];
+    ? [`Změnu jsme schválili, už je na webu:\n${line}`, pageLinks([section])]
+    : [`Tuhle změnu jsme nezapsali:\n${line}`, reason ? `Důvod: ${reason}` : "", "Kdyby to byl omyl, napište nám znovu na tuto adresu nebo na redakce@kopidlenskadrbna.org."];
   await replyTo(env, mail, paragraphs).catch(() => {});
 }

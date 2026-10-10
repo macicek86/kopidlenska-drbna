@@ -6,7 +6,7 @@ import { MAIL_FROM, sendMail } from "../mail.js";
 
 export const MAILIN_ADDRESS = "oteviracidoba@kopidlenskadrbna.org";
 
-const SIGN = "Koza Drběna\nKopidlenská drbna";
+const SIGN = "Koza Drběna\nKopidlenská drbna\nKdyby to spěchalo: +420 722 888 906";
 
 function subjectOf(subject) {
   const base = String(subject ?? "").trim();
@@ -65,11 +65,11 @@ export function pageLinks(sections) {
   return [...new Set(sections)].map((section) => `${SITE_ORIGIN}${PAGES[section]}`).join("\n");
 }
 
-export const NOT_HOURS = `Tahle adresa je jen na změny otevírací doby (třeba „15. 8. zavřeno“ nebo „od září nově po–pá 8–16“). Zprávy, tipy a dotazy posílejte na ${MAIL_FROM.email}, přečte je člověk z redakce.`;
+export const NOT_HOURS = `Tahle adresa je jen na změny otevírací doby. Zprávy, tipy a dotazy posílejte prosím na ${MAIL_FROM.email}, tam se jim budeme věnovat.`;
 
-export const UNKNOWN_SENDER = `Na adresu ${MAILIN_ADDRESS} můžou psát jen správci míst, které redakce zná, a tahle adresa mezi nimi není. Když chcete u nás měnit otevírací dobu, napište na ${MAIL_FROM.email}. Zprávy a tipy taky tam.`;
+export const UNKNOWN_SENDER = `Na adresu ${MAILIN_ADDRESS} můžou psát jen správci míst, které známe, a tahle adresa mezi nimi není. Když chcete u nás měnit otevírací dobu, napište nám na ${MAIL_FROM.email}. Zprávy a tipy taky tam.`;
 
-// Neznámá adresa, která psala o otevírací době: její e-mail čeká na povolení redakcí.
-export const REQUEST_RECEIVED = `Tuhle adresu zatím neznám, takže jsem e-mail předala redakci. Jakmile vás povolí, e-mail zpracuji a odepíšu vám, co jsem zapsala. Nemusíte psát znovu. Kdyby to spěchalo, napište na ${MAIL_FROM.email}.`;
+// Neznámá adresa, která psala o otevírací době: její e-mail čeká na povolení.
+export const REQUEST_RECEIVED = `Tahle adresa zatím není v seznamu správců, e-mail zkontrolujeme. Jakmile dokončíme kontrolu, e-mail zpracujeme a pošleme vám potvrzení, co se změnilo. Psát znovu nemusíte.`;
 
-export const REQUEST_REFUSED = `Redakce vás zatím mezi správce, kteří smějí měnit otevírací dobu e-mailem, nepřidala, a e-mail proto nezapsala. Kdyby to byl omyl, napište na ${MAIL_FROM.email}.`;
+export const REQUEST_REFUSED = `Tuhle adresu jsme zatím nepřidali mezi správce, kteří smějí měnit otevírací dobu e-mailem, a proto jsme e-mail nezapsali. Kdyby šlo o omyl, napište nám na ${MAIL_FROM.email}.`;
